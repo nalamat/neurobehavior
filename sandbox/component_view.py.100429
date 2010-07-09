@@ -1,0 +1,92 @@
+'''
+Created on Apr 28, 2010
+
+@author: Brad
+'''
+
+from enthought.chaco.api import ArrayDataSource, DataRange1D, PlotAxis, PlotLabel
+from enthought.enable.component import Component
+from enthought.enable.component_editor import ComponentEditor
+from enthought.traits.api import Str, DelegatesTo, Instance, HasTraits, Bool, \
+    List, Any, Property
+from enthought.traits.ui.api import View, Item
+
+class ComponentView(HasTraits):
+
+    value_title = Str('Value')
+    index_title = Str('Index')
+    title = Str('Title')
+
+    value_min = DelegatesTo('value_range', 'low_setting')
+    value_max = DelegatesTo('value_range', 'high_setting')
+    index_min = DelegatesTo('index_range', 'low_setting')
+    index_max = DelegatesTo('index_range', 'high_setting')
+
+    # Plot axes (tick marks and labels)
+    index_range = Instance(DataRange1D, sync=True)
+    value_range = Instance(DataRange1D, sync=True)
+    index_label = Instance(PlotAxis)
+    value_label = Instance(PlotAxis)
+    title_label = Instance(PlotLabel)
+    
+    # Show labels on axes (set to False if you are overlaying this chart on
+    # another chart that already has the labels).
+    show_labels = Bool(True)
+    show_aids = Bool(False)
+
+    component = Instance(Component)
+
+    _index_ds = Instance(ArrayDataSource, ())
+    _value_ds = Instance(ArrayDataSource, ())
+
+    def _index_range_default(self):
+        return DataRange1D(self._index_ds)
+    
+    def _value_range_default(self):
+        return DataRange1D(self._value_ds)
+
+    def _index_label_default(self):
+        return PlotAxis(orientation='left', title=self.index_title)
+    
+    def _value_label_default(self):
+        return PlotAxis(orientation='left', title=self.value_title)
+    
+    def _title_label_default(self):
+        return PlotLabel(text=self.title, overlay_position='top')
+    
+    def _add_underlays(self, component):
+        if self.show_labels:
+            self.value_label.component = component
+            self.index_label.component = component
+            self.title_label.component = component
+            component.underlays.append(self.value_label)
+            component.underlays.append(self.index_label)
+            component.underlays.append(self.title_label)
+    
+    traits_view = View(Item('component', editor=ComponentEditor(), show_label=False))
+
+class OverlayComponentView(ComponentView):
+
+    components = List(Instance(ComponentView))
+    component_type = Any
+    traits_to_sync = Property(depends_on='component_type')
+
+    def _get_traits_to_sync(self):
+        return self.component_type.class_trait_names(sync=True)
+
+    def _component_type_changed(self, new):
+        print self.index_range
+        #print self.copy_traits(new, new.class_trait_names(sync=True))
+
+    def _component_default(self):
+        return OverlayPlotContainer(bgcolor='white', fill_padding=True)
+
+    def _components_items_changed(self, event):
+        for component in event.added:
+            for trait in self.traits_to_sync:
+                print trait
+                self.sync_trait(trait, component)
+
+        for component in event.added:
+            for trait in self.traits_to_sync:
+                self.sync_trait(trait, component, remove=True)

@@ -1,0 +1,2 @@
+W_BUTTON = -20
+H_BUTTON = -20
