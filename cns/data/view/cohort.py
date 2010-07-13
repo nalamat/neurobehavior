@@ -1,6 +1,7 @@
 from ..type import Animal, Cohort
 from .edit_animal import animal_edit_view, animal_view
 from cns import data
+import operator as op
 from cns.widgets.handler import FileHandler, filehandler_menubar
 from enthought.pyface.api import YES, confirm
 from enthought.traits.api import HasTraits, Button, Instance, Event, \
@@ -38,8 +39,11 @@ class AnimalAdapter(TabularAdapter):
 
 animal_table = TabularEditor(adapter=AnimalAdapter(),
                              editable=False,
+                             #auto_update=True,
+                             update='update',
                              selected='selected',
                              dclicked='dclicked',
+                             column_clicked='column_clicked',
                              right_clicked='rclicked')
 
 class CohortViewHandler(FileHandler):
@@ -47,6 +51,10 @@ class CohortViewHandler(FileHandler):
     path            = File(cns.COHORT_PATH)
     wildcard        = Str(cns.COHORT_WILDCARD)
     modified_trait  = '_modified'
+    
+    def new_object(self, info):
+        info.object.cohort = Cohort()
+        info.object._modified = False
 
     def load_object(self, info, file):
         info.object.cohort = data.io.load_cohort(0, file)
@@ -79,11 +87,30 @@ class CohortView(HasTraits):
     selected = Instance(Animal)
     dclicked = Event
     rclicked = Event
+    update = Event
+    column_clicked = Event
+    
     _modified = Bool(False)
+    
+    @on_trait_change('column_clicked')
+    def sort(self, event):
+        return
+        if event is not None:
+            attr = event.editor.adapter.columns[event.column][1]
+            key = op.attrgetter(attr)
+            print attr, key
+            #self.cohort.animals.sort(key=op.attrgetter(attr))
+            #print event, event.column, event.editor, event#.item, event.row
 
     @on_trait_change('cohort.+, cohort.animals.+')
     def set_modified(self):
         self._modified = True
+        
+    @on_trait_change('cohort.animals.+')
+    def sort_animals(self):
+        #self.cohort.animals.sort()
+        #self.update = True
+        return
 
     view = View(VGroup(Group('object.cohort.description~',
                        ),
@@ -113,7 +140,7 @@ class CohortEditView(CohortView):
         else: return Animal()
 
     def trait_view(self, parent=None):
-        group = VGroup(Group(Item('object.cohort.description')),
+        group = VGroup(Group('object.cohort.description'),
                        HGroup(spring, 'add', 'delete', show_labels=False),
                        Item('object.cohort.animals', editor=animal_table,
                             show_label=False, style='readonly'),

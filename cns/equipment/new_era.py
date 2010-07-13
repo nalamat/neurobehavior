@@ -44,6 +44,12 @@ pump_view <-> PumpController <-> Pump
 # exceptions so that we can provide messages and information specific to
 # problems with the pump hardware.
 
+import serial
+connection_settings = dict(port=0, baudrate=19200, bytesize=8, parity='N',
+        stopbits=1, timeout=1, xonxoff=0, rtscts=0, writeTimeout=1,
+        dsrdtr=None, interCharTimeout=None)
+SERIAL = serial.Serial(**connection_settings)
+
 class PumpError(EquipmentError):
 
     def __init__(self, code, cmd):
@@ -208,8 +214,7 @@ class PumpInterface(object):
         try: self.ser.close()
         except: pass
         try:
-            import serial
-            self.ser = serial.Serial(**self.connection_settings)
+            self.ser = SERIAL
             for cmd in self._connect_seq:
                 try:
                     self.xmit(cmd)
@@ -233,7 +238,7 @@ class PumpInterface(object):
     def disconnect(self):
         for cmd in self._disconnect_seq:
             self.xmit(cmd)
-        self.ser.close()
+        #self.ser.close()
 
     def run(self, **kw):
         '''Sets the appropriate properties of the pump and starts running.  This

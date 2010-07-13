@@ -12,6 +12,7 @@ from enthought.traits.ui.api import Item, Group, View
 # Chaco imports
 from enthought.chaco.api import ArrayPlotData, Plot
 from cns.widgets.tools.window_tool import WindowTool
+from cns.widgets.tools.zoom_tool import RLZoomTool
 
 #===============================================================================
 # # Create the Chaco plot.
@@ -48,8 +49,8 @@ def _create_plot_component():
     # Attach some tools to the plot
     #pan = PanTool(plot, drag_button="right", constrain_key="shift")
     #plot.tools.append(pan)
-    #zoom = ZoomTool(component=plot, tool_mode="box", always_on=False)
-    #plot.overlays.append(zoom)
+    zoom = RLZoomTool(component=plot)
+    plot.overlays.append(zoom)
     #plot.tools.append(WindowTool(plot))
     return plot
 
@@ -70,21 +71,21 @@ class Demo(HasTraits):
 
     def _show_fired(self):
         print self.tool.coordinates
-    
+
     traits_view = View(
                     Group(
                         Item('plot', editor=ComponentEditor(size=size),
                              show_label=False),
                         Item('show'),
                         orientation = "vertical"),
-                    resizable=True, title=title
-                    )
-    
+                    resizable=True, title=title,
+                    height=1, width=1)
+
     def _plot_default(self):
         plot = _create_plot_component()
         self.tool = WindowTool(plot)
         plot.overlays.append(self.tool)
         return plot
-    
+
 demo = Demo()
 demo.configure_traits()

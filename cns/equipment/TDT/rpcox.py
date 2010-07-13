@@ -84,7 +84,8 @@ correctly download data from the DSP.  The conventions are as follows:
         incremented since the last read.  If it has, the new data is acquired
         and returned.
 
-    Triggered acquire
+    Triggered acquire 
+        (I haven't really been using this lately so it's unmaintained)
         1) <buffer>             name of tag connected to data port of buffer
         2) <buffer>_idx_trig    index of last sample buffer acquired prior to
                                 the trigger
@@ -179,7 +180,6 @@ class DSPBuffer(BlockBuffer):
             self.dsp.WriteTagV(self.name, 0, data.signal)
             log.debug('Set buffer %s with %d samples', self.name, len(data.signal))
         except AttributeError, e:
-            print e
             self._set_length(len(data))
             self.dsp.WriteTagV(self.name, 0, data)
             log.debug('Set buffer %s with %d samples', self.name, len(data))
@@ -306,59 +306,10 @@ class DSPBuffer(BlockBuffer):
                    (MC, 'decimated')     : _mc_dec_read,
                   }
 
-class NewDSPBuffer(DSPBuffer):
-    
-    def initialize(self, src_type=np.float32, dest_type=np.float32,
-                   channels=1, sf=1, read_mode='continuous', multiple=1,
-                   compression=None, fs=None):
-
-        self.__dict__.update(locals())
-
-        if read_mode == 'continuous':
-            self.name_idx = self.name + '_idx'
-        elif read_mode == 'triggered':
-            self.name_idx = self.name + '_idx_trig'
-        else:
-            raise ValueError, '%s read not supported' % read_mode
-        
-        self.read_args = type_lookup[src_type], type_lookup[dest_type], channels
-        self._read_f = self.dsp.ReadTagVEX
-            
-        self.c_factor = 4/np.nbytes[src_type]
-        self.idx = self.dsp.GetTagVal(self.name_idx)
-        
-        if self.compression is not None:
-            self._read = self._c_read
-        else:
-            self._read = self._simple_read
-        
-    def _simple_read(self, offset, length):
-        # Available reports the number of samples ready to be read and
-        # accounts for various edge cases.  See function documentation for
-        # more detail.
-        if length == 0:
-            return np.array([])
-        else:
-            print 'offset, length, read_args', offset, length, self.read_args
-            data = self._read_f(self.name, offset, length/self.channels, *self.read_args)
-            data = np.array(data)
-            print data.shape
-            return data
-        
-    def _c_read(self, offset, length):
-        data = self._simple_read(offset, length)
-        return data/self.sf
-
-    def _mc_c_read(self, offset, length):
-        return self._c_read(offset, length)
-    
-    def _mc_dec_read(self, offset, length):
-        return self._c_read(offset, length)
-    
 class DSPTag(object):
     '''Wrapper around a RPvdsEx circuit tag that facilitates getting and setting
     the value.  If you follow appropriate naming conventions in the DSP circuit,
-o   the get and set methods will be able to convert the provided value to the
+    the get and set methods will be able to convert the provided value to the
     appropriate type.  For example, if the DSP tag expects number of samples
     (i.e. cycles of the DSP clock) and you provide the value in seconds, then
     the tag name must be <name>_n (the _n indicates it requires number of
@@ -457,17 +408,25 @@ class Circuit(object):
     def acquire(self, buffer, samples, trigger=None, timeout=1, dt=0.01):
         self.trigger(trigger)
         cumtime = 0
-        idx = self.get(buffer+'_idx')
+        cumsamples = 0
 
+        data = []
         while True:
-            oldidx, idx = idx, self.get(buffer+'_idx')
-            if idx >= samples: break
-            elif idx > oldidx: cumtime = 0
+            new_data = buffer.read()
+            cumsamples += len(new_data)
+            data.append(new_data)
+            if cumsamples >= samples:
+                break
+            elif len(new_data) > 0:
+                # Reset the "clock" eachtime we get new data.  Timeout is only activated when the read stalls and continually returns zero samples.
+                cumtime = 0
             elif timeout is not None and cumtime > timeout:
                 raise IOError, 'Read from buffer %s timed out' % buffer
+            
             time.sleep(dt)
             cumtime += dt
-        return getattr(self, buffer).read(samples)
+        
+        return np.concatenate(data)[:samples]
     
     def convert(self, src_unit, req_unit, value):
         return convert(src_unit, req_unit, value, self.fs)

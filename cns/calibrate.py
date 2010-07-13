@@ -18,16 +18,6 @@ DAQ_SETTINGS = {
         'ch_ADC':           DAQ.RX6_IN2,
         }
 
-class MicrophoneInfo(HasTraits):
-
-    manufacturer = String('Bruel & Kjaer')
-    ID = String()
-    nominal_sens = CFloat(units='Vrms/Pa')
-
-BK_4135 = MicrophoneInfo(manufacturer='Bruel & Kjaer', ID=4135, nominal_sens=3.59e-3)
-BK_4134 = MicrophoneInfo(manufacturer='Bruel & Kjaer', ID=4134, nominal_sens=11.6e-3)
-BK_4133 = MicrophoneInfo(manufacturer='Bruel & Kjaer', ID=4133, nominal_sens=12.5e-3)
-
 def fft_analyze(signals, fs, mic_sens=None, filter=None):
     if filter is not None:
         signals = [filtfilt(x=s, **filter) for s in signals]
@@ -68,32 +58,6 @@ def acquire(dev, samples, n):
         raise SystemError, 'Clipping of signal'
     return signals
 
-def tone_power(dev, samples, averages=2, freq=1e3, mode='conv', fft=False):
-    '''Calibrates measuring microphone against a known reference (e.g. a
-    pistonphone).  Typically this is the B&K microphone, but certainly could be
-    any microphone that is felt to produce a flat frequency response across the
-    range of frequencies of interest.
-
-    samples         Number of samples to acquire
-    averages        Number of samples to average.
-    freq            Frequency to extract
-
-    DEBUGGING PARAMETERS
-    fft             Returns signal waveform and FFT so it can be plotted.  This
-                    significantly slows down the acquisition because it computes
-                    the FFT.
-
-    RETURNS         Measuring microphone sensitivity in Vrms/Pa
-    '''
-    signals = acquire(dev, samples, averages)
-    extract = globals()['get_rms_power_' + mode]
-    components = [extract(dev.fs, s, freq) for s in signals]
-    vrms, phi = np.array(components).mean(0)
-
-    if fft:
-        result = fft_analyze(signals, dev.fs)
-        return vrms, phi, result
-    else: return vrms, phi
 
 def ref_cal(duration=1, averages=2, ref_freq=1e3, ref_level=93.8, fft=False,
         mode='conv'):

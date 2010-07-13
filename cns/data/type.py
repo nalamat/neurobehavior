@@ -49,8 +49,8 @@ class Animal(HasTraits):
         if self.birth is None:
             return -1
         else:
-	        td = datetime.date.today() - self.birth
-	        return td.days
+            td = datetime.date.today() - self.birth
+            return td.days
 
     def __repr__(self):
         # Is this needed?
@@ -62,6 +62,12 @@ class Animal(HasTraits):
 
     def __str__(self):
         return '%s %s %d' % (self.identifier, self.sex, self.nyu_id)
+    
+    #def __cmp__(self, other):
+    #    if self is other:
+    #        return True
+    #    else:
+    #        return (self.sex, self.identifier) > (other.sex, other.identifier)
 
 class Cohort(HasTraits):
 

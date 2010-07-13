@@ -7,9 +7,12 @@ from cns.experiment.experiment.aversive_physiology_experiment import \
     AversivePhysiologyExperiment
 import sys
 import tables
+from enthought.traits.api import Any, Trait
 
 
 class ExperimentHandler(CohortViewHandler):
+
+    last_paradigm = Trait(None, Any)
 
     def init(self, info):
         if not self.load_file(info):
@@ -29,12 +32,16 @@ class ExperimentHandler(CohortViewHandler):
                 store_node = file.getNode(item.store_path)
 
             handler = AversiveController()
-            model = AversiveExperiment(store_node=store_node)
+            model = AversiveExperiment(store_node=store_node, animal=item)
+            if self.last_paradigm is not None:
+                model.paradigm = self.last_paradigm
             model.edit_traits(handler=handler)
-            if model.edit_traits(handler=handler,
-                                 parent=info.ui.control,
-                                 kind='livemodal').result:
-                item.processed = True
+            #if model.edit_traits(handler=handler,
+            #                     parent=info.ui.control,
+            #                     kind='livemodal').result:
+            item.processed = True
+            self.last_paradigm = model.paradigm
+                
         except AttributeError: pass
         
 def test_experiment():
@@ -49,7 +56,7 @@ def test_aversive_experiment():
     ae.configure_traits()
 
 if __name__ == '__main__':
-    #CohortView().configure_traits(handler=ExperimentHandler)
+    CohortView().configure_traits(handler=ExperimentHandler)
     #test_experiment()
     #test_aversive_experiment()
-    test_experiment()
+    #test_experiment()

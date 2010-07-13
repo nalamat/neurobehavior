@@ -18,8 +18,8 @@ def apply_mask(fun, seq, mask):
     seq = np.array(seq).ravel()
     return [fun(seq[m]) for m in mask]
 
-TRIAL_DTYPE = [('timestamp', 'f'), ('par', 'f'), ('shock', 'f'), ('type', 'S16'), ]
-LOG_DTYPE = [('timestamp', 'f'), ('name', 'S64'), ('value', 'S128'), ]
+TRIAL_DTYPE = [('timestamp', 'i'), ('par', 'f'), ('shock', 'f'), ('type', 'S16'), ]
+LOG_DTYPE = [('timestamp', 'i'), ('name', 'S64'), ('value', 'S128'), ]
 
 class AversiveData(ExperimentData):
 
@@ -226,10 +226,8 @@ class AnalyzedAversiveData(AnalyzedData):
                    self.par_fa_frac, )
 
     def score_timestamp(self, ts):
+        ts = ts/self.data.contact_fs
         lb, ub = ts + self.contact_offset, ts + self.contact_offset + self.contact_dur
-        print ts, lb, ub, self.data.contact_digital.fs, 
-        print self.data.contact_digital.get_range(lb, ub)
-        print self.data.contact_digital.get_range(lb-.2, ub+.2)
         return self.data.contact_digital.get_range(lb, ub)[0].mean()
 
     @on_trait_change('data')

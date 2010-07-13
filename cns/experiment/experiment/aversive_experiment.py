@@ -8,6 +8,7 @@ from cns.experiment.controller import AversiveController
 class AversiveExperiment(HasTraits):
 
     # The store node should be a reference to an animal
+    animal = Any
     store_node = Any
     
     # Show the analyzed data
@@ -25,9 +26,10 @@ class AversiveExperiment(HasTraits):
     
     def _get_view_group(self):
         return HGroup(VGroup('handler.toolbar@',
-                              ['^handler.status{}~',
+                              ['^animal{}~',
+                               '^handler.status{}~',
                                '^handler.time_elapsed{}~',
-                               'handler.ch_monitor',
+                               #'handler.ch_monitor',
                                '|[Equipment status]'],
                               Item('handler.pump@', editor=InstanceEditor()),
                               Item('paradigm@', editor=InstanceEditor(view='edit_view'),

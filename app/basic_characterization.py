@@ -11,7 +11,7 @@ from cns.data.persistence import append_date_node
 from cns.signal.signal_dialog import SignalDialog
 from cns.widgets.views.channel_view import MultiChannelView
 from enthought.pyface.timer.api import Timer
-from enthought.traits.api import Range, Float, HasTraits, Instance, DelegatesTo, Int, Any
+from enthought.traits.api import Range, Float, HasTraits, Instance, DelegatesTo, Int, Any, on_trait_change, Enum
 from enthought.traits.ui.api import View, VGroup, HGroup, Action, Controller
 import numpy as np
 import tables
@@ -63,7 +63,14 @@ class MedusaController(Controller):
     timer       = Instance(Timer)
     settings    = Instance(MedusaSettings, args=())
     prior       = Int(0)
-    prior_sig       = Int(0)
+    prior_sig   = Int(0)
+    
+    buffer      = Enum('mc', 'mc16', 'mc8')
+    
+    @on_trait_change('settings.ch_out')
+    def update_ch_out(self):
+        self.RZ5.ch_out.value = self.settings.ch_out
+        print 'changed'
     
     def init(self, info):
         # Load circuits
@@ -76,16 +83,18 @@ class MedusaController(Controller):
         # Initialize buffers
         self.RX6.sig.initialize()
         self.RZ5.mc_sig.initialize(channels=16, read_mode='continuous')
-        self.RZ5.mc_sig16.initialize(channels=16, read_mode='continuous', src_type=np.int16, 
-                                     sf=81917500, compression='decimated')
+        self.RZ5.mc_sig16.initialize(channels=16, read_mode='continuous', 
+                                     src_type=np.int16,  
+                                     sf=8.19175e7,
+                                     compression='decimated')
+        self.RZ5.mc_sig8.initialize(channels=16, read_mode='continuous', 
+                                     src_type=np.int8,  
+                                     sf=32e3,
+                                     compression='decimated')
         
-        #self.raw_data = FileMultiChannel(channels=16, fs=self.RZ5.fs, name='mc_sig', 
-        #                                 type=np.float32, node=store_node)
-        #self.plot_data = BufferedMultiChannel(channels=16, fs=self.RZ5.fs, window=5)
         self.plot_data = RAMMultiChannel(channels=16, fs=self.RZ5.fs, window=10)
         self.plot_signal = RAMChannel(fs=self.RX6.fs, window=10)
         
-        #self.raw_view = NewMultiChannelView(channel=self.plot_data, visual_aids=False)
         self.raw_view = MultiChannelView(signal=self.plot_signal,
                                          channel=self.plot_data, 
                                          visual_aids=False)
@@ -113,8 +122,10 @@ class MedusaController(Controller):
         pass
 
     def tick(self):
-        data = self.RZ5.mc_sig.read()
-        #data = self.RZ5.mc_sig16.read()
+        #data = self.RZ5.mc_sig.read()
+        data = self.RZ5.mc_sig16.read()
+        #data = self.RZ5.mc_sig8.read()
+        #print np.max(data)
         self.pipeline.send(data)
         trig = int(self.RZ5.ts.value)
         
@@ -132,11 +143,12 @@ class MedusaController(Controller):
 
 plot_size = (300, 300)
 view = View(
+        #HGroup(VGroup('handler.settings{}@', 'handler.buffer'), 'handler.raw_view{}@'),
         HGroup('handler.settings{}@', 'handler.raw_view{}@'),
         resizable=True,
         buttons=[Action(name='Run', action='run'),],
-        height=600,
-        width=1200,
+        height=1,
+        width=1,
         )
 
 def test_medusa():

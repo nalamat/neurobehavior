@@ -3,7 +3,26 @@ from enthought.traits.api import Enum, Instance, Property, Str
 from enthought.enable.base_tool import KeySpec
 from enthought.enable.events import KeyEvent
 
+class RLZoomTool(SimpleZoom):
+    
+    enable_wheel        = True
+    tool_mode           = 'range'
+    
+    def normal_right_down(self, event):
+        if event.shift_down:
+            self.axis = 'index'
+            self._start_select(event)
+            event.handled = True
+            
+    def normal_left_down(self, event):
+        if event.shift_down:
+            self.axis = 'value'
+            self._start_select(event)
+            event.handled = True
+    
 class ConstrainedZoomTool(SimpleZoom):
+
+    enable_wheel        = False
 
     tool_mode           = 'box'
     index_constrain_key = Enum('shift', 'control', 'alt', None)

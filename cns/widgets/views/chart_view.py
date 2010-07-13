@@ -115,14 +115,12 @@ class DynamicBarPlotView(SingleBarPlotView):
         return range(0, len(values) * self.index_spacing, self.index_spacing)
 
     def _get_labels(self):
-        print 'getting labesl'
         indices = self._get_indices()
         if self.label is None:
             labels = indices
         else:
             labels = np.array(getattr(self.source, self.label))
         label_text = [(self.label_fmt % l) for l in labels]
-        print indices, label_text
         return indices, label_text
 
     def _source_changed(self, old, new):

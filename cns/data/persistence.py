@@ -161,6 +161,7 @@ def add_or_update_object(object, node, name=None):
     #        child._f_remove(recursive=True)
 
     object.store_node = object_node
+    h5_file.flush()
     return object_node
 
 date_classes = [datetime.date, datetime.time, datetime.datetime]
@@ -284,6 +285,7 @@ def load_object(source):
         value = getattr(source, name)
         if trait.is_trait_type(List) or trait.is_trait_type(Array):
             kw[name] = [load_object(o) for o in value._v_children.values()]
+            #kw[name].sort()
         else:
             kw[name] = load_object(value)
     return type(**kw)

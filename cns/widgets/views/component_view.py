@@ -92,12 +92,10 @@ class BarChartOverlay(ComponentView):
         self.component.add(new.component)
 
     def add(self, **kw):
-        print kw
         klass = self.template.__class__
         kw['show_labels'] = False
         for trait in self.traits_to_sync:
             kw[trait] = getattr(self.template, trait)
-        print kw
         component = klass(**kw)
         self.components.append(component)
         return component

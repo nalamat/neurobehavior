@@ -1,5 +1,5 @@
-from cns.channel import AbstractChannel, Channel, MultiChannel, SnippetChannel
-from cns.widgets.tools.constrained_zoom_tool import ConstrainedZoomTool
+from cns.channel import Channel, MultiChannel, SnippetChannel
+from cns.widgets.tools.zoom_tool import RLZoomTool
 from cns.widgets.views.decimated_plot import ChannelDataSource, TimeSeries, \
     SharedTimeSeries
 from enthought.chaco.api import ArrayPlotData, DataRange1D, PlotLabel, \
@@ -128,98 +128,6 @@ class OverlayChannelView(Plot):
         value_name = self.value_names[channel]
         self.data.set_data(value_name, self._clean(channel.signal_windowed))
 
-class OldMultipleChannelView(ChannelView):
-
-    channels = List(Any, [])
-    index_names = Dict(Channel, Str, {})
-    value_names = Dict(Channel, Str, {})
-    clean_data = Bool(False)
-
-    def __init__(self, *args, **kw):
-        super(MultipleChannelView, self).__init__(*args, **kw)
-
-    def _clean(self, data):
-        if self.clean_data: return np.nan_to_num(data)
-        else: return data
-
-    def _component_default(self):
-        component = Plot(
-            data=self.data,
-            padding=(75, 25, 25, 75), # LRTB
-            fill_padding=True,
-            bgcolor='white',
-            border_visible=True,
-            title=self.title,
-            use_backbuffer=False,
-            )
-        component.index_range = self.index_range
-        component.value_range = self.value_range
-
-        index_label = PlotLabel(self.index_label,
-                component=component,
-                overlay_position='bottom'
-                )
-        value_label = PlotLabel(self.value_label,
-                component=component,
-                overlay_position='left',
-                angle=90,
-                )
-        component.overlays.append(index_label)
-        component.overlays.append(value_label)
-
-        pan = PanTool(component)
-        component.tools.append(pan)
-        zoom = ConstrainedZoomTool(component,
-                                   wheel_zoom_step=0.25,
-                                   enter_zoom_key=KeySpec('z'))
-        component.overlays.append(zoom)
-        return component
-
-    def add(self, channel, type='line', *args, **kwargs):
-        if channel not in self.channels:
-            self.channels.append(channel)
-            index_name = self.data.set_data('',
-                                            self._clean(channel.t_windowed),
-                                            True)
-            value_name = self.data.set_data('',
-                                            self._clean(channel.signal_windowed),
-                                            True)
-            self.index_names[channel] = index_name
-            self.value_names[channel] = value_name
-
-            if type == 'line':
-                self.component.plot((index_name, value_name), *args, **kwargs)
-            elif type == 'filled_line':
-                # The FilledlinePlot will crash if we pass NaN and Inf values to
-                # it so we must ensure the data is cleaned first!
-                self.clean_data = True
-                index = self.component._get_or_create_datasource(index_name)
-                value = self.component._get_or_create_datasource(value_name)
-                index_mapper = LinearMapper(range=self.component.index_range)
-                value_mapper = LinearMapper(range=self.component.value_range)
-
-                plot = FilledLinePlot(index=index,
-                                      value=value,
-                                      index_mapper=index_mapper,
-                                      value_mapper=value_mapper,
-                                      **kwargs)
-
-                self.component.add(plot)
-
-    @on_trait_change('window')
-    def update_index_range(self):
-        self.component.index_range.low = -self.window
-
-    @on_trait_change('channels:fs')
-    def update_index(self, channel, name, new):
-        index_name = self.index_names[channel]
-        self.data.set_data(index_name, self._clean(channel.t_windowed))
-
-    @on_trait_change('channels:updated')
-    def update_signal(self, channel, name, new):
-        value_name = self.value_names[channel]
-        self.data.set_data(value_name, self._clean(channel.signal_windowed))
-        
 class MultipleChannelView(ChannelView):
 
     channels = List(Any, [])
@@ -275,7 +183,6 @@ class MultipleChannelView(ChannelView):
                               index_mapper=LinearMapper(range=self.idx_range),
                               value_mapper=LinearMapper(range=self.val_range),
                               *args, **kwargs)
-            print 'adding', plot
             self.component.add(plot)
 
 class MultiChannelView(ChannelView):
@@ -284,6 +191,7 @@ class MultiChannelView(ChannelView):
     signal = Instance(Channel)
     components = Dict(Int, Any, {})
     available = List(Int)
+    ch_ds = Instance(ChannelDataSource, ())
     
     available = List(Str, [])
     visible = List(Str, editor=CheckListEditor(name='available', cols=1))
@@ -292,7 +200,8 @@ class MultiChannelView(ChannelView):
     _9_to_16 = Button
     _all = Button
     
-    traits_view = View([VGroup('visible{}@', '_1_to_8', '_9_to_16', '_all', 
+    traits_view = View([VGroup('visible{}@', '_1_to_8', '_9_to_16', '_all',
+                               'object.ch_ds.reference',
                                show_labels=False),
                         Item('component{}', editor=ComponentEditor()), '-'],
                        height=600,
@@ -334,6 +243,7 @@ class MultiChannelView(ChannelView):
                           index_mapper=self.idx_map,
                           value_mapper=val_map,
                           padding_left=75,
+                          reference='trigger',
                           )
         axis = PlotAxis(orientation='left', component=plot,
                         small_haxis_style=True, title='Signal')
@@ -344,13 +254,13 @@ class MultiChannelView(ChannelView):
         val_range = DataRange1D(low_setting=-3e-4, high_setting=3e-4)
         #val_range = DataRange1D(low_setting=-5, high_setting=5)
         self.available = [str(i+1) for i in range(new.channels)]
-        ch_ds = ChannelDataSource(channel=new)
+        self.ch_ds = ChannelDataSource(channel=new)
         
         for i in range(new.channels):
             #ch_ds = ChannelDataSource(channel=new.get_channel(i))
             val_map = LinearMapper(range=val_range)
             #plot = TimeSeries(channel_source=ch_ds, 
-            plot = SharedTimeSeries(channel=ch_ds,
+            plot = SharedTimeSeries(channel=self.ch_ds,
                               channel_index=i,
                               index_mapper=self.idx_map,
                               value_mapper=val_map,
@@ -358,7 +268,7 @@ class MultiChannelView(ChannelView):
             axis = PlotAxis(orientation='left', component=plot,
                             small_haxis_style=True, title='%d' % (i+1))
             plot.overlays.append(axis)
-            zoom = ConstrainedZoomTool(component=plot)
+            zoom = RLZoomTool(component=plot)
             plot.tools.append(PanTool(component=plot, constrain=True, constrain_direction="x"))
             plot.overlays.append(zoom)
             self.component.add(plot)

@@ -18,13 +18,13 @@ import numpy as np
 import tables
 
 class AbstractChannel(HasTraits):
-    
+
     def to_index(self, time):
         return int((time-self.t0)*self.fs)
-    
+
     def get_indices(self, *args):
         return [self.get_index(a) for a in args]
-    
+
     def get_range(self, start, end, reference=None):
         if reference is not None:
             if len(self.trigger_indices):
@@ -39,7 +39,7 @@ class AbstractChannel(HasTraits):
         lb_time = lb/self.fs + self.t0 - ref_idx/self.fs
         ub_time = lb_time + len(signal)/self.fs
         return signal, lb_time, ub_time
-    
+
     def get_recent_range(self, start, end=0):
         lb = min(-1, int(start*self.fs))
         ub = min(-1, int(end*self.fs))
@@ -47,79 +47,79 @@ class AbstractChannel(HasTraits):
         ub_time = ub/self.fs
         lb_time = ub_time-len(signal)/self.fs
         return signal, lb_time, ub_time
-    
+
 class Channel(AbstractChannel):
 
     fs = Float                          # Sampling frequency
     t0 = Float(0)                       # Time of first sample (typically zero)
     trigger_indices = List([])
-    
+
     updated = Event
     signal = Property
-    
+
     def _get_signal(self):
         raise NotImplementedError, 'Use a subclass of Channel'
-    
+
 class FileChannel(Channel):
-    
+
     dtype = Any
     node = Any
     name = String('FileChannel')
     buffer = Any
     expected_duration = Float(60) # seconds
     shape = Property
-    
+
     def _get_shape(self):
         return (0,)
-    
+
     def _create_buffer(self):
         atom = tables.Atom.from_dtype(np.dtype(self.dtype))
         buffer = append_node(self.node, self.name, 'EArray', atom, self.shape,
                              expectedrows=int(self.fs*self.expected_duration))
         buffer.setAttr('fs', self.fs)
         return buffer
-    
+
     def _buffer_default(self):
         return self._create_buffer()
-        
+
     def _get_signal(self):
         return self.buffer
 
     def send(self, data):
         self.buffer.append(data)
         self.updated = True
-    
+
 class RAMChannel(Channel):
-    
+
     window = Float(10)
     samples = Property(Int, depends_on='window, fs')
-    
+
     buffer = Array
     offset = Int(0)
     dropped = Int(0)
-    
+
     partial_idx = 0
-    
+
     t0 = Property(depends_on="offset, fs")
-    
+
     @cached_property
     def _get_t0(self):
         return self.offset/self.fs
-    
+
     @cached_property
     def _get_samples(self):
         return int(self.window * self.fs)
-    
+
     def _buffer_default(self):
         return np.empty(self.samples)
-    
+
     def _get_signal(self):
         return self.buffer
 
     def send(self, data):
         self._write(data)
         self.updated = True
-        
+
     def _partial_write(self, data):
         size = len(data)
         if size > self.samples:
@@ -137,7 +137,7 @@ class RAMChannel(Channel):
         else:
             self.buffer[self.partial_idx:self.partial_idx+size] = data
             self.partial_idx += size
-            
+
     def _full_write(self, data):
         size = len(data)
         if size > self.samples:
@@ -152,24 +152,24 @@ class RAMChannel(Channel):
                 self.offset += size
             # Write new data to end of buffer
             self.buffer[-size:] = data
-            
+
     _write = _partial_write
-        
+
 class BufferedChannel(Channel):
-    
+
     window = Float(10)
     samples = Property(Int, depends_on='window, fs')
     buffer = Instance(SoftwareRingBuffer)
-    
+
     @cached_property
     def _get_samples(self):
         return int(self.window * self.fs)
-    
+
     #signal = Property(Array(dtype='f'))
 
     def _buffer_default(self):
         return SoftwareRingBuffer(self.samples)
-    
+
     def _get_signal(self):
         return self.buffer.data
 
@@ -192,7 +192,7 @@ class MultiChannel(Channel):
 
     channels = Int(8)
     names = List(Str)
-    
+
     def get_channel(self, channel):
         try:
             idx = self.names.index(channel)
@@ -205,39 +205,40 @@ class MultiChannel(Channel):
         #channel.sync_trait('trigger_indices', self)
         #return channel
         return DerivedChannel(parent=self, idx=idx)
-    
+
 class DerivedChannel(AbstractChannel):
-    
+    '''This is a hack, but I'm not sure the best way around this.'''
+
     parent = Instance(MultiChannel)
     _ = DelegatesTo('parent')
     signal = Property
-    
+
     def _get_signal(self):
         return self.parent.signal[:,self.idx]
 
 class RAMMultiChannel(RAMChannel, MultiChannel):
-    
+
     def _buffer_default(self):
         return np.empty((self.samples, self.channels))
-    
+
 class BufferedMultiChannel(BufferedChannel, MultiChannel):
 
     def _buffer_default(self):
         return SoftwareRingBuffer((self.samples, self.channels))
-        
+
 class FileMultiChannel(FileChannel, MultiChannel):
-    
+
     channels = Int(8)
     name = 'FileMultiChannel'
-    
+
     def _get_shape(self):
         return (0, self.channels)
-    
+
     def _create_buffer(self):
         buffer = super(FileMultiChannel, self)._create_buffer()
         buffer.setAttr('channels', self.channels)
         return buffer
-        
+
 class SnippetChannel(Channel):
 
     buffer = Instance(SoftwareRingBuffer)
@@ -259,7 +260,7 @@ class SnippetChannel(Channel):
         return self.buffer.buffered
 
     def send(self, data):
-        # Ensure that 1D arrays containing a single snippet are broadcast 
+        # Ensure that 1D arrays containing a single snippet are broadcast
         # properly to the correct shape.
         data.shape = (-1, self.samples)
         added = self.buffer.write(data)
@@ -278,6 +279,6 @@ class SnippetChannel(Channel):
 
     def _get_average_signal(self):
         return self.buffer.buffered.mean(0)
-    
+
     def __len__(self):
         return self.samples

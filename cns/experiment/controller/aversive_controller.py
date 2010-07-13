@@ -333,8 +333,9 @@ class AversiveController(ExperimentController):
         # before we set the circuit flags to allow commencement of a trial.
         self.circuit.trial_buf.set(self.current.signal_remind)
         self.circuit.shock_level.value = self.current.shock_remind
-        self.circuit.trigger(2) # Go into warning on next trial
+        self.circuit.trigger(1) # Go into warning on next trial
         self.circuit.pause_state.value = False # Everything's ready. GO!
+        self.circuit.trigger(2)
 
     def pause(self, info=None):
         self.state = 'paused'
@@ -356,6 +357,7 @@ class AversiveController(ExperimentController):
         add_or_update_object(self.model.paradigm, self.model.exp_node)
         add_or_update_object(self.model.data, self.model.exp_node, 'AversiveData')
         add_or_update_object(self.model.analyzed, self.model.data_node)
+        print 'successfully saved data'
 
     #===========================================================================
     # Tasks driven by the slow and fast timers
@@ -375,7 +377,8 @@ class AversiveController(ExperimentController):
     def task_monitor_circuit(self):
         if self.circuit.get('idx') > self.current.idx:
             self.current.idx += 1
-            ts = self.circuit.ts_trial_start_n.get('s')
+            #ts = self.circuit.ts_trial_start_n.value
+            ts = self.circuit.lick_ts_trial_start_n.value
 
             # Process "reminder" signals
             if self.state == 'manual':
@@ -399,6 +402,7 @@ class AversiveController(ExperimentController):
                     self.current.next()
                     self.circuit.trial_buf.set(self.current.signal_warn)
                     self.circuit.shock_level.value = self.current.shock_warn
+                    self.circuit.trigger(2)
                 elif self.current.trial == self.current.safe_trials + 1:
                     self.model.data.update(ts, self.current.par, 0, 'safe')
                 elif self.current.trial <= self.current.safe_trials:
@@ -409,7 +413,7 @@ class AversiveController(ExperimentController):
                     # However an appropriate warning should be sent.
 
             # Signal to the circuit that data processing is done and it can commence execution
-            self.circuit.trigger(2)
+            self.circuit.trigger(1)
 
     def _get_time_elapsed(self):
         if self.state is 'halted':
@@ -456,11 +460,12 @@ class AversiveController(ExperimentController):
 
     def apply(self):
         reset_settings = False
-        ts = self.circuit.get('ts')
+        #ts = self.circuit.get('ts')
+        ts = self.circuit.ts.value
         for (object, name), value in self.pending_changes.items():
             log.debug('Value changed during experiment: %s = %r', name, value)
             if name == 'lick_th':
-                self.circuit.set('lick_th', value)
+                self.circuit.lick_th.value = value
                 self.model.data.log(ts, name, '%f' % value)
             elif name == 'par_order':
                 reset_settings = True

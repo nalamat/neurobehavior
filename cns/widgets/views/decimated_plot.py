@@ -2,14 +2,14 @@ from __future__ import division
 from cns.channel import Channel
 from enthought.chaco.api import BaseXYPlot
 from enthought.enable.api import black_color_trait, LineStyle
-from enthought.traits.api import Float, Int, Instance, \
-    HasTraits, Trait, Bool, Event, Str
+from enthought.traits.api import Float, Int, Instance, HasTraits, Trait, Bool, \
+    Event, Str, Enum
 from enthought.traits.ui.api import View
 import numpy as np
 
 def decimate(data, screen_width, downsampling_cutoff=4, mode='extremes'):
     data_width = len(data)
-    downsample = np.floor((data_width/screen_width)/2.)
+    downsample = np.floor((data_width/screen_width)/4.)
     if downsample > downsampling_cutoff:
         return globals()['decimate_'+mode](data, downsample)
     else:
@@ -57,6 +57,7 @@ class ChannelDataSource(HasTraits):
     downsampling_cutoff = Int(4)
     data_changed = Event
     decimate_mode = Str('extremes')
+    reference = Enum('last_sample', 'trigger')
     
     def get_bounds(self):
         return self._data_cache_bounds
@@ -66,7 +67,10 @@ class ChannelDataSource(HasTraits):
         # the type of channel (e.g. a file-based channel can be very slow since
         # it hits the disk each time), we store the data in a cache.
         if not self._data_cache_valid or self._data_cache_pars != (lb,  ub, reference):
-            self._data_cache, lb, ub = self.channel.get_range(lb, ub, reference) 
+            if self.reference == 'last_sample':
+                self._data_cache, lb, ub = self.channel.get_recent_range(lb, ub) 
+            else:
+                self._data_cache, lb, ub = self.channel.get_range(lb, ub, reference) 
             self._data_cache_bounds = lb, ub
             self._data_cache_valid = True
             self._data_cache_pars = (lb, ub, reference)
@@ -113,6 +117,7 @@ class TimeSeries(BaseXYPlot):
     color = black_color_trait
     line_width = Float(1.0)
     line_style = LineStyle
+    reference = Enum('most_recent', 'trigger')
 
     traits_view = View("color@", "line_width")
     downsampling_cutoff = Int(4)
@@ -137,8 +142,10 @@ class TimeSeries(BaseXYPlot):
     def _gather_points(self):
         if not self._cache_valid:
             range = self.index_mapper.range
-            values, t_lb, t_ub = self.channel.get_range(range.low, range.high, reference=-1)
-            #values, t_lb, t_ub = self.channel.get_recent_range(range.low, range.high)
+            if self.reference == 'most_recent':
+                values, t_lb, t_ub = self.channel.get_recent_range(range.low, range.high)
+            else:
+                values, t_lb, t_ub = self.channel.get_range(range.low, range.high, reference=-1)
             if self.ch_index is None:
                 self._cached_data = values
             else:
