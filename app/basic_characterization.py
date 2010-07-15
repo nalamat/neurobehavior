@@ -3,7 +3,7 @@ Created on Jun 9, 2010
 
 @author: admin_behavior
 '''
-import settings
+from config import settings
 from cns import equipment
 from cns.channel import FileMultiChannel, MultiChannel, \
     RAMMultiChannel, RAMChannel, Channel

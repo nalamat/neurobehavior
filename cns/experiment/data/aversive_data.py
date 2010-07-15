@@ -18,6 +18,7 @@ def apply_mask(fun, seq, mask):
     seq = np.array(seq).ravel()
     return [fun(seq[m]) for m in mask]
 
+WATER_DTYPE = [('timestamp', 'i'), ('infused', 'f')]
 TRIAL_DTYPE = [('timestamp', 'i'), ('par', 'f'), ('shock', 'f'), ('type', 'S16'), ]
 LOG_DTYPE = [('timestamp', 'i'), ('name', 'S64'), ('value', 'S128'), ]
 
@@ -54,7 +55,14 @@ class AversiveData(ExperimentData):
                            name='contact', type=np.float32, names=names,
                            channels=4, window_fill=0)
 
-    water_infused = CFloat(0.0, store='attribute')
+    water_log = Any(store='automatic')
+    def _water_log_default(self):
+        description = np.recarray((0,), dtype=WATER_DTYPE)
+        return append_node(self.store_node, 'water_log', 'table', description)
+    
+    def log_water(self, ts, infused):
+        self.water_log.append([(ts, infused)])
+        self.water_updated = True
 
     # This is actually a pointer to the stored data, which acts like a numpy
     # array for the most part

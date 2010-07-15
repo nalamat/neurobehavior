@@ -27,9 +27,10 @@ class AversiveExperiment(HasTraits):
     
     def _get_view_group(self):
         return HGroup(VGroup('handler.toolbar@',
-                              ['^animal{}~',
-                               '^handler.status{}~',
-                               '^handler.time_elapsed{}~',
+                              [['animal{}~',
+                               'handler.status{}~',],
+                               'handler.time_elapsed{Time}~',
+                               'handler.water_infused{Water infused}~',
                                #'handler.ch_monitor',
                                '|[Equipment status]'],
                               Item('handler.pump@', editor=InstanceEditor()),

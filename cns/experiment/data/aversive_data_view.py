@@ -34,9 +34,9 @@ class AnalyzedAversiveDataView(AnalyzedView):
                 clean_data=True,
                 )
         view.add(self.analyzed.data.contact_data, 
-                 decimate_mode='mean', ch_index=3, color='red', line_width=3)
+                 decimate_mode='mean', ch_index=3, color='lightpink', line_width=2)
         view.add(self.analyzed.data.contact_data, 
-                 decimate_mode='mean', ch_index=0, color='gray')
+                 decimate_mode='mean', ch_index=0, color='gray', line_width=2)
         view.add(self.analyzed.data.contact_data, 
                  decimate_mode='mean', ch_index=1, color='black', line_width=2)
         return view
@@ -133,6 +133,7 @@ class AnalyzedAversiveDataView(AnalyzedView):
                         show_label=False)
 
     group = HGroup([#Item('object.raw_contact_plot.component', **kw_plot),
+                    #VGroup('object.data.water_infused~'),
                     Item('object.contact_plot.component', **kw_plot),
                     'score_chart{}@',],
                    VGroup(Item('object.par_count_chart.component', **kw_plot),

@@ -61,7 +61,8 @@ class Animal(HasTraits):
                 identifier=self.identifier, sex=self.sex)
 
     def __str__(self):
-        return '%s %s %d' % (self.identifier, self.sex, self.nyu_id)
+        #return '{identifier} {sex} (NYU ID {nyu_id}'.format(self.__dict__).capitalize()
+        return '%s %s NYU%d' % (self.identifier, self.sex, self.nyu_id)
     
     #def __cmp__(self, other):
     #    if self is other:

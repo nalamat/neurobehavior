@@ -1,4 +1,4 @@
-import settings
+from config import settings
 
 from cns.data.view.cohort import CohortView, CohortViewHandler
 from cns.data import persistence

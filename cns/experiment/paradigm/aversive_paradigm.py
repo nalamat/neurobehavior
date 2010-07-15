@@ -68,8 +68,9 @@ class ShockSettings(HasTraits):
     cache = Dict(Float, Float, store='attribute')
     
     def update(self):
-        self.levels = []
-        self._add_pars(self.paradigm.pars)
+        return
+        #self.levels = []
+        #self._add_pars(self.paradigm.pars)
 
     @on_trait_change('paradigm')
     def _paradigm_changed(self, new):
@@ -77,6 +78,7 @@ class ShockSettings(HasTraits):
 
     @on_trait_change('paradigm:pars')
     def _new_items(self, object, name, old, new):
+        return
         if old:
             for par in old:
                 self.levels.remove(par)
@@ -84,13 +86,15 @@ class ShockSettings(HasTraits):
             self._add_pars(new)
             
     def _add_pars(self, pars):
+        return
         for par in pars:
             level = self.cache.setdefault(par, 0)
             self.levels.append(self.Setting(par=par, level=level))
         self.levels.sort()
 
     def get_level(self, par):
-        return self.cache[par]*self.max_shock
+        return 0
+        #return self.cache[par]*self.max_shock
 
     editor = ListEditor(editor=InstanceEditor(), mutable=False, style='custom')
     traits_view = View([['max_shock{Maximum shock}'],

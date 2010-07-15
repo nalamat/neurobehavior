@@ -460,8 +460,7 @@ class PumpToolBar(HasTraits):
         kw = dict(height=18, width=18)
         increase = SVGButton(filename=icons.up, **kw)
         decrease = SVGButton(filename=icons.down, **kw)
-        override = SVGButton(filename=icons.right2, tooltip='override',
-                                toggle=True, **kw)
+        override = SVGButton(filename=icons.right2, tooltip='override', toggle=True, **kw)
         #initialize  = SVGButton(filename=icons.first, **kw)
         #shutdown    = SVGButton(filename=icons.last, **kw)
         item_kw = dict(show_label=False)

@@ -160,10 +160,12 @@ class CurrentSettings(HasTraits):
         return self._signal_warn_cache[self.par_remind]
 
     def _get_shock_warn(self):
-        return self._shock_level_cache[self.par]
+        return 0
+        #return self._shock_level_cache[self.par]
 
     def _get_shock_remind(self):
-        return self._shock_level_cache[self.par_remind]
+        return 0
+        #return self._shock_level_cache[self.par_remind]
 
     def _get_choice_num_safe(self, paradigm):
         trials = range(paradigm.min_safe, paradigm.max_safe + 1)
@@ -241,6 +243,7 @@ class AversiveController(ExperimentController):
     data_pipe = Any
     start_time = Float
     completed = Bool(False)
+    water_infused = Float(0)
 
     status = Property(Str, depends_on='current.trial, current.par, current.safe_trials, state')
     time_elapsed = Property(Str, depends_on='slow_tick', label='Time')
@@ -341,6 +344,8 @@ class AversiveController(ExperimentController):
         self.circuit.trial_buf.set(self.current.signal_remind)
         self.backend.set_attenuation(self.current.signal_remind.attenuation, 'PA5')
         self.circuit.shock_level.value = self.current.shock_remind
+        print self.circuit.shock_level.value
+        print self.circuit.actual_shock.value
         #self.circuit.trigger(1) # Go into warning on next trial
         self.circuit.pause_state.value = False # Everything's ready. GO!
         self.circuit.trigger(2)
@@ -373,6 +378,12 @@ class AversiveController(ExperimentController):
     #===========================================================================
     # Tasks driven by the slow and fast timers
     #===========================================================================
+    @on_trait_change('slow_tick')
+    def task_update_pump(self):
+        infused = self.pump.infused
+        self.model.data.log_water(self.circuit.ts_n.value, infused)
+        self.water_infused = infused
+        
     @on_trait_change('fast_tick')
     def task_update_data(self):
         data = self.circuit.contact_buf.read()
