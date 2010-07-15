@@ -30,9 +30,13 @@ class AnimalEditHandler(Controller):
         try: self.animal = info.object.animal
         except: self.animal = info.object
 
-animal_edit_view = View([  ['nyu_id{NYU ID}', 'parents', 'birth', 'sex', 'identifier'],
-                           'handler.weight_log_editor{}@<>',
-                           'handler.status_log_editor{}@<>',
+animal_edit_view = View('nyu_id', 'parents', 'birth', 'sex', 'identifier',
+                        kind='livemodal',
+                        buttons=['OK', 'Cancel'])
+
+old_animal_edit_view = View([  ['nyu_id{NYU ID}', 'parents', 'birth', 'sex', 'identifier'],
+                           #'handler.weight_log_editor{}@<>',
+                           #'handler.status_log_editor{}@<>',
                            '-', ],
                         handler=AnimalEditHandler(),
                         buttons=['OK', 'Cancel'],

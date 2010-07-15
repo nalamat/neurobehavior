@@ -70,7 +70,7 @@ class ChannelDataSource(HasTraits):
             if self.reference == 'last_sample':
                 self._data_cache, lb, ub = self.channel.get_recent_range(lb, ub) 
             else:
-                self._data_cache, lb, ub = self.channel.get_range(lb, ub, reference) 
+                self._data_cache, lb, ub = self.channel.get_range(lb, ub, -1) 
             self._data_cache_bounds = lb, ub
             self._data_cache_valid = True
             self._data_cache_pars = (lb, ub, reference)
@@ -145,7 +145,7 @@ class TimeSeries(BaseXYPlot):
             if self.reference == 'most_recent':
                 values, t_lb, t_ub = self.channel.get_recent_range(range.low, range.high)
             else:
-                values, t_lb, t_ub = self.channel.get_range(range.low, range.high, reference=-1)
+                values, t_lb, t_ub = self.channel.get_range(range.low, range.high, -1)
             if self.ch_index is None:
                 self._cached_data = values
             else:

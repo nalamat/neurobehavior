@@ -25,8 +25,8 @@ class Animal(HasTraits):
     # change the ID in the future (i.e. change it to an alphanumeric string if
     # they switch databases or reuse IDs).
 
-    id = CInt(-1, store='key')
-    nyu_id = CInt(store='attribute')
+    #id = CInt(-1, store='key')
+    nyu_id = CInt(store='attribute', label='NYU ID')
     identifier = Enum(*ANIMAL_IDS, store='attribute')
     sex = Enum('U', 'M', 'F', store='attribute')
     birth = Date(store='attribute')

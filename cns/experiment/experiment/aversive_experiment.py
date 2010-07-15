@@ -1,4 +1,4 @@
-from enthought.traits.api import HasTraits, Any, Instance, DelegatesTo
+from enthought.traits.api import HasTraits, Any, Instance, DelegatesTo, Int
 from enthought.traits.ui.api import View, Item, VGroup, HGroup, InstanceEditor
 
 from cns.experiment.data import AversiveData, AnalyzedAversiveDataView
@@ -10,6 +10,7 @@ class AversiveExperiment(HasTraits):
     # The store node should be a reference to an animal
     animal = Any
     store_node = Any
+    trial_blocks = Int(0)
     
     # Show the analyzed data
     data = Instance(AversiveData, ())

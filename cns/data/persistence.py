@@ -2,7 +2,7 @@ import functools
 import tables
 import re
 from numpy import dtype, array
-from enthought.traits.api import Array, List
+from enthought.traits.api import Array, List, Dict
 import datetime
 
 import logging
@@ -13,15 +13,25 @@ name_lookup = {'group':     'Group',
                'array':     'Array',
                'table':     'Table'}
 
+def get_or_append_node(node, name, type='group', *arg, **kw):
+    try:
+        # TODO: add type checking?
+        return getattr(node, name)
+    except tables.NoSuchNodeError:
+        return append_node(node, name, type, *arg, **kw)
+    
 def append_node(node, name, type='group', *arg, **kw):
+    log.debug('appending %r to node %r', name, node)
     file = node._v_file
     path = node._v_pathname
     type = name_lookup[type.lower()]
     func = getattr(file, 'create' + type)
-    return func(path, name, *arg, **kw)
+    new_node = func(path, name, *arg, **kw)
+    #file.flush()
+    return new_node
 
-def append_date_node(node, base='date', type='group', *arg, **kw):
-    name = base + datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
+def append_date_node(node, pre='date', post='', type='group', *arg, **kw):
+    name = pre + datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S') + post
     return append_node(node, name, type, *arg, **kw)
 
 def next_id(element, name=''):
@@ -72,14 +82,14 @@ def add_or_update_object(object, node, name=None):
     # Now we add the metadata for the object
     # TODO: add support for deleted metadata.  Right now this is unsupported
     # because we don't need this use case.
-    for name in object.class_trait_names(store='attribute'):
+    for name, trait in object.class_traits(store='attribute').items():
         # this is a bit of a hack to ensure we get the raw value since we normally get
         # a list or dict back wrapped in a trait object
         value = getattr(object, name)
-        try: value = value[:]
-        except: pass
-        try: value = dict(value)
-        except: pass
+        if trait.is_trait_type(List):
+            value = value[:]
+        elif trait.is_trait_type(Dict):
+            value = dict(value)
         
         if value is None:
             value = 'None'
@@ -160,7 +170,7 @@ def add_or_update_object(object, node, name=None):
     #    if child not in children:
     #        child._f_remove(recursive=True)
 
-    object.store_node = object_node
+    append_metadata(object, object_node)
     h5_file.flush()
     return object_node
 
@@ -252,12 +262,22 @@ sanitize_datetimes = functools.partial(switch_datetime_fmt, parser=strftime_arr)
 unsanitize_datetimes = functools.partial(switch_datetime_fmt,
         parser=strptime_arr)
 
-def load_object(source):
-    kw = dict(UNIQUE_ID=source._f_getAttr('UNIQUE_ID'),
-              store_file=source._v_file.filename, # TODO: we need to get abs path
-              store_path=source._v_pathname,
-              store_name=source._v_name,
-              store_node=source)
+def append_metadata(object, source):
+    object.store_file = source._v_file.filename # TODO: we need to get abs pathource.
+    object.store_path = source._v_pathname
+    object.store_name = source._v_name
+    object.store_node = source
+    return object
+    
+def load_object(source, name=None):
+    if name is not None:
+        source = getattr(source, name)
+        
+    kw = {}
+    try:
+        kw['UNIQUE_ID'] = source._f_getAttr('UNIQUE_ID')
+    except AttributeError:
+        pass
 
     module_name = source._f_getAttr('module')
     klass_name = source._f_getAttr('klass')
@@ -268,11 +288,19 @@ def load_object(source):
     type = getattr(__import__(module_name, fromlist=[klass_name]), klass_name)
 
     for name, trait in type.class_traits(store='attribute').items():
-        value = source._f_getAttr(name)
-        klass = trait.trait_type.klass
-        if klass is not None and klass in date_classes:
-            kw[name] = strptime(value)
-        else:
+        if trait.type != 'property':
+            value = source._f_getAttr(name)
+            # TraitMap will raise an error here
+            try:
+                klass = trait.trait_type.klass
+            except:
+                klass = None
+            # We just want to check on the datetime
+            if klass is not None and klass in date_classes:
+                value = strptime(value)
+            elif isinstance(value, int):
+                value = int(value)
+                
             kw[name] = value
 
     for name, trait in type.class_traits(store='table').items():
@@ -288,4 +316,5 @@ def load_object(source):
             #kw[name].sort()
         else:
             kw[name] = load_object(value)
-    return type(**kw)
+    object = type(**kw)
+    return append_metadata(object, source)

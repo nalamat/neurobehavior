@@ -5,10 +5,11 @@ import operator as op
 from cns.widgets.handler import FileHandler, filehandler_menubar
 from enthought.pyface.api import YES, confirm
 from enthought.traits.api import HasTraits, Button, Instance, Event, \
-    on_trait_change, Property, File, Bool, Str
+    on_trait_change, Property, File, Bool, Str, Any
 from enthought.traits.ui.api import View, HGroup, Item, VGroup, spring, \
     InstanceEditor, TabularEditor, Group
 from enthought.traits.ui.tabular_adapter import TabularAdapter
+import tables
 import cns
 import logging
 log = logging.getLogger(__name__)
@@ -103,8 +104,9 @@ class CohortView(HasTraits):
             #print event, event.column, event.editor, event#.item, event.row
 
     @on_trait_change('cohort.+, cohort.animals.+')
-    def set_modified(self):
-        self._modified = True
+    def set_modified(self, object, name, old, new):
+        if name != 'processed':
+            self._modified = True
         
     @on_trait_change('cohort.animals.+')
     def sort_animals(self):
@@ -112,7 +114,7 @@ class CohortView(HasTraits):
         #self.update = True
         return
 
-    view = View(VGroup(Group('object.cohort.description~',
+    log_view = View(VGroup(Group('object.cohort.description~',
                        ),
                        Item('object.cohort.animals', editor=animal_table,
                             show_label=False, style='readonly'),
@@ -126,6 +128,14 @@ class CohortView(HasTraits):
                 resizable=True,
                 handler=CohortViewHandler
                 )
+    
+    traits_view = View(VGroup(Group(Item('object.cohort.description', style='readonly')),
+                              Item('object.cohort.animals', editor=animal_table,
+                                   show_label=False, style='readonly')),
+                       height=400,
+                       width=600,
+                       resizable=True)
+    
 
 class CohortEditView(CohortView):
 
@@ -134,7 +144,8 @@ class CohortEditView(CohortView):
 
     def _animal_factory(self):
         if self.selected is not None:
-            return Animal(parents=self.selected.parents,
+            return Animal(nyu_id=self.selected.nyu_id+1,
+                          parents=self.selected.parents,
                           birth=self.selected.birth,
                           sex=self.selected.sex)
         else: return Animal()
@@ -150,8 +161,8 @@ class CohortEditView(CohortView):
         view = View(group,
                     title='Cohort Editor',
                     menubar=filehandler_menubar(),
-                    height=0.7,
-                    width=0.7,
+                    height=400,
+                    width=600,
                     resizable=True,
                     handler=CohortViewHandler(),
                     )

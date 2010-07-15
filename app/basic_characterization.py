@@ -68,9 +68,12 @@ class MedusaController(Controller):
     buffer      = Enum('mc', 'mc16', 'mc8')
     
     @on_trait_change('settings.ch_out')
-    def update_ch_out(self):
-        self.RZ5.ch_out.value = self.settings.ch_out
-        print 'changed'
+    def update_ch_out(self, new):
+        self.RZ5.ch_out.value = new
+        
+    @on_trait_change('settings.attenuation')
+    def update_attenuation(self, new):
+        equipment.dsp().set_attenuation(new, 'PA5')
     
     def init(self, info):
         # Load circuits
@@ -81,13 +84,13 @@ class MedusaController(Controller):
         self.RZ5 = equipment.dsp().init_device('MedusaRecord_v4', 'RZ5')
         
         # Initialize buffers
-        self.RX6.sig.initialize()
-        self.RZ5.mc_sig.initialize(channels=16, read_mode='continuous')
-        self.RZ5.mc_sig16.initialize(channels=16, read_mode='continuous', 
+        self.RX6.sig_out.initialize(src_type=np.int8, compression='decimated', sf=64)
+        self.RZ5.mc_sig.initialize(channels=16)
+        self.RZ5.mc_sig16.initialize(channels=16, 
                                      src_type=np.int16,  
                                      sf=8.19175e7,
                                      compression='decimated')
-        self.RZ5.mc_sig8.initialize(channels=16, read_mode='continuous', 
+        self.RZ5.mc_sig8.initialize(channels=16, 
                                      src_type=np.int8,  
                                      sf=32e3,
                                      compression='decimated')
@@ -122,8 +125,8 @@ class MedusaController(Controller):
         pass
 
     def tick(self):
-        #data = self.RZ5.mc_sig.read()
-        data = self.RZ5.mc_sig16.read()
+        data = self.RZ5.mc_sig.read()
+        #data = self.RZ5.mc_sig16.read()
         #data = self.RZ5.mc_sig8.read()
         #print np.max(data)
         self.pipeline.send(data)
@@ -131,6 +134,7 @@ class MedusaController(Controller):
         
         if self.prior != trig:
             self.plot_data.trigger_indices.append(trig)
+            print self.plot_data.trigger_indices
             self.prior = trig
             
         sig = self.RX6.sig_out.read()

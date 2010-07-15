@@ -22,16 +22,15 @@ def load_cohort(id, filename):
         obj = load_object(getattr(fh.root, 'Cohort_' + str(id)))
         fh.close()
         return obj
-    except BaseException, e:
-        print e
-        log.exception('Attempt to load cohort %d from file %s failed', id,
-                      filename)
+    except BaseException:
+        mesg = 'Attempt to load cohort %d from file %s failed'
+        log.exception(mesg, id, filename)
         raise BadCohortFile(filename)
 
 def save_cohort(cohort, filename):
     fh = tables.openFile(filename, 'a')
     node = add_or_update_object(cohort, fh.root)
-    fh.flush()
+    #fh.flush()
     fh.close()
     return node
 

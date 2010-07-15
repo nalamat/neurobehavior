@@ -66,11 +66,14 @@ class ShockSettings(HasTraits):
     levels = List(Setting)
     #cache = Dict(Float, Setting, store='attribute')
     cache = Dict(Float, Float, store='attribute')
+    
+    def update(self):
+        self.levels = []
+        self._add_pars(self.paradigm.pars)
 
     @on_trait_change('paradigm')
     def _paradigm_changed(self, new):
-        self.levels = []
-        self._add_pars(new.pars)
+        self.update()
 
     @on_trait_change('paradigm:pars')
     def _new_items(self, object, name, old, new):

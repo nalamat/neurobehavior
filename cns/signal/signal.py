@@ -33,8 +33,8 @@ class Signal(Waveform):
                               store='attribute')
     t = Property(Array(dtype='f'), depends_on='coerced_duration, fs')
     period = Property(Float)
-    level = Range(0, 120, value=60, configurable=True, label='Level', unit='dB SPL',
-                             store='attribute')
+    attenuation = Range(0.0, 120.0, value=60, configurable=True, label='Attenuation', 
+                        unit='dB ATT', store='attribute')
     #variables = List(Str, [])
     #static = Bool(False)
     variable = Str(editor=EnumEditor(name='parameters'), store='attribute')

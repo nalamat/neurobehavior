@@ -9,6 +9,7 @@ log = logging.getLogger(__name__)
 import os, time
 
 from cns.equipment import EquipmentError
+#from cns.equipment.TDT import set_attenuation
 
 type_lookup = {
         np.float32: 'F32',
@@ -140,7 +141,7 @@ class DSPBuffer(BlockBuffer):
         return 1/self.sf
     
     def best_sf(self, max_amplitude):
-        lb, ub = self.bounds()
+        ub = self.bounds()[1]
         return np.floor(ub/max_amplitude)
 
     def initialize(self, src_type=np.float32, channels=1, read_mode='continuous', 
@@ -154,6 +155,10 @@ class DSPBuffer(BlockBuffer):
             self.name_idx = self.name + '_idx_trig'
         else:
             raise ValueError, '%s read not supported' % read_mode
+        
+        if self.compression not in [None, 'decimated', 'shuffled']:
+            mesg = "{0} is not a valid compression mode".format(self.compression)
+            raise ValueError, mesg
         
         #self.read_args = type_lookup[src_type], type_lookup[dest_type], 1
         #self._read_f = self.dsp.ReadTagVEX
@@ -178,6 +183,8 @@ class DSPBuffer(BlockBuffer):
             data.fs = self.dsp.GetSFreq()
             self._set_length(len(data))
             self.dsp.WriteTagV(self.name, 0, data.signal)
+            #PA5.SetAtten(data.level)
+            #set_attenuation(data.level)
             log.debug('Set buffer %s with %d samples', self.name, len(data.signal))
         except AttributeError, e:
             self._set_length(len(data))

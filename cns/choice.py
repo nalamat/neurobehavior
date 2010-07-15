@@ -10,7 +10,7 @@ def ascending(sequence):
     sequence.sort()
     while True:
         yield sequence[index]
-        index = index+1%len(sequence)
+        index = (index+1)%len(sequence)
 
 def descending(sequence):
     index = 0

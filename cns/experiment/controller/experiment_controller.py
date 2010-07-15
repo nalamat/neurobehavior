@@ -1,4 +1,4 @@
-from enthought.traits.api import Enum
+from enthought.traits.api import Enum, Int
 from enthought.traits.ui.api import Controller
 
 class ExperimentController(Controller):
@@ -11,6 +11,7 @@ class ExperimentController(Controller):
     # Running: The system is playing the sequence of safe and warn signals.
     # Disconnected: Could not connect to the equipment.
     state = Enum('halted', 'paused', 'running', 'manual',  'disconnected')
+    runs = Int(0)
     
     def tick(self, speed):
         setattr(self, speed + '_tick', True)

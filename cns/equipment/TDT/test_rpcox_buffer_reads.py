@@ -50,6 +50,51 @@ c16_settings = {'src_type'  	: np.int16,
                'multiple'   	: 1,
                'compression'    : 'decimated',}
 
+c16_settings = {'src_type'  	: np.int16,
+               'channels'  		: 1,
+               'sf'         	: int16_sf, 
+               'read_mode'  	: read_mode,
+               'multiple'   	: 1,
+               'compression'    : 'decimated',}
+
+c_upload_settings = {
+               'src_type'  	    : np.int8,
+               'channels'  		: 1,
+               'sf'         	: 63, 
+               'read_mode'  	: read_mode,
+               'multiple'   	: 1,
+               'compression'    : 'decimated',}
+
+
+class TestBufferReadWrite(unittest.TestCase):
+    
+    def setUp(self):
+        self.circuit = equipment.dsp().load('test/data_reduction_RX6', 'RX6')
+        self.circuit.nHi.value = 2000
+        self.tone = np.sin(2*np.pi*1000*np.linspace(0, 1, 1000))
+        self.circuit.upl.write(self.tone)
+        self.circuit.upl_8.initialize(**c_upload_settings)
+        self.circuit.start()
+        self.circuit.trigger(1)
+        while 1:
+            #print self.circuit.upl_idx.value, self.circuit.upl_8_idx.value
+            if not self.circuit.running.value:
+                break
+        print self.circuit.upl_idx.value, self.circuit.upl_8_idx.value
+        print self.circuit.nHiActual.value
+        
+    def tearDown(self):
+        self.circuit.stop()
+        
+    def testBufWrite(self):
+        from pylab import *
+        tone_8 = self.circuit.upl_8.read()
+        plot(tone_8, 'k')
+        plot(self.tone, 'r')
+        print len(self.tone)
+        print len(tone_8)
+        show()
+
 class TestBufferRead(unittest.TestCase):
 
     def setUp(self):
@@ -103,20 +148,16 @@ class TestBufferRead(unittest.TestCase):
         self.assertValid('mc8')
 
     def test_mc16(self):
-        print 'mc16'
         self.assertValid('mc16')
 
     def test_sh8(self):
-        print 'sh8'
         self.assertValid('sh8')
 
     def test_sh16(self):
-        print 'sh16'
         self.shape = (4, 2)
         self.assertValid('sh16')
 
     def test_c16(self):
-        print 'c16'
         self.shape = (4,)
         self.assertValid('c16')
 

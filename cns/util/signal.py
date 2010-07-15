@@ -9,8 +9,8 @@ def rfft(fs, signal):
     N = len(signal)
     freq = fs / 2 * np.linspace(0, 1, N / 2 + 1)
     component = np.fft.rfft(signal, N) / N
-    power = abs(component)
-    phase = abs(component)
+    power = np.abs(component)
+    phase = np.angle(component)
     return freq, power, phase
 
 def dbtopa(db):

@@ -47,6 +47,10 @@ class AbstractChannel(HasTraits):
         ub_time = ub/self.fs
         lb_time = ub_time-len(signal)/self.fs
         return signal, lb_time, ub_time
+    
+    def filter(self, filter):
+        '''Takes b,a parameters for filter'''
+        self.signal = filtfilt(self.signal, **filter)
 
 class Channel(AbstractChannel):
 
