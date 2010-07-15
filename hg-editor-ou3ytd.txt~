@@ -1,0 +1,32 @@
+
+
+HG: Enter commit message.  Lines beginning with 'HG:' are removed.
+HG: Leave message empty to abort commit.
+HG: --
+HG: user: bburan
+HG: branch 'default'
+HG: changed app/basic_characterization.py
+HG: changed app/run_aversive_behavior.py
+HG: changed cns/channel.py
+HG: changed cns/choice.py
+HG: changed cns/data/io.py
+HG: changed cns/data/persistence.py
+HG: changed cns/data/test_persistence.py
+HG: changed cns/data/type.py
+HG: changed cns/data/view/cohort.py
+HG: changed cns/data/view/edit_animal.py
+HG: changed cns/equipment/TDT/components/MedusaRecord_v4.rcx
+HG: changed cns/equipment/TDT/components/RepeatPlayRecord.rcx
+HG: changed cns/equipment/TDT/components/aversive-behavior.rcx
+HG: changed cns/equipment/TDT/components/test/data_reduction_RX6.rcx
+HG: changed cns/equipment/TDT/rpcox.py
+HG: changed cns/equipment/TDT/test_rpcox_buffer_reads.py
+HG: changed cns/equipment/calibration.py
+HG: changed cns/experiment/controller/aversive_controller.py
+HG: changed cns/experiment/controller/experiment_controller.py
+HG: changed cns/experiment/experiment/aversive_experiment.py
+HG: changed cns/experiment/paradigm/aversive_paradigm.py
+HG: changed cns/signal/signal.py
+HG: changed cns/signal/type/silence.py
+HG: changed cns/util/signal.py
+HG: changed cns/widgets/views/decimated_plot.py
