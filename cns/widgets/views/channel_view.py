@@ -208,7 +208,7 @@ class MultiChannelView(ChannelView):
                        width=600,
                        resizable=True)
     
-    idx_range = Instance(DataRange1D, kw=dict(low_setting=0, high_setting=2.0))
+    idx_range = Instance(DataRange1D, kw=dict(low_setting=0, high_setting=4.0))
     idx_map = Instance(LinearMapper)
     
     def _idx_map_default(self):

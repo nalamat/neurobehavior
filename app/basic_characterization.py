@@ -4,19 +4,19 @@ Created on Jun 9, 2010
 @author: admin_behavior
 '''
 from config import settings
+
 from cns import equipment
-from cns.channel import FileMultiChannel, MultiChannel, \
-    RAMMultiChannel, RAMChannel, Channel
+from cns.channel import FileMultiChannel, MultiChannel, RAMMultiChannel, \
+    RAMChannel, Channel
 from cns.data.persistence import append_date_node
 from cns.signal.signal_dialog import SignalDialog
 from cns.widgets.views.channel_view import MultiChannelView
 from enthought.pyface.timer.api import Timer
-from enthought.traits.api import Range, Float, HasTraits, Instance, DelegatesTo, Int, Any, on_trait_change, Enum
+from enthought.traits.api import Range, Float, HasTraits, Instance, DelegatesTo, \
+    Int, Any, on_trait_change, Enum, Trait
 from enthought.traits.ui.api import View, VGroup, HGroup, Action, Controller
 import numpy as np
 import tables
-
-
 
 class MedusaSettings(HasTraits):
 
@@ -24,6 +24,9 @@ class MedusaSettings(HasTraits):
     attenuation = Range(0.0, 120.0, 20.0)
     ch_out      = Range(1, 16, 1)
     ch_out_gain = Float(50e3)
+    
+    mode        = Enum('raw', 'differential', 'test')
+    ch_diff     = Range(1, 16, 1)
 
     fc_low      = Float(3e3)
     fc_high     = Float(300)
@@ -39,7 +42,9 @@ class MedusaSettings(HasTraits):
     traits_view = View(
             VGroup(
                 'attenuation{Attenuation (dB SPL)}',
+                'mode',
                 'ch_out{Monitor channel}',
+                'ch_diff{Differential electrode}',
                 'ch_out_gain{Monitor channel gain}',
                 'fc_low{Lowpass cutoff (Hz)}',
                 'fc_high{Highpass cutoff (Hz)}',
@@ -66,6 +71,16 @@ class MedusaController(Controller):
     prior_sig   = Int(0)
     
     buffer      = Enum('mc', 'mc16', 'mc8')
+    
+    @on_trait_change('settings.mode')
+    def update_mode(self, new):
+        mode_map = dict(raw=0, differential=1, test=2)
+        self.RZ5.rec_mode.value = mode_map[new]
+        print self.RZ5.offset.value
+    
+    @on_trait_change('settings.ch_diff')
+    def update_ch_differential(self, new):
+        self.RZ5.ch_diff.value = new
     
     @on_trait_change('settings.ch_out')
     def update_ch_out(self, new):
