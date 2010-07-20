@@ -399,16 +399,25 @@ class AnalyzedAversiveData(AnalyzedData):
     def _get_remind_seq(self):
         return self.remind_scores < self.contact_fraction
 
+    # We need to check curidx to see if there are any contact scores.  If curidx
+    # is 0, this means that code somewhere has requested the value of these
+    # properties before any data is available. 
     @cached_property
     def _get_safe_scores(self):
+        if self.curidx == 0:
+            return []
         return self.contact_scores[self.safe_indices]
 
     @cached_property
     def _get_warn_scores(self):
+        if self.curidx == 0:
+            return []
         return self.contact_scores[self.warn_indices]
 
     @cached_property
     def _get_remind_scores(self):
+        if self.curidx == 0:
+            return []
         return self.contact_scores[self.remind_indices]
 
 if __name__ == '__main__':
