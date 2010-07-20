@@ -405,19 +405,19 @@ class AnalyzedAversiveData(AnalyzedData):
     @cached_property
     def _get_safe_scores(self):
         if self.curidx == 0:
-            return []
+            return np.array([])
         return self.contact_scores[self.safe_indices]
 
     @cached_property
     def _get_warn_scores(self):
         if self.curidx == 0:
-            return []
+            return np.array([])
         return self.contact_scores[self.warn_indices]
 
     @cached_property
     def _get_remind_scores(self):
         if self.curidx == 0:
-            return []
+            return np.array([])
         return self.contact_scores[self.remind_indices]
 
 if __name__ == '__main__':

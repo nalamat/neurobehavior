@@ -43,7 +43,12 @@ class AbstractChannel(HasTraits):
     def get_recent_range(self, start, end=0):
         lb = min(-1, int(start*self.fs))
         ub = min(-1, int(end*self.fs))
-        signal = self.signal[lb:ub]
+        # This check is necessary to avoid raising an error in the HDF5
+        # (PyTables?) library if it attempts to slice an empty array.
+        if len(self.signal) == 0:
+            signal = np.array([])
+        else:
+            signal = self.signal[lb:ub]
         ub_time = ub/self.fs
         lb_time = ub_time-len(signal)/self.fs
         return signal, lb_time, ub_time
