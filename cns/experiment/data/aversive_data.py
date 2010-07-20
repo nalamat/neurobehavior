@@ -380,7 +380,6 @@ class AnalyzedAversiveData(AnalyzedData):
             self._contact_scores[self.curidx] = score
             self.curidx += 1
             self.updated = True
-            print 'CONTACT', self.contact_scores
 
     @cached_property
     def _get_par_fa_frac(self):
