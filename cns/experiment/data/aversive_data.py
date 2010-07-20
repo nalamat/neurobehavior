@@ -7,12 +7,13 @@ terminology to avoid any confusion.  For example:
 """
 #from .experiment_data import ExperimentData, AnalyzedData
 from cns.experiment.data.experiment_data import ExperimentData, AnalyzedData
-from cns.channel import FileMultiChannel
+from cns.channel import FileMultiChannel, FileChannel
 from enthought.traits.api import Instance, List, CFloat, Int, Float, Any, \
     Range, DelegatesTo, cached_property, on_trait_change, Array, Event, \
-    Property, Undefined
+    Property, Undefined, Callable
 import numpy as np
-from cns.data.persistence import append_node
+from cns.data.persistence import append_node, get_or_append_node
+from cns.pipeline import deinterleave
 
 def apply_mask(fun, seq, mask):
     seq = np.array(seq).ravel()
@@ -22,7 +23,13 @@ WATER_DTYPE = [('timestamp', 'i'), ('infused', 'f')]
 TRIAL_DTYPE = [('timestamp', 'i'), ('par', 'f'), ('shock', 'f'), ('type', 'S16'), ]
 LOG_DTYPE = [('timestamp', 'i'), ('name', 'S64'), ('value', 'S128'), ]
 
-class AversiveData(ExperimentData):
+def Alias(name):
+    return Property(lambda obj: getattr(obj, name),
+                    lambda obj, val: setattr(obj, name, val))
+
+class RawAversiveData_v0_1(ExperimentData):
+
+    version = Float(0.1)
 
     # This is a bit of a hack but I'm not sure of a better way to send the
     # datafile down the hierarchy.  We need access to this data file so we can
@@ -31,8 +38,6 @@ class AversiveData(ExperimentData):
 
     contact_fs = Float
 
-    contact_data = Instance(FileMultiChannel, store='automatic')
-    
     contact_digital = Property
     contact_digital_mean = Property
     contact_analog = Property
@@ -50,16 +55,112 @@ class AversiveData(ExperimentData):
     def _get_trial_running(self):
         return self.contact_data.get_channel('trial_running')
 
+
+    # Stores raw contact data from optical and electrical sensors as well as
+    # whether a trial is running.
+    contact_data = Instance(FileMultiChannel, store='automatic')
+    water_log = Any(store='automatic')
+    trial_log = Any(store='automatic')
+    trial_data_table = Any(store='automatic')
+
     def _contact_data_default(self):
         names = ['digital', 'digital_mean', 'analog', 'trial_running']
         return FileMultiChannel(node=self.store_node, fs=self.contact_fs,
                            name='contact', dtype=np.float32, names=names,
                            channels=4, window_fill=0)
 
-    water_log = Any(store='automatic')
     def _water_log_default(self):
         description = np.recarray((0,), dtype=WATER_DTYPE)
         return append_node(self.store_node, 'water_log', 'table', description)
+
+    def _trial_data_table_default(self):
+        description = np.recarray((0,), dtype=TRIAL_DTYPE)
+        return append_node(self.store_node, 'trial_data', 'table', description)
+
+    def _trial_log_default(self):
+        description = np.recarray((0,), dtype=LOG_DTYPE)
+        return append_node(self.store_node, 'trial_log', 'table', description)
+
+class RawAversiveData_v0_2():
+
+    # This version restructures how contact data is stored
+    version = Float(0.2)
+
+    store_node = Any
+    contact_fs = Float
+
+    contact_data = Callable
+
+    touch_digital = Instance(FileChannel, store='automatic')
+    touch_digital_mean = Instance(FileChannel, store='automatic')
+    touch_analog = Instance(FileChannel, store='automatic')
+    optical_digital = Instance(FileChannel, store='automatic')
+    optical_digital_mean = Instance(FileChannel, store='automatic')
+    optical_analog = Instance(FileChannel, store='automatic')
+
+    trial_running = Instance(FileChannel, store='automatic')
+
+    def _contact_data_default(self):
+        targets = [self.touch_digital,
+                   self.touch_digital_mean,
+                   self.touch_analog,
+                   self.trial_running,
+                   self.optical_digital,
+                   self.optical_digital_mean,
+                   self.optical_analog]
+        return deinterleave(targets)
+
+    def _create_channel(self, name, dtype):
+        contact_node = get_or_append_node(self.store_node, 'contact')
+        return FileChannel(node=contact_node, fs=self.contact_fs,
+                           name=name, dtype=dtype)
+
+    def _touch_digital_default(self):
+        return self._create_channel('touch_digital', np.bool)
+
+    def _touch_digital_mean_default(self):
+        return self._create_channel('touch_digital_mean', np.float32)
+
+    def _touch_analog_default(self):
+        return self._create_channel('touch_analog', np.float32)
+
+    def _optical_digital_default(self):
+        return self._create_channel('optical_digital', np.bool)
+
+    def _optical_digital_mean_default(self):
+        return self._create_channel('optical_digital_mean', np.float32)
+
+    def _optical_analog_default(self):
+        return self._create_channel('optical_analog', np.float32)
+
+    def _trial_running(self):
+        return self._create_channel('trial_running', np.bool)
+
+    contact_digital = Alias('touch_digital')
+    contact_digital_mean = Alias('touch_digital_mean')
+    contact_analog = Alias('touch_analog')
+
+    # Stores raw contact data from optical and electrical sensors as well as
+    # whether a trial is running.
+    water_log = Any(store='automatic')
+    trial_log = Any(store='automatic')
+    trial_data_table = Any(store='automatic')
+
+    def _water_log_default(self):
+        description = np.recarray((0,), dtype=WATER_DTYPE)
+        return append_node(self.store_node, 'water_log', 'table', description)
+
+    def _trial_data_table_default(self):
+        description = np.recarray((0,), dtype=TRIAL_DTYPE)
+        return append_node(self.store_node, 'trial_data', 'table', description)
+
+    def _trial_log_default(self):
+        description = np.recarray((0,), dtype=LOG_DTYPE)
+        return append_node(self.store_node, 'trial_log', 'table', description)
+
+RawAversiveData = RawAversiveData_v0_2
+
+class AversiveData(RawAversiveData):
 
     def log_water(self, ts, infused):
         self.water_log.append([(ts, infused)])
@@ -67,9 +168,7 @@ class AversiveData(ExperimentData):
 
     # This is actually a pointer to the stored data, which acts like a numpy
     # array for the most part
-    trial_data_table = Any(store='automatic')
     trial_data = Property(depends_on='curidx')
-    trial_log = Any(store='automatic')
 
     #updated = Event
 
@@ -85,14 +184,6 @@ class AversiveData(ExperimentData):
         except (ValueError, TypeError):
             self.trial_data_table = np.array(data, dtype=TRIAL_DTYPE)
         self.curidx = len(self.trial_data_table)
-
-    def _trial_data_table_default(self):
-        description = np.recarray((0,), dtype=TRIAL_DTYPE)
-        return append_node(self.store_node, 'trial_data', 'table', description)
-
-    def _trial_log_default(self):
-        description = np.recarray((0,), dtype=LOG_DTYPE)
-        return append_node(self.store_node, 'trial_log', 'table', description)
 
     safe_indices = Property(Array('i'), store='array', depends_on='curidx')
     warn_indices = Property(Array('i'), store='array', depends_on='curidx')
@@ -293,4 +384,3 @@ if __name__ == '__main__':
     #analyzed = AnalyzedAversiveData(data=data)
     from cns.data.persistence import add_or_update_object
     add_or_update_object(data, f.root)
-

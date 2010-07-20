@@ -51,7 +51,7 @@ def rand_source(count, size, sleep):
 def adapter(source, target):
     while True:
         target.send(source.next())
-    
+
 @pipeline
 def sp_decimate(n, target):
     buffered = (yield)
@@ -65,7 +65,7 @@ def sp_decimate(n, target):
         target.send(max_data)
         print 'sent data'
         buffered = np.r_[buffered, (yield)]
-            
+
 @pipeline
 def moving_average(n, weights, overlap, target):
     '''Moving average of n samples using weights and sends to the target.  If
@@ -113,16 +113,17 @@ def broadcast(targets):
 
 @pipeline
 def deinterleave(targets):
-    n = len(targets)
+    #n = len(targets)
     while True:
         item = np.array((yield))
         for i, target in enumerate(targets):
             if target is not None:
-                target.send(item[:,i::n].ravel())
+                #target.send(item[:,i::n].ravel())
+                target.send(item[:,i].ravel())
 
 @pipeline
 def deinterleave_2d(targets):
-    n = len(targets)
+    #n = len(targets)
     while True:
         item = np.array((yield))
         for i, target in enumerate(targets):
