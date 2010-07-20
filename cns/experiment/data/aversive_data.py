@@ -238,24 +238,25 @@ class RawAversiveData_v0_2(BaseAversiveData):
 
     trial_running = Instance(FileChannel, store='automatic')
 
+    # We can switch back and forth between touch and optical as needed
     contact_digital = Alias('touch_digital')
     contact_digital_mean = Alias('touch_digital_mean')
     contact_analog = Alias('touch_analog')
 
-    # Stores raw contact data from optical and electrical sensors as well as
-    # whether a trial is running.
     water_log = Any(store='automatic')
     trial_log = Any(store='automatic')
     trial_data_table = Any(store='automatic')
 
+    # Stores raw contact data from optical and electrical sensors as well as
+    # whether a trial is running.
     def _contact_data_default(self):
         targets = [self.touch_digital,
                    self.touch_digital_mean,
-                   self.touch_analog,
-                   self.trial_running,
+                   #self.touch_analog,
                    self.optical_digital,
                    self.optical_digital_mean,
-                   self.optical_analog]
+                   self.trial_running, ]
+                   #self.optical_analog]
         return deinterleave(targets)
 
     def _create_channel(self, name, dtype):
@@ -372,12 +373,14 @@ class AnalyzedAversiveData(AnalyzedData):
 
     @on_trait_change('data.updated')
     def process_timestamp(self, timestamp):
-        # need to check if timestamp is undefined because this apparently fires when the class is initialized
+        # need to check if timestamp is undefined because this apparently fires
+        # when the class is initialized
         if timestamp is not Undefined:
             score = self.score_timestamp(timestamp)
             self._contact_scores[self.curidx] = score
             self.curidx += 1
             self.updated = True
+            print 'CONTACT', self.contact_scores
 
     @cached_property
     def _get_par_fa_frac(self):

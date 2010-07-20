@@ -288,7 +288,7 @@ class AversiveController(ExperimentController):
         circuit.trial_buf.initialize(fs=circuit.fs)
         circuit.int_buf.initialize(fs=circuit.fs)
         circuit.int_buf.set(paradigm.signal_safe)
-        circuit.contact_buf.initialize(channels=7, sf=1, fs=circuit.lick_nPer.get('fs'))
+        circuit.contact_buf.initialize(channels=5, sf=1, fs=circuit.lick_nPer.get('fs'))
         circuit.pause_state.value = True
         self.backend.set_attenuation(paradigm.signal_safe.attenuation, 'PA5')
         
@@ -310,7 +310,9 @@ class AversiveController(ExperimentController):
             return
 
         try:
-            # Order is important.  The data depends on several properties set in the circuit, so initialize_data must be called after initialize_circuit
+            # Order is important.  The data depends on several properties set in
+            # the circuit, so initialize_data must be called after
+            # initialize_circuit
             self.configure_circuit(self.circuit, self.model.paradigm)
             self.initialize_data(self.model)
 
