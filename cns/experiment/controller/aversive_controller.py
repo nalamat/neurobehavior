@@ -17,6 +17,7 @@ from enthought.traits.api import Any, Instance, CInt, CFloat, Str, Float, \
 from enthought.traits.ui.api import HGroup, spring, Item, View
 import logging
 import time
+import numpy as np
 
 log = logging.getLogger(__name__)
 
@@ -288,7 +289,14 @@ class AversiveController(ExperimentController):
         circuit.trial_buf.initialize(fs=circuit.fs)
         circuit.int_buf.initialize(fs=circuit.fs)
         circuit.int_buf.set(paradigm.signal_safe)
-        circuit.contact_buf.initialize(channels=5, sf=1, fs=circuit.lick_nPer.get('fs'))
+
+        circuit.contact_buf.initialize(channels=5, sf=127, src_type=np.int8,
+                compression='decimated', fs=circuit.lick_nPer.get('fs'))
+        circuit.touch_buf.initialize(sf=3276, src_type=np.int16,
+                compression='decimated', fs=circuit.lick_nPer.get('fs'))
+        circuit.optical_buf.initialize(sf=3276, src_type=np.int16,
+                compression='decimated', fs=circuit.lick_nPer.get('fs'))
+
         circuit.pause_state.value = True
         self.backend.set_attenuation(paradigm.signal_safe.attenuation, 'PA5')
         
@@ -389,8 +397,9 @@ class AversiveController(ExperimentController):
         
     @on_trait_change('fast_tick')
     def task_update_data(self):
-        data = self.circuit.contact_buf.read()
-        self.model.data.contact_data.send(data)
+        self.model.data.contact_data.send(self.circuit.contact_buf.read())
+        self.model.data.touch_analog.send(self.circuit.touch_buf.read())
+        self.model.data.optical_analog.send(self.circuit.optical_buf.read())
 
     @on_trait_change('fast_tick')
     def task_monitor_signal_safe(self):
