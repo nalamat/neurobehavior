@@ -3,3 +3,4 @@ glob:*.h5
 glob:*.pyc
 glob:*.asv
 glob:sandbox/**
+glob:*.*~

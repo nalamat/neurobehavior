@@ -3,36 +3,11 @@ import tables
 import re
 from numpy import dtype, array
 from enthought.traits.api import Array, List, Dict
+from cns.channel import FileChannel, FileMultiChannel
 import datetime
 
 import logging
 log = logging.getLogger(__name__)
-
-name_lookup = {'group':     'Group',
-               'earray':    'EArray',
-               'array':     'Array',
-               'table':     'Table'}
-
-def get_or_append_node(node, name, type='group', *arg, **kw):
-    try:
-        # TODO: add type checking?
-        return getattr(node, name)
-    except tables.NoSuchNodeError:
-        return append_node(node, name, type, *arg, **kw)
-    
-def append_node(node, name, type='group', *arg, **kw):
-    log.debug('appending %r to node %r', name, node)
-    file = node._v_file
-    path = node._v_pathname
-    type = name_lookup[type.lower()]
-    func = getattr(file, 'create' + type)
-    new_node = func(path, name, *arg, **kw)
-    #file.flush()
-    return new_node
-
-def append_date_node(node, pre='date', post='', type='group', *arg, **kw):
-    name = pre + datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S') + post
-    return append_node(node, name, type, *arg, **kw)
 
 def next_id(element, name=''):
     try: next_id = element._f_getAttr(name+'_NEXT_ID')
@@ -48,6 +23,22 @@ def get_np_dtype(trait):
 def get_hdf5_dtype(trait):
     types = ['S32' if t.startswith('date') else t for t in trait.col_types]
     return dtype(zip(trait.col_names, types))
+
+def get_traits(object, filter_readonly=False, filter_events=True, **metadata):
+    '''Convenience function to filter out readonly traits.  This is useful for
+    reconstructing a traited class that has been persisted by avoiding writes
+    to a readonly trait.  It is expected that the traited class knows how to
+    reconstruct readonly properties.
+    '''
+    #try: object = object.get_class_version(version)
+    #except: pass
+
+    if filter_readonly:
+        filter = lambda x: x() is None or x()[1].__name__ <> '_read_only'
+        metadata['property'] = filter
+    if filter_events:
+        metadata['type'] = lambda x: x <> 'event'
+    return object.class_traits(**metadata)
 
 def add_or_update_object(object, node, name=None):
     h5_file = node._v_file
@@ -73,7 +64,7 @@ def add_or_update_object(object, node, name=None):
         try: object_node._f_setAttr('UNIQUE_ID', object.UNIQUE_ID)
         except: pass
         # Info that allows us to recreate the object later
-        
+
     object_node._f_setAttr('module', object.__class__.__module__)
     object_node._f_setAttr('klass', object.__class__.__name__)
     #else: # We are supposed to use this node!
@@ -90,7 +81,7 @@ def add_or_update_object(object, node, name=None):
             value = value[:]
         elif trait.is_trait_type(Dict):
             value = dict(value)
-        
+
         if value is None:
             value = 'None'
         if value.__class__ in date_classes:
@@ -111,9 +102,9 @@ def add_or_update_object(object, node, name=None):
             h5_file.createEArray(object_node._v_pathname, name, atom, (0,))
         else:
             h5_file.createArray(object_node._v_pathname, name, value)
-            
-    # We need to track children nodes now since we will delete any old nodes 
-    # that the object may no longer have.  All nodes to be protected from 
+
+    # We need to track children nodes now since we will delete any old nodes
+    # that the object may no longer have.  All nodes to be protected from
     # deletion must be added to the children list.
     # Actually, I have decided this is a bad idea since it risks losing data
     #children = []
@@ -126,9 +117,9 @@ def add_or_update_object(object, node, name=None):
         value = sanitize_datetimes(value, trait)
         #value = array(value, dtype=get_np_dtype(trait))
         value = array(value, dtype=get_hdf5_dtype(trait))
-                                                    
+
         try:
-            # Table already exists.  We delete the data in the table and 
+            # Table already exists.  We delete the data in the table and
             # re-add it.  This is not really efficient, but the current use
             # case for this type of table will only have up to 100 rows so
             # we should not see much of a performance hit.
@@ -148,7 +139,7 @@ def add_or_update_object(object, node, name=None):
         except tables.NoSuchNodeError:
             object_path = object_node._v_pathname
             group_node = h5_file.createGroup(object_path, name)
-            
+
         if hasattr(value, '__iter__'): # This is a list of items
             #children.append(group_node)
             group_children = []
@@ -240,7 +231,7 @@ def strftime(value, resolution=None):
     return value.strftime(fmt)
 
 def switch_datetime_fmt(table, trait, parser):
-    # TODO: this is obviously not the most efficient implementation; however, 
+    # TODO: this is obviously not the most efficient implementation; however,
     # it works!
     if len(table):
         table = [tuple(row) for row in table]
@@ -249,7 +240,7 @@ def switch_datetime_fmt(table, trait, parser):
             if ctype.startswith('datetime'):
                 res = ctype[-2]
                 table[cname] = parser(table[cname], res)
-                
+
         # This is an ugly hack required by Numpy v1.3.  Once datetime support is
         # included in Numpy (possibly v1.5) much of the work can be delegated to
         # Numpy.  Possibly some of the other libraries that depend on numpy
@@ -268,11 +259,11 @@ def append_metadata(object, source):
     object.store_name = source._v_name
     object.store_node = source
     return object
-    
+
 def load_object(source, name=None):
     if name is not None:
         source = getattr(source, name)
-        
+
     kw = {}
     try:
         kw['UNIQUE_ID'] = source._f_getAttr('UNIQUE_ID')
@@ -281,40 +272,83 @@ def load_object(source, name=None):
 
     module_name = source._f_getAttr('module')
     klass_name = source._f_getAttr('klass')
+    #try: version = source._f_getAttr('version')
+    #except AttributeError: version = 0.1
 
     # We need to obtain a reference to the type so we can adequately parse any
     # datetime values that are stored in the HDF5 file.  This type will also be
     # used to create a class instance once we are done loading the data.
     type = getattr(__import__(module_name, fromlist=[klass_name]), klass_name)
 
-    for name, trait in type.class_traits(store='attribute').items():
-        if trait.type != 'property':
-            value = source._f_getAttr(name)
-            # TraitMap will raise an error here
-            try:
-                klass = trait.trait_type.klass
-            except:
-                klass = None
-            # We just want to check on the datetime
-            if klass is not None and klass in date_classes:
-                value = strptime(value)
-            elif isinstance(value, int):
-                value = int(value)
-                
-            kw[name] = value
+    #for name, trait in type.class_traits(store='attribute').items():
+    for name, trait in get_traits(type, True,  store='attribute').items():
+        value = source._f_getAttr(name)
+        # TraitMap will raise an error here
+        try:
+            klass = trait.trait_type.klass
+        except:
+            klass = None
+        # We just want to check on the datetime
+        if klass is not None and klass in date_classes:
+            value = strptime(value)
+        elif isinstance(value, int):
+            value = int(value)
 
-    for name, trait in type.class_traits(store='table').items():
+        kw[name] = value
+
+    #for name, trait in type.class_traits(store='table').items():
+    for name, trait in get_traits(type, True,  store='table').items():
         # Converts datetime back from string to Python datetime format
         data = getattr(source, name)[:]
         data = unsanitize_datetimes(data, trait)
         kw[name] = data
 
-    for name, trait in type.class_traits(store='child').items():
+    #for name, trait in type.class_traits(store='child').items():
+    for name, trait in get_traits(type, True, store='child').items():
         value = getattr(source, name)
         if trait.is_trait_type(List) or trait.is_trait_type(Array):
             kw[name] = [load_object(o) for o in value._v_children.values()]
             #kw[name].sort()
         else:
             kw[name] = load_object(value)
+
+    for name, trait in get_traits(type, True, store='automatic').items():
+        try:
+            try:
+                value = getattr(source, trait.store_name)
+            except (TypeError, AttributeError):
+                value = getattr(source, name)
+            kw[name] = value
+        except tables.NoSuchNodeError:
+            pass
+
+    for name, trait in get_traits(type, True, store='channel').items():
+        try:
+            try:
+                value = getattr(source, trait.store_name)
+            except (TypeError, AttributeError):
+                value = getattr(source, name)
+            kw[name] = load_file_channel(value)
+        except tables.NoSuchNodeError:
+            pass
+
     object = type(**kw)
     return append_metadata(object, source)
+
+def load_file_channel(node):
+    kw = {}
+    kw['fs'] = node._f_getAttr('fs')
+    kw['dtype'] = node.atom.dtype
+    kw['compression_level'] = node.filters.complevel
+    kw['compression_type'] = node.filters.complib
+    kw['use_checksum'] = node.filters.fletcher32
+    kw['node'] = node._g_getparent()
+    kw['buffer'] = node
+    kw['name'] = node.name
+    
+    if len(node.shape) == 2:
+        klass = FileMultiChannel
+        kw['channels'] = node.shape[1]
+    else:
+        klass = FileChannel
+    return klass(**kw)

@@ -12,7 +12,7 @@ from enthought.traits.api import Instance, List, CFloat, Int, Float, Any, \
     Range, DelegatesTo, cached_property, on_trait_change, Array, Event, \
     Property, Undefined, Callable
 import numpy as np
-from cns.data.persistence import append_node, get_or_append_node
+from cns.data.h5_utils import append_node, get_or_append_node
 from cns.pipeline import deinterleave
 
 def apply_mask(fun, seq, mask):
@@ -27,151 +27,60 @@ def Alias(name):
     return Property(lambda obj: getattr(obj, name),
                     lambda obj, val: setattr(obj, name, val))
 
-class RawAversiveData_v0_1(ExperimentData):
+def migrate_data(data):
+    if data.version == 0.1:
+        old_data = data.__dict__
+        new_data = old_data.copy()
+        del new_data['__traits_listener__']
+        new_data['touch_digital'] = old_data.contact_data[0,:]
+        new_data['touch_digital_mean'] = old_data.contact_data[1,:]
+        new_data['touch_digital_analog'] = old_data.contact_data[2,:]
+        new_data['trial_running'] = old_data.contact_data[3,:]
+        return AversiveData(**new_data)
+    else:
+        return data
 
-    version = Float(0.1)
+class BaseAversiveData(ExperimentData):
 
-    # This is a bit of a hack but I'm not sure of a better way to send the
-    # datafile down the hierarchy.  We need access to this data file so we can
-    # stream data to disk rather than storing it in a temporary buffer.
-    store_node = Any
+    version = Float(0.0)
+    latest_version = 0.1
 
-    contact_fs = Float
-
-    contact_digital = Property
-    contact_digital_mean = Property
-    contact_analog = Property
-    trial_running = Property
-
-    def _get_contact_digital(self):
-        return self.contact_data.get_channel('digital')
-
-    def _get_contact_digital_mean(self):
-        return self.contact_data.get_channel('digital_mean')
-
-    def _get_contact_analog(self):
-        return self.contact_data.get_channel('analog')
-
-    def _get_trial_running(self):
-        return self.contact_data.get_channel('trial_running')
-
-
-    # Stores raw contact data from optical and electrical sensors as well as
-    # whether a trial is running.
-    contact_data = Instance(FileMultiChannel, store='automatic')
-    water_log = Any(store='automatic')
-    trial_log = Any(store='automatic')
-    trial_data_table = Any(store='automatic')
-
-    def _contact_data_default(self):
-        names = ['digital', 'digital_mean', 'analog', 'trial_running']
-        return FileMultiChannel(node=self.store_node, fs=self.contact_fs,
-                           name='contact', dtype=np.float32, names=names,
-                           channels=4, window_fill=0)
-
-    def _water_log_default(self):
-        description = np.recarray((0,), dtype=WATER_DTYPE)
-        return append_node(self.store_node, 'water_log', 'table', description)
-
-    def _trial_data_table_default(self):
-        description = np.recarray((0,), dtype=TRIAL_DTYPE)
-        return append_node(self.store_node, 'trial_data', 'table', description)
-
-    def _trial_log_default(self):
-        description = np.recarray((0,), dtype=LOG_DTYPE)
-        return append_node(self.store_node, 'trial_log', 'table', description)
-
-class RawAversiveData_v0_2():
-
-    # This version restructures how contact data is stored
-    version = Float(0.2)
-
-    store_node = Any
-    contact_fs = Float
-
-    contact_data = Callable
-
-    touch_digital = Instance(FileChannel, store='automatic')
-    touch_digital_mean = Instance(FileChannel, store='automatic')
-    touch_analog = Instance(FileChannel, store='automatic')
-    optical_digital = Instance(FileChannel, store='automatic')
-    optical_digital_mean = Instance(FileChannel, store='automatic')
-    optical_analog = Instance(FileChannel, store='automatic')
-
-    trial_running = Instance(FileChannel, store='automatic')
-
-    def _contact_data_default(self):
-        targets = [self.touch_digital,
-                   self.touch_digital_mean,
-                   self.touch_analog,
-                   self.trial_running,
-                   self.optical_digital,
-                   self.optical_digital_mean,
-                   self.optical_analog]
-        return deinterleave(targets)
-
-    def _create_channel(self, name, dtype):
-        contact_node = get_or_append_node(self.store_node, 'contact')
-        return FileChannel(node=contact_node, fs=self.contact_fs,
-                           name=name, dtype=dtype)
-
-    def _touch_digital_default(self):
-        return self._create_channel('touch_digital', np.bool)
-
-    def _touch_digital_mean_default(self):
-        return self._create_channel('touch_digital_mean', np.float32)
-
-    def _touch_analog_default(self):
-        return self._create_channel('touch_analog', np.float32)
-
-    def _optical_digital_default(self):
-        return self._create_channel('optical_digital', np.bool)
-
-    def _optical_digital_mean_default(self):
-        return self._create_channel('optical_digital_mean', np.float32)
-
-    def _optical_analog_default(self):
-        return self._create_channel('optical_analog', np.float32)
-
-    def _trial_running(self):
-        return self._create_channel('trial_running', np.bool)
-
-    contact_digital = Alias('touch_digital')
-    contact_digital_mean = Alias('touch_digital_mean')
-    contact_analog = Alias('touch_analog')
-
-    # Stores raw contact data from optical and electrical sensors as well as
-    # whether a trial is running.
-    water_log = Any(store='automatic')
-    trial_log = Any(store='automatic')
-    trial_data_table = Any(store='automatic')
-
-    def _water_log_default(self):
-        description = np.recarray((0,), dtype=WATER_DTYPE)
-        return append_node(self.store_node, 'water_log', 'table', description)
-
-    def _trial_data_table_default(self):
-        description = np.recarray((0,), dtype=TRIAL_DTYPE)
-        return append_node(self.store_node, 'trial_data', 'table', description)
-
-    def _trial_log_default(self):
-        description = np.recarray((0,), dtype=LOG_DTYPE)
-        return append_node(self.store_node, 'trial_log', 'table', description)
-
-RawAversiveData = RawAversiveData_v0_2
-
-class AversiveData(RawAversiveData):
+    '''
+    @classmethod
+    def get_class_version(cls, version):
+        cls_map = { 0.1:    RawAversiveData_v0_1,
+                    0.2:    RawAversiveData_v0_2, }
+        return cls_map[version]
+            
+    def __new__(cls, *arg, **kw):
+        print kw.keys()
+        # Check to see if a version is identified.
+        try:
+            version = kw.get('version', cls.latest_version)
+            print cls.__subclasses__()
+            subclass = cls_map[version]
+            print cls, subclass
+            return super(cls, subclass).__new__(subclass, *arg, **kw)
+        except BaseException, e:
+            print e
+            raise BaseException, 'Unsupported version of the data!'
+    '''
 
     def log_water(self, ts, infused):
         self.water_log.append([(ts, infused)])
         self.water_updated = True
 
+    def log(self, timestamp, name, value):
+        self.trial_log.append([(timestamp, name, '%r' % value)])
+
+    def update(self, timestamp, par, shock, type):
+        self.trial_data_table.append([(timestamp, par, shock, type)])
+        self.curidx += 1
+        self.updated = timestamp
+
     # This is actually a pointer to the stored data, which acts like a numpy
     # array for the most part
     trial_data = Property(depends_on='curidx')
-
-    #updated = Event
-
     curidx = Int(0)
 
     # TODO: Is this a performance hit?
@@ -236,14 +145,6 @@ class AversiveData(RawAversiveData):
 
     updated = Event
 
-    def log(self, timestamp, name, value):
-        self.trial_log.append([(timestamp, name, '%r' % value)])
-
-    def update(self, timestamp, par, shock, type):
-        self.trial_data_table.append([(timestamp, par, shock, type)])
-        self.curidx += 1
-        self.updated = timestamp
-
     @cached_property
     def _get_total_trials(self):
         return len(self.warn_trials)
@@ -265,9 +166,142 @@ class AversiveData(RawAversiveData):
     def _get_par_count(self):
         return apply_mask(len, self.warn_trials, self.warn_par_mask)
 
+class RawAversiveData_v0_1(BaseAversiveData):
+
+    version = 0.1
+
+    # This is a bit of a hack but I'm not sure of a better way to send the
+    # datafile down the hierarchy.  We need access to this data file so we can
+    # stream data to disk rather than storing it in a temporary buffer.
+    store_node = Any
+
+    contact_fs = Float
+
+    contact_digital = Property
+    contact_digital_mean = Property
+    contact_analog = Property
+    trial_running = Property
+
+    def _get_contact_digital(self):
+        return self.contact_data.get_channel('digital')
+
+    def _get_contact_digital_mean(self):
+        return self.contact_data.get_channel('digital_mean')
+
+    def _get_contact_analog(self):
+        return self.contact_data.get_channel('analog')
+
+    def _get_trial_running(self):
+        return self.contact_data.get_channel('trial_running')
+
+    # Stores raw contact data from optical and electrical sensors as well as
+    # whether a trial is running.
+    contact_data = Instance(FileMultiChannel, store='channel', 
+                            store_name='contact')
+    water_log = Any(store='automatic')
+    trial_log = Any(store='automatic')
+    trial_data_table = Any(store='automatic', store_name='trial_data')
+
+    def _contact_data_default(self):
+        names = ['digital', 'digital_mean', 'analog', 'trial_running']
+        return FileMultiChannel(node=self.store_node, fs=self.contact_fs,
+                           name='contact', dtype=np.float32, names=names,
+                           channels=4, window_fill=0)
+
+    def _water_log_default(self):
+        description = np.recarray((0,), dtype=WATER_DTYPE)
+        return append_node(self.store_node, 'water_log', 'table', description)
+
+    def _trial_data_table_default(self):
+        description = np.recarray((0,), dtype=TRIAL_DTYPE)
+        return append_node(self.store_node, 'trial_data', 'table', description)
+
+    def _trial_log_default(self):
+        description = np.recarray((0,), dtype=LOG_DTYPE)
+        return append_node(self.store_node, 'trial_log', 'table', description)
+
+class RawAversiveData_v0_2(BaseAversiveData):
+
+    version = 0.2
+
+    store_node = Any
+    contact_fs = Float
+
+    contact_data = Callable
+
+    touch_digital = Instance(FileChannel, store='automatic')
+    touch_digital_mean = Instance(FileChannel, store='automatic')
+    touch_analog = Instance(FileChannel, store='automatic')
+    optical_digital = Instance(FileChannel, store='automatic')
+    optical_digital_mean = Instance(FileChannel, store='automatic')
+    optical_analog = Instance(FileChannel, store='automatic')
+
+    trial_running = Instance(FileChannel, store='automatic')
+
+    contact_digital = Alias('touch_digital')
+    contact_digital_mean = Alias('touch_digital_mean')
+    contact_analog = Alias('touch_analog')
+
+    # Stores raw contact data from optical and electrical sensors as well as
+    # whether a trial is running.
+    water_log = Any(store='automatic')
+    trial_log = Any(store='automatic')
+    trial_data_table = Any(store='automatic')
+
+    def _contact_data_default(self):
+        targets = [self.touch_digital,
+                   self.touch_digital_mean,
+                   self.touch_analog,
+                   self.trial_running,
+                   self.optical_digital,
+                   self.optical_digital_mean,
+                   self.optical_analog]
+        return deinterleave(targets)
+
+    def _create_channel(self, name, dtype):
+        contact_node = get_or_append_node(self.store_node, 'contact')
+        return FileChannel(node=contact_node, fs=self.contact_fs,
+                           name=name, dtype=dtype)
+
+    def _touch_digital_default(self):
+        return self._create_channel('touch_digital', np.bool)
+
+    def _touch_digital_mean_default(self):
+        return self._create_channel('touch_digital_mean', np.float32)
+
+    def _touch_analog_default(self):
+        return self._create_channel('touch_analog', np.float32)
+
+    def _optical_digital_default(self):
+        return self._create_channel('optical_digital', np.bool)
+
+    def _optical_digital_mean_default(self):
+        return self._create_channel('optical_digital_mean', np.float32)
+
+    def _optical_analog_default(self):
+        return self._create_channel('optical_analog', np.float32)
+
+    def _trial_running_default(self):
+        return self._create_channel('trial_running', np.bool)
+
+    def _water_log_default(self):
+        description = np.recarray((0,), dtype=WATER_DTYPE)
+        return append_node(self.store_node, 'water_log', 'table', description)
+
+    def _trial_data_table_default(self):
+        description = np.recarray((0,), dtype=TRIAL_DTYPE)
+        return append_node(self.store_node, 'trial_data', 'table', description)
+
+    def _trial_log_default(self):
+        description = np.recarray((0,), dtype=LOG_DTYPE)
+        return append_node(self.store_node, 'trial_log', 'table', description)
+
+# For legacy reasons, we will let AversiveData = RawAversiveData_v0_1
+AversiveData = RawAversiveData_v0_1
+
 class AnalyzedAversiveData(AnalyzedData):
 
-    data = Instance(AversiveData, ())
+    data = Instance(BaseAversiveData, ())
     updated = Event
 
     # The next few pars will influence the analysis of the data,
@@ -316,9 +350,8 @@ class AnalyzedAversiveData(AnalyzedData):
     par_fa_frac = Property(List(Float), depends_on='curidx')
 
     par_info = Property(store='table',
-                                  col_names=['par', 'hit_frac', 'fa_frac'],
-                                  col_types=['f', 'f', 'f'],
-                                  )
+                        col_names=['par', 'hit_frac', 'fa_frac'],
+                        col_types=['f', 'f', 'f'],)
 
     def _get_par_info(self):
         return zip(self.pars,

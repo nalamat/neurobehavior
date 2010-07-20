@@ -9,7 +9,7 @@
 #------------------------------------------------------------------------------
 
 from cns.buffer import SoftwareRingBuffer
-from cns.data.persistence import append_node
+from cns.data.h5_utils import append_node
 from cns.util.signal import rfft
 from enthought.traits.api import HasTraits, Property, Array, Int, Event, \
     Instance, on_trait_change, Bool, Any, String, Float, cached_property, List, Str, \
@@ -78,7 +78,8 @@ class FileChannel(Channel):
     
     # It is important to implement dtype appropriately, otherwise it defaults
     # to float64 (double-precision float).
-    dtype = Instance(type) # TODO: How do we restrict this to a dtype?
+    #dtype = Instance(type) # TODO: How do we restrict this to a dtype?
+    dtype = Any
 
     node = Instance(tables.group.Group)
     name = String('FileChannel')
