@@ -1,7 +1,8 @@
 from .experiment_controller import ExperimentController
 from cns import choice, equipment
-from cns.data.persistence import append_node, append_date_node, \
-    add_or_update_object, get_or_append_node
+from cns.data.h5_utils import append_node, append_date_node, \
+    get_or_append_node
+from cns.data.persistence import add_or_update_object
 from cns.experiment.data import AversiveData
 from cns.experiment.paradigm import AversiveParadigm
 from cns.widgets import icons
@@ -287,7 +288,7 @@ class AversiveController(ExperimentController):
         circuit.trial_buf.initialize(fs=circuit.fs)
         circuit.int_buf.initialize(fs=circuit.fs)
         circuit.int_buf.set(paradigm.signal_safe)
-        circuit.contact_buf.initialize(channels=4, sf=1, fs=circuit.lick_nPer.get('fs'))
+        circuit.contact_buf.initialize(channels=7, sf=1, fs=circuit.lick_nPer.get('fs'))
         circuit.pause_state.value = True
         self.backend.set_attenuation(paradigm.signal_safe.attenuation, 'PA5')
         
@@ -344,8 +345,8 @@ class AversiveController(ExperimentController):
         self.circuit.trial_buf.set(self.current.signal_remind)
         self.backend.set_attenuation(self.current.signal_remind.attenuation, 'PA5')
         self.circuit.shock_level.value = self.current.shock_remind
-        print self.circuit.shock_level.value
-        print self.circuit.actual_shock.value
+        #print self.circuit.shock_level.value
+        #print self.circuit.actual_shock.value
         #self.circuit.trigger(1) # Go into warning on next trial
         self.circuit.pause_state.value = False # Everything's ready. GO!
         self.circuit.trigger(2)

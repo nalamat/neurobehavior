@@ -6,7 +6,7 @@ from os.path import abspath, dirname, join
 import sys
 
 
-libdir = abspath(join(dirname(__name__), '..'))
+libdir = abspath(join(dirname(__file__), '../..'))
 sys.path.append(libdir)
 
 #import logging.config

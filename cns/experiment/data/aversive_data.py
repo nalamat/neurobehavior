@@ -227,7 +227,7 @@ class RawAversiveData_v0_2(BaseAversiveData):
     store_node = Any
     contact_fs = Float
 
-    contact_data = Callable
+    contact_data = Any
 
     touch_digital = Instance(FileChannel, store='automatic')
     touch_digital_mean = Instance(FileChannel, store='automatic')
@@ -297,7 +297,8 @@ class RawAversiveData_v0_2(BaseAversiveData):
         return append_node(self.store_node, 'trial_log', 'table', description)
 
 # For legacy reasons, we will let AversiveData = RawAversiveData_v0_1
-AversiveData = RawAversiveData_v0_1
+#AversiveData = RawAversiveData_v0_1
+AversiveData = RawAversiveData_v0_2
 
 class AnalyzedAversiveData(AnalyzedData):
 
@@ -400,15 +401,15 @@ class AnalyzedAversiveData(AnalyzedData):
 
     @cached_property
     def _get_safe_scores(self):
-        return self.contact_scores[self.data.safe_indices]
+        return self.contact_scores[self.safe_indices]
 
     @cached_property
     def _get_warn_scores(self):
-        return self.contact_scores[self.data.warn_indices]
+        return self.contact_scores[self.warn_indices]
 
     @cached_property
     def _get_remind_scores(self):
-        return self.contact_scores[self.data.remind_indices]
+        return self.contact_scores[self.remind_indices]
 
 if __name__ == '__main__':
     import tables

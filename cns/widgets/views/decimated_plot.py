@@ -149,6 +149,7 @@ class TimeSeries(BaseXYPlot):
             if self.ch_index is None:
                 self._cached_data = values
             else:
+		print self.ch_index
                 self._cached_data = values[:,self.ch_index]
             self._cached_data_bounds = t_lb, t_ub
             self._cache_valid = True

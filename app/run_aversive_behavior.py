@@ -78,13 +78,6 @@ def test_experiment():
     ae.paradigm.signal_warn.variables = ['frequency']
     ae.configure_traits()
 
-def test_aversive_experiment():
-    store = tables.openFile('test.h5', 'a')
-    ae = AversivePhysiologyExperiment(store_node=store.root)
-    ae.configure_traits()
-
 if __name__ == '__main__':
-    CohortView().configure_traits(handler=ExperimentHandler)
-    #test_experiment()
-    #test_aversive_experiment()
-    #test_experiment()
+    #CohortView().configure_traits(handler=ExperimentHandler)
+    test_experiment()

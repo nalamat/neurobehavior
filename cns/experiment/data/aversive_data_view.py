@@ -31,14 +31,16 @@ class AnalyzedAversiveDataView(AnalyzedView):
                 value_max=1,
                 interactive=False,
                 window=5,
-                clean_data=True,
-                )
-        view.add(self.analyzed.data.contact_data, 
-                 decimate_mode='mean', ch_index=3, color='lightpink', line_width=2)
-        view.add(self.analyzed.data.contact_data, 
-                 decimate_mode='mean', ch_index=0, color='gray', line_width=2)
-        view.add(self.analyzed.data.contact_data, 
-                 decimate_mode='mean', ch_index=1, color='black', line_width=2)
+                clean_data=True,)
+	view.add(self.analyzed.data.trial_running,
+        #view.add(self.analyzed.data.contact_data, ch_index=3,
+                 decimate_mode='mean', color='lightpink', line_width=2)
+	view.add(self.analyzed.data.contact_digital,
+        #view.add(self.analyzed.data.contact_data, ch_index=0,
+                 decimate_mode='mean', color='gray', line_width=2)
+        #view.add(self.analyzed.data.contact_data, ch_index=1,
+	view.add(self.analyzed.data.contact_digital_mean, 
+                 decimate_mode='mean', color='black', line_width=2)
         return view
 
     def _raw_contact_plot_default(self):
