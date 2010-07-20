@@ -62,7 +62,7 @@ class AnalyzedAversiveDataView(AnalyzedView):
                 bar_color='black',
                 bar_width=0.9,
                 value_min=0,
-                value_max=1,
+                value_max='auto',
                 )
 
     def _par_hit_frac_chart_default(self):
