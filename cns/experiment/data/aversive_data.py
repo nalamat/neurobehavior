@@ -32,6 +32,7 @@ class AversiveData(ExperimentData):
     contact_fs = Float
 
     contact_data = Instance(FileMultiChannel, store='automatic')
+    
     contact_digital = Property
     contact_digital_mean = Property
     contact_analog = Property
@@ -52,14 +53,14 @@ class AversiveData(ExperimentData):
     def _contact_data_default(self):
         names = ['digital', 'digital_mean', 'analog', 'trial_running']
         return FileMultiChannel(node=self.store_node, fs=self.contact_fs,
-                           name='contact', type=np.float32, names=names,
+                           name='contact', dtype=np.float32, names=names,
                            channels=4, window_fill=0)
 
     water_log = Any(store='automatic')
     def _water_log_default(self):
         description = np.recarray((0,), dtype=WATER_DTYPE)
         return append_node(self.store_node, 'water_log', 'table', description)
-    
+
     def log_water(self, ts, infused):
         self.water_log.append([(ts, infused)])
         self.water_updated = True

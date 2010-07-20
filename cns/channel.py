@@ -13,7 +13,7 @@ from cns.data.persistence import append_node
 from cns.util.signal import rfft
 from enthought.traits.api import HasTraits, Property, Array, Int, Event, \
     Instance, on_trait_change, Bool, Any, String, Float, cached_property, List, Str, \
-    DelegatesTo
+    DelegatesTo, Enum
 import numpy as np
 import tables
 
@@ -47,7 +47,7 @@ class AbstractChannel(HasTraits):
         ub_time = ub/self.fs
         lb_time = ub_time-len(signal)/self.fs
         return signal, lb_time, ub_time
-    
+
     def filter(self, filter):
         '''Takes b,a parameters for filter'''
         self.signal = filtfilt(self.signal, **filter)
@@ -66,20 +66,40 @@ class Channel(AbstractChannel):
 
 class FileChannel(Channel):
 
-    dtype = Any
-    node = Any
+    # Default settings for the filter should create the smallest possible file
+    # size while providing adequate read/write performance.  Checksumming allows
+    # us to check for data integrity.  I have it disabled by default because
+    # small aberrations in a large, continuous waveform are not of as much
+    # concern to us and I understand there can be a sizable performance
+    # penalty.
+    compression_level = Int(1)
+    compression_type = Enum('zlib', 'lzo', 'bzip')
+    use_checksum = Bool(False)
+    
+    # It is important to implement dtype appropriately, otherwise it defaults
+    # to float64 (double-precision float).
+    dtype = Instance(type) # TODO: How do we restrict this to a dtype?
+
+    node = Instance(tables.group.Group)
     name = String('FileChannel')
-    buffer = Any
     expected_duration = Float(60) # seconds
     shape = Property
+    
+    buffer = Instance(tables.array.Array)
 
     def _get_shape(self):
         return (0,)
 
     def _create_buffer(self):
         atom = tables.Atom.from_dtype(np.dtype(self.dtype))
+        filters = tables.Filters(complevel=self.compression_level,
+                                 complib=self.compression_type,
+                                 fletcher32=self.use_checksum)
+
         buffer = append_node(self.node, self.name, 'EArray', atom, self.shape,
-                             expectedrows=int(self.fs*self.expected_duration))
+                             expectedrows=int(self.fs*self.expected_duration),
+                             filters=filters)
+
         buffer.setAttr('fs', self.fs)
         return buffer
 
@@ -241,6 +261,7 @@ class FileMultiChannel(FileChannel, MultiChannel):
     def _create_buffer(self):
         buffer = super(FileMultiChannel, self)._create_buffer()
         buffer.setAttr('channels', self.channels)
+        buffer.setAttr('names', self.names)
         return buffer
 
 class SnippetChannel(Channel):
