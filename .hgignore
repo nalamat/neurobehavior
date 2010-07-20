@@ -4,3 +4,4 @@ glob:*.pyc
 glob:*.asv
 glob:sandbox/**
 glob:*.*~
+glob:*.swp

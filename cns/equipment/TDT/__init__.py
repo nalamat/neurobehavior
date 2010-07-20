@@ -2,7 +2,6 @@ import logging
 log = logging.getLogger(__name__)
 
 import rpcox
-import actxobjects
 
 '''The simplest way to connect to the TDT DSP devices is:
 
@@ -93,12 +92,20 @@ try:
     # functions the library supports).
     import actxobjects
     import pywintypes
+    import atexit
     ZBUS = connect_zbus(INTERFACE)
+
+    # Connect to devices and register an atexit handler so that we can properly
+    # halt the equipment once we are done.
     RX6 = connect('RX6', INTERFACE)
+    atexit.register(RX6.Halt)
     RZ5 = connect('RZ5', INTERFACE)
+    atexit.register(RZ5.Halt)
+
     # Merri: For a two-speaker configuration I believe you would want to do
     # something such as PA5_1 = connect('PA5', ID=1)
     PA5 = connect('PA5', INTERFACE)
+    atexit.register(PA5.SetAtten, 120)
 except ImportError, e:
     log.exception('Missing module.  Unable to load hardware drivers')
 except pywintypes.com_error, e:
