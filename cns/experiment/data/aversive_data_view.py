@@ -22,7 +22,6 @@ class AnalyzedAversiveDataView(AnalyzedView):
 
     score_chart = Instance(BarChartOverlay)
     contact_plot = Instance(MultipleChannelView)
-    #raw_contact_plot = Instance(MultipleChannelView)
     raw_contact_plot = Instance(MultiChannelView)
 
     def _contact_plot_default(self):
@@ -32,14 +31,11 @@ class AnalyzedAversiveDataView(AnalyzedView):
                 interactive=False,
                 window=5,
                 clean_data=True,)
-	view.add(self.analyzed.data.trial_running,
-        #view.add(self.analyzed.data.contact_data, ch_index=3,
+        view.add(self.analyzed.data.trial_running,
                  decimate_mode='mean', color='lightpink', line_width=2)
-	view.add(self.analyzed.data.contact_digital,
-        #view.add(self.analyzed.data.contact_data, ch_index=0,
+        view.add(self.analyzed.data.contact_digital,
                  decimate_mode='mean', color='gray', line_width=2)
-        #view.add(self.analyzed.data.contact_data, ch_index=1,
-	view.add(self.analyzed.data.contact_digital_mean, 
+        view.add(self.analyzed.data.contact_digital_mean, 
                  decimate_mode='mean', color='black', line_width=2)
         return view
 

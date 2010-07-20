@@ -17,7 +17,6 @@ def next_id(element, name=''):
 
 def get_np_dtype(trait):
     types = ['object' if t.startswith('date') else t for t in trait.col_types]
-    #return dtype(zip(trait.col_names, trait.col_types))
     return dtype(zip(trait.col_names, types))
 
 def get_hdf5_dtype(trait):
@@ -30,9 +29,6 @@ def get_traits(object, filter_readonly=False, filter_events=True, **metadata):
     to a readonly trait.  It is expected that the traited class knows how to
     reconstruct readonly properties.
     '''
-    #try: object = object.get_class_version(version)
-    #except: pass
-
     if filter_readonly:
         filter = lambda x: x() is None or x()[1].__name__ <> '_read_only'
         metadata['property'] = filter
