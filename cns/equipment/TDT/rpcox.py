@@ -148,7 +148,7 @@ class DSPBuffer(BlockBuffer):
                    multiple=1, compression=None, fs=None, sf=1):
 
         self.__dict__.update(locals())
-        
+
         if read_mode == 'continuous':
             self.name_idx = self.name + '_idx'
         elif read_mode == 'triggered':
@@ -167,6 +167,10 @@ class DSPBuffer(BlockBuffer):
         self.idx = self.dsp.GetTagVal(self.name_idx)
         read_func = self._read_mode[(self.channels==1, self.compression)]
         self._read = read_func.__get__(self, DSPBuffer)
+
+        if self.dsp.GetTagSize(self.name) % self.channels:
+            mesg = 'Buffer size must be a multiple of the channel number'
+            raise ValueError, mesg
             
     def _set_length(self, length):
         #buf_size = self.dsp.GetTagVal(self.name_len)
