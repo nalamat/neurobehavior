@@ -33,26 +33,26 @@ class ExperimentHandler(CohortViewHandler):
                 animal_node = item.store_node
             else:
                 log.debug('Opening node %r for %r', item.store_node, item)
-                #print item.store_path, item.store_node
                 file = tables.openFile(item.store_file, 'a', rootUEP=item.store_path)
                 animal_node = file.root
-                #print file.root._v_children
-                #animal_node = file.getNode(item.store_path)
             
             store_node = get_or_append_node(animal_node, 'experiments')
             try:
                 paradigm = persistence.load_object(store_node, 'last_paradigm')
                 paradigm.shock_settings.paradigm = paradigm
             except (tables.NoSuchNodeError, TraitError):
-                log.debug('behavior_experiments not found, creating node')
+                log.debug('No prior paradigm found.  Creating new paradigm.')
                 paradigm = None
                 
             handler = AversiveController()
             model = AversiveExperiment(store_node=store_node, animal=item)
             
             if paradigm is not None:
+                log.debug('Animal does not have any prior paradigm.')
+                log.debug('Using paradigm from previous animal.')
                 model.paradigm = paradigm
             elif self.last_paradigm is not None:
+                log.debug('Using paradigm from last time this animal was run')
                 model.paradigm = self.last_paradigm
 
             model.edit_traits(handler=handler, parent=info.ui.control, kind='livemodal')
@@ -64,11 +64,8 @@ class ExperimentHandler(CohortViewHandler):
                 self.last_paradigm = model.paradigm
                 
             # Close the file if we opened it
-            try:
-                #file.flush()
-                file.close()
-            except NameError:
-                pass
+            try: file.close()
+            except NameError: pass
             
         except AttributeError: pass
         

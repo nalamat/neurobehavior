@@ -33,7 +33,6 @@ class AversiveExperiment(HasTraits):
                                'handler.status{}~',],
                                'handler.time_elapsed{Time}~',
                                'handler.water_infused{Water infused}~',
-                               #'handler.ch_monitor',
                                '|[Equipment status]'],
                               Item('handler.pump@', editor=InstanceEditor()),
                               Item('paradigm@', editor=InstanceEditor(view='edit_view'),
@@ -42,7 +41,6 @@ class AversiveExperiment(HasTraits):
                                    visible_when='handler.state<>"halted"'),
                               show_labels=False,
                               ),
-                              #Item('object.data.ch_monitor'),
                        Item('analyzed_view', style='custom', width=900, height=800),
                        show_labels=False,
                        )
