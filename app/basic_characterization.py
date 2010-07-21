@@ -8,7 +8,7 @@ from config import settings
 from cns import equipment
 from cns.channel import FileMultiChannel, MultiChannel, RAMMultiChannel, \
     RAMChannel, Channel
-from cns.data.persistence import append_date_node
+from cns.data.h5_utils import append_date_node
 from cns.signal.signal_dialog import SignalDialog
 from cns.widgets.views.channel_view import MultiChannelView
 from enthought.pyface.timer.api import Timer
