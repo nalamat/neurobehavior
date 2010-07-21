@@ -33,7 +33,7 @@ class AversiveExperiment(HasTraits):
                                'handler.status{}~',],
                                'handler.time_elapsed{Time}~',
                                'handler.water_infused{Water infused}~',
-                               '|[Equipment status]'],
+                               '|[Experiment status]'],
                               Item('handler.pump@', editor=InstanceEditor()),
                               Item('paradigm@', editor=InstanceEditor(view='edit_view'),
                                    visible_when='handler.state=="halted"'),

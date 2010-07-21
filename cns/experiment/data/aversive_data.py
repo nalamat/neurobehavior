@@ -3,7 +3,7 @@ not sure what to call the SAFE/WARN trials.  We need to agree on some sensible
 terminology to avoid any confusion.  For example:
 
     TRIAL - The response to the test signal plus it's associated "false alarms".
-    TRIAL BLOCK - All pars presented during an experiment.
+    TRIAL BLOCK - All trials presented during an experiment.
 """
 #from .experiment_data import ExperimentData, AnalyzedData
 from cns.experiment.data.experiment_data import ExperimentData, AnalyzedData
@@ -11,6 +11,7 @@ from cns.channel import FileMultiChannel, FileChannel
 from enthought.traits.api import Instance, List, CFloat, Int, Float, Any, \
     Range, DelegatesTo, cached_property, on_trait_change, Array, Event, \
     Property, Undefined, Callable, Str, Enum
+from datetime import datetime
 import numpy as np
 from cns.data.h5_utils import append_node, get_or_append_node
 from cns.pipeline import deinterleave
@@ -19,6 +20,7 @@ def apply_mask(fun, seq, mask):
     seq = np.array(seq).ravel()
     return [fun(seq[m]) for m in mask]
 
+# All timestamps reflect the sample number of the contact data
 WATER_DTYPE = [('timestamp', 'i'), ('infused', 'f')]
 TRIAL_DTYPE = [('timestamp', 'i'), ('par', 'f'), ('shock', 'f'), ('type', 'S16'), ]
 LOG_DTYPE = [('timestamp', 'i'), ('name', 'S64'), ('value', 'S128'), ]
@@ -101,8 +103,17 @@ class BaseAversiveData(ExperimentData):
     warn_ts = Property(Array('f'))
     safe_ts = Property(Array('f'))
 
-    comment = Str(store='attribute')
+    comment = Str('', store='attribute')
     exit_status = Enum('complete', 'partial', 'aborted', store='attribute')
+    start_time = Instance(datetime, store='attribute')
+    stop_time = Instance(datetime, store='attribute')
+    duration = Property(store='attribute')
+
+    def _get_duration(self):
+        if self.stop_time is None:
+            return datetime.now()-self.start_time
+        else:
+            return self.stop_time-self.start_time
 
     def _get_warn_ts(self):
         return self.trial_data[self.warn_indices]['timestamp']

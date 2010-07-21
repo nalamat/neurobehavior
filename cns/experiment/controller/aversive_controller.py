@@ -7,7 +7,7 @@ from cns.experiment.data import AversiveData
 from cns.experiment.paradigm import AversiveParadigm
 from cns.widgets import icons
 from cns.widgets.toolbar import ToolBar
-from datetime import timedelta
+from datetime import timedelta, datetime
 from enthought.etsconfig.etsconfig import ETSConfig
 from enthought.pyface.api import error
 from enthought.pyface.timer.api import Timer
@@ -335,11 +335,11 @@ class AversiveController(ExperimentController):
             #===================================================================
             self.fast_timer = Timer(250, self.tick, 'fast')
             self.slow_timer = Timer(1000, self.tick, 'slow')
-            self.start_time = time.time()
 
             # Setting state to paused should be one of the last things we do to
             # prevent the UI from changing the controls to the 'running' state.
             self.state = 'paused'
+            self.model.data.start_time = datetime.now()
             self.circuit.start()
             self.model.trial_blocks += 1
 
@@ -379,6 +379,8 @@ class AversiveController(ExperimentController):
         self.circuit.stop()
         self.pending_changes = {}
         self.old_values = {}
+
+        self.model.data.stop_time = datetime.now()
 
         # Gather post-experiment information
         view = View(Item('comment', style='custom'),
@@ -441,7 +443,6 @@ class AversiveController(ExperimentController):
                 # What do we need to do to get ready?
                 
                 if last_trial == self.current.safe_trials + 1:
-                #if self.current.trial == self.current.safe_trials + 1:
                     log.debug('processing warning trial')
                     self.model.data.update(ts,
                                            self.current.par,
@@ -466,10 +467,9 @@ class AversiveController(ExperimentController):
 
     def _get_time_elapsed(self):
         if self.state is 'halted':
-            seconds = 0
+            return '%s' % timedelta()
         else:
-            seconds = int(time.time() - self.start_time)
-        return '%s' % timedelta(seconds=seconds)
+            return '%s' % self.model.data.duration
 
     def _get_status(self):
         if self.state == 'disconnected':
