@@ -10,7 +10,7 @@ from cns.experiment.data.experiment_data import ExperimentData, AnalyzedData
 from cns.channel import FileMultiChannel, FileChannel
 from enthought.traits.api import Instance, List, CFloat, Int, Float, Any, \
     Range, DelegatesTo, cached_property, on_trait_change, Array, Event, \
-    Property, Undefined, Callable, Str
+    Property, Undefined, Callable, Str, Enum
 import numpy as np
 from cns.data.h5_utils import append_node, get_or_append_node
 from cns.pipeline import deinterleave
@@ -98,10 +98,11 @@ class BaseAversiveData(ExperimentData):
     warn_indices = Property(Array('i'), store='array', depends_on='curidx')
     remind_indices = Property(Array('i'), store='array', depends_on='curidx')
 
-    comment = Str(store='attribute')
-
     warn_ts = Property(Array('f'))
     safe_ts = Property(Array('f'))
+
+    comment = Str(store='attribute')
+    exit_status = Enum('complete', 'partial', 'aborted', store='attribute')
 
     def _get_warn_ts(self):
         return self.trial_data[self.warn_indices]['timestamp']

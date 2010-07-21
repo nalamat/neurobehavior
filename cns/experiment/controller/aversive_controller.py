@@ -380,10 +380,14 @@ class AversiveController(ExperimentController):
         self.pending_changes = {}
         self.old_values = {}
 
-        view = View('comment', height=200, width=300, 
-                buttons=['OK'], kind='livemodal')
+        # Gather post-experiment information
+        view = View(Item('comment', style='custom'),
+                    'exit_status', 
+                    height=200, width=300, 
+                    buttons=['OK'], 
+                    kind='livemodal')
+
         self.model.data.edit_traits(parent=info.ui.control, view=view)
-        print self.model.data.comment
 
         # Save the data in our newly created node
         add_or_update_object(self.model.paradigm, self.model.exp_node, 'Paradigm')
