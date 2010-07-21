@@ -96,6 +96,7 @@ class AnalyzedAversiveDataView(AnalyzedView):
                                       value_max=1,
                                       index_title='Trial',
                                       value_title='Score',
+                                      history=30,
                                       title='')
         self.analyzed.sync_trait('curidx', template, 'current_index')
         view = BarChartOverlay(template=template)
