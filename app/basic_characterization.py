@@ -76,7 +76,6 @@ class MedusaController(Controller):
     def update_mode(self, new):
         mode_map = dict(raw=0, differential=1, test=2)
         self.RZ5.rec_mode.value = mode_map[new]
-        print self.RZ5.offset.value
     
     @on_trait_change('settings.ch_diff')
     def update_ch_differential(self, new):
@@ -141,15 +140,11 @@ class MedusaController(Controller):
 
     def tick(self):
         data = self.RZ5.mc_sig.read()
-        #data = self.RZ5.mc_sig16.read()
-        #data = self.RZ5.mc_sig8.read()
-        #print np.max(data)
         self.pipeline.send(data)
         trig = int(self.RZ5.ts.value)
         
         if self.prior != trig:
             self.plot_data.trigger_indices.append(trig)
-            print self.plot_data.trigger_indices
             self.prior = trig
             
         sig = self.RX6.sig_out.read()
