@@ -85,25 +85,25 @@ class AversiveToolBar(ToolBar):
     trait_view = View(group, kind='subpanel')
 
     def _apply_fired(self):
-        self.handler.apply()
+        self.handler.apply(self.info)
 
     def _revert_fired(self):
-        self.handler.revert()
+        self.handler.revert(self.info)
 
     def _remind_fired(self):
-        self.handler.remind()
+        self.handler.remind(self.info)
 
     def _start_fired(self):
-        self.handler.run()
+        self.handler.run(self.info)
 
     def _pause_fired(self):
-        self.handler.pause()
+        self.handler.pause(self.info)
 
     def _resume_fired(self):
-        self.handler.resume()
+        self.handler.resume(self.info)
 
     def _stop_fired(self):
-        self.handler.stop()
+        self.handler.stop(self.info)
 
 class CurrentSettings(HasTraits):
 
@@ -310,7 +310,7 @@ class AversiveController(ExperimentController):
         model.data = AversiveData(contact_fs=self.circuit.lick_nPer.get('fs'),
                                   store_node=model.data_node)
 
-    def run(self):
+    def run(self, info=None):
         if not self.model.paradigm.is_valid():
             mesg = 'Please correct the following errors first:\n'
             mesg += self.model.paradigm.err_messages()
@@ -372,13 +372,18 @@ class AversiveController(ExperimentController):
         self.circuit.pause_state.value = False
         self.circuit.trigger(1)
 
-    def stop(self):
+    def stop(self, info=None):
         self.state = 'halted'
         self.slow_timer.stop()
         self.fast_timer.stop()
         self.circuit.stop()
         self.pending_changes = {}
         self.old_values = {}
+
+        view = View('comment', height=200, width=300, 
+                buttons=['OK'], kind='livemodal')
+        self.model.data.edit_traits(parent=info.ui.control, view=view)
+        print self.model.data.comment
 
         # Save the data in our newly created node
         add_or_update_object(self.model.paradigm, self.model.exp_node, 'Paradigm')
