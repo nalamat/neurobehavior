@@ -18,7 +18,7 @@ class ComponentView(HasTraits):
 
     index_title = DelegatesTo('index_label', 'title')
     value_title = DelegatesTo('value_label', 'title')
-    title = DelegatesTo('title_label', 'text')
+    #title = DelegatesTo('title_label', 'text')
 
     index_label = Instance(PlotAxis)
     value_label = Instance(PlotAxis)
