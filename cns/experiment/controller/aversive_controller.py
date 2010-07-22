@@ -420,6 +420,9 @@ class AversiveController(ExperimentController):
 
     @on_trait_change('fast_tick')
     def task_monitor_circuit(self):
+        print self.model.analyzed.par_z_hit
+        print self.model.analyzed.par_z_fa
+        print self.model.analyzed.par_dprime
         if self.circuit.idx.value > self.current.idx:
             self.current.idx += 1
             ts = self.circuit.lick_ts_trial_start_n.value

@@ -15,6 +15,7 @@ from datetime import datetime
 import numpy as np
 from cns.data.h5_utils import append_node, get_or_append_node
 from cns.pipeline import deinterleave
+from scipy.stats import norm
 
 def apply_mask(fun, seq, mask):
     seq = np.array(seq).ravel()
@@ -364,6 +365,9 @@ class AnalyzedAversiveData(AnalyzedData):
     pars = DelegatesTo('data')
     par_hit_frac = Property(List(Float), depends_on='curidx')
     par_fa_frac = Property(List(Float), depends_on='curidx')
+    par_z_hit = Property(List(Float), depends_on='curidx')
+    par_z_fa = Property(List(Float), depends_on='curidx')
+    par_dprime = Property(List(Float), depends_on='curidx')
 
     par_info = Property(store='table',
                         col_names=['par', 'hit_frac', 'fa_frac'],
@@ -435,6 +439,18 @@ class AnalyzedAversiveData(AnalyzedData):
         if self.curidx == 0:
             return np.array([])
         return self.contact_scores[self.remind_indices]
+
+    @cached_property
+    def _get_par_z_hit(self):
+        return norm.ppf(self.par_hit_frac)
+
+    @cached_property
+    def _get_par_z_fa(self):
+        return norm.ppf(self.par_fa_frac)
+
+    @cached_property
+    def _get_par_dprime(self):
+        return self.par_z_hit-self.par_z_fa 
 
 if __name__ == '__main__':
     import tables

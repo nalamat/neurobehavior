@@ -1,6 +1,6 @@
 from ..type import Animal, Cohort
 from .edit_animal import animal_edit_view, animal_view
-from cns import data
+from cns.data import io
 import operator as op
 from cns.widgets.handler import FileHandler, filehandler_menubar
 from enthought.pyface.api import YES, confirm
@@ -58,11 +58,11 @@ class CohortViewHandler(FileHandler):
         info.object._modified = False
 
     def load_object(self, info, file):
-        info.object.cohort = data.io.load_cohort(0, file)
+        info.object.cohort = io.load_cohort(0, file)
         info.object._modified = False
 
     def save_object(self, info, file):
-        data.io.save_cohort(info.object.cohort, file)
+        io.save_cohort(info.object.cohort, file)
         info.object._modified = False
         
     def object_modified(self, info):

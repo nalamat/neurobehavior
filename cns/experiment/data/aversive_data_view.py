@@ -19,6 +19,7 @@ class AnalyzedAversiveDataView(AnalyzedView):
     par_fa_frac_chart = Instance(DynamicBarPlotView)
     par_hit_frac_chart = Instance(DynamicBarPlotView)
     par_count_chart = Instance(DynamicBarPlotView)
+    par_dprime_chart = Instance(DynamicBarPlotView)
 
     score_chart = Instance(BarChartOverlay)
     contact_plot = Instance(MultipleChannelView)
@@ -89,6 +90,18 @@ class AnalyzedAversiveDataView(AnalyzedView):
                 value_max=1,
                 )
 
+    def _par_dprime_chart_default(self):
+        return DynamicBarPlotView(
+                source=self.analyzed,
+                label='pars',
+                value='par_dprime',
+                index_title='Parameter',
+                value_title="d'",
+                bar_width=0.9,
+                value_min='auto',
+                value_max='auto',
+                )
+
     def _score_chart_default(self):
         template = HistoryBarPlotView(is_template=True,
                                       preprocess_values=lambda x: clip(x, 0.2, 1.0),
@@ -135,10 +148,12 @@ class AnalyzedAversiveDataView(AnalyzedView):
                     #VGroup('object.data.water_infused~'),
                     Item('object.contact_plot.component', **kw_plot),
                     'score_chart{}@',],
-                   VGroup(HGroup(Item('object.data.total_trials', style='readonly')),
-                          Item('object.par_count_chart.component', **kw_plot),
-                          Item('object.par_hit_frac_chart.component', **kw_plot),
-                          Item('object.par_fa_frac_chart.component', **kw_plot),
+                   VGroup(HGroup(VGroup([Item('object.data.total_trials', style='readonly')],
+                                 Item('object.par_count_chart.component',
+                                     **kw_plot),),
+                                 Item('object.par_dprime_chart.component', **kw_plot),),
+                          HGroup(Item('object.par_hit_frac_chart.component', **kw_plot),
+                                 Item('object.par_fa_frac_chart.component', **kw_plot),),
                           ),
                    ),
 
