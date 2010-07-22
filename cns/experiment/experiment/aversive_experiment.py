@@ -41,7 +41,7 @@ class AversiveExperiment(HasTraits):
                                    visible_when='handler.state<>"halted"'),
                               show_labels=False,
                               ),
-                       Item('analyzed_view', style='custom', width=900, height=800),
+                       Item('analyzed_view', style='custom', width=1300, height=900),
                        show_labels=False,
                        )
     
