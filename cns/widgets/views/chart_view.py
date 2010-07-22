@@ -89,7 +89,6 @@ class SingleBarPlotView(BarChartComponentView):
         label_position, label_text = self._get_labels()
         return LabelAxis(labels=label_text,
                          positions=label_position,
-                         title=self.index_title,
                          orientation='bottom')
 
     def _index_range(self):
