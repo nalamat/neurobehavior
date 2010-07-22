@@ -55,7 +55,7 @@ class BaseAversiveData(ExperimentData):
                     0.2:    RawAversiveData_v0_2, }
         return cls_map[version]
             
-    def __new__(cls, *arg, **kw):
+    def __new__(cls, *arg, **kwi:
         print kw.keys()
         # Check to see if a version is identified.
         try:
@@ -400,14 +400,6 @@ class AnalyzedAversiveData(AnalyzedData):
             self.updated = True
 
     @cached_property
-    def _get_par_fa_frac(self):
-        return apply_mask(np.mean, self.fa_seq, self.data.safe_par_mask)
-
-    @cached_property
-    def _get_par_hit_frac(self):
-        return apply_mask(np.mean, self.hit_seq, self.data.warn_par_mask)
-
-    @cached_property
     def _get_fa_seq(self):
         return self.safe_scores < self.contact_fraction
 
@@ -441,16 +433,28 @@ class AnalyzedAversiveData(AnalyzedData):
         return self.contact_scores[self.remind_indices]
 
     @cached_property
+    def _get_par_fa_frac(self):
+        return apply_mask(np.mean, self.fa_seq, self.data.safe_par_mask)
+
+    @cached_property
+    def _get_par_hit_frac(self):
+        return apply_mask(np.mean, self.hit_seq, self.data.warn_par_mask)
+
+    clip = 0.05
+
+    @cached_property
     def _get_par_z_hit(self):
-        return norm.ppf(self.par_hit_frac)
+        par_hit_frac = np.clip(self.par_hit_frac, self.clip, 1-self.clip)
+        return norm.ppf(par_hit_frac)
 
     @cached_property
     def _get_par_z_fa(self):
-        return norm.ppf(self.par_fa_frac)
+        par_fa_frac = np.clip(self.par_fa_frac, self.clip, 1-self.clip)
+        return norm.ppf(par_fa_frac)
 
     @cached_property
     def _get_par_dprime(self):
-        return self.par_z_hit-self.par_z_fa 
+        return self.par_z_hit-self.par_z_fa
 
 if __name__ == '__main__':
     import tables

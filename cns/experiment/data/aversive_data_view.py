@@ -98,8 +98,8 @@ class AnalyzedAversiveDataView(AnalyzedView):
                 index_title='Parameter',
                 value_title="d'",
                 bar_width=0.9,
-                value_min='auto',
-                value_max='auto',
+                value_min=0,
+                value_max=4,
                 )
 
     def _score_chart_default(self):
