@@ -19,6 +19,7 @@ class ComponentView(HasTraits):
     index_title = DelegatesTo('index_label', 'title')
     value_title = DelegatesTo('value_label', 'title')
     #title = DelegatesTo('title_label', 'text')
+    title = Str
 
     index_label = Instance(PlotAxis)
     value_label = Instance(PlotAxis)
@@ -31,6 +32,9 @@ class ComponentView(HasTraits):
 
     is_template = Bool(False)
 
+    def _title_changed(self, new):
+        self.title_label.text = new
+
     def _index_label_default(self):
         return PlotAxis(orientation='bottom')
 
@@ -38,7 +42,7 @@ class ComponentView(HasTraits):
         return PlotAxis(orientation='left')
 
     def _title_label_default(self):
-        return PlotLabel(overlay_position='top')
+        return PlotLabel(text=self.title, overlay_position='top')
 
     def _add_underlays(self, component):
         if self.show_labels:
