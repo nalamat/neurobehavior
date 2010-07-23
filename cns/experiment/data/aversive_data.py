@@ -53,7 +53,7 @@ class BaseAversiveData(ExperimentData):
         self.water_log.append([(ts, infused)])
         self.water_updated = True
 
-    def log(self, timestamp, name, value):
+    def log_event(self, timestamp, name, value):
         self.trial_log.append([(timestamp, name, '%r' % value)])
 
     def update(self, timestamp, par, shock, type):

@@ -368,10 +368,12 @@ class AversiveController(ExperimentController):
         self.circuit.trigger(1)
 
     def pause(self, info=None):
+        self.model.data.log_event(self.circuit.ts_n.value, 'pause', True)
         self.state = 'paused'
         self.circuit.pause_state.value = True
 
     def resume(self, info=None):
+        self.model.data.log_event(self.circuit.ts_n.value, 'pause', False)
         #self.circuit.trigger(1)
         self.state = 'running'
         self.circuit.pause_state.value = False
@@ -500,7 +502,6 @@ class AversiveController(ExperimentController):
                      'model.paradigm.signal_warn.+', 'model.paradigm.shock_settings.+',
                      'model.paradigm.shock_settings.levels.level')
     def log_changes(self, object, name, old, new):
-        #log.debug('log_changes: %r, %r, %r, %r', object, name, old, new)
         if self.state <> 'halted':
             key = object, name
             if key not in self.old_values:
@@ -512,20 +513,20 @@ class AversiveController(ExperimentController):
             else:
                 self.pending_changes[key] = new
 
-    def apply(self):
+    def apply(self, info=None):
         reset_settings = False
         ts = self.circuit.ts_n.value
         for (object, name), value in self.pending_changes.items():
             log.debug('Value changed during experiment: %s = %r', name, value)
             if name == 'lick_th':
                 self.circuit.lick_th.value = value
-                self.model.data.log(ts, name, value)
+                self.model.data.log_event(ts, name, value)
             elif name in ('par_order', 'par_remind', 'pars'):
                 reset_settings = True
-                self.model.data.log(ts, name, value)
+                self.model.data.log_event(ts, name, value)
             elif name == 'pars':
                 reset_settings = True
-                self.model.data.log(ts, name, value)
+                self.model.data.log_event(ts, name, value)
             elif name == 'level' or name == 'max_shock':
                 reset_settings = True
             elif name == 'levels_items':
@@ -535,7 +536,7 @@ class AversiveController(ExperimentController):
                     self.circuit.contact_method.value = 0
                 else:
                     self.circuit.contact_method.value = 1
-                self.model.data.log(ts, name, value)
+                self.model.data.log_event(ts, name, value)
             else:
                 raise ValueError, 'Cannot change parameter %s while running' % name
             del self.pending_changes[(object, name)]
