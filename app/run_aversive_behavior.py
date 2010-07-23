@@ -1,5 +1,6 @@
 from config import settings
 
+from enthought.pyface.api import error
 from cns.data.view.cohort import CohortView, CohortViewHandler
 from cns.data import persistence
 from cns.data.h5_utils import get_or_append_node
@@ -40,9 +41,7 @@ class ExperimentHandler(CohortViewHandler):
             try:
                 paradigm = persistence.load_object(store_node, 'last_paradigm')
                 paradigm.shock_settings.paradigm = paradigm
-                print 'foo'
             except (tables.NoSuchNodeError, TraitError):
-                print 'why am i not here'
                 log.debug('No prior paradigm found.  Creating new paradigm.')
                 paradigm = None
                 
@@ -50,11 +49,11 @@ class ExperimentHandler(CohortViewHandler):
             model = AversiveExperiment(store_node=store_node, animal=item)
             
             if paradigm is not None:
-                log.debug('Animal does not have any prior paradigm.')
-                log.debug('Using paradigm from previous animal.')
+                log.debug('Using paradigm from last time this animal was run')
                 model.paradigm = paradigm
             elif self.last_paradigm is not None:
-                log.debug('Using paradigm from last time this animal was run')
+                log.debug('Animal does not have any prior paradigm.')
+                log.debug('Using paradigm from previous animal.')
                 model.paradigm = self.last_paradigm
 
             model.edit_traits(handler=handler, parent=info.ui.control, kind='livemodal')
@@ -70,6 +69,20 @@ class ExperimentHandler(CohortViewHandler):
             except NameError: pass
             
         except AttributeError: pass
+        except SystemError, e:
+            from textwrap import dedent
+            mesg = """\
+            Could not launch experiment.  This likely means that you
+            forgot to turn on a piece of equipment.  Please check and ensure
+            that the RX6, RZ5 and PA5 are turned on.  If you still get this
+            error message, please try power-cycling the rack.  If this still
+            does not fix the error, power-cycle the computer as well.  
+            
+            Please remember that you need to give the equipment rack a minute to
+            boot up once you turn it back on before attempting to launch an
+            experiment.
+            """
+            error(info.ui.control, str(e) + '\n\n' + dedent(mesg))
         
 def test_experiment():
     store = tables.openFile('test.h5', 'w')

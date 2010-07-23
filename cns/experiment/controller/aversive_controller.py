@@ -269,6 +269,10 @@ class AversiveController(ExperimentController):
         self.circuit = self.backend.load('aversive-behavior', 'RX6')
         #self.atten = equipment.attenuator()
 
+    @on_trait_change('pump.rate')
+    def log_pump(self):
+        print 'change detected'
+
     def configure_circuit(self, circuit, paradigm):
         if circuit is None:
             return

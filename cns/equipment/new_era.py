@@ -602,11 +602,10 @@ class Pump(HasTraits):
     # Approximate volume of the tube connecting the pump to the lick spout
     tube_volume = CFloat(4.0, label='Tube volume (mL)', store='attribute')
     # Fastest (safe) rate at which we can fill the tube
-    fill_rate = CFloat(10.0, label='Tube fill rate (mL/min)',
-                         store='attribute')
+    fill_rate = CFloat(10.0, label='Tube fill rate (mL/min)', store='attribute')
 
     traits_view = View(['handler.toolbar{}@', 'rate', '-'],
-                       handler=PumpController)
+                        handler=PumpController)
 
 if __name__ == '__main__':
     try:
