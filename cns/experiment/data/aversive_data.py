@@ -262,6 +262,9 @@ class RawAversiveData_v0_2(BaseAversiveData):
     contact_digital = Alias('touch_digital')
     contact_digital_mean = Alias('touch_digital_mean')
     contact_analog = Alias('touch_analog')
+    #contact_digital = Alias('optical_digital')
+    #contact_digital_mean = Alias('optical_digital_mean')
+    #contact_analog = Alias('optical_analog')
 
     water_log = Any(store='automatic')
     trial_log = Any(store='automatic')

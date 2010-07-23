@@ -40,7 +40,9 @@ class ExperimentHandler(CohortViewHandler):
             try:
                 paradigm = persistence.load_object(store_node, 'last_paradigm')
                 paradigm.shock_settings.paradigm = paradigm
+                print 'foo'
             except (tables.NoSuchNodeError, TraitError):
+                print 'why am i not here'
                 log.debug('No prior paradigm found.  Creating new paradigm.')
                 paradigm = None
                 

@@ -7,7 +7,7 @@ from cns.traits.ui.api import ListAsStringEditor
 from cns.widgets import icons
 from enthought.savage.traits.ui.svg_button import SVGButton
 from enthought.traits.api import Button, on_trait_change, HasTraits, Any, Range, \
-    CFloat, Property, Instance, Trait, Int, Dict, Float, List, Bool
+    CFloat, Property, Instance, Trait, Int, Dict, Float, List, Bool, Enum
 from enthought.traits.ui.api import Handler, View, spring, \
     Item, InstanceEditor, ListEditor
 import logging
@@ -103,6 +103,8 @@ class ShockSettings(HasTraits):
 
 class AversiveParadigm(Paradigm):
 
+    contact_method = Enum('touch', 'optical', store='attribute')
+
     par_order = Trait('descending', choice.options,
                       label='Parameter order',
                       store='attribute', log_change=True)
@@ -171,7 +173,8 @@ class AversiveParadigm(Paradigm):
         timing_gr = [['{Num safe trials:}',
                       Item('min_safe{}', invalid='err_num_trials'), '{to}',
                       Item('max_safe{}', invalid='err_num_trials'), '-'],
-                      'shock_delay', 'lick_th{Contact threshold}', '|[Trial settings]']
+                      'shock_delay', 'contact_method', 'lick_th{Contact threshold}', 
+                      '|[Trial settings]']
 
         return View(par_gr, shock_gr, timing_gr,
                     ['signal_safe{}~', spring, 'handler.edit_signal_safe{}', '-[SAFE signal]'],

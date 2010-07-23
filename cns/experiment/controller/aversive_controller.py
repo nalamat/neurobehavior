@@ -281,6 +281,11 @@ class AversiveController(ExperimentController):
         # hardware, this code would be the only stuff that needs changing.
         circuit.reload()
 
+        if paradigm.contact_method == 'touch':
+            circuit.contact_method.value = 0
+        else:
+            circuit.contact_method.value = 1
+
         circuit.lick_th.value = paradigm.lick_th
         circuit.shock_n.set(0.3, src_unit='s')
         circuit.shock_delay_n.set(paradigm.shock_delay, src_unit='s')
@@ -525,6 +530,12 @@ class AversiveController(ExperimentController):
                 reset_settings = True
             elif name == 'levels_items':
                 reset_settings = True
+            elif name == 'contact_method':
+                if value == 'touch':
+                    self.circuit.contact_method.value = 0
+                else:
+                    self.circuit.contact_method.value = 1
+                self.model.data.log(ts, name, value)
             else:
                 raise ValueError, 'Cannot change parameter %s while running' % name
             del self.pending_changes[(object, name)]

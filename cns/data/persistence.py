@@ -278,19 +278,23 @@ def load_object(source, name=None):
 
     #for name, trait in type.class_traits(store='attribute').items():
     for name, trait in get_traits(type, True,  store='attribute').items():
-        value = source._f_getAttr(name)
-        # TraitMap will raise an error here
         try:
-            klass = trait.trait_type.klass
-        except:
-            klass = None
-        # We just want to check on the datetime
-        if klass is not None and klass in date_classes:
-            value = strptime(value)
-        elif isinstance(value, int):
-            value = int(value)
-
-        kw[name] = value
+            value = source._f_getAttr(name)
+            # TraitMap will raise an error here
+            try:
+                klass = trait.trait_type.klass
+            except:
+                klass = None
+            # We just want to check on the datetime
+            if klass is not None and klass in date_classes:
+                value = strptime(value)
+            elif isinstance(value, int):
+                value = int(value)
+            kw[name] = value
+        except AttributeError:
+            # This information was not saved to the node, which suggests that
+            # the data stored in the node may be an older version.
+            pass
 
     #for name, trait in type.class_traits(store='table').items():
     for name, trait in get_traits(type, True,  store='table').items():
