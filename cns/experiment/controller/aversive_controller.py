@@ -295,7 +295,7 @@ class AversiveController(ExperimentController):
         circuit.int_buf.initialize(fs=circuit.fs)
         circuit.int_buf.set(paradigm.signal_safe)
 
-        circuit.contact_buf.initialize(channels=5, sf=127, src_type=np.int8,
+        circuit.contact_buf.initialize(channels=7, sf=127, src_type=np.int8,
                 compression='decimated', fs=circuit.lick_nPer.get('fs'))
         circuit.touch_buf.initialize(sf=3276, src_type=np.int16,
                 compression='decimated', fs=circuit.lick_nPer.get('fs'))

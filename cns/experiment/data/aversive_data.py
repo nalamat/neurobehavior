@@ -31,6 +31,7 @@ def Alias(name):
                     lambda obj, val: setattr(obj, name, val))
 
 def migrate_data(data):
+    raise NotImplementedError
     if data.version == 0.1:
         old_data = data.__dict__
         new_data = old_data.copy()
@@ -47,27 +48,6 @@ class BaseAversiveData(ExperimentData):
 
     version = Float(0.0)
     latest_version = 0.1
-
-    '''
-    @classmethod
-    def get_class_version(cls, version):
-        cls_map = { 0.1:    RawAversiveData_v0_1,
-                    0.2:    RawAversiveData_v0_2, }
-        return cls_map[version]
-            
-    def __new__(cls, *arg, **kwi:
-        print kw.keys()
-        # Check to see if a version is identified.
-        try:
-            version = kw.get('version', cls.latest_version)
-            print cls.__subclasses__()
-            subclass = cls_map[version]
-            print cls, subclass
-            return super(cls, subclass).__new__(subclass, *arg, **kw)
-        except BaseException, e:
-            print e
-            raise BaseException, 'Unsupported version of the data!'
-    '''
 
     def log_water(self, ts, infused):
         self.water_log.append([(ts, infused)])
@@ -167,7 +147,6 @@ class BaseAversiveData(ExperimentData):
 
     @cached_property
     def _get_pars(self):
-        # Should be sorted
         return np.unique(self.warn_trials['par'])
 
     @cached_property
@@ -259,12 +238,8 @@ class RawAversiveData_v0_2(BaseAversiveData):
     trial_running = Instance(FileChannel, store='automatic')
 
     # We can switch back and forth between touch and optical as needed
-    contact_digital = Alias('touch_digital')
-    contact_digital_mean = Alias('touch_digital_mean')
-    contact_analog = Alias('touch_analog')
-    #contact_digital = Alias('optical_digital')
-    #contact_digital_mean = Alias('optical_digital_mean')
-    #contact_analog = Alias('optical_analog')
+    contact_digital = Instance(FileChannel, store='automatic')
+    contact_digital_mean = Instance(FileChannel, store='automatic')
 
     water_log = Any(store='automatic')
     trial_log = Any(store='automatic')
@@ -275,17 +250,23 @@ class RawAversiveData_v0_2(BaseAversiveData):
     def _contact_data_default(self):
         targets = [self.touch_digital,
                    self.touch_digital_mean,
-                   #self.touch_analog,
                    self.optical_digital,
                    self.optical_digital_mean,
+                   self.contact_digital,
+                   self.contact_digital_mean,
                    self.trial_running, ]
-                   #self.optical_analog]
         return deinterleave(targets)
 
     def _create_channel(self, name, dtype):
         contact_node = get_or_append_node(self.store_node, 'contact')
         return FileChannel(node=contact_node, fs=self.contact_fs,
                            name=name, dtype=dtype)
+
+    def _contact_digital_default(self):
+        return self._create_channel('contact_digital', np.bool)
+
+    def _contact_digital_mean_default(self):
+        return self._create_channel('contact_digital_mean', np.float32)
 
     def _touch_digital_default(self):
         return self._create_channel('touch_digital', np.bool)

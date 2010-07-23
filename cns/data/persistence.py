@@ -40,7 +40,6 @@ def add_or_update_object(object, node, name=None):
     h5_file = node._v_file
     h5_path = node._v_pathname
     base_name = object.__class__.__name__
-    #log.debug('%s, %s, %s', h5_file, h5_path, base_name)
 
     if name is None:
     #if as_child:
@@ -50,6 +49,9 @@ def add_or_update_object(object, node, name=None):
         object_name = base_name + '_' + str(object.UNIQUE_ID)
     else:
         object_name = name
+
+    log.debug('Saving %s to %s in file %s', object_name, h5_path,
+            h5_file.filename)
 
     # Check to see if node has already been set aside for the object
     try:

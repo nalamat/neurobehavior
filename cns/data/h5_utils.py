@@ -21,7 +21,7 @@ def get_or_append_node(node, name, type='group', *arg, **kw):
         return append_node(node, name, type, *arg, **kw)
 
 def append_node(node, name, type='group', *arg, **kw):
-    log.debug('appending %r to node %r', name, node)
+    log.debug('appending %r to node %r', name, node._v_pathname)
     file = node._v_file
     path = node._v_pathname
     type = name_lookup[type.lower()]
