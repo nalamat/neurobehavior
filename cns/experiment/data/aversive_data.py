@@ -7,14 +7,14 @@ terminology to avoid any confusion.  For example:
 """
 #from .experiment_data import ExperimentData, AnalyzedData
 from cns.experiment.data.experiment_data import ExperimentData, AnalyzedData
-from cns.channel import FileMultiChannel, FileChannel
+from cns.channel import FileMultiChannel, FileChannel, RAMChannel
 from enthought.traits.api import Instance, List, CFloat, Int, Float, Any, \
     Range, DelegatesTo, cached_property, on_trait_change, Array, Event, \
     Property, Undefined, Callable, Str, Enum
 from datetime import datetime
 import numpy as np
 from cns.data.h5_utils import append_node, get_or_append_node
-from cns.pipeline import deinterleave
+from cns.pipeline import deinterleave, broadcast
 from scipy.stats import norm
 
 def apply_mask(fun, seq, mask):
@@ -241,6 +241,10 @@ class RawAversiveData_v0_2(BaseAversiveData):
     contact_digital = Instance(FileChannel, store='automatic')
     contact_digital_mean = Instance(FileChannel, store='automatic')
 
+    contact_digital_memory = Instance(RAMChannel)
+    contact_digital_mean_memory = Instance(RAMChannel)
+    trial_running_memory = Instance(RAMChannel)
+
     water_log = Any(store='automatic')
     trial_log = Any(store='automatic')
     trial_data_table = Any(store='automatic')
@@ -252,15 +256,27 @@ class RawAversiveData_v0_2(BaseAversiveData):
                    self.touch_digital_mean,
                    self.optical_digital,
                    self.optical_digital_mean,
-                   self.contact_digital,
-                   self.contact_digital_mean,
-                   self.trial_running, ]
+                   broadcast((self.contact_digital,
+                              self.contact_digital_memory)),
+                   broadcast((self.contact_digital_mean,
+                              self.contact_digital_mean_memory)),
+                   broadcast((self.trial_running,
+                              self.trial_running_memory)), ]
         return deinterleave(targets)
 
     def _create_channel(self, name, dtype):
         contact_node = get_or_append_node(self.store_node, 'contact')
         return FileChannel(node=contact_node, fs=self.contact_fs,
                            name=name, dtype=dtype)
+
+    def _contact_digital_memory_default(self):
+        return RAMChannel(fs=self.contact_fs, window=10)
+
+    def _contact_digital_mean_memory_default(self):
+        return RAMChannel(fs=self.contact_fs, window=10)
+
+    def _trial_running_memory_default(self):
+        return RAMChannel(fs=self.contact_fs, window=10)
 
     def _contact_digital_default(self):
         return self._create_channel('contact_digital', np.bool)
