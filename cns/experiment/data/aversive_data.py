@@ -146,14 +146,15 @@ class BaseAversiveData(ExperimentData):
     total_trials = Property(Int, depends_on='curidx', store='attribute')
 
     par_count = Property(List(Int), depends_on='curidx', store='attribute')
+    par_safe_count = Property(List(Int), depends_on='curidx', store='attribute')
     pars = Property(List(Int), depends_on='curidx')
 
     par_info = Property(store='table',
-                               col_names=['par', 'count'],
-                               col_types=['f', 'i'])
+                        col_names=['par', 'safe_count', 'count'],
+                        col_types=['f', 'i',  'i'])
 
     def _get_par_info(self):
-        return zip(self.pars, self.par_count)
+        return zip(self.pars, self.par_safe_count, self.par_count)
 
     safe_par_mask = Property(List(Array(dtype='b')), depends_on='curidx')
     warn_par_mask = Property(List(Array(dtype='b')) , depends_on='curidx')
@@ -180,6 +181,10 @@ class BaseAversiveData(ExperimentData):
     @cached_property
     def _get_par_count(self):
         return apply_mask(len, self.warn_trials, self.warn_par_mask)
+
+    @cached_property
+    def _get_par_safe_count(self):
+        return apply_mask(len, self.safe_trials, self.safe_par_mask)
 
 class RawAversiveData_v0_1(BaseAversiveData):
 
@@ -328,6 +333,10 @@ class AnalyzedAversiveData(AnalyzedData):
     contact_dur = CFloat(0.1, store='attribute')
     contact_fraction = Range(0.0, 1.0, 0.5, store='attribute')
 
+    # Clip FA/HIT rate if it is < clip or > 1-clip (prevents unusually high
+    # z-scores)
+    clip = Float(0.05, store='attribute')
+
     # False alarms and hits can only be determined after we score the data.
     # Scores contains the actual contact ratio for each trial.  False alarms and
     # hits are then computed against these scores (using the contact_fraction as
@@ -370,13 +379,17 @@ class AnalyzedAversiveData(AnalyzedData):
     par_dprime = Property(List(Float), depends_on='curidx')
 
     par_info = Property(store='table',
-                        col_names=['par', 'hit_frac', 'fa_frac'],
-                        col_types=['f', 'f', 'f'],)
+                        col_names=['par', 'safe_trials', 'warn_trials',
+                                   'hit_frac', 'fa_frac', 'd'],
+                        col_types=['f', 'i', 'i', 'f', 'f', 'f'],)
 
     def _get_par_info(self):
         return zip(self.pars,
+                   self.data.par_safe_count,
+                   self.data.par_count,
                    self.par_hit_frac,
-                   self.par_fa_frac, )
+                   self.par_fa_frac, 
+                   self.par_dprime, )
 
     def score_timestamp(self, ts):
         ts = ts/self.data.contact_fs
@@ -439,8 +452,6 @@ class AnalyzedAversiveData(AnalyzedData):
     @cached_property
     def _get_par_hit_frac(self):
         return apply_mask(np.mean, self.hit_seq, self.data.warn_par_mask)
-
-    clip = 0.05
 
     @cached_property
     def _get_par_z_hit(self):
