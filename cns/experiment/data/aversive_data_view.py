@@ -32,11 +32,11 @@ class AnalyzedAversiveDataView(AnalyzedView):
                 interactive=False,
                 window=5,
                 clean_data=True,)
-        view.add(self.analyzed.data.contact_digital_memory,
+        view.add(self.analyzed.data.contact_digital,
                  decimate_mode='mean', color='gray', line_width=1)
-        view.add(self.analyzed.data.contact_digital_mean_memory, 
+        view.add(self.analyzed.data.contact_digital_mean, 
                  decimate_mode='mean', color='black', line_width=3)
-        view.add(self.analyzed.data.trial_running_memory,
+        view.add(self.analyzed.data.trial_running,
                  decimate_mode='mean', color='red', line_width=2)
         return view
 
