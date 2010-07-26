@@ -174,7 +174,8 @@ class CurrentSettings(HasTraits):
         return choice.get('pseudorandom', trials)
 
     def _get_choice_par(self, paradigm):
-        # Always pass a copy of pars to other functions that may modify the content of the list
+        # Always pass a copy of pars to other functions that may modify the
+        # content of the list
         return choice.get(paradigm.par_order, paradigm.pars[:])
 
     def _generate_signal(self, template, parameter):
@@ -403,6 +404,7 @@ class AversiveController(ExperimentController):
         self.model.data.edit_traits(parent=info.ui.control, view=view)
 
         # Save the data in our newly created node
+        add_or_update_object(self.pump, self.model.exp_node, 'Pump')
         add_or_update_object(self.model.paradigm, self.model.exp_node, 'Paradigm')
         add_or_update_object(self.model.data, self.model.exp_node, 'Data')
         analyzed_node = get_or_append_node(self.model.data.store_node, 'Analyzed')
