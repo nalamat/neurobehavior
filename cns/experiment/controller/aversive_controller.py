@@ -270,10 +270,6 @@ class AversiveController(ExperimentController):
         self.circuit = self.backend.load('aversive-behavior', 'RX6')
         #self.atten = equipment.attenuator()
 
-    @on_trait_change('pump.rate')
-    def log_pump(self):
-        print 'change detected'
-
     def configure_circuit(self, circuit, paradigm):
         if circuit is None:
             return
@@ -501,12 +497,17 @@ class AversiveController(ExperimentController):
             status = 'PAUSED: next trial is %s' % status
         return status
 
+    @on_trait_change('pump.rate')
+    def log_pump(self, new):
+        if self.state <> 'halted':
+            self.model.data.log_event(self.circuit.ts_n.value, 'pump rate', new)
+
     pending_changes = Dict({})
     old_values = Dict({})
 
     @on_trait_change('model.paradigm.+', 'model.paradigm.signal_safe.+',
                      'model.paradigm.signal_warn.+', 'model.paradigm.shock_settings.+',
-                     'model.paradigm.shock_settings.levels.level')
+                     'model.paradigm.shock_settings.levels.level',)
     def log_changes(self, object, name, old, new):
         if self.state <> 'halted':
             key = object, name
