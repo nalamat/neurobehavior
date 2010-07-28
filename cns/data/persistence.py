@@ -263,6 +263,8 @@ def load_object(source, path=None):
         node = source.getNode(path)
     elif path is not None:
         node = getattr(source, path)
+    else:
+        node = source
 
     kw = {}
     try: kw['UNIQUE_ID'] = node._f_getAttr('UNIQUE_ID')

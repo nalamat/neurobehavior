@@ -21,6 +21,7 @@ class AnalyzedAversiveDataView(AnalyzedView):
     par_count_chart = Instance(DynamicBarPlotView)
     par_dprime_chart = Instance(DynamicBarPlotView)
 
+    fa_chart = Instance(HistoryBarPlotView)
     score_chart = Instance(BarChartOverlay)
     contact_plot = Instance(MultipleChannelView)
     raw_contact_plot = Instance(MultiChannelView)
@@ -106,6 +107,11 @@ class AnalyzedAversiveDataView(AnalyzedView):
                 value_max=4,
                 )
 
+    def _fa_chart_default(self):
+        return HistoryBarPlotView(value_min=0, value_max=1, index_title='Trial',
+                value_title='FA Fraction', history=30, title='FA history',
+                source=self.analyzed, value='fa_seq', bar_width=1)
+
     def _score_chart_default(self):
         template = HistoryBarPlotView(is_template=True,
                                       preprocess_values=lambda x: clip(x, 0.2, 1.0),
@@ -113,7 +119,7 @@ class AnalyzedAversiveDataView(AnalyzedView):
                                       value_max=1,
                                       index_title='Trial',
                                       value_title='Score',
-                                      history=30,
+                                      history=60,
                                       title='')
         self.analyzed.sync_trait('curidx', template, 'current_index')
         view = BarChartOverlay(template=template)
@@ -151,7 +157,9 @@ class AnalyzedAversiveDataView(AnalyzedView):
     group = HGroup([#Item('object.raw_contact_plot.component', **kw_plot),
                     #VGroup('object.data.water_infused~'),
                     Item('object.contact_plot.component', **kw_plot),
-                    'score_chart{}@',],
+                    'score_chart{}@',
+                    #'fa_chart{}@'],
+                    ],
                    VGroup(HGroup(VGroup([Item('object.data.total_trials', style='readonly')],
                                  Item('object.par_count_chart.component',
                                      **kw_plot),),

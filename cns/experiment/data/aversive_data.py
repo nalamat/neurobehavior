@@ -326,8 +326,8 @@ class RawAversiveData_v0_2(BaseAversiveData):
         return append_node(self.store_node, 'trial_log', 'table', description)
 
 # For legacy reasons, we will let AversiveData = RawAversiveData_v0_1
-AversiveData = RawAversiveData_v0_1
-#AversiveData = RawAversiveData_v0_2
+#AversiveData = RawAversiveData_v0_1
+AversiveData = RawAversiveData_v0_2
 
 class AnalyzedAversiveData(AnalyzedData):
 
