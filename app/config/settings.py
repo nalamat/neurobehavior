@@ -7,5 +7,6 @@ import sys
 libdir = abspath(join(dirname(__file__), '../..'))
 sys.path.insert(0, libdir)
 
-#import logging.config
-#logger = logging.config.fileConfig("logging.conf")
+log_config = join(dirname(abspath(__file__)), "logging.conf")
+import logging.config
+logger = logging.config.fileConfig(log_config)

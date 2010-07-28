@@ -154,20 +154,29 @@ class AnalyzedAversiveDataView(AnalyzedView):
     kw_plot = dict(editor=ComponentEditor(**kw_component),
                         show_label=False)
 
+    total_trials = DelegatesTo('data')
+    global_fa_frac = DelegatesTo('analyzed')
+    use_global_fa_frac = DelegatesTo('analyzed')
+
     group = HGroup([#Item('object.raw_contact_plot.component', **kw_plot),
                     #VGroup('object.data.water_infused~'),
                     Item('object.contact_plot.component', **kw_plot),
                     'score_chart{}@',
                     #'fa_chart{}@'],
                     ],
-                   VGroup(HGroup(VGroup([Item('object.data.total_trials', style='readonly')],
-                                 Item('object.par_count_chart.component',
-                                     **kw_plot),),
-                                 Item('object.par_dprime_chart.component', **kw_plot),),
+                   VGroup(HGroup(VGroup(['total_trials~'],
+                                         Item('object.par_count_chart.component', **kw_plot),),
+                                 VGroup(['use_global_fa_frac{Compute using global FA fraction}'],
+                                        Item('object.par_dprime_chart.component', **kw_plot),
+                                        ),
+                                 ),
                           HGroup(Item('object.par_hit_frac_chart.component', **kw_plot),
-                                 Item('object.par_fa_frac_chart.component', **kw_plot),),
+                                 VGroup(['global_fa_frac{Global FA fraction}~'],
+                                        Item('object.par_fa_frac_chart.component', **kw_plot),
+                                        ),
+                                 ),
                           ),
-                   ),
+                   )
 
     traits_view = View(group,
                        title='Analyzed Data',

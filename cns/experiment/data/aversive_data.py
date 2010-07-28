@@ -10,7 +10,7 @@ from cns.experiment.data.experiment_data import ExperimentData, AnalyzedData
 from cns.channel import FileMultiChannel, FileChannel, RAMChannel
 from enthought.traits.api import Instance, List, CFloat, Int, Float, Any, \
     Range, DelegatesTo, cached_property, on_trait_change, Array, Event, \
-    Property, Undefined, Callable, Str, Enum
+    Property, Undefined, Callable, Str, Enum, Bool
 from datetime import datetime
 import numpy as np
 from cns.data.h5_utils import append_node, get_or_append_node
@@ -384,12 +384,17 @@ class AnalyzedAversiveData(AnalyzedData):
     par_fa_frac = Property(List(Float), depends_on='curidx')
     par_z_hit = Property(List(Float), depends_on='curidx')
     par_z_fa = Property(List(Float), depends_on='curidx')
-    par_dprime = Property(List(Float), depends_on='curidx')
+    par_dprime = Property(List(Float), depends_on='curidx, use_global_fa_frac')
+    par_dprime_nonglobal = Property(List(Float), depends_on='curidx')
+    par_dprime_global = Property(List(Float), depends_on='curidx')
+    global_fa_frac = Property(Float, depends_on='curidx', store='attribute')
+
+    use_global_fa_frac = Bool(False)
 
     par_info = Property(store='table',
                         col_names=['par', 'safe_trials', 'warn_trials',
-                                   'hit_frac', 'fa_frac', 'd'],
-                        col_types=['f', 'i', 'i', 'f', 'f', 'f'],)
+                                   'hit_frac', 'fa_frac', 'd', 'd_global'],
+                        col_types=['f', 'i', 'i', 'f', 'f', 'f', 'f'],)
 
     def _get_par_info(self):
         return zip(self.pars,
@@ -397,7 +402,8 @@ class AnalyzedAversiveData(AnalyzedData):
                    self.data.par_count,
                    self.par_hit_frac,
                    self.par_fa_frac, 
-                   self.par_dprime, )
+                   self.par_dprime_nonglobal,
+                   self.par_dprime_global, )
 
     def score_timestamp(self, ts):
         ts = ts/self.data.contact_fs
@@ -473,7 +479,22 @@ class AnalyzedAversiveData(AnalyzedData):
 
     @cached_property
     def _get_par_dprime(self):
+        if self.use_global_fa_frac:
+            return self.par_dprime_global
+        else:
+            return self.par_dprime_nonglobal
+
+    @cached_property
+    def _get_par_dprime_nonglobal(self):
         return self.par_z_hit-self.par_z_fa
+
+    @cached_property
+    def _get_par_dprime_global(self):
+        return self.par_z_hit-norm.ppf(self.global_fa_frac)
+
+    @cached_property
+    def _get_global_fa_frac(self):
+        return self.fa_seq.mean()
 
 if __name__ == '__main__':
     import tables
