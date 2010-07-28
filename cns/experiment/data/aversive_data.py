@@ -196,10 +196,10 @@ class RawAversiveData_v0_1(BaseAversiveData):
     # Stores raw contact data from optical and electrical sensors as well as
     # whether a trial is running.
     contact_data = Instance(FileMultiChannel, store='channel', 
-                            store_name='contact')
+                            store_path='contact')
     water_log = Any(store='automatic')
     trial_log = Any(store='automatic')
-    trial_data_table = Any(store='automatic', store_name='trial_data')
+    trial_data_table = Any(store='automatic', store_path='trial_data')
 
     def _contact_data_default(self):
         names = ['digital', 'digital_mean', 'analog', 'trial_running']
@@ -228,18 +228,26 @@ class RawAversiveData_v0_2(BaseAversiveData):
 
     contact_data = Any
 
-    touch_digital = Instance(FileChannel, store='automatic')
-    touch_digital_mean = Instance(FileChannel, store='automatic')
-    touch_analog = Instance(FileChannel, store='automatic')
-    optical_digital = Instance(FileChannel, store='automatic')
-    optical_digital_mean = Instance(FileChannel, store='automatic')
-    optical_analog = Instance(FileChannel, store='automatic')
-
-    trial_running = Instance(FileChannel, store='automatic')
+    touch_digital = Instance(FileChannel, 
+            store='channel', store_path='contact/touch_digital')
+    touch_digital_mean = Instance(FileChannel, 
+            store='channel', store_path='contact/touch_digital_mean')
+    touch_analog = Instance(FileChannel, 
+            store='channel', store_path='contact/touch_analog')
+    optical_digital = Instance(FileChannel, 
+            store='channel', store_path='contact/optical_digital')
+    optical_digital_mean = Instance(FileChannel, 
+            store='channel', store_path='contact/optical_digital_mean')
+    optical_analog = Instance(FileChannel, 
+            store='channel', store_path='contact/optical_analog')
+    trial_running = Instance(FileChannel, 
+            store='channel', store_path='contact/trial_running')
 
     # We can switch back and forth between touch and optical as needed
-    contact_digital = Instance(FileChannel, store='automatic')
-    contact_digital_mean = Instance(FileChannel, store='automatic')
+    contact_digital = Instance(FileChannel, 
+            store='channel', store_path='contact/contact_digital')
+    contact_digital_mean = Instance(FileChannel, 
+            store='channel', store_path='contact/contact_digital_mean')
 
     contact_digital_memory = Instance(RAMChannel)
     contact_digital_mean_memory = Instance(RAMChannel)
@@ -247,7 +255,7 @@ class RawAversiveData_v0_2(BaseAversiveData):
 
     water_log = Any(store='automatic')
     trial_log = Any(store='automatic')
-    trial_data_table = Any(store='automatic')
+    trial_data_table = Any(store='automatic', store_path='trial_data')
 
     # Stores raw contact data from optical and electrical sensors as well as
     # whether a trial is running.
@@ -318,8 +326,8 @@ class RawAversiveData_v0_2(BaseAversiveData):
         return append_node(self.store_node, 'trial_log', 'table', description)
 
 # For legacy reasons, we will let AversiveData = RawAversiveData_v0_1
-#AversiveData = RawAversiveData_v0_1
-AversiveData = RawAversiveData_v0_2
+AversiveData = RawAversiveData_v0_1
+#AversiveData = RawAversiveData_v0_2
 
 class AnalyzedAversiveData(AnalyzedData):
 
