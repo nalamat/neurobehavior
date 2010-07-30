@@ -136,6 +136,29 @@ class ExperimentController(Controller):
             return True    
 
     ############################################################################
+    # Stubs to implement
+    ############################################################################
+    def run(self, info=None):
+        error(info.ui.control, 'This action has not been implemented yet')
+        raise NotImplementedError
+
+    def resume(self, info=None):
+        error(info.ui.control, 'This action has not been implemented yet')
+        raise NotImplementedError
+
+    def pause(self, info=None):
+        error(info.ui.control, 'This action has not been implemented yet')
+        raise NotImplementedError
+
+    def remind(self, info=None):
+        error(info.ui.control, 'This action has not been implemented yet')
+        raise NotImplementedError
+
+    def stop(self, info=None):
+        error(info.ui.control, 'This action has not been implemented yet')
+        raise NotImplementedError
+
+    ############################################################################
     # Apply/Revert code
     ############################################################################
     # This code listens for any potential changes to the parameters listed under
