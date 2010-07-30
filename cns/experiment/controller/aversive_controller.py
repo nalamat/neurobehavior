@@ -5,13 +5,9 @@ from cns.data.h5_utils import append_node, append_date_node, \
 from cns.data.persistence import add_or_update_object
 from cns.experiment.data import AversiveData
 from cns.experiment.paradigm import AversiveParadigm
-from cns.widgets import icons
-from cns.widgets.toolbar import ToolBar
 from datetime import timedelta, datetime
-from enthought.etsconfig.etsconfig import ETSConfig
 from enthought.pyface.api import error
 from enthought.pyface.timer.api import Timer
-from enthought.savage.traits.ui.svg_button import SVGButton
 from enthought.traits.api import Any, Instance, CInt, CFloat, Str, Float, \
     Property, HasTraits, Bool, on_trait_change, Dict, Button, Event
 from enthought.traits.ui.api import HGroup, spring, Item, View
@@ -20,90 +16,6 @@ import time
 import numpy as np
 
 log = logging.getLogger(__name__)
-
-class AversiveToolBar(ToolBar):
-
-    handler = Any
-    size = 24, 24
-
-    if ETSConfig.toolkit == 'qt4':
-        kw = dict(height=24, width=24)
-        apply = SVGButton('Apply', filename=icons.apply,
-                          tooltip='Apply settings', **kw)
-        revert = SVGButton('Revert', filename=icons.undo,
-                          tooltip='Revert settings', **kw)
-        start = SVGButton('Run', filename=icons.start,
-                          tooltip='Begin experiment', **kw)
-        pause = SVGButton('Pause', filename=icons.pause,
-                          tooltip='Pause', **kw)
-        resume = SVGButton('Resume', filename=icons.resume,
-                          tooltip='Resume', **kw)
-        stop = SVGButton('Stop', filename=icons.stop,
-                          tooltip='stop', **kw)
-        remind = SVGButton('Remind', filename=icons.warn,
-                          tooltip='Remind', **kw)
-
-        item_kw = dict(show_label=False)
-
-    else:
-        # The WX backend renderer for SVG buttons is ugly, so let's use text
-        # buttons instead.
-        apply = Button('A')
-        start = Button('>>')
-        pause = Button('||')
-        stop = Button('X')
-        remind = Button('!')
-        item_kw = dict(show_label=False, height= -22, width= -22)
-
-    group = HGroup(Item('apply',
-                        enabled_when="object.handler.pending_changes<>{}",
-                        **item_kw),
-                   Item('revert',
-                        enabled_when="object.handler.pending_changes<>{}",
-                        **item_kw),
-                   Item('start',
-                        enabled_when="object.handler.state=='halted'",
-                        **item_kw),
-                   '_',
-                   Item('remind',
-                        enabled_when="object.handler.state=='paused'",
-                        **item_kw),
-                   Item('pause',
-                        enabled_when="object.handler.state=='running'",
-                        **item_kw),
-                   Item('resume',
-                        enabled_when="object.handler.state=='paused'",
-                        **item_kw),
-                   Item('stop',
-                        enabled_when="object.handler.state in " +\
-                                     "['running', 'paused', 'manual']",
-                        **item_kw),
-                   spring,
-                   springy=True,
-                   )
-
-    trait_view = View(group, kind='subpanel')
-
-    def _apply_fired(self):
-        self.handler.apply(self.info)
-
-    def _revert_fired(self):
-        self.handler.revert(self.info)
-
-    def _remind_fired(self):
-        self.handler.remind(self.info)
-
-    def _start_fired(self):
-        self.handler.run(self.info)
-
-    def _pause_fired(self):
-        self.handler.pause(self.info)
-
-    def _resume_fired(self):
-        self.handler.resume(self.info)
-
-    def _stop_fired(self):
-        self.handler.stop(self.info)
 
 class CurrentSettings(HasTraits):
 
@@ -253,16 +165,6 @@ class AversiveController(ExperimentController):
 
     slow_tick = Event
     fast_tick = Event
-
-    def init(self, info):
-        # Install the toolbar handler
-        self.model = info.object
-        self.toolbar.install(self, info)
-        try:
-            self.init_equipment(info)
-        except equipment.EquipmentError, e:
-            self.state = 'disconnected'
-            error(info.ui.control, str(e))
 
     def init_equipment(self, info):
         self.pump = equipment.pump().Pump()
@@ -502,69 +404,29 @@ class AversiveController(ExperimentController):
         if self.state <> 'halted':
             self.model.data.log_event(self.circuit.ts_n.value, 'pump rate', new)
 
-    pending_changes = Dict({})
-    old_values = Dict({})
-
-    @on_trait_change('model.paradigm.+', 'model.paradigm.signal_safe.+',
-                     'model.paradigm.signal_warn.+', 'model.paradigm.shock_settings.+',
-                     'model.paradigm.shock_settings.levels.level',)
-    def log_changes(self, object, name, old, new):
-        if self.state <> 'halted':
-            key = object, name
-            if key not in self.old_values:
-                self.old_values[key] = old
-                self.pending_changes[key] = new
-            elif new == self.old_values[key]:
-                del self.pending_changes[key]
-                del self.old_values[key]
-            else:
-                self.pending_changes[key] = new
-
-    def apply(self, info=None):
-        reset_settings = False
-        ts = self.circuit.ts_n.value
-        for (object, name), value in self.pending_changes.items():
-            log.debug('Value changed during experiment: %s = %r', name, value)
-            if name == 'lick_th':
-                self.circuit.lick_th.value = value
-                self.model.data.log_event(ts, name, value)
-            elif name in ('par_order', 'par_remind', 'pars'):
-                reset_settings = True
-                self.model.data.log_event(ts, name, value)
-            elif name == 'pars':
-                reset_settings = True
-                self.model.data.log_event(ts, name, value)
-            elif name == 'level' or name == 'max_shock':
-                reset_settings = True
-            elif name == 'levels_items':
-                reset_settings = True
-            elif name == 'contact_method':
-                if value == 'touch':
-                    self.circuit.contact_method.value = 0
-                else:
-                    self.circuit.contact_method.value = 1
-                self.model.data.log_event(ts, name, value)
-            else:
-                raise ValueError, 'Cannot change parameter %s while running' % name
-            del self.pending_changes[(object, name)]
-            del self.old_values[(object, name)]
-        if reset_settings:
-            self.current.reset()
-
-    def revert(self):
-        log.debug('reverting changes')
-        for (object, name), value in self.old_values.items():
-            log.debug('reverting changes for %s', name)
-            setattr(object, name, value)
-        self.old_values = {}
-        self.pending_changes = {}
-        
     count = CInt(0)
-    
-    def close(self, info, is_ok):
-        if self.state != 'halted':
-            mesg = 'Please halt experiment before attempting to close window.'
-            error(info.ui.control, mesg)
-            return False
+
+    ############################################################################
+    # Code to apply parameter changes
+    ############################################################################
+    def log_event(self, ts, name, value):
+        self.model.data.log_event(ts, name, value)
+
+    def _reset_current(self, value):
+        self.current.reset()
+
+    _apply_lick_th = _reset_current
+    _apply_par_order = _reset_current
+    _apply_par_remind = _reset_current
+    _apply_pars = _reset_current
+    _apply_level = _reset_current
+    _apply_levels_items = _reset_current
+
+    def _apply_lick_th(self, value):
+        self.circuit.lick_th.value = value
+
+    def _apply_contact_method(self, value):
+        if value == 'touch':
+            self.circuit.contact_method.value = 0
         else:
-            return True
+            self.circuit.contact_method.value = 1
