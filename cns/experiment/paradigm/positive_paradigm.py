@@ -10,11 +10,12 @@ from enthought.savage.traits.ui.svg_button import SVGButton
 from enthought.traits.api import Button, on_trait_change, HasTraits, Any, Range, \
     CFloat, Property, Instance, Trait, Int, Dict, Float, List, Bool, Enum
 from enthought.traits.ui.api import Handler, View, spring, \
-    Item, InstanceEditor, ListEditor
+    Item, InstanceEditor, ListEditor, VGroup, HGroup
+
 import logging
 log = logging.getLogger(__name__)
 
-class ParadigmSignalEditHandler(Handler):
+class SignalEditHandler(Handler):
 
     from enthought.etsconfig.api import ETSConfig
 
@@ -22,8 +23,9 @@ class ParadigmSignalEditHandler(Handler):
         edit_signal = Button('E')
     else:
         item_kw = dict(height=24, width=24)
-        edit_signal = SVGButton(filename=icons.configure, tooltip='Edit Signal',
-                **item_kw)
+        edit_signal = SVGButton(filename=icons.configure, 
+                                tooltip='Edit Signal',
+                                **item_kw)
 
     def handler_edit_signal_changed(self, info):
         dlg = SignalDialog(signal=info.object.signal,
@@ -34,35 +36,36 @@ class ParadigmSignalEditHandler(Handler):
 
 class PositiveParadigm(Paradigm):
 
+    pretrial_delay = Float(100, unit='msec')
+    reward_delay = Float(100, unit='msec')
+    reward_duration = Float(500, unit='msec')
+
     par_order = Trait('descending', choice.options,
                       label='Parameter order',
                       store='attribute', log_change=True)
-    pars = List(CFloat, [2000, 4000, 8000], 
+
+    pars = List(CFloat, [500, 1000, 2000], 
                 minlen=1,
                 label='Parameters',
                 editor=ListAsStringEditor(),
                 store='attribute')
-    par_remind = CFloat(1000,
-                        label='Remind parameter',
-                        store='attribute', log_change=True)
 
     signal = Instance(Signal, Tone(), store='child')
 
     #===========================================================================
     # The views available
     #===========================================================================
-    def edit_view(self, parent=None):
-        par_gr = ['par_remind', 'par_order', 'pars', '|[Parameters]']
-
-        return View(par_gr, shock_gr, timing_gr,
-                    ['signal{}~', spring, 'handler.edit_signal{}', '-[signal]'],
-                    handler=ParadigmSignalEditHandler,
-                    resizable=True,
-                    title='Positive paradigm editor')
-
-    def run_view(self, parent=None):
-        par_gr = ['par_remind', 'par_order', 'pars', '|[Parameters]']
-        return View(par_gr, shock_gr)
+    edit_view = View(VGroup('pretrial_delay',
+                            HGroup(Item('signal', style='readonly'),
+                                   spring, 'handler.edit_signal',
+                                   show_labels=False),
+                            'reward_delay',
+                            'reward_duration',
+                           ),
+                     handler=SignalEditHandler,
+                     resizable=True,
+                     title='Positive paradigm editor',
+                    )
 
 if __name__ == '__main__':
     PositiveParadigm().configure_traits()
