@@ -86,7 +86,7 @@ class RampMixin(EnvelopeMixin):
     def _get_envelope(self):
         ramp = self.generate_ramp()
         n = int(self.ramp_duration * self.fs) - len(ramp)
-        envelope = np.r_[ramp, np.ones(n), self.ramp[::-1]]
+        envelope = np.r_[ramp, np.ones(n), ramp[::-1]]
 
         if self.ramp_delay_ref == 'onset':
             pre_n = int(self.ramp_delay * self.fs)
