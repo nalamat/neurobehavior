@@ -1,4 +1,7 @@
-from enthought.traits.api import HasTraits, Property, CFloat, Range, Enum, Bool
+from enthought.traits.api import HasTraits, Property, CFloat, Range, Enum, \
+        Bool, on_trait_change
+import logging
+log = logging.getLogger(__name__)
 
 import numpy as np
 
@@ -66,12 +69,21 @@ class RampMixin(EnvelopeMixin):
     ramp_delay      = CFloat(0, configurable=True,
                              label='Ramp onset delay', unit='sec',
                              store='attribute')
-    ramp_duration   = CFloat(1, configurable=True,
+    ramp_duration   = CFloat(0.512, configurable=True,
                              label='Envelope duration', unit='sec',
                              store='attribute')
     ramp_delay_ref  = Enum('onset', 'offset', configurable=True,
                            label='Delay from', unit=None,
                            store='attribute')
+
+    @on_trait_change('ramp_duration, ramp_delay, ramp_time')
+    def check_ramp_duration(self, trait, new):
+        max_ramp = self.duration-(2*self.ramp_time+self.ramp_delay)
+        if self.ramp_duration > max_ramp:
+            log.warn('Requested ramp duration %r for %r is too long',
+                    self.ramp_duration, self)
+            log.warn('Coercing ramp duration for %r to %r', self, max_ramp)
+            self.set(trait_change_notify=False, ramp_duration=max_ramp)
 
     def generate_ramp(self):
         n = int(self.ramp_time * self.fs)
@@ -86,7 +98,7 @@ class RampMixin(EnvelopeMixin):
     def _get_envelope(self):
         ramp = self.generate_ramp()
         n = int(self.ramp_duration * self.fs) - len(ramp)
-        envelope = np.r_[ramp, np.ones(n), self.ramp[::-1]]
+        envelope = np.r_[ramp, np.ones(n), ramp[::-1]]
 
         if self.ramp_delay_ref == 'onset':
             pre_n = int(self.ramp_delay * self.fs)

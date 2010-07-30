@@ -5,6 +5,8 @@ from enthought.traits.api import HasTraits, Str, Property, Float, CFloat, Range,
 from enthought.traits.ui.api import EnumEditor
 from cns.signal.calibration import DummyCalibration
 import numpy as np
+import logging
+log = logging.getLogger(__name__)
 
 # I have added new metadata properties to the trait definitions in this
 # file:
@@ -53,14 +55,11 @@ class Signal(Waveform):
         return 10.0 / sf
 
     def set_variable(self, par):
-        setattr(self, self.variable, par)
-        '''
-        if len(args) != len(self.variables):
-            raise ValueError, 'Not enough parameters provided'
+        if self.variable is not None:
+            log.debug('Setting %r %s to %r', self, self.variable, par)
+            setattr(self, self.variable, par)
         else:
-            for variable, parameter in zip(self.variables, args):
-                setattr(self, variable, parameter)
-        '''
+            raise ValueError, 'No variable configured for this signal'
 
     def _get_average_power(self):
         return (self.signal ** 2).mean()
