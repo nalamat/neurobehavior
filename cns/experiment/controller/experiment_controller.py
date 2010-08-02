@@ -27,7 +27,6 @@ def build_signal_cache(signal, *parameters):
 
 class ExperimentToolBar(ToolBar):
 
-    handler = Instance(Handler)
     size = 24, 24
 
     if ETSConfig.toolkit == 'qt4':
@@ -87,14 +86,6 @@ class ExperimentToolBar(ToolBar):
                    )
 
     trait_view = View(group, kind='subpanel')
-
-    def _anytrait_changed(self, trait, value):
-        if trait == 'trait_added':
-            return
-        if self.handler is not None:
-            getattr(self.handler, trait)(self.info)
-        else:
-            print 'Button %s pressed' % trait
 
 class ExperimentController(Controller):
 

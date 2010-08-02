@@ -30,21 +30,21 @@ class SignalEditHandler(Handler):
     def handler_edit_signal_changed(self, info):
         dlg = SignalDialog(signal=info.object.signal,
                            title='Edit signal',
-                           allow_par=False)
+                           allow_par=True)
         if dlg.edit_traits(parent=info.ui.control).result:
             info.object.signal = dlg.signal
 
 class PositiveParadigm(Paradigm):
 
-    trial_delay = Float(100, unit='ms')
-    reward_delay = Float(100, unit='ms')
-    reward_dur = Float(500, unit='ms')
+    trial_delay = Float(0.1, unit='s')
+    reward_delay = Float(0.1, unit='s')
+    reward_dur = Float(0.5, unit='s')
 
     par_order = Trait('descending', choice.options,
                       label='Parameter order',
                       store='attribute', log_change=True)
 
-    pars = List(CFloat, [500, 1000, 2000], 
+    pars = List(CFloat, [1, .5, .25, .125], 
                 minlen=1,
                 label='Parameters',
                 editor=ListAsStringEditor(),
@@ -56,6 +56,8 @@ class PositiveParadigm(Paradigm):
     # The views available
     #===========================================================================
     edit_view = View(VGroup('trial_delay',
+                            'pars',
+                            'par_order',
                             HGroup(Item('signal', style='readonly'),
                                    spring, 'handler.edit_signal',
                                    show_labels=False),

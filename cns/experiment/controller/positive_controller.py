@@ -90,9 +90,9 @@ class PositiveController(ExperimentController):
 
     def configure_circuit(self, circuit, paradigm):
         circuit.reload()
-        circuit.trial_delay_n.set(paradigm.trial_delay, 'ms')
-        circuit.reward_delay_n.set(paradigm.reward_delay, 'ms')
-        circuit.reward_dur_n.set(paradigm.reward_dur, 'ms')
+        circuit.trial_delay_n.set(paradigm.trial_delay, 's')
+        circuit.reward_delay_n.set(paradigm.reward_delay, 's')
+        circuit.reward_dur_n.set(paradigm.reward_dur, 's')
         circuit.contact_buf.initialize()
         circuit.trial_running_buf.initialize()
         circuit.reward_running_buf.initialize()
@@ -155,15 +155,16 @@ class PositiveController(ExperimentController):
             self.current.idx += 1
             if self.state == 'manual':
                 self.state = 'paused'
+                self.current.next()
 
     ############################################################################
     # Code to apply parameter changes
     ############################################################################
     def _apply_trial_delay(self, value):
-        self.circuit.trial_delay_n.set(value, 'ms')
+        self.circuit.trial_delay_n.set(value, 's')
 
     def _apply_reward_delay(self, value):
-        self.circuit.reward_delay_n.set(value, 'ms')
+        self.circuit.reward_delay_n.set(value, 's')
 
     def _apply_reward_dur(self, value):
-        self.circuit.reward_dur_n.set(value, 'ms')
+        self.circuit.reward_dur_n.set(value, 's')
