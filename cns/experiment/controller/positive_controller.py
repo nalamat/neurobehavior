@@ -93,6 +93,9 @@ class PositiveController(ExperimentController):
         circuit.trial_delay_n.set(paradigm.trial_delay, 'ms')
         circuit.reward_delay_n.set(paradigm.reward_delay, 'ms')
         circuit.reward_dur_n.set(paradigm.reward_dur, 'ms')
+        circuit.contact_buf.initialize()
+        circuit.trial_running_buf.initialize()
+        circuit.reward_running_buf.initialize()
 
     def start(self, info=None):
         if not self.model.paradigm.is_valid():
@@ -139,6 +142,12 @@ class PositiveController(ExperimentController):
         if self.state == 'halted':
             return 'System is halted'
         return 'Target (%r)' % self.current.par
+
+    @on_trait_change('fast_tick')
+    def monitor_buffers(self):
+        self.model.data.optical_digital.send(self.circuit.contact_buf.read())
+        self.model.data.trial_running.send(self.circuit.trial_running_buf.read())
+        self.model.data.reward_running.send(self.circuit.reward_running_buf.read())
 
     @on_trait_change('fast_tick')
     def monitor_circuit(self):
