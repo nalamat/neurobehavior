@@ -23,16 +23,18 @@ class PositiveData_0_1(ExperimentData):
     version = 0.2
 
     store_node = Any
-    contact_fs = Float
+    contact_fs = Float(500.0)
 
     contact_data = Any
 
+    '''
     touch_digital = Instance(FileChannel, 
             store='channel', store_path='contact/touch_digital')
     touch_digital_mean = Instance(FileChannel, 
             store='channel', store_path='contact/touch_digital_mean')
     touch_analog = Instance(FileChannel, 
             store='channel', store_path='contact/touch_analog')
+    '''
     optical_digital = Instance(FileChannel, 
             store='channel', store_path='contact/optical_digital')
     optical_digital_mean = Instance(FileChannel, 
@@ -44,6 +46,7 @@ class PositiveData_0_1(ExperimentData):
     reward_running = Instance(FileChannel,
             store='channel', store_path='contact/reward_running')
 
+    '''
     # Stores raw contact data from optical and electrical sensors as well as
     # whether a trial is running.
     def _contact_data_default(self):
@@ -51,34 +54,18 @@ class PositiveData_0_1(ExperimentData):
                    self.touch_digital_mean,
                    self.optical_digital,
                    self.optical_digital_mean,
-                   broadcast((self.contact_digital,
-                              self.contact_digital_memory)),
-                   broadcast((self.contact_digital_mean,
-                              self.contact_digital_mean_memory)),
-                   broadcast((self.trial_running,
-                              self.trial_running_memory)), ]
+                   self.contact_digital,
+                   self.contact_digital_mean,
+                   self.trial_running, ]
         return deinterleave(targets)
+    '''
 
     def _create_channel(self, name, dtype):
         contact_node = get_or_append_node(self.store_node, 'contact')
         return FileChannel(node=contact_node, fs=self.contact_fs,
                            name=name, dtype=dtype)
 
-    def _contact_digital_memory_default(self):
-        return RAMChannel(fs=self.contact_fs, window=10)
-
-    def _contact_digital_mean_memory_default(self):
-        return RAMChannel(fs=self.contact_fs, window=10)
-
-    def _trial_running_memory_default(self):
-        return RAMChannel(fs=self.contact_fs, window=10)
-
-    def _contact_digital_default(self):
-        return self._create_channel('contact_digital', np.bool)
-
-    def _contact_digital_mean_default(self):
-        return self._create_channel('contact_digital_mean', np.float32)
-
+    '''
     def _touch_digital_default(self):
         return self._create_channel('touch_digital', np.bool)
 
@@ -87,6 +74,7 @@ class PositiveData_0_1(ExperimentData):
 
     def _touch_analog_default(self):
         return self._create_channel('touch_analog', np.float32)
+    '''
 
     def _optical_digital_default(self):
         return self._create_channel('optical_digital', np.bool)
