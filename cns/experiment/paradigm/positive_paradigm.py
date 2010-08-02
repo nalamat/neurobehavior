@@ -36,9 +36,9 @@ class SignalEditHandler(Handler):
 
 class PositiveParadigm(Paradigm):
 
-    pretrial_delay = Float(100, unit='msec')
-    reward_delay = Float(100, unit='msec')
-    reward_duration = Float(500, unit='msec')
+    trial_delay = Float(100, unit='ms')
+    reward_delay = Float(100, unit='ms')
+    reward_dur = Float(500, unit='ms')
 
     par_order = Trait('descending', choice.options,
                       label='Parameter order',
@@ -55,12 +55,12 @@ class PositiveParadigm(Paradigm):
     #===========================================================================
     # The views available
     #===========================================================================
-    edit_view = View(VGroup('pretrial_delay',
+    edit_view = View(VGroup('trial_delay',
                             HGroup(Item('signal', style='readonly'),
                                    spring, 'handler.edit_signal',
                                    show_labels=False),
                             'reward_delay',
-                            'reward_duration',
+                            'reward_dur',
                            ),
                      handler=SignalEditHandler,
                      resizable=True,

@@ -41,14 +41,20 @@ def convert(src_unit, dest_unit, value, dsp_fs):
             raise SamplingRateError(dsp_fs, req_fs)
         return int(dsp_fs/req_fs)
     
-    def nPer_to_fs(n, dsp_fs):
-        return dsp_fs/n
+    def nPer_to_fs(nPer, dsp_fs):
+        return dsp_fs/nPer
     
     def n_to_s(n, dsp_fs):
         return n/dsp_fs
     
     def s_to_n(s, dsp_fs):
         return int(s*dsp_fs)
+
+    def ms_to_n(ms, dsp_fs):
+        return int(ms*1e-3*dsp_fs)
+
+    def n_to_ms(n, dsp_fs):
+        return n/dsp_fs*1e3
    
     def s_to_nPow2(s, dsp_fs):
         return nextpow2(s_to_n(s, dsp_fs))

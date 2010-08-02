@@ -3,8 +3,8 @@ from cns import choice, equipment
 from cns.data.h5_utils import append_node, append_date_node, \
     get_or_append_node
 from cns.data.persistence import add_or_update_object
-from cns.experiment.data import AversiveData
-from cns.experiment.paradigm import AversiveParadigm
+from cns.experiment.data.positive_data import PositiveData
+from cns.experiment.paradigm.positive_paradigm import PositiveParadigm
 from cns.widgets import icons
 from cns.widgets.toolbar import ToolBar
 from datetime import timedelta, datetime
@@ -18,12 +18,14 @@ from enthought.traits.ui.api import HGroup, spring, Item, View
 import logging
 import time
 import numpy as np
+from cns.experiment.controller.experiment_controller import build_signal_cache
 
 log = logging.getLogger(__name__)
 
 class CurrentSettings(HasTraits):
 
-    paradigm = Instance(PostiveParadigm)
+    paradigm = Instance(PositiveParadigm, ())
+    signal = Property
     
     '''Tracks the trial index for comparision with the circuit index'''
     idx = CInt(0)
@@ -35,16 +37,15 @@ class CurrentSettings(HasTraits):
 
     def __init__(self, **kw):
         super(CurrentSettings, self).__init__(**kw)
-        self.initialize(self.paradigm)
+        self.initialize()
 
     def reset(self):
-        self.initialize(self.paradigm)
+        self.initialize()
 
-    def initialize(self, paradigm):
-        self._choice_par = self._get_choice_par(paradigm)
-        self._signal_cache = build_signal_cache(self.signal_warn,
-                                                paradigm.par_remind,
-                                                *paradigm.pars)
+    def initialize(self):
+        self._choice_par = self._get_choice_par()
+        self._signal_cache = build_signal_cache(self.paradigm.signal,
+                                                *self.paradigm.pars)
         self.next()
 
     def next(self):
@@ -56,14 +57,14 @@ class CurrentSettings(HasTraits):
     def _get_signal(self):
         return self._signal_cache[self.par]
 
-    def _get_choice_par(self, paradigm):
+    def _get_choice_par(self):
         # Always pass a copy of pars to other functions that may modify the
         # content of the list
-        return choice.get(paradigm.par_order, paradigm.pars[:])
+        return choice.get(self.paradigm.par_order, self.paradigm.pars[:])
 
 class PositiveController(ExperimentController):
 
-    toolbar = Instance(AversiveToolBar, ())
+    current = Instance(CurrentSettings)
 
     backend = Any
     circuit = Any
@@ -78,23 +79,22 @@ class PositiveController(ExperimentController):
     completed = Bool(False)
     water_infused = Float(0)
 
-    status = Property(Str, depends_on='currentnt.par, state')
-    time_elapsed = Property(Str, depends_on='slow_tick', label='Time')
+    status = Property(Str, depends_on='current.par, state')
 
     fast_tick = Event
 
     def init_equipment(self, info):
         self.pump = equipment.pump().Pump()
         self.backend = equipment.dsp()
-        self.circuit = self.backend.load('positive-behavior', 'RX6')
+        self.circuit = self.backend.load('positive-behavior-stage1', 'RX6')
 
     def configure_circuit(self, circuit, paradigm):
         circuit.reload()
-        circuit.pretrial_delay_n.set(paradigm.pretrial_delay, 'msec')
-        circuit.reward_delay_n.set(paradigm.reward_delay, 'msec')
-        circuit.reward_duration_n.set(paradigm.reward_duration, 'msec')
+        circuit.trial_delay_n.set(paradigm.trial_delay, 'ms')
+        circuit.reward_delay_n.set(paradigm.reward_delay, 'ms')
+        circuit.reward_dur_n.set(paradigm.reward_dur, 'ms')
 
-    def run(self, info=None):
+    def start(self, info=None):
         if not self.model.paradigm.is_valid():
             mesg = 'Please correct the following errors first:\n'
             mesg += self.model.paradigm.err_messages()
@@ -104,6 +104,8 @@ class PositiveController(ExperimentController):
         try:
             self.configure_circuit(self.circuit, self.model.paradigm)
             self.fast_timer = Timer(250, self.tick, 'fast')
+            self.current = CurrentSettings(paradigm=self.model.paradigm)
+            self.state = 'paused'
             self.circuit.start()
         except BaseException, e:
             self.state = 'halted'
@@ -112,8 +114,8 @@ class PositiveController(ExperimentController):
 
     def remind(self, info=None):
         self.state = 'manual'
-        signal = self.current.target_signal
-        self.circuit.target_signal.set(signal)
+        signal = self.current.signal
+        self.circuit.trial_buf.set(signal)
         self.backend.set_attenuation(signal.attenuation, 'PA5')
         self.circuit.trigger(1)
 
@@ -138,24 +140,21 @@ class PositiveController(ExperimentController):
             return 'System is halted'
         return 'Target (%r)' % self.current.par
 
+    @on_trait_change('fast_tick')
+    def monitor_circuit(self):
+        if self.circuit.trial_idx.value > self.current.idx:
+            self.current.idx += 1
+            if self.state == 'manual':
+                self.state = 'paused'
+
     ############################################################################
     # Code to apply parameter changes
     ############################################################################
-    def _reset_current(self, value):
-        self.current.reset()
+    def _apply_trial_delay(self, value):
+        self.circuit.trial_delay_n.set(value, 'ms')
 
-    _apply_lick_th = _reset_current
-    _apply_par_order = _reset_current
-    _apply_par_remind = _reset_current
-    _apply_pars = _reset_current
-    _apply_level = _reset_current
-    _apply_levels_items = _reset_current
+    def _apply_reward_delay(self, value):
+        self.circuit.reward_delay_n.set(value, 'ms')
 
-    def _apply_lick_th(self, value):
-        self.circuit.lick_th.value = value
-
-    def _apply_contact_method(self, value):
-        if value == 'touch':
-            self.circuit.contact_method.value = 0
-        else:
-            self.circuit.contact_method.value = 1
+    def _apply_reward_dur(self, value):
+        self.circuit.reward_dur_n.set(value, 'ms')
