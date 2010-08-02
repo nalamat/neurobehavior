@@ -127,7 +127,6 @@ class AversiveController(ExperimentController):
     documentation online at:
     https://svn.enthought.com/enthought/wiki/UnderstandingMVCAndTraitsUI
     """
-    toolbar = Instance(AversiveToolBar, ())
 
     backend = Any
     circuit = Any
@@ -218,7 +217,7 @@ class AversiveController(ExperimentController):
         model.data = AversiveData(contact_fs=self.circuit.lick_nPer.get('fs'),
                                   store_node=model.data_node)
 
-    def run(self, info=None):
+    def start(self, info=None):
         if not self.model.paradigm.is_valid():
             mesg = 'Please correct the following errors first:\n'
             mesg += self.model.paradigm.err_messages()

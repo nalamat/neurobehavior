@@ -1,13 +1,16 @@
-from enthought.traits.api import Enum, Int, Instance
+from enthought.traits.api import Enum, Int, Instance, Dict, \
+        on_trait_change, Property, Str
 from enthought.traits.ui.api import Controller, Handler, HGroup, Item, \
         spring, View
 from enthought.savage.traits.ui.svg_button import SVGButton
 from enthought.etsconfig.api import ETSConfig
+from enthought.pyface.api import error
+from cns import equipment
 
 from cns.widgets import icons
 from cns.widgets.toolbar import ToolBar
 
-def build_signal_cache(self, signal, *parameters):
+def build_signal_cache(signal, *parameters):
 
     def generate_signal(template, parameter):
         signal = template.__class__()
@@ -20,6 +23,7 @@ def build_signal_cache(self, signal, *parameters):
     cache = {}
     for par in parameters:
         cache[par] = generate_signal(signal, par)
+    return cache
 
 class ExperimentToolBar(ToolBar):
 
@@ -94,7 +98,8 @@ class ExperimentToolBar(ToolBar):
 
 class ExperimentController(Controller):
 
-    toolbar =  Instance(ExperimentToolBar)
+    toolbar = Instance(ExperimentToolBar, ())
+    #time_elapsed = Property(Str, depends_on='slow_tick', label='Time')
     
     # SYSTEM STATE
     # - Halted: The system is waiting for the user to configure parameters.  No
@@ -138,7 +143,7 @@ class ExperimentController(Controller):
     ############################################################################
     # Stubs to implement
     ############################################################################
-    def run(self, info=None):
+    def start(self, info=None):
         error(info.ui.control, 'This action has not been implemented yet')
         raise NotImplementedError
 
@@ -173,7 +178,7 @@ class ExperimentController(Controller):
     pending_changes = Dict({})
     old_values = Dict({})
 
-    @on_trait_change('paradigm.+')
+    @on_trait_change('object.model.paradigm.+')
     def queue_change(self, object, name, old, new):
         if self.state <> 'halted' and hasattr(self, '_apply_'+name):
             key = object, name
@@ -208,6 +213,9 @@ class ExperimentController(Controller):
             setattr(object, name, value)
         self.old_values = {}
         self.pending_changes = {}
+
+    def _apply_circuit_change(self, name, value, circuit=None):
+        setattr(self.circuit, name, value)
 
 if __name__ == '__main__':
     ExperimentToolBar().configure_traits()

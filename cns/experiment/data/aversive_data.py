@@ -16,6 +16,7 @@ import numpy as np
 from cns.data.h5_utils import append_node, get_or_append_node
 from cns.pipeline import deinterleave, broadcast
 from scipy.stats import norm
+from cns.traits.api import Alias
 
 def apply_mask(fun, seq, mask):
     seq = np.array(seq).ravel()
@@ -25,10 +26,6 @@ def apply_mask(fun, seq, mask):
 WATER_DTYPE = [('timestamp', 'i'), ('infused', 'f')]
 TRIAL_DTYPE = [('timestamp', 'i'), ('par', 'f'), ('shock', 'f'), ('type', 'S16'), ]
 LOG_DTYPE = [('timestamp', 'i'), ('name', 'S64'), ('value', 'S128'), ]
-
-def Alias(name):
-    return Property(lambda obj: getattr(obj, name),
-                    lambda obj, val: setattr(obj, name, val))
 
 def migrate_data(data):
     raise NotImplementedError
