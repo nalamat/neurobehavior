@@ -44,15 +44,9 @@ pump_view <-> PumpController <-> Pump
 # exceptions so that we can provide messages and information specific to
 # problems with the pump hardware.
 
-import serial
-connection_settings = dict(port=0, baudrate=19200, bytesize=8, parity='N',
-        stopbits=1, timeout=1, xonxoff=0, rtscts=0, writeTimeout=1,
-        dsrdtr=None, interCharTimeout=None)
-SERIAL = serial.Serial(**connection_settings)
-
 class PumpError(EquipmentError):
 
-    def __init__(self, code, cmd):
+    def __init__(self, code, cmd=''):
         self.code = code
         self.cmd = cmd
 
@@ -71,7 +65,8 @@ class PumpCommError(PumpError):
             'COM'   : 'Invalid communications packet recieved',
             'IGN'   : 'Command ignored due to new phase start',
             # Custom codes
-            'NR'    : 'No response from pump'
+            'NR'    : 'No response from pump',
+            'SER'   : 'Unable to open serial port',
             }
 
     _todo = 'Unable to connect to pump.  Please ensure that no other ' + \
@@ -104,6 +99,15 @@ class PumpUnitError(Exception):
     def __str__(self):
         mesg = '%s: Expected units in %s, receved %s'
         return mesg % (self.cmd, self.expected, self.actual)
+
+try:
+    import serial
+    connection_settings = dict(port=0, baudrate=19200, bytesize=8, parity='N',
+            stopbits=1, timeout=1, xonxoff=0, rtscts=0, writeTimeout=1,
+            dsrdtr=None, interCharTimeout=None)
+    SERIAL = serial.Serial(**connection_settings)
+except serial.SerialException:
+    raise PumpCommError('SER', 'serial.Serial')
 
 class PumpInterface(object):
     # The Syringe Pump uses a standard 8N1 frame with a default baud rate of
