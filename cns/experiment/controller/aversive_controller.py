@@ -266,7 +266,7 @@ class AversiveController(ExperimentController):
     def init_equipment(self, info):
         self.pump = equipment.pump().Pump()
         self.backend = equipment.dsp()
-        self.circuit = self.backend.load('aversive-behavior', 'RX6')
+        self.circuit = self.backend.load('aversive-behavior-FM', 'RX6')
         #self.atten = equipment.attenuator()
 
     def configure_circuit(self, circuit, paradigm):
