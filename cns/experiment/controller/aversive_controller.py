@@ -333,7 +333,8 @@ class AversiveController(ExperimentController):
             # Initialize parameters
             #===================================================================
             self.current = CurrentSettings(paradigm=self.model.paradigm)
-            self.circuit.trial_buf.set(self.current.signal_warn)
+            #self.circuit.trial_buf.set(self.current.signal_warn)
+	    self.circuit.depth.value = self.current.par
 
             #===================================================================
             # Finally, everything's a go!
@@ -357,7 +358,8 @@ class AversiveController(ExperimentController):
         self.state = 'manual'
         # The actual sequence is important.  We must finish uploading the signal
         # before we set the circuit flags to allow commencement of a trial.
-        self.circuit.trial_buf.set(self.current.signal_remind)
+        #self.circuit.trial_buf.set(self.current.signal_remind)
+	self.circuit.depth.value = self.current.par_remind
         self.backend.set_attenuation(self.current.signal_remind.attenuation, 'PA5')
         self.circuit.shock_level.value = self.current.shock_remind
         #print self.circuit.shock_level.value
@@ -436,7 +438,8 @@ class AversiveController(ExperimentController):
                                        self.current.par_remind,
                                        self.current.shock_remind,
                                        'remind')
-                self.circuit.trial_buf.set(self.current.signal_warn)
+                #self.circuit.trial_buf.set(self.current.signal_warn)
+		self.circuit.depth.value = self.current.par
                 self.backend.set_attenuation(self.current.signal_warn.attenuation, 'PA5')
                 self.circuit.shock_level.value = self.current.shock_level
 
@@ -456,7 +459,8 @@ class AversiveController(ExperimentController):
                     self.current.next()
                 elif last_trial == self.current.safe_trials: 
                     self.model.data.update(ts, self.current.par, 0, 'safe')
-                    self.circuit.trial_buf.set(self.current.signal_warn)
+                    #self.circuit.trial_buf.set(self.current.signal_warn)
+		    self.circuit.depth.value = self.current.par
                     self.backend.set_attenuation(self.current.signal_warn.attenuation, 'PA5')
                     self.circuit.shock_level.value = self.current.shock_warn
                     self.circuit.trigger(2)
