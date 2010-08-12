@@ -106,7 +106,7 @@ try:
             stopbits=1, timeout=1, xonxoff=0, rtscts=0, writeTimeout=1,
             dsrdtr=None, interCharTimeout=None)
     SERIAL = serial.Serial(**connection_settings)
-except serial.SerialException:
+except serial.SerialException, e:
     raise PumpCommError('SER', 'serial.Serial')
 
 class PumpInterface(object):

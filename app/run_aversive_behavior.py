@@ -4,10 +4,8 @@ from enthought.pyface.api import error
 from cns.data.view.cohort import CohortView, CohortViewHandler
 from cns.data import persistence
 from cns.data.h5_utils import get_or_append_node
-from cns.experiment.controller import AversiveController
+from cns.experiment.controller.aversive_controller import AversiveController
 from cns.experiment.experiment.aversive_experiment import AversiveExperiment
-from cns.experiment.experiment.aversive_physiology_experiment import \
-    AversivePhysiologyExperiment
 import sys
 import tables
 from enthought.traits.api import Any, Trait, TraitError

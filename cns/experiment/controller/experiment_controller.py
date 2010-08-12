@@ -1,5 +1,5 @@
 from enthought.traits.api import Enum, Int, Instance, Dict, \
-        on_trait_change, Property, Str
+        on_trait_change, Property, Str, Button
 from enthought.traits.ui.api import Controller, Handler, HGroup, Item, \
         spring, View
 from enthought.savage.traits.ui.svg_button import SVGButton
