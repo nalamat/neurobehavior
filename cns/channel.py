@@ -77,8 +77,11 @@ class FileChannel(Channel):
     # small aberrations in a large, continuous waveform are not of as much
     # concern to us and I understand there can be a sizable performance
     # penalty.
+    #
+    # If compression_level is > 0 and compression_type is None, tables.Filter
+    # will raise an exception.
     compression_level = Int(1)
-    compression_type = Enum('zlib', 'lzo', 'bzip')
+    compression_type = Enum('zlib', 'lzo', 'bzip', None)
     use_checksum = Bool(False)
     
     # It is important to implement dtype appropriately, otherwise it defaults

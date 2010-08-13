@@ -1,11 +1,12 @@
 from enthought.traits.api import HasTraits, Any, Instance, DelegatesTo, Int
 from enthought.traits.ui.api import View, Item, VGroup, HGroup, InstanceEditor
 
-from cns.experiment.data import AversiveData, AnalyzedAversiveDataView
+from cns.experiment.data.aversive_data import AversiveData
+from cns.experiment.data.aversive_data_view import AnalyzedAversiveDataView
 #from cns.experiment.data.aversive_data import AversiveData_v0_2 as AversiveData
 #from cns.experiment.data.aversive_data import AnalyzedAversiveData
-from cns.experiment.paradigm import AversiveParadigm 
-from cns.experiment.controller import AversiveController
+from cns.experiment.paradigm.aversive_paradigm import AversiveParadigm 
+from cns.experiment.controller.aversive_controller import AversiveController
 
 class AversiveExperiment(HasTraits):
 
@@ -15,14 +16,11 @@ class AversiveExperiment(HasTraits):
     trial_blocks = Int(0)
     
     # Show the analyzed data
-    data = Instance(AversiveData, ())
+    data = Instance(AversiveData)
 
     analyzed = DelegatesTo('analyzed_view')
     analyzed_view = Instance(AnalyzedAversiveDataView)
     paradigm = Instance(AversiveParadigm, ())
-    
-    def _data_default(self):
-        return AversiveData(store_node=self.store_node)
 
     def _data_changed(self):
         self.analyzed_view = AnalyzedAversiveDataView(data=self.data)

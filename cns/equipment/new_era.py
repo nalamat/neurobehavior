@@ -44,15 +44,9 @@ pump_view <-> PumpController <-> Pump
 # exceptions so that we can provide messages and information specific to
 # problems with the pump hardware.
 
-import serial
-connection_settings = dict(port=0, baudrate=19200, bytesize=8, parity='N',
-        stopbits=1, timeout=1, xonxoff=0, rtscts=0, writeTimeout=1,
-        dsrdtr=None, interCharTimeout=None)
-SERIAL = serial.Serial(**connection_settings)
-
 class PumpError(EquipmentError):
 
-    def __init__(self, code, cmd):
+    def __init__(self, code, cmd=''):
         self.code = code
         self.cmd = cmd
 
@@ -71,7 +65,8 @@ class PumpCommError(PumpError):
             'COM'   : 'Invalid communications packet recieved',
             'IGN'   : 'Command ignored due to new phase start',
             # Custom codes
-            'NR'    : 'No response from pump'
+            'NR'    : 'No response from pump',
+            'SER'   : 'Unable to open serial port',
             }
 
     _todo = 'Unable to connect to pump.  Please ensure that no other ' + \
@@ -104,6 +99,15 @@ class PumpUnitError(Exception):
     def __str__(self):
         mesg = '%s: Expected units in %s, receved %s'
         return mesg % (self.cmd, self.expected, self.actual)
+
+try:
+    import serial
+    connection_settings = dict(port=0, baudrate=19200, bytesize=8, parity='N',
+            stopbits=1, timeout=1, xonxoff=0, rtscts=0, writeTimeout=1,
+            dsrdtr=None, interCharTimeout=None)
+    SERIAL = serial.Serial(**connection_settings)
+except serial.SerialException, e:
+    raise PumpCommError('SER', 'serial.Serial')
 
 class PumpInterface(object):
     # The Syringe Pump uses a standard 8N1 frame with a default baud rate of
@@ -254,7 +258,8 @@ class PumpInterface(object):
         for k, v in kw.items():
             setattr(self, k, v)
         if self.cur_status not in 'IW':
-            self.xmit('RUN')
+            self.start()
+            #self.xmit('RUN')
 
     def run_if_TTL(self, **kw):
         '''In contrast to run, the state of the TTL is inspected.  If the TTL is
@@ -263,25 +268,40 @@ class PumpInterface(object):
 
         The goal of this function is to allow an easy way to smoothly switch
         from an override mode where the TTL logic is ignored to a mode in which
-        the TTL logic controls the pump.
+        the TTL logic controls the pump (also change rate while an animal is
+        drinking).
 
         TODO: This handling does not factor in TTL modes where a low or falling
         edge is meant to START the pump (not stop it).  Right now we do not have
         a need for this, so I will not worry about it.
         '''
+        # Some changes to properties are stored in volatile memory if the pump
+        # is currently executing a program.  Once the pump stops (e.g. if the
+        # gerbil comes off the spout), then the changes are lost.  By stopping
+        # the pump, we can ensure these changes are stored in non-volatile
+        # memory.
+        self.stop()
         for k, v in kw.items():
             setattr(self, k, v)
         # Store value in a local variable so we don't have to send a new RS232
         # command the next time we need the value
         TTL = self.TTL
         if TTL and self.cur_status not in 'IW':
-            self.xmit('RUN')
+            #self.xmit('RUN')
+            self.run()
         elif not TTL and self.cur_status in 'IW':
-            self.xmit('STP')
+            self.stop()
+            #self.xmit('STP')
 
     def reset_volume(self):
         self.xmit('CLD INF')
         self.xmit('CLD WDR')
+
+    def stop(self):
+        self.xmit('STP')
+
+    def start(self):
+        self.xmit('RUN')
 
     #####################################################################
     # Property get/set for controlling pump parameters
@@ -325,9 +345,13 @@ class PumpInterface(object):
         # in volatile memory remains in effect.  It isn't until you hit a button
         # on the keypad or power-cycle the pump that the pump reverts to the old
         # rate.
+
+        # NOTE: RAT C does not work with the older pump.
         if rate < 0: self.direction = 'withdraw'
         else: self.direction = 'infuse'
-        self.xmit('RAT C %.2f' % abs(rate))
+        #self.stop()
+        self.xmit('RAT C %.3f' % abs(rate))
+        #self.start()
 
     def _get_rate(self):
         rate = self.xmit('RAT')
@@ -579,6 +603,7 @@ class PumpController(Controller):
 
     def object_rate_changed(self, info):
         self.iface.rate = info.object.rate
+        info.object.rate = self.iface.rate
 
     def object_diameter_changed(self, info):
         self.iface.diameter = info.object.diameter
@@ -593,20 +618,19 @@ class Pump(HasTraits):
     diameter = Constant(19.05, label='Syringe ID (mm)', store='attribute')
     trigger = Constant('run_high', store='atribute')
 
-    infused = CFloat(0)
-    withdrawn = CFloat(0)
+    #infused = CFloat(0)
+    #withdrawn = CFloat(0)
 
     # \u0394 is the unicode character code for the Greek uppercase delta.
-    rate_incr = CFloat(0.05, label=u'\u0394 Rate (mL/min)', store='attribute')
+    rate_incr = CFloat(0.025, label=u'\u0394 Rate (mL/min)', store='attribute')
 
     # Approximate volume of the tube connecting the pump to the lick spout
     tube_volume = CFloat(4.0, label='Tube volume (mL)', store='attribute')
     # Fastest (safe) rate at which we can fill the tube
-    fill_rate = CFloat(10.0, label='Tube fill rate (mL/min)',
-                         store='attribute')
+    fill_rate = CFloat(10.0, label='Tube fill rate (mL/min)', store='attribute')
 
-    traits_view = View(['handler.toolbar{}@', 'rate', '-'],
-                       handler=PumpController)
+    traits_view = View(['handler.toolbar{}@', 'rate_incr', 'rate', '-'],
+                        handler=PumpController)
 
 if __name__ == '__main__':
     try:

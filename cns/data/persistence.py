@@ -258,20 +258,20 @@ def append_metadata(object, source):
     object.store_node = source
     return object
 
-def load_object(source, name=None):
-    if name is not None:
-        source = getattr(source, name)
+def load_object(source, path=None):
+    if path is not None and '/' in path:
+        node = source.getNode(path)
+    elif path is not None:
+        node = getattr(source, path)
+    else:
+        node = source
 
     kw = {}
-    try:
-        kw['UNIQUE_ID'] = source._f_getAttr('UNIQUE_ID')
-    except AttributeError:
-        pass
+    try: kw['UNIQUE_ID'] = node._f_getAttr('UNIQUE_ID')
+    except AttributeError: pass
 
-    module_name = source._f_getAttr('module')
-    klass_name = source._f_getAttr('klass')
-    #try: version = source._f_getAttr('version')
-    #except AttributeError: version = 0.1
+    module_name = node._f_getAttr('module')
+    klass_name = node._f_getAttr('klass')
 
     # We need to obtain a reference to the type so we can adequately parse any
     # datetime values that are stored in the HDF5 file.  This type will also be
@@ -281,7 +281,7 @@ def load_object(source, name=None):
     #for name, trait in type.class_traits(store='attribute').items():
     for name, trait in get_traits(type, True,  store='attribute').items():
         try:
-            value = source._f_getAttr(name)
+            value = node._f_getAttr(name)
             # TraitMap will raise an error here
             try:
                 klass = trait.trait_type.klass
@@ -296,46 +296,49 @@ def load_object(source, name=None):
         except AttributeError:
             # This information was not saved to the node, which suggests that
             # the data stored in the node may be an older version.
-            pass
+            log.debug('Node %s from file %s does not have attribute "%s"',
+                    node._v_pathname, node._v_file.filename, name)
 
     #for name, trait in type.class_traits(store='table').items():
     for name, trait in get_traits(type, True,  store='table').items():
         # Converts datetime back from string to Python datetime format
-        data = getattr(source, name)[:]
+        data = getattr(node, name)[:]
         data = unsanitize_datetimes(data, trait)
         kw[name] = data
 
     #for name, trait in type.class_traits(store='child').items():
     for name, trait in get_traits(type, True, store='child').items():
-        value = getattr(source, name)
+        value = getattr(node, name)
         if trait.is_trait_type(List) or trait.is_trait_type(Array):
             kw[name] = [load_object(o) for o in value._v_children.values()]
-            #kw[name].sort()
         else:
             kw[name] = load_object(value)
 
     for name, trait in get_traits(type, True, store='automatic').items():
         try:
-            try:
-                value = getattr(source, trait.store_name)
-            except (TypeError, AttributeError):
-                value = getattr(source, name)
-            kw[name] = value
+            path = getattr(trait, 'store_path')
+            print path
+            kw[name] = node._f_getChild(path)
+            #except (TypeError, AttributeError):
+            #    kw[name] = node._f_getChild(name)
         except tables.NoSuchNodeError:
-            pass
+            log.debug('Node %s from file %s does not have node "%s"',
+                    node._v_pathname, node._v_file.filename, name)
 
     for name, trait in get_traits(type, True, store='channel').items():
         try:
             try:
-                value = getattr(source, trait.store_name)
+                value = getattr(node, trait.store_path)
             except (TypeError, AttributeError):
-                value = getattr(source, name)
+                value = getattr(node, name)
             kw[name] = load_file_channel(value)
         except tables.NoSuchNodeError:
-            pass
+            log.debug('Node %s from file %s does not have node "%s"',
+                    node._v_pathname, node._v_file.filename, name)
 
     object = type(**kw)
-    return append_metadata(object, source)
+    return append_metadata(object, node)
+    #return kw
 
 def load_file_channel(node):
     kw = {}
