@@ -1,4 +1,6 @@
 from cns import choice
+from cns import equipment
+#Pump = equipment.pump().Pump
 from cns.experiment.paradigm.paradigm import Paradigm
 from cns.signal import Signal
 from cns.signal.signal_dialog import SignalDialog
@@ -121,6 +123,9 @@ class AversiveParadigm(Paradigm):
     shock_settings = Instance(ShockSettings,
                            label='Shock level (V)',
                            store='child', log_change=True)
+
+    #pump = Instance(Pump, (), label='Pump Settings', store='child',
+    #                log_change=True)
 
     def _shock_settings_default(self):
         return ShockSettings(paradigm=self)

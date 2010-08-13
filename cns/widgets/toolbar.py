@@ -14,3 +14,9 @@ class ToolBar(HasTraits):
     def install(self, handler, info):
         self.handler = handler
         self.info = info
+
+    def _anytrait_changed(self, trait, value):
+        # Discard any trait changes that are not due to the buttons defined in
+        # the subclasses.
+        if trait not in ('trait_added', 'info', 'handler'):
+            getattr(self.handler, trait)(self.info)

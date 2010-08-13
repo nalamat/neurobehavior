@@ -91,7 +91,6 @@ class Data(HasTraits):
                       bar_color='lightpink',
                       bar_width=0.9,
                       source=self)
-        print c.bar_color
         container.add(index='hit_history_indices',
                       value='hit_history',
                       source=self,
