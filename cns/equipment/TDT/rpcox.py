@@ -361,10 +361,19 @@ class DSPTag(object):
 
     value = property(_get_value, _set_value)
 
-    def set(self, value, src_unit=None):
+    def set(self, value, src_unit=None, lb=-np.inf, ub=np.inf):
+        '''The converted value is coerced to the range [lb, ub].  Since lb and
+        ub are set to -inf and +inf by default, no coercion is typically done.
+        This clipping is useful for some TDT compnents such as TTLDelay2.  If
+        N1+N2=0 for TTLDelay2, the component will not relay any TTLs it
+        recieves.  By ensuring that N1+N2!=1 when you want a delay of 0, you can
+        avoid this issue.  Note that I typically solve this problem by making N1
+        configurable via a tag, and setting N2 to 1 that way the software does
+        not need to worry about avoiding setting N1 to 0.
+        '''
         if src_unit is not None:
             value = convert(src_unit, self.unit, value, self.fs)
-        self.value = value
+        self.value = np.clip(value, lb, ub)
 
     def get(self, req_unit=None):
         if req_unit is not None:
