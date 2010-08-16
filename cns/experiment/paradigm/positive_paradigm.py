@@ -36,9 +36,11 @@ class SignalEditHandler(Handler):
 
 class PositiveParadigm(Paradigm):
 
-    trial_delay = Float(0.1, unit='s')
-    reward_delay = Float(0.1, unit='s')
-    reward_dur = Float(0.5, unit='s')
+    trial_delay = Float(0, unit='s')
+    reward_delay = Float(0, unit='s')
+    reward_dur = Float(1.5, unit='s')
+    timeout_dur = Float(5, unit='s')
+    allow_timeout = Bool(False)
 
     par_order = Trait('descending', choice.options,
                       label='Parameter order',
@@ -63,6 +65,8 @@ class PositiveParadigm(Paradigm):
                                    show_labels=False),
                             'reward_delay',
                             'reward_dur',
+                            'timeout_dur',
+                            'allow_timeout',
                            ),
                      handler=SignalEditHandler,
                      resizable=True,

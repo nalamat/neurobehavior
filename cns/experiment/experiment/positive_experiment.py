@@ -30,6 +30,8 @@ class PositiveExperiment(HasTraits):
                  decimate_mode='mean', color='blue', line_width=3)
         view.add(self.data.trial_running,
                  decimate_mode='mean', color='red', line_width=2)
+        view.add(self.data.timeout_running,
+                 decimate_mode='mean', color='green', line_width=4)
         return view
     
     def _data_default(self):
