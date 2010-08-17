@@ -1,0 +1,8 @@
+glob:.bzr
+glob:*.h5
+glob:*.pyc
+glob:*.asv
+glob:sandbox/**
+glob:*.*~
+glob:*.swp
+glob:app/log/**
