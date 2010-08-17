@@ -1,5 +1,5 @@
 from enthought.traits.api import Enum, Int, Instance, Dict, \
-        on_trait_change, Property, Str
+        on_trait_change, Property, Str, Button
 from enthought.traits.ui.api import Controller, Handler, HGroup, Item, \
         spring, View
 from enthought.savage.traits.ui.svg_button import SVGButton
@@ -27,7 +27,6 @@ def build_signal_cache(signal, *parameters):
 
 class ExperimentToolBar(ToolBar):
 
-    handler = Instance(Handler)
     size = 24, 24
 
     if ETSConfig.toolkit == 'qt4':
@@ -88,14 +87,11 @@ class ExperimentToolBar(ToolBar):
 
     trait_view = View(group, kind='subpanel')
 
-    @on_trait_change('+action')
+    #@on_trait_change('+action')
+    @on_trait_change('start, stop, pause, revert, apply, resume, remind')
     def process_action(self, trait, value):
-        print 'detected'
         if self.traits_inited():
-            print 'GETTING TRAIT:', trait
-            #getattr(self.handler, trait)(self.info)
-        else:
-            print 'Button %s pressed' % trait
+            getattr(self.handler, trait)(self.info)
 
 class ExperimentController(Controller):
 

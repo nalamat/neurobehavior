@@ -27,6 +27,20 @@ WATER_DTYPE = [('timestamp', 'i'), ('infused', 'f')]
 TRIAL_DTYPE = [('timestamp', 'i'), ('par', 'f'), ('shock', 'f'), ('type', 'S16'), ]
 LOG_DTYPE = [('timestamp', 'i'), ('name', 'S64'), ('value', 'S128'), ]
 
+def migrate_data(data):
+    raise NotImplementedError
+    if data.version == 0.1:
+        old_data = data.__dict__
+        new_data = old_data.copy()
+        del new_data['__traits_listener__']
+        new_data['touch_digital'] = old_data.contact_data[0,:]
+        new_data['touch_digital_mean'] = old_data.contact_data[1,:]
+        new_data['touch_digital_analog'] = old_data.contact_data[2,:]
+        new_data['trial_running'] = old_data.contact_data[3,:]
+        return AversiveData(**new_data)
+    else:
+        return data
+
 class BaseAversiveData(ExperimentData):
 
     version = Float(0.0)
@@ -232,6 +246,10 @@ class RawAversiveData_v0_2(BaseAversiveData):
     contact_digital_mean = Instance(FileChannel, 
             store='channel', store_path='contact/contact_digital_mean')
 
+    contact_digital_memory = Instance(RAMChannel)
+    contact_digital_mean_memory = Instance(RAMChannel)
+    trial_running_memory = Instance(RAMChannel)
+
     water_log = Any(store='automatic')
     trial_log = Any(store='automatic')
     trial_data_table = Any(store='automatic', store_path='trial_data')
@@ -243,15 +261,27 @@ class RawAversiveData_v0_2(BaseAversiveData):
                    self.touch_digital_mean,
                    self.optical_digital,
                    self.optical_digital_mean,
-                   self.contact_digital,
-                   self.contact_digital_mean,
-                   self.trial_running, ]
+                   broadcast((self.contact_digital,
+                              self.contact_digital_memory)),
+                   broadcast((self.contact_digital_mean,
+                              self.contact_digital_mean_memory)),
+                   broadcast((self.trial_running,
+                              self.trial_running_memory)), ]
         return deinterleave(targets)
 
     def _create_channel(self, name, dtype):
         contact_node = get_or_append_node(self.store_node, 'contact')
         return FileChannel(node=contact_node, fs=self.contact_fs,
                            name=name, dtype=dtype)
+
+    def _contact_digital_memory_default(self):
+        return RAMChannel(fs=self.contact_fs, window=10)
+
+    def _contact_digital_mean_memory_default(self):
+        return RAMChannel(fs=self.contact_fs, window=10)
+
+    def _trial_running_memory_default(self):
+        return RAMChannel(fs=self.contact_fs, window=10)
 
     def _contact_digital_default(self):
         return self._create_channel('contact_digital', np.bool)

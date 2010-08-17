@@ -174,9 +174,11 @@ class DSPBuffer(BlockBuffer):
         read_func = self._read_mode[(self.channels==1, self.compression)]
         self._read = read_func.__get__(self, DSPBuffer)
 
-        if self.dsp.GetTagSize(self.name) % self.channels:
-            mesg = 'Buffer size must be a multiple of the channel number'
-            raise ValueError, mesg
+        buf_size = self.dsp.GetTagSize(self.name)
+        if buf_size % self.channels:
+            mesg = 'Buffer size, %d, is not a multiple of the channel number, %d'
+            mesg = mesg % (buf_size, self.channels)
+            raise ValueError(mesg)
             
     def _set_length(self, length):
         #buf_size = self.dsp.GetTagVal(self.name_len)
@@ -359,10 +361,19 @@ class DSPTag(object):
 
     value = property(_get_value, _set_value)
 
-    def set(self, value, src_unit=None):
+    def set(self, value, src_unit=None, lb=-np.inf, ub=np.inf):
+        '''The converted value is coerced to the range [lb, ub].  Since lb and
+        ub are set to -inf and +inf by default, no coercion is typically done.
+        This clipping is useful for some TDT compnents such as TTLDelay2.  If
+        N1+N2=0 for TTLDelay2, the component will not relay any TTLs it
+        recieves.  By ensuring that N1+N2!=1 when you want a delay of 0, you can
+        avoid this issue.  Note that I typically solve this problem by making N1
+        configurable via a tag, and setting N2 to 1 that way the software does
+        not need to worry about avoiding setting N1 to 0.
+        '''
         if src_unit is not None:
             value = convert(src_unit, self.unit, value, self.fs)
-        self.value = value
+        self.value = np.clip(value, lb, ub)
 
     def get(self, req_unit=None):
         if req_unit is not None:
@@ -449,7 +460,8 @@ class Circuit(object):
         return convert(src_unit, req_unit, value, self.fs)
 
 def load_cof(iface, circuit_name):
-    '''Loads circuit file to DSP device.  Searches cns/equipment/TDT/components directory as well as working directory.'''
+    '''Loads circuit file to DSP device.  Searches cns/equipment/TDT/components
+    directory as well as working directory.'''
     # Use os.path to construct paths since this facilitates reuse of code across
     # platforms.
     search_dirs = [os.path.join(os.path.dirname(__file__), 'components'),

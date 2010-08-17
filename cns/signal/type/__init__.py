@@ -5,6 +5,7 @@ from .noise import Noise
 from .am_noise import AMNoise
 from .am_tone import AMTone
 from .ramped_tone import RampedTone
+from .ramped_noise import RampedNoise
 
 signal_types = {
         Silence     : 'silence',
@@ -14,4 +15,5 @@ signal_types = {
         AMNoise     : 'AM noise',
         AMTone      : 'AM tone',
         RampedTone  : 'ramped tone',
+        RampedNoise : 'ramped noise',
         }

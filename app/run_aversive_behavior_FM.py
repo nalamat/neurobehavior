@@ -4,8 +4,7 @@ from enthought.pyface.api import error
 from cns.data.view.cohort import CohortView, CohortViewHandler
 from cns.data import persistence
 from cns.data.h5_utils import get_or_append_node
-from cns.experiment.controller.aversive_controller import AversiveController
-from cns.experiment.experiment.aversive_experiment import AversiveExperiment
+from cns.experiment.experiment.aversive_experiment_FM import AversiveExperimentFM
 import sys
 import tables
 from enthought.traits.api import Any, Trait, TraitError
@@ -43,8 +42,7 @@ class ExperimentHandler(CohortViewHandler):
                 log.debug('No prior paradigm found.  Creating new paradigm.')
                 paradigm = None
                 
-            handler = AversiveController()
-            model = AversiveExperiment(store_node=store_node, animal=item)
+            model = AversiveExperimentFM(store_node=store_node, animal=item)
             
             if paradigm is not None:
                 log.debug('Using paradigm from last time this animal was run')
@@ -54,7 +52,7 @@ class ExperimentHandler(CohortViewHandler):
                 log.debug('Using paradigm from previous animal.')
                 model.paradigm = self.last_paradigm
 
-            model.edit_traits(handler=handler, parent=info.ui.control, kind='livemodal')
+            model.edit_traits(parent=info.ui.control, kind='livemodal')
             
             # Check to see if a trial block was collected
             if model.trial_blocks > 0:
