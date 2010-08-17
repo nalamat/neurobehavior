@@ -158,12 +158,8 @@ class AnalyzedAversiveDataView(AnalyzedView):
     global_fa_frac = DelegatesTo('analyzed')
     use_global_fa_frac = DelegatesTo('analyzed')
 
-    group = HGroup([#Item('object.raw_contact_plot.component', **kw_plot),
-                    #VGroup('object.data.water_infused~'),
-                    Item('object.contact_plot.component', **kw_plot),
-                    'score_chart{}@',
-                    #'fa_chart{}@'],
-                    ],
+    group = HGroup([Item('object.contact_plot.component', **kw_plot),
+                    'score_chart{}@', ],
                    VGroup(HGroup(VGroup(['total_trials~'],
                                          Item('object.par_count_chart.component', **kw_plot),),
                                  VGroup(['use_global_fa_frac{Compute using global FA fraction}'],

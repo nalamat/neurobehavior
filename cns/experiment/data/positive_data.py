@@ -45,36 +45,13 @@ class PositiveData_0_1(ExperimentData):
             store='channel', store_path='contact/trial_running')
     reward_running = Instance(FileChannel,
             store='channel', store_path='contact/reward_running')
-
-    '''
-    # Stores raw contact data from optical and electrical sensors as well as
-    # whether a trial is running.
-    def _contact_data_default(self):
-        targets = [self.touch_digital,
-                   self.touch_digital_mean,
-                   self.optical_digital,
-                   self.optical_digital_mean,
-                   self.contact_digital,
-                   self.contact_digital_mean,
-                   self.trial_running, ]
-        return deinterleave(targets)
-    '''
+    timeout_running = Instance(FileChannel,
+            store='channel', store_path='contact/timeout_running')
 
     def _create_channel(self, name, dtype):
         contact_node = get_or_append_node(self.store_node, 'contact')
         return FileChannel(node=contact_node, fs=self.contact_fs,
                            name=name, dtype=dtype)
-
-    '''
-    def _touch_digital_default(self):
-        return self._create_channel('touch_digital', np.bool)
-
-    def _touch_digital_mean_default(self):
-        return self._create_channel('touch_digital_mean', np.float32)
-
-    def _touch_analog_default(self):
-        return self._create_channel('touch_analog', np.float32)
-    '''
 
     def _optical_digital_default(self):
         return self._create_channel('optical_digital', np.bool)
@@ -90,6 +67,9 @@ class PositiveData_0_1(ExperimentData):
 
     def _reward_running_default(self):
         return self._create_channel('reward_running', np.bool)
+
+    def _timeout_running_default(self):
+        return self._create_channel('timeout_running', np.bool)
 
 PositiveData = PositiveData_0_1
 

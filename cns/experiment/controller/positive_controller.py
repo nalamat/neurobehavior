@@ -90,12 +90,15 @@ class PositiveController(ExperimentController):
 
     def configure_circuit(self, circuit, paradigm):
         circuit.reload()
-        circuit.trial_delay_n.set(paradigm.trial_delay, 'ms')
-        circuit.reward_delay_n.set(paradigm.reward_delay, 'ms')
-        circuit.reward_dur_n.set(paradigm.reward_dur, 'ms')
+        circuit.trial_delay_n.set(paradigm.trial_delay, 's')
+        circuit.reward_delay_n.set(paradigm.reward_delay, 's')
+        circuit.reward_dur_n.set(paradigm.reward_dur, 's')
+        circuit.timeout_dur_n.set(paradigm.timeout_dur, 's')
+        circuit.allow_timeout.value = paradigm.allow_timeout
         circuit.contact_buf.initialize()
         circuit.trial_running_buf.initialize()
         circuit.reward_running_buf.initialize()
+        circuit.timeout_running_buf.initialize()
 
     def start(self, info=None):
         if not self.model.paradigm.is_valid():
@@ -148,6 +151,7 @@ class PositiveController(ExperimentController):
         self.model.data.optical_digital.send(self.circuit.contact_buf.read())
         self.model.data.trial_running.send(self.circuit.trial_running_buf.read())
         self.model.data.reward_running.send(self.circuit.reward_running_buf.read())
+        self.model.data.timeout_running.send(self.circuit.timeout_running_buf.read())
 
     @on_trait_change('fast_tick')
     def monitor_circuit(self):
@@ -155,15 +159,22 @@ class PositiveController(ExperimentController):
             self.current.idx += 1
             if self.state == 'manual':
                 self.state = 'paused'
+                self.current.next()
 
     ############################################################################
     # Code to apply parameter changes
     ############################################################################
     def _apply_trial_delay(self, value):
-        self.circuit.trial_delay_n.set(value, 'ms')
+        self.circuit.trial_delay_n.set(value, 's')
 
     def _apply_reward_delay(self, value):
-        self.circuit.reward_delay_n.set(value, 'ms')
+        self.circuit.reward_delay_n.set(value, 's')
 
     def _apply_reward_dur(self, value):
-        self.circuit.reward_dur_n.set(value, 'ms')
+        self.circuit.reward_dur_n.set(value, 's')
+
+    def _apply_timeout_dur(self, value):
+        circuit.timeout_dur_n.set(paradigm.timeout_dur, 's')
+
+    def _apply_allow_timeout(self, value):
+        circuit.allow_timeout.value = value

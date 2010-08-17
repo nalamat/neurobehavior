@@ -1,6 +1,6 @@
 from cns import choice
 from cns import equipment
-Pump = equipment.pump().Pump
+#Pump = equipment.pump().Pump
 from cns.experiment.paradigm.paradigm import Paradigm
 from cns.signal import Signal
 from cns.signal.signal_dialog import SignalDialog

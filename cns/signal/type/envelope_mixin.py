@@ -52,7 +52,7 @@ class AMMixin(EnvelopeMixin):
         return self.env_fm ** -1
 
     def _get_envelope(self):
-        env = 0.5 * np.sin(self.t*2*np.pi*self.env_fm+self.phase_corr) + 0.5
+        env = 0.5 * np.cos(self.t*2*np.pi*self.env_fm+self.phase_corr) + 0.5
         env *= self.env_depth
         env += 1 - self.env_depth
         env *= 1/self.power_corr
