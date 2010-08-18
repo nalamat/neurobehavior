@@ -25,7 +25,7 @@ class MedusaSettings(HasTraits):
     ch_out      = Range(1, 16, 1)
     ch_out_gain = Float(50e3)
     
-    mode        = Enum('raw', 'differential', 'test')
+    mode        = Enum('raw', 'differential', 'test', 'unfiltered')
     ch_diff     = Range(1, 16, 1)
 
     fc_low      = Float(3e3)
@@ -74,7 +74,7 @@ class MedusaController(Controller):
     
     @on_trait_change('settings.mode')
     def update_mode(self, new):
-        mode_map = dict(raw=0, differential=1, test=2)
+        mode_map = dict(raw=0, differential=1, test=2, unfiltered=3)
         self.RZ5.rec_mode.value = mode_map[new]
     
     @on_trait_change('settings.ch_diff')
