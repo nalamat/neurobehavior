@@ -22,10 +22,16 @@ class MedusaSettings(HasTraits):
 
     # IN settings
     attenuation = Range(0.0, 120.0, 20.0)
-    ch_out      = Range(1, 16, 1)
+    ch_out = Range(1, 16, 1)
+    ch_out_1 = Range(1, 16, 1)
+    ch_out_2 = Range(1, 16, 2)
+    ch_out_3 = Range(1, 16, 3)
     ch_out_gain = Float(50e3)
+    ch_out_gain_1 = Float(50e3)
+    ch_out_gain_2 = Float(50e3)
+    ch_out_gain_3 = Float(50e3)
     
-    mode        = Enum('raw', 'differential', 'test', 'unfiltered')
+    mode        = Enum('raw', 'differential', 'test')
     ch_diff     = Range(1, 16, 1)
 
     fc_low      = Float(3e3)
@@ -43,9 +49,11 @@ class MedusaSettings(HasTraits):
             VGroup(
                 'attenuation{Attenuation (dB SPL)}',
                 'mode',
-                'ch_out{Monitor channel}',
+                VGroup(HGroup('ch_out_1{Channel 1}', 'ch_out_gain_1'),
+                       HGroup('ch_out_2{Channel 2}', 'ch_out_gain_2'),
+                       HGroup('ch_out_3{Channel 3}', 'ch_out_gain_3'),
+                       ),
                 'ch_diff{Differential electrode}',
-                'ch_out_gain{Monitor channel gain}',
                 'fc_low{Lowpass cutoff (Hz)}',
                 'fc_high{Highpass cutoff (Hz)}',
                 'trial_dur{Trial duration (s)}',
@@ -74,7 +82,7 @@ class MedusaController(Controller):
     
     @on_trait_change('settings.mode')
     def update_mode(self, new):
-        mode_map = dict(raw=0, differential=1, test=2, unfiltered=3)
+        mode_map = dict(raw=0, differential=1, test=2)
         self.RZ5.rec_mode.value = mode_map[new]
     
     @on_trait_change('settings.ch_diff')
