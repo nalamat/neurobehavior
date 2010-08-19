@@ -30,7 +30,7 @@ class ExperimentToolBar(ToolBar):
     size = 24, 24
 
     if ETSConfig.toolkit == 'qt4':
-        kw = dict(height=size[0], width=size[1])
+        kw = dict(height=size[0], width=size[1], action=True)
         apply = SVGButton('Apply', filename=icons.apply,
                           tooltip='Apply settings', **kw)
         revert = SVGButton('Revert', filename=icons.undo,
@@ -51,11 +51,11 @@ class ExperimentToolBar(ToolBar):
         # The WX backend renderer for SVG buttons is ugly, so let's use text
         # buttons instead.  Eventually I'd like to unite these under ONE
         # backend.
-        apply = Button('A')
-        start = Button('>>')
-        pause = Button('||')
-        stop = Button('X')
-        remind = Button('!')
+        apply = Button('A', action=True)
+        start = Button('>>', action=True)
+        pause = Button('||', action=True)
+        stop = Button('X', action=True)
+        remind = Button('!', action=True)
         item_kw = dict(show_label=False, height=-size[0], width=-size[1])
 
     group = HGroup(Item('apply',
@@ -65,7 +65,7 @@ class ExperimentToolBar(ToolBar):
                         enabled_when="object.handler.pending_changes<>{}",
                         **item_kw),
                    Item('start',
-                        enabled_when="object.handler.state=='halted'",
+                        enabled_when="object.handler.state=='disconnected'",
                         **item_kw),
                    '_',
                    Item('remind',
@@ -86,6 +86,12 @@ class ExperimentToolBar(ToolBar):
                    )
 
     trait_view = View(group, kind='subpanel')
+
+    #@on_trait_change('+action')
+    @on_trait_change('start, stop, pause, revert, apply, resume, remind')
+    def process_action(self, trait, value):
+        if self.traits_inited():
+            getattr(self.handler, trait)(self.info)
 
 class ExperimentController(Controller):
 
@@ -124,7 +130,7 @@ class ExperimentController(Controller):
         '''Prevent user from closing window while an experiment is running since
         data is not saved to file until the stop button is pressed.
         '''
-        if self.state != 'halted':
+        if self.state not in ('disconnected', 'halted'):
             mesg = 'Please halt experiment before attempting to close window.'
             error(info.ui.control, mesg)
             return False
@@ -171,6 +177,7 @@ class ExperimentController(Controller):
 
     @on_trait_change('object.model.paradigm.+')
     def queue_change(self, object, name, old, new):
+        print 'change detected'
         if self.state <> 'halted' and hasattr(self, '_apply_'+name):
             key = object, name
             if key not in self.old_values:

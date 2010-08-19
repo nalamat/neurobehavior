@@ -11,6 +11,7 @@ import os, time
 from cns.equipment import EquipmentError
 #from cns.equipment.TDT import set_attenuation
 
+'''Mapper between Numpy datatype and TDT's ActiveX type.'''
 type_lookup = {
         np.float32: 'F32',
         np.int32:   'I32',
@@ -31,12 +32,52 @@ rpcox_types = {
         }
 
 def convert(src_unit, dest_unit, value, dsp_fs):
+    '''Converts value to desired unit give the sampling frequency of the DSP.
+
+    Parameters specified in paradigms are typically expressed as
+    frequency and time while many DSP parameters are expressed in number of
+    samples (referenced to the DSP sampling frequency).  This function provides
+    a convenience method for converting between conventional values and the
+    'digital' values used by the DSP.
+
+    Note that for converting units of time/frequency to n/nPer, we have to
+    coerce the value to a multiple of the DSP period (e.g. the number of 'ticks'
+    of the DSP clock).
+
+    Appropriate strings for the unit types:
+        fs
+            sampling frequency
+        nPer
+            number of samples per period
+        n
+            number of samples
+        s
+            seconds
+        ms
+            milliseconds
+        nPow2
+            number of samples, coerced to the next greater power of 2 (used for
+            ensuring efficient FFT computation)
+
+    >>> convert('s', 'n', 0.5, 10000)
+    5000
+    >>> convert('fs', 'nPer', 500, 10000)
+    20
+
+    Parameters
+    ----------
+    src_unit: string
+    dest_unit: string
+        Destination unit
+    value: numerical (e.g. integer or float)
+        Value to be converted
+
+    Returns
+    -------
+    numerical value
+    '''
     
     def fs_to_nPer(req_fs, dsp_fs):
-        # To achieve requested sampling rate, we need
-        # to sample every n ticks of the DSP clock.  However, many
-        # sampling rates cannot be achieved so we have to coerce
-        # sampling rate to the nearest feasible rate.
         if dsp_fs < req_fs:
             raise SamplingRateError(dsp_fs, req_fs)
         return int(dsp_fs/req_fs)
@@ -79,38 +120,48 @@ class SamplingRateError(UnitError):
                'the DSP clock frequency of %f Hz.'
         return mesg % (self.requested_fs, self.fs)
 
-'''
-Many of these buffer functions rely on strict naming conventions to be able to
-correctly download data from the DSP.  The conventions are as follows:
+class DSPBuffer(BlockBuffer):
+    '''
+    Provides simple read/write access to the DSP buffers.  
+    
+    This class is meant to handle the various methods via which data can be
+    stored on the DSP.  Since data can be compressed for storage in the DSP
+    buffer and may contain multiple channels, you must tell the object how to
+    interpret the data downloaded from the buffer by initializing it via
+    :method:`initialize`.
+
+    This class relies on strict naming conventions for the DSP tags to correctly
+    download data from the DSP.
 
     Continuous acquire
-        1) <buffer>             name of tag connected to data port of buffer
-        2) <buffer>_idx         tag connected to index port of buffer
-        3) <buffer>_n           tag connected to size port of buffer
+    ------------------
+        <buffer>
+            name of tag connected to data port of buffer
+        <buffer>_idx
+            tag connected to index port of buffer
+        <buffer>_n
+            tag connected to size port of buffer
+
         Each time a read is requested, <buffer>_idx is checked to see if it has
         incremented since the last read.  If it has, the new data is acquired
         and returned.
 
     Triggered acquire 
-        (I haven't really been using this lately so it's unmaintained)
-        1) <buffer>             name of tag connected to data port of buffer
-        2) <buffer>_idx_trig    index of last sample buffer acquired prior to
-                                the trigger
-        3) <buffer>_n           tag connected to size port of buffer
-        Each time a read is requested, <buffer>_idx_trig is checked to see if it
-        has changed since the last read.  If it has, the new data is
-        acquired and returned.  This data should reflect the entire recording
-        over a single trigger.
-'''
+    -----------------
+        In addition to the tags required for continuous aquisition, we need an
+        additional tag.
 
-class DSPBuffer(BlockBuffer):
-    '''Provides simple read/write access to the DSP buffers.  This class is
-    meant to handle the various modes under which data can be stored on the DSP.
-    Since data can be compressed for storage in the DSP buffer or it may contain
-    multiple channels (stored in 1D format), you must tell the object how to
-    interpret the data downloaded from the buffer (e.g. how many channels are
-    stored in the buffer, is it compressed, is it set up for continuous or
-    triggered acquisition?
+        <buffer>_idx_trig
+            index of last sample buffer acquired prior to the trigger
+
+        Each time a read is requested, <buffer>_idx_trig is checked to see if it
+        has changed since the last read.  If it has, the new data up to
+        <buffer>_idx_trig is returned.
+
+    I have been toying with the idea of creating TDT macros that handle a lot of
+    the boilerplate in setting up the necessary tags for the serial buffers.  If
+    I do this, then I would incorporate auto-discovery of the necessary
+    parameters (e.g. sampling rate, compression settings and number of channels).
     '''
 
     def __init__(self, dsp, name):
@@ -121,9 +172,9 @@ class DSPBuffer(BlockBuffer):
         self.length = dsp.GetTagVal(self.name_len)
         BlockBuffer.__init__(self, self.max_len, blocks=2)
         self.initialize()
-        self.bind_activex_functions()
+        self._bind_activex_functions()
         
-    def bind_activex_functions(self):
+    def _bind_activex_functions(self):
         '''Freezes the Name parameter of the ActiveX function.
         '''
         functions = ['ReadTagV', 'ReadTagVEX', 'WriteTagV', 'WriteTagVEX']
@@ -137,7 +188,8 @@ class DSPBuffer(BlockBuffer):
                  self.idx, len(self), self.cycles)
                 
     def bounds(self):
-        """Returns the minimum, maximum valid value, numerical resolution of a
+        """
+        Returns the minimum, maximum valid value, numerical resolution of a
         32-bit float that has been scaled and compressed to an integer for
         faster data streaming."""
         bits = 8*np.nbytes[self.src_type]
@@ -382,11 +434,19 @@ class DSPTag(object):
             return self.value
 
 class Circuit(object):
-    '''Really, this represents the actual DSP itself, but I call it "circuit"
-    (i.e. what the TDT documentation calls the DSP code) since this basically
-    allows us to set/get the circuit tag values as well as read from/write to
-    the buffers.
+    '''Acts as a loose wrapper around a RPvdsEx circuit.  The circuit exposes
+    the circuit tags (i.e. variables) and buffers as class attributes.
+    Technically these attributes are instances of :class:`DSPTag` and
+    :class:`DSPBuffer`, respectively.  These instances provide many convenience
+    methods and attributes that facilitate coding of software for the RPvdsEx
+    circuit.
+
+    This class is not meant to be instantiated directly as a factory function
+    must be used to inspect the RPvdsEx circuit, create the appropriate
+    :class:`DSPTag` and :class:`DSPBuffer` instances and bind them to the
+    Circuit instance.  See :func:`circuit_factory` for more information.
     '''
+
     def reload(self):
         self.dsp.ClearCOF()
         self.dsp.LoadCOF(self.CIRCUIT_PATH)
@@ -446,7 +506,9 @@ class Circuit(object):
             if cumsamples >= samples:
                 break
             elif len(new_data) > 0:
-                # Reset the "clock" eachtime we get new data.  Timeout is only activated when the read stalls and continually returns zero samples.
+                # Reset the "clock" eachtime we get new data.  Timeout is only
+                # activated when the read stalls and continually returns zero
+                # samples.
                 cumtime = 0
             elif timeout is not None and cumtime > timeout:
                 raise IOError, 'Read from buffer %s timed out' % buffer
@@ -494,7 +556,10 @@ def load_cof(iface, circuit_name):
     return circuit_path
 
 def get_tags(iface, map=rpcox_types):
-    '''Queries RPcoX for information of available tags/variables.
+    '''Queries the DSP for information regarding available tags.
+
+    Args:
+        iface: iface
     '''
     num_tags = iface.GetNumOf('ParTag')
     tags = [iface.GetNameOf('ParTag', i+1) for i in range(num_tags)]
@@ -502,6 +567,33 @@ def get_tags(iface, map=rpcox_types):
     return zip(tags, types)
 
 def circuit_factory(circuit_name, iface, map=rpcox_types):
+    '''Load RPvdsEx circuit to specified DSP.  
+
+    A subclass of :class:`DSPBuffer` is dynamically created via introspection of
+    the RPvdsEx circuit.  All tags (i.e. variables) and buffers that can be read
+    or written are exposed in the instance returned by this function.
+
+    Parameters
+    ----------
+    circuit_name: string
+        String identifying the circuit.  The rcx extension may be omitted if
+        desired.  Since this string is passed directly to :func:`load_cof`,
+        refer to that documentation for more information regarding what
+        directories are searched to locate the circuit.
+
+    iface: instance of ActiveX driver
+        The target DSP (e.g. RX6 or RZ5)
+
+    map: dictionary, optional
+        Optional map of DSP tag/buffer types to Python types (e.g.  a DSP buffer
+        should map to a :class:`DSPBuffer` instance and a TTL tag should map to
+        a boolean type.
+
+    Returns
+    -------
+    A subclass instance of :class:`DSPBuffer` containing attributes
+    specific to the circuit.
+    '''
     # The class factory is a design pattern in object-oriented programming that
     # allows class definitions to be created on-the-fly.  Often we use "static"
     # class definitions (i.e. HardwareBuffer); however, sometimes the definition
