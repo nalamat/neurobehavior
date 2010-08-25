@@ -1,0 +1,736 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>cns.equipment.TDT.rpcox &mdash; NeuroBehavior v0.3 documentation</title>
+    <link rel="stylesheet" href="../../../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../../../',
+        VERSION:     '0.3',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../../_static/doctools.js"></script>
+    <link rel="top" title="NeuroBehavior v0.3 documentation" href="../../../../index.html" />
+    <link rel="up" title="Module code" href="../../../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../../../index.html">NeuroBehavior v0.3 documentation</a> &raquo;</li>
+          <li><a href="../../../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for cns.equipment.TDT.rpcox</h1><div class="highlight"><pre>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">division</span>
+<span class="kn">from</span> <span class="nn">cns.buffer</span> <span class="kn">import</span> <span class="n">available</span><span class="p">,</span> <span class="n">BlockBuffer</span>
+<span class="kn">from</span> <span class="nn">cns.util.math</span> <span class="kn">import</span> <span class="n">nextpow2</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">partial</span>
+<span class="n">log</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">__name__</span><span class="p">)</span>
+
+<span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">time</span>
+
+<span class="kn">from</span> <span class="nn">cns.equipment</span> <span class="kn">import</span> <span class="n">EquipmentError</span>
+<span class="c">#from cns.equipment.TDT import set_attenuation</span>
+
+<span class="sd">&#39;&#39;&#39;Mapper between Numpy datatype and TDT&#39;s ActiveX type.&#39;&#39;&#39;</span>
+<span class="n">type_lookup</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">:</span> <span class="s">&#39;F32&#39;</span><span class="p">,</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">:</span>   <span class="s">&#39;I32&#39;</span><span class="p">,</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">int16</span><span class="p">:</span>   <span class="s">&#39;I16&#39;</span><span class="p">,</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">int8</span><span class="p">:</span>    <span class="s">&#39;I8&#39;</span><span class="p">,</span>
+        <span class="p">}</span>
+
+<span class="n">rpcox_types</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="mi">68</span><span class="p">:</span>     <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>     <span class="c"># Data buffer</span>
+        <span class="mi">73</span><span class="p">:</span>     <span class="nb">int</span><span class="p">,</span>
+        <span class="mi">74</span><span class="p">:</span>     <span class="s">&#39;Static&#39;</span><span class="p">,</span>       <span class="c"># May indicate static parameter</span>
+        <span class="mi">78</span><span class="p">:</span>     <span class="nb">bool</span><span class="p">,</span>
+        <span class="mi">83</span><span class="p">:</span>     <span class="nb">float</span><span class="p">,</span>
+        <span class="mi">80</span><span class="p">:</span>     <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>     <span class="c"># This is coefficient buffer?</span>
+        <span class="mi">65</span><span class="p">:</span>     <span class="bp">None</span><span class="p">,</span>           <span class="c"># What was this again?</span>
+        <span class="mi">76</span><span class="p">:</span>     <span class="s">&#39;Trigger&#39;</span><span class="p">,</span>      <span class="c"># Not sure how to implement this (this is a</span>
+                                <span class="c"># software trigger?)</span>
+        <span class="p">}</span>
+
+<div class="viewcode-block" id="convert"><a class="viewcode-back" href="../../../../index.html#cns.equipment.TDT.rpcox.convert">[docs]</a><span class="k">def</span> <span class="nf">convert</span><span class="p">(</span><span class="n">src_unit</span><span class="p">,</span> <span class="n">dest_unit</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">dsp_fs</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39;Converts value to desired unit give the sampling frequency of the DSP.</span>
+
+<span class="sd">    Parameters specified in paradigms are typically expressed as</span>
+<span class="sd">    frequency and time while many DSP parameters are expressed in number of</span>
+<span class="sd">    samples (referenced to the DSP sampling frequency).  This function provides</span>
+<span class="sd">    a convenience method for converting between conventional values and the</span>
+<span class="sd">    &#39;digital&#39; values used by the DSP.</span>
+
+<span class="sd">    Note that for converting units of time/frequency to n/nPer, we have to</span>
+<span class="sd">    coerce the value to a multiple of the DSP period (e.g. the number of &#39;ticks&#39;</span>
+<span class="sd">    of the DSP clock).</span>
+
+<span class="sd">    Appropriate strings for the unit types:</span>
+<span class="sd">        fs</span>
+<span class="sd">            sampling frequency</span>
+<span class="sd">        nPer</span>
+<span class="sd">            number of samples per period</span>
+<span class="sd">        n</span>
+<span class="sd">            number of samples</span>
+<span class="sd">        s</span>
+<span class="sd">            seconds</span>
+<span class="sd">        ms</span>
+<span class="sd">            milliseconds</span>
+<span class="sd">        nPow2</span>
+<span class="sd">            number of samples, coerced to the next greater power of 2 (used for</span>
+<span class="sd">            ensuring efficient FFT computation)</span>
+
+<span class="sd">    &gt;&gt;&gt; convert(&#39;s&#39;, &#39;n&#39;, 0.5, 10000)</span>
+<span class="sd">    5000</span>
+<span class="sd">    &gt;&gt;&gt; convert(&#39;fs&#39;, &#39;nPer&#39;, 500, 10000)</span>
+<span class="sd">    20</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    src_unit: string</span>
+<span class="sd">    dest_unit: string</span>
+<span class="sd">        Destination unit</span>
+<span class="sd">    value: numerical (e.g. integer or float)</span>
+<span class="sd">        Value to be converted</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    numerical value</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    
+    <span class="k">def</span> <span class="nf">fs_to_nPer</span><span class="p">(</span><span class="n">req_fs</span><span class="p">,</span> <span class="n">dsp_fs</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">dsp_fs</span> <span class="o">&lt;</span> <span class="n">req_fs</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">SamplingRateError</span><span class="p">(</span><span class="n">dsp_fs</span><span class="p">,</span> <span class="n">req_fs</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">dsp_fs</span><span class="o">/</span><span class="n">req_fs</span><span class="p">)</span>
+    
+    <span class="k">def</span> <span class="nf">nPer_to_fs</span><span class="p">(</span><span class="n">nPer</span><span class="p">,</span> <span class="n">dsp_fs</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">dsp_fs</span><span class="o">/</span><span class="n">nPer</span>
+    
+    <span class="k">def</span> <span class="nf">n_to_s</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">dsp_fs</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">n</span><span class="o">/</span><span class="n">dsp_fs</span>
+    
+    <span class="k">def</span> <span class="nf">s_to_n</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">dsp_fs</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">s</span><span class="o">*</span><span class="n">dsp_fs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">ms_to_n</span><span class="p">(</span><span class="n">ms</span><span class="p">,</span> <span class="n">dsp_fs</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">ms</span><span class="o">*</span><span class="mf">1e-3</span><span class="o">*</span><span class="n">dsp_fs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">n_to_ms</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">dsp_fs</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">n</span><span class="o">/</span><span class="n">dsp_fs</span><span class="o">*</span><span class="mf">1e3</span>
+   
+    <span class="k">def</span> <span class="nf">s_to_nPow2</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">dsp_fs</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">nextpow2</span><span class="p">(</span><span class="n">s_to_n</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">dsp_fs</span><span class="p">))</span>
+
+    <span class="n">fun</span> <span class="o">=</span> <span class="s">&#39;</span><span class="si">%s</span><span class="s">_to_</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">src_unit</span><span class="p">,</span> <span class="n">dest_unit</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">locals</span><span class="p">()[</span><span class="n">fun</span><span class="p">](</span><span class="n">value</span><span class="p">,</span> <span class="n">dsp_fs</span><span class="p">)</span>
+</div>
+<span class="k">class</span> <span class="nc">CircuitError</span><span class="p">(</span><span class="ne">BaseException</span><span class="p">):</span>
+    <span class="k">pass</span>
+
+<span class="k">class</span> <span class="nc">UnitError</span><span class="p">(</span><span class="n">CircuitError</span><span class="p">):</span>
+    <span class="k">pass</span>
+
+<span class="k">class</span> <span class="nc">SamplingRateError</span><span class="p">(</span><span class="n">UnitError</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fs</span><span class="p">,</span> <span class="n">requested_fs</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fs</span> <span class="o">=</span> <span class="n">fs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">requested_fs</span> <span class="o">=</span> <span class="n">requested_fs</span>
+
+    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">mesg</span> <span class="o">=</span> <span class="s">&#39;The requested sampling rate, </span><span class="si">%f</span><span class="s"> Hz, is greater than &#39;</span> <span class="o">+</span> \
+               <span class="s">&#39;the DSP clock frequency of </span><span class="si">%f</span><span class="s"> Hz.&#39;</span>
+        <span class="k">return</span> <span class="n">mesg</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">requested_fs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">fs</span><span class="p">)</span>
+
+<div class="viewcode-block" id="DSPBuffer"><a class="viewcode-back" href="../../../../index.html#cns.equipment.TDT.rpcox.DSPBuffer">[docs]</a><span class="k">class</span> <span class="nc">DSPBuffer</span><span class="p">(</span><span class="n">BlockBuffer</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Provides simple read/write access to the DSP buffers.  </span>
+<span class="sd">    </span>
+<span class="sd">    This class is meant to handle the various methods via which data can be</span>
+<span class="sd">    stored on the DSP.  Since data can be compressed for storage in the DSP</span>
+<span class="sd">    buffer and may contain multiple channels, you must tell the object how to</span>
+<span class="sd">    interpret the data downloaded from the buffer by initializing it via</span>
+<span class="sd">    :method:`initialize`.</span>
+
+<span class="sd">    This class relies on strict naming conventions for the DSP tags to correctly</span>
+<span class="sd">    download data from the DSP.</span>
+
+<span class="sd">    Continuous acquire</span>
+<span class="sd">    ------------------</span>
+<span class="sd">        &lt;buffer&gt;</span>
+<span class="sd">            name of tag connected to data port of buffer</span>
+<span class="sd">        &lt;buffer&gt;_idx</span>
+<span class="sd">            tag connected to index port of buffer</span>
+<span class="sd">        &lt;buffer&gt;_n</span>
+<span class="sd">            tag connected to size port of buffer</span>
+
+<span class="sd">        Each time a read is requested, &lt;buffer&gt;_idx is checked to see if it has</span>
+<span class="sd">        incremented since the last read.  If it has, the new data is acquired</span>
+<span class="sd">        and returned.</span>
+
+<span class="sd">    Triggered acquire </span>
+<span class="sd">    -----------------</span>
+<span class="sd">        In addition to the tags required for continuous aquisition, we need an</span>
+<span class="sd">        additional tag.</span>
+
+<span class="sd">        &lt;buffer&gt;_idx_trig</span>
+<span class="sd">            index of last sample buffer acquired prior to the trigger</span>
+
+<span class="sd">        Each time a read is requested, &lt;buffer&gt;_idx_trig is checked to see if it</span>
+<span class="sd">        has changed since the last read.  If it has, the new data up to</span>
+<span class="sd">        &lt;buffer&gt;_idx_trig is returned.</span>
+
+<span class="sd">    I have been toying with the idea of creating TDT macros that handle a lot of</span>
+<span class="sd">    the boilerplate in setting up the necessary tags for the serial buffers.  If</span>
+<span class="sd">    I do this, then I would incorporate auto-discovery of the necessary</span>
+<span class="sd">    parameters (e.g. sampling rate, compression settings and number of channels).</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dsp</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dsp</span> <span class="o">=</span> <span class="n">dsp</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name_len</span> <span class="o">=</span> <span class="n">name</span> <span class="o">+</span> <span class="s">&#39;_n&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_len</span> <span class="o">=</span> <span class="n">dsp</span><span class="o">.</span><span class="n">GetTagSize</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">length</span> <span class="o">=</span> <span class="n">dsp</span><span class="o">.</span><span class="n">GetTagVal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name_len</span><span class="p">)</span>
+        <span class="n">BlockBuffer</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_len</span><span class="p">,</span> <span class="n">blocks</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">initialize</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_bind_activex_functions</span><span class="p">()</span>
+        
+    <span class="k">def</span> <span class="nf">_bind_activex_functions</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Freezes the Name parameter of the ActiveX function.</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="n">functions</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;ReadTagV&#39;</span><span class="p">,</span> <span class="s">&#39;ReadTagVEX&#39;</span><span class="p">,</span> <span class="s">&#39;WriteTagV&#39;</span><span class="p">,</span> <span class="s">&#39;WriteTagVEX&#39;</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">functions</span><span class="p">:</span>
+            <span class="nb">callable</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dsp</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">partial</span><span class="p">(</span><span class="nb">callable</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s">&#39;&lt;</span><span class="si">%s</span><span class="s">::</span><span class="si">%s</span><span class="s">[idx=</span><span class="si">%d</span><span class="s">:len=</span><span class="si">%d</span><span class="s">:cyc=</span><span class="si">%d</span><span class="s">]&gt;&#39;</span> <span class="o">%</span> \
+                <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__class__</span><span class="o">.</span><span class="n">__name__</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                 <span class="bp">self</span><span class="o">.</span><span class="n">idx</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">cycles</span><span class="p">)</span>
+                
+<div class="viewcode-block" id="DSPBuffer.bounds"><a class="viewcode-back" href="../../../../index.html#cns.equipment.TDT.rpcox.DSPBuffer.bounds">[docs]</a>    <span class="k">def</span> <span class="nf">bounds</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns the minimum, maximum valid value, numerical resolution of a</span>
+<span class="sd">        32-bit float that has been scaled and compressed to an integer for</span>
+<span class="sd">        faster data streaming.&quot;&quot;&quot;</span>
+        <span class="n">bits</span> <span class="o">=</span> <span class="mi">8</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">nbytes</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">src_type</span><span class="p">]</span>
+        <span class="k">return</span> <span class="o">-</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="n">bits</span><span class="p">)</span><span class="o">/</span><span class="mi">2</span><span class="p">,</span> <span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="n">bits</span><span class="p">)</span><span class="o">/</span><span class="mi">2</span><span class="o">-</span><span class="mi">1</span>
+</div>
+    <span class="k">def</span> <span class="nf">resolution</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mi">1</span><span class="o">/</span><span class="bp">self</span><span class="o">.</span><span class="n">sf</span>
+    
+    <span class="k">def</span> <span class="nf">best_sf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">max_amplitude</span><span class="p">):</span>
+        <span class="n">ub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bounds</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">floor</span><span class="p">(</span><span class="n">ub</span><span class="o">/</span><span class="n">max_amplitude</span><span class="p">)</span>
+
+<div class="viewcode-block" id="DSPBuffer.initialize"><a class="viewcode-back" href="../../../../index.html#cns.equipment.TDT.rpcox.DSPBuffer.initialize">[docs]</a>    <span class="k">def</span> <span class="nf">initialize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">src_type</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span> <span class="n">channels</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">read_mode</span><span class="o">=</span><span class="s">&#39;continuous&#39;</span><span class="p">,</span> 
+                   <span class="n">multiple</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">compression</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">fs</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">sf</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">__dict__</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="nb">locals</span><span class="p">())</span>
+
+        <span class="k">if</span> <span class="n">read_mode</span> <span class="o">==</span> <span class="s">&#39;continuous&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">name_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">+</span> <span class="s">&#39;_idx&#39;</span>
+        <span class="k">elif</span> <span class="n">read_mode</span> <span class="o">==</span> <span class="s">&#39;triggered&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">name_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">+</span> <span class="s">&#39;_idx_trig&#39;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="s">&#39;</span><span class="si">%s</span><span class="s"> read not supported&#39;</span> <span class="o">%</span> <span class="n">read_mode</span>
+        
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">compression</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="bp">None</span><span class="p">,</span> <span class="s">&#39;decimated&#39;</span><span class="p">,</span> <span class="s">&#39;shuffled&#39;</span><span class="p">]:</span>
+            <span class="n">mesg</span> <span class="o">=</span> <span class="s">&quot;{0} is not a valid compression mode&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">compression</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="n">mesg</span>
+        
+        <span class="c">#self.read_args = type_lookup[src_type], type_lookup[dest_type], 1</span>
+        <span class="c">#self._read_f = self.dsp.ReadTagVEX</span>
+            
+        <span class="bp">self</span><span class="o">.</span><span class="n">c_factor</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="mi">4</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">nbytes</span><span class="p">[</span><span class="n">src_type</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dsp</span><span class="o">.</span><span class="n">GetTagVal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name_idx</span><span class="p">)</span>
+        <span class="n">read_func</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_mode</span><span class="p">[(</span><span class="bp">self</span><span class="o">.</span><span class="n">channels</span><span class="o">==</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">compression</span><span class="p">)]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_read</span> <span class="o">=</span> <span class="n">read_func</span><span class="o">.</span><span class="n">__get__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">DSPBuffer</span><span class="p">)</span>
+
+        <span class="n">buf_size</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dsp</span><span class="o">.</span><span class="n">GetTagSize</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">buf_size</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">channels</span><span class="p">:</span>
+            <span class="n">mesg</span> <span class="o">=</span> <span class="s">&#39;Buffer size, </span><span class="si">%d</span><span class="s">, is not a multiple of the channel number, </span><span class="si">%d</span><span class="s">&#39;</span>
+            <span class="n">mesg</span> <span class="o">=</span> <span class="n">mesg</span> <span class="o">%</span> <span class="p">(</span><span class="n">buf_size</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">channels</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">mesg</span><span class="p">)</span>
+            </div>
+    <span class="k">def</span> <span class="nf">_set_length</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">length</span><span class="p">):</span>
+        <span class="c">#buf_size = self.dsp.GetTagVal(self.name_len)</span>
+        <span class="n">buf_size</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dsp</span><span class="o">.</span><span class="n">GetTagSize</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">length</span> <span class="o">&gt;</span> <span class="n">buf_size</span><span class="p">:</span>
+            <span class="n">mesg</span> <span class="o">=</span> <span class="s">&#39;Cannot set size of buffer </span><span class="si">%s</span><span class="s"> to </span><span class="si">%d</span><span class="s">.  Buffer size is </span><span class="si">%d</span><span class="s">.&#39;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">mesg</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">length</span><span class="p">,</span> <span class="n">buf_size</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dsp</span><span class="o">.</span><span class="n">SetTagVal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name_len</span><span class="p">,</span> <span class="n">length</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">length</span> <span class="o">=</span> <span class="n">length</span>
+
+<div class="viewcode-block" id="DSPBuffer.set"><a class="viewcode-back" href="../../../../index.html#cns.equipment.TDT.rpcox.DSPBuffer.set">[docs]</a>    <span class="k">def</span> <span class="nf">set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Assumes data is written starting at the first index of the buffer.&#39;&#39;&#39;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">data</span><span class="o">.</span><span class="n">fs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dsp</span><span class="o">.</span><span class="n">GetSFreq</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_set_length</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dsp</span><span class="o">.</span><span class="n">WriteTagV</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">signal</span><span class="p">)</span>
+            <span class="c">#PA5.SetAtten(data.level)</span>
+            <span class="c">#set_attenuation(data.level)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&#39;Set buffer </span><span class="si">%s</span><span class="s"> with </span><span class="si">%d</span><span class="s"> samples&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">signal</span><span class="p">))</span>
+        <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_set_length</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dsp</span><span class="o">.</span><span class="n">WriteTagV</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&#39;Set buffer </span><span class="si">%s</span><span class="s"> with </span><span class="si">%d</span><span class="s"> samples&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">))</span>
+</div>
+    <span class="k">def</span> <span class="nf">write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">data</span><span class="o">.</span><span class="n">fs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fs</span>
+            <span class="nb">super</span><span class="p">(</span><span class="n">DSPBuffer</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">signal</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+            <span class="nb">super</span><span class="p">(</span><span class="n">DSPBuffer</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">samples_processed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">curidx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dsp</span><span class="o">.</span><span class="n">GetTagVal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name_idx</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">curidx</span><span class="o">&lt;</span><span class="bp">self</span><span class="o">.</span><span class="n">idx</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">length</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">idx</span><span class="o">+</span><span class="n">curidx</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">curidx</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">idx</span>
+
+<div class="viewcode-block" id="DSPBuffer.block_processed"><a class="viewcode-back" href="../../../../index.html#cns.equipment.TDT.rpcox.DSPBuffer.block_processed">[docs]</a>    <span class="k">def</span> <span class="nf">block_processed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Indicates that the next block has been processed.  If this is</span>
+<span class="sd">        primarily an input buffer, it means the block has data that is ready for</span>
+<span class="sd">        acquisition.  If this is primarily an output buffer, it means the data</span>
+<span class="sd">        in the block has been processed by the system (e.g.  played to the</span>
+<span class="sd">        speaker) and can be overwritten safely using writeBlock.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">samples_processed</span><span class="p">()</span><span class="o">&gt;=</span><span class="bp">self</span><span class="o">.</span><span class="n">block_size</span>
+</div>
+    <span class="k">def</span> <span class="nf">available</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c"># Very important!  We must read name_idx only once and store it locally as</span>
+        <span class="c"># the DSP will continue to acquire data while we are doing our processing.</span>
+        <span class="c"># We simply will grab the current data up to the point at which we read</span>
+        <span class="c"># name_idx.</span>
+        <span class="n">new_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dsp</span><span class="o">.</span><span class="n">GetTagVal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name_idx</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">available</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">idx</span><span class="p">,</span> <span class="n">new_idx</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">length</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">multiple</span><span class="p">)</span>
+    
+    <span class="k">def</span> <span class="nf">_simple_read</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">offset</span><span class="p">,</span> <span class="n">length</span><span class="p">):</span>
+        <span class="c"># Available reports the number of samples ready to be read and</span>
+        <span class="c"># accounts for various edge cases.  See function documentation for</span>
+        <span class="c"># more detail.</span>
+        <span class="k">if</span> <span class="n">length</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c">#data = self._read_f(self.name, offset, length, *self.read_args)[0]</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ReadTagV</span><span class="p">(</span><span class="n">offset</span><span class="p">,</span> <span class="n">length</span><span class="p">)</span>
+            <span class="c"># The RZ5 and RX6 use float32 as the native datatype.  Numpy appears</span>
+            <span class="c"># to use float64 by default.</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        
+    <span class="k">def</span> <span class="nf">_c_read</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">offset</span><span class="p">,</span> <span class="n">length</span><span class="p">):</span>
+        <span class="c"># We could use the TDT ReadTagVEX function and pass the appropriate data</span>
+        <span class="c"># type parameters (e.g. I8 or I16) and have it expand the 32 bit value</span>
+        <span class="c"># to the appropriate number; however, in my tests (see</span>
+        <span class="c"># test_readtag_speed.py) it seems pretty clear that TDT uses an</span>
+        <span class="c"># inefficient algorithm for converting the data.  If we are converting 4</span>
+        <span class="c"># samples of data to 8 bits each then combining it into a 32 bit word,</span>
+        <span class="c"># we would expect the read to be 4x faster than the uncompressed version</span>
+        <span class="c"># (since we only are transferring 25% of the data); however, the</span>
+        <span class="c"># ReadTagVEX function is only 1.16x faster when reading compressed data.</span>
+        <span class="c"># If we just grab the raw bits using ReadTagV and use Numpy to convert</span>
+        <span class="c"># the 32 bit values to the corresponding 8 bit values, it is 3.8x</span>
+        <span class="c"># faster.</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_simple_read</span><span class="p">(</span><span class="n">offset</span><span class="p">,</span> <span class="n">length</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">src_type</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">data</span><span class="o">/</span><span class="bp">self</span><span class="o">.</span><span class="n">sf</span>
+
+    <span class="k">def</span> <span class="nf">_mc_read</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">offset</span><span class="p">,</span> <span class="n">length</span><span class="p">):</span>
+        <span class="c"># We need to reshape the empty array to give it dimensionality</span>
+        <span class="c"># so that attempting to index a channel does not result in an</span>
+        <span class="c"># error.  For example, data[:,1] should give us [] for channel 1.</span>
+        <span class="c">#return np.array([]).reshape((-1, self.channels))</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_simple_read</span><span class="p">(</span><span class="n">offset</span><span class="p">,</span> <span class="n">length</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">channels</span><span class="p">))</span>
+    
+    <span class="k">def</span> <span class="nf">_mc_c_read</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">offset</span><span class="p">,</span> <span class="n">length</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_c_read</span><span class="p">(</span><span class="n">offset</span><span class="p">,</span> <span class="n">length</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">channels</span><span class="p">))</span>
+    
+    <span class="k">def</span> <span class="nf">_mc_dec_read</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">offset</span><span class="p">,</span> <span class="n">length</span><span class="p">):</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_c_read</span><span class="p">(</span><span class="n">offset</span><span class="p">,</span> <span class="n">length</span><span class="p">)</span>
+        <span class="n">temp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="o">/</span><span class="bp">self</span><span class="o">.</span><span class="n">channels</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">channels</span><span class="p">))</span>
+
+        <span class="c"># Since two samples are compressed into a single word before being</span>
+        <span class="c"># shuffled, the data is stored in the order A1 A2 B1 B2 C1 C2 D1 D2 A3</span>
+        <span class="c"># A4 B3 B4 C3 C4 D3 D4 (where A through D are &quot;channels&quot; and 1 through 4</span>
+        <span class="c"># are the sample number).  We need to compensate for this by using some</span>
+        <span class="c"># fancy indexing.</span>
+
+        <span class="c"># The TDT ActiveX documentation does not appear to accurately</span>
+        <span class="c"># describe how ReadTagVEX works.  ReadTagVEX wants the number of</span>
+        <span class="c"># samples acquired, not the buffer index.  If two samples are</span>
+        <span class="c"># compressed into a single buffer slot, then we need to multiply</span>
+        <span class="c"># the read size by 2.  If four samples are compressed into a</span>
+        <span class="c"># single buffer slot, the read size needs to be 4.</span>
+
+        <span class="c"># We also need to offset the read appropriately.  &lt;Don&#39;t fully</span>
+        <span class="c"># understand this but my test code says I&#39;ve got it OK&gt;</span>
+
+        <span class="c"># Do not change the four lines below unless you test it with</span>
+        <span class="c"># timeit!  This has been optimized for speed.  See</span>
+        <span class="c"># test_concatenate_time.py (in the same folder as this file)</span>
+        <span class="c"># to see the test results.  This method is an order of a</span>
+        <span class="c"># magnitude faster than any other method I have thought of.</span>
+        <span class="n">c</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">c_factor</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">channels</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">c</span><span class="p">):</span>
+                <span class="n">temp</span><span class="p">[</span><span class="n">j</span><span class="p">::</span><span class="n">c</span><span class="p">,</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">i</span><span class="o">*</span><span class="n">c</span><span class="o">+</span><span class="n">j</span><span class="p">::</span><span class="n">c</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">channels</span><span class="p">]</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">temp</span>
+        <span class="k">return</span> <span class="n">data</span>
+
+    <span class="k">def</span> <span class="nf">_write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">offset</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">dsp</span><span class="o">.</span><span class="n">WriteTagV</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">offset</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_get_duration</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">buffer</span><span class="p">)</span><span class="o">/</span><span class="bp">self</span><span class="o">.</span><span class="n">fs</span>
+    
+    <span class="k">def</span> <span class="nf">channel_args</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">{</span> <span class="s">&#39;channels&#39;</span> <span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">channels</span><span class="p">,</span>
+                 <span class="s">&#39;fs&#39;</span>       <span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">fs</span><span class="p">,</span> <span class="p">}</span>
+
+    <span class="n">MC</span> <span class="o">=</span> <span class="bp">False</span>
+    <span class="n">SINGLE</span> <span class="o">=</span> <span class="bp">True</span>
+    
+    <span class="n">_read_mode</span> <span class="o">=</span> <span class="p">{</span> <span class="p">(</span><span class="n">SINGLE</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>        <span class="p">:</span> <span class="n">_simple_read</span><span class="p">,</span>
+                   <span class="p">(</span><span class="n">SINGLE</span><span class="p">,</span> <span class="s">&#39;decimated&#39;</span><span class="p">)</span> <span class="p">:</span> <span class="n">_c_read</span><span class="p">,</span>
+                   <span class="p">(</span><span class="n">MC</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>            <span class="p">:</span> <span class="n">_mc_read</span><span class="p">,</span>
+                   <span class="p">(</span><span class="n">MC</span><span class="p">,</span> <span class="s">&#39;shuffled&#39;</span><span class="p">)</span>      <span class="p">:</span> <span class="n">_mc_c_read</span><span class="p">,</span>
+                   <span class="p">(</span><span class="n">MC</span><span class="p">,</span> <span class="s">&#39;decimated&#39;</span><span class="p">)</span>     <span class="p">:</span> <span class="n">_mc_dec_read</span><span class="p">,</span>
+                  <span class="p">}</span>
+</div>
+<div class="viewcode-block" id="DSPTag"><a class="viewcode-back" href="../../../../index.html#cns.equipment.TDT.rpcox.DSPTag">[docs]</a><span class="k">class</span> <span class="nc">DSPTag</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39;Wrapper around a RPvdsEx circuit tag that facilitates getting and setting</span>
+<span class="sd">    the value.  If you follow appropriate naming conventions in the DSP circuit,</span>
+<span class="sd">    the get and set methods will be able to convert the provided value to the</span>
+<span class="sd">    appropriate type.  For example, if the DSP tag expects number of samples</span>
+<span class="sd">    (i.e. cycles of the DSP clock) and you provide the value in seconds, then</span>
+<span class="sd">    the tag name must be &lt;name&gt;_n (the _n indicates it requires number of</span>
+<span class="sd">    samples), and you can call circuit.name_n.set(value, src_unit=&#39;s&#39;).  The</span>
+<span class="sd">    value you provided will be multiplied by the DSP clock frequency to get the</span>
+<span class="sd">    appropriate unit which is then uploaded to the DSP.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+
+    <span class="n">epsilon</span> <span class="o">=</span> <span class="mf">1e-6</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dsp</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dsp</span> <span class="o">=</span> <span class="n">dsp</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fs</span> <span class="o">=</span> <span class="n">dsp</span><span class="o">.</span><span class="n">GetSFreq</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">unit</span> <span class="o">=</span> <span class="n">name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&#39;_&#39;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">_get_value</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dsp</span><span class="o">.</span><span class="n">GetTagVal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">value</span>
+
+    <span class="k">def</span> <span class="nf">_set_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="n">success</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dsp</span><span class="o">.</span><span class="n">SetTagVal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dsp</span><span class="o">.</span><span class="n">GetTagVal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="c"># Accounts for floating point inaccuracy</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">success</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">result</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">epsilon</span><span class="o">&lt;</span><span class="n">value</span><span class="o">&lt;</span><span class="n">result</span><span class="o">+</span><span class="bp">self</span><span class="o">.</span><span class="n">epsilon</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">SystemError</span><span class="p">,</span> <span class="s">&quot;Hardware communication error. &quot;</span> <span class="o">+</span> \
+                    <span class="s">&quot;Could not set tag </span><span class="si">%s</span><span class="s"> to </span><span class="si">%r</span><span class="s">.&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&#39;Set </span><span class="si">%s</span><span class="s"> to </span><span class="si">%r</span><span class="s">&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+
+    <span class="n">value</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="n">_get_value</span><span class="p">,</span> <span class="n">_set_value</span><span class="p">)</span>
+
+<div class="viewcode-block" id="DSPTag.set"><a class="viewcode-back" href="../../../../index.html#cns.equipment.TDT.rpcox.DSPTag.set">[docs]</a>    <span class="k">def</span> <span class="nf">set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">src_unit</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">lb</span><span class="o">=-</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">,</span> <span class="n">ub</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;The converted value is coerced to the range [lb, ub].  Since lb and</span>
+<span class="sd">        ub are set to -inf and +inf by default, no coercion is typically done.</span>
+<span class="sd">        This clipping is useful for some TDT compnents such as TTLDelay2.  If</span>
+<span class="sd">        N1+N2=0 for TTLDelay2, the component will not relay any TTLs it</span>
+<span class="sd">        recieves.  By ensuring that N1+N2!=1 when you want a delay of 0, you can</span>
+<span class="sd">        avoid this issue.  Note that I typically solve this problem by making N1</span>
+<span class="sd">        configurable via a tag, and setting N2 to 1 that way the software does</span>
+<span class="sd">        not need to worry about avoiding setting N1 to 0.</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="n">src_unit</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">convert</span><span class="p">(</span><span class="n">src_unit</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">unit</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">fs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">lb</span><span class="p">,</span> <span class="n">ub</span><span class="p">)</span>
+</div>
+    <span class="k">def</span> <span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">req_unit</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">req_unit</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">convert</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">unit</span><span class="p">,</span> <span class="n">req_unit</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">fs</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">value</span>
+</div>
+<div class="viewcode-block" id="Circuit"><a class="viewcode-back" href="../../../../index.html#cns.equipment.TDT.rpcox.Circuit">[docs]</a><span class="k">class</span> <span class="nc">Circuit</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39;Acts as a loose wrapper around a RPvdsEx circuit.  The circuit exposes</span>
+<span class="sd">    the circuit tags (i.e. variables) and buffers as class attributes.</span>
+<span class="sd">    Technically these attributes are instances of :class:`DSPTag` and</span>
+<span class="sd">    :class:`DSPBuffer`, respectively.  These instances provide many convenience</span>
+<span class="sd">    methods and attributes that facilitate coding of software for the RPvdsEx</span>
+<span class="sd">    circuit.</span>
+
+<span class="sd">    This class is not meant to be instantiated directly as a factory function</span>
+<span class="sd">    must be used to inspect the RPvdsEx circuit, create the appropriate</span>
+<span class="sd">    :class:`DSPTag` and :class:`DSPBuffer` instances and bind them to the</span>
+<span class="sd">    Circuit instance.  See :func:`circuit_factory` for more information.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+
+    <span class="k">def</span> <span class="nf">reload</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dsp</span><span class="o">.</span><span class="n">ClearCOF</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dsp</span><span class="o">.</span><span class="n">LoadCOF</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">CIRCUIT_PATH</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">trigger</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">configure</span><span class="p">(</span><span class="o">**</span><span class="n">kw</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">trigger</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">trigger</span><span class="p">(</span><span class="n">trigger</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dsp</span><span class="o">.</span><span class="n">Run</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">stop</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dsp</span><span class="o">.</span><span class="n">Halt</span><span class="p">()</span>
+        
+    <span class="k">def</span> <span class="nf">configure</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">kw</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tag</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tag</span><span class="p">)</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">value</span>
+
+    <span class="k">def</span> <span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tag</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tag</span><span class="p">)</span><span class="o">.</span><span class="n">value</span>
+
+    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">__class__</span><span class="o">.</span><span class="n">__name__</span>
+
+    <span class="k">def</span> <span class="nf">_get_status</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c"># Flip around order of bits so we can walk through them in order</span>
+        <span class="c"># bin is a function available only in Python 2.6+</span>
+        <span class="n">status</span> <span class="o">=</span> <span class="nb">bin</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dsp</span><span class="o">.</span><span class="n">GetStatus</span><span class="p">())[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">status</span>
+
+    <span class="k">def</span> <span class="nf">_get_running</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="s">&#39;1&#39;</span>
+
+    <span class="n">running</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="n">_get_running</span><span class="p">)</span>
+    <span class="n">status</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="n">_get_status</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">trigger</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">trig</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">trig</span> <span class="o">==</span> <span class="s">&#39;A&#39;</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+        <span class="k">elif</span> <span class="n">trig</span> <span class="o">==</span> <span class="s">&#39;B&#39;</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+        <span class="k">elif</span> <span class="nb">type</span><span class="p">(</span><span class="n">trig</span><span class="p">)</span> <span class="o">==</span> <span class="nb">int</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dsp</span><span class="o">.</span><span class="n">SoftTrg</span><span class="p">(</span><span class="n">trig</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">acquire</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">buffer</span><span class="p">,</span> <span class="n">samples</span><span class="p">,</span> <span class="n">trigger</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">dt</span><span class="o">=</span><span class="mf">0.01</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">trigger</span><span class="p">(</span><span class="n">trigger</span><span class="p">)</span>
+        <span class="n">cumtime</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">cumsamples</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="n">data</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">while</span> <span class="bp">True</span><span class="p">:</span>
+            <span class="n">new_data</span> <span class="o">=</span> <span class="nb">buffer</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+            <span class="n">cumsamples</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">new_data</span><span class="p">)</span>
+            <span class="n">data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_data</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">cumsamples</span> <span class="o">&gt;=</span> <span class="n">samples</span><span class="p">:</span>
+                <span class="k">break</span>
+            <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">new_data</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="c"># Reset the &quot;clock&quot; eachtime we get new data.  Timeout is only</span>
+                <span class="c"># activated when the read stalls and continually returns zero</span>
+                <span class="c"># samples.</span>
+                <span class="n">cumtime</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">elif</span> <span class="n">timeout</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">cumtime</span> <span class="o">&gt;</span> <span class="n">timeout</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">IOError</span><span class="p">,</span> <span class="s">&#39;Read from buffer </span><span class="si">%s</span><span class="s"> timed out&#39;</span> <span class="o">%</span> <span class="nb">buffer</span>
+            
+            <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">dt</span><span class="p">)</span>
+            <span class="n">cumtime</span> <span class="o">+=</span> <span class="n">dt</span>
+        
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span><span class="n">data</span><span class="p">)[:</span><span class="n">samples</span><span class="p">]</span>
+    
+    <span class="k">def</span> <span class="nf">convert</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">src_unit</span><span class="p">,</span> <span class="n">req_unit</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">convert</span><span class="p">(</span><span class="n">src_unit</span><span class="p">,</span> <span class="n">req_unit</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">fs</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="load_cof"><a class="viewcode-back" href="../../../../index.html#cns.equipment.TDT.rpcox.load_cof">[docs]</a><span class="k">def</span> <span class="nf">load_cof</span><span class="p">(</span><span class="n">iface</span><span class="p">,</span> <span class="n">circuit_name</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39;Loads circuit file to DSP device.  Searches cns/equipment/TDT/components</span>
+<span class="sd">    directory as well as working directory.&#39;&#39;&#39;</span>
+    <span class="c"># Use os.path to construct paths since this facilitates reuse of code across</span>
+    <span class="c"># platforms.</span>
+    <span class="n">search_dirs</span> <span class="o">=</span> <span class="p">[</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">__file__</span><span class="p">),</span> <span class="s">&#39;components&#39;</span><span class="p">),</span>
+                   <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">(),</span> <span class="p">]</span>
+
+    <span class="n">success</span> <span class="o">=</span> <span class="bp">False</span>
+    <span class="k">for</span> <span class="nb">dir</span> <span class="ow">in</span> <span class="n">search_dirs</span><span class="p">:</span>
+        <span class="n">circuit_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">dir</span><span class="p">,</span> <span class="n">circuit_name</span><span class="o">+</span><span class="s">&#39;.rcx&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">circuit_path</span><span class="p">):</span>
+            <span class="n">success</span> <span class="o">=</span> <span class="bp">True</span>
+            <span class="k">break</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">success</span><span class="p">:</span>
+        <span class="n">mesg</span> <span class="o">=</span> <span class="s">&#39;Could not find </span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">circuit_name</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">critical</span><span class="p">(</span><span class="n">mesg</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">SystemError</span><span class="p">,</span> <span class="n">mesg</span>
+
+    <span class="k">if</span> <span class="n">iface</span><span class="o">.</span><span class="n">ClearCOF</span><span class="p">():</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&#39;Cleared </span><span class="si">%s</span><span class="s"> buffers&#39;</span> <span class="o">%</span> <span class="n">iface</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">mesg</span> <span class="o">=</span> <span class="s">&#39;Unable to clear </span><span class="si">%s</span><span class="s"> buffers&#39;</span> <span class="o">%</span> <span class="n">iface</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">critical</span><span class="p">(</span><span class="n">mesg</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">SystemError</span><span class="p">,</span> <span class="n">mesg</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">iface</span><span class="o">.</span><span class="n">LoadCOF</span><span class="p">(</span><span class="n">circuit_path</span><span class="p">):</span>
+        <span class="n">mesg</span> <span class="o">=</span> <span class="s">&#39;Unable to load </span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">circuit_path</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">critical</span><span class="p">(</span><span class="n">mesg</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">SystemError</span><span class="p">,</span> <span class="n">mesg</span>
+
+    <span class="k">return</span> <span class="n">circuit_path</span>
+</div>
+<div class="viewcode-block" id="get_tags"><a class="viewcode-back" href="../../../../index.html#cns.equipment.TDT.rpcox.get_tags">[docs]</a><span class="k">def</span> <span class="nf">get_tags</span><span class="p">(</span><span class="n">iface</span><span class="p">,</span> <span class="nb">map</span><span class="o">=</span><span class="n">rpcox_types</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39;Queries the DSP for information regarding available tags.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        iface: iface</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="n">num_tags</span> <span class="o">=</span> <span class="n">iface</span><span class="o">.</span><span class="n">GetNumOf</span><span class="p">(</span><span class="s">&#39;ParTag&#39;</span><span class="p">)</span>
+    <span class="n">tags</span> <span class="o">=</span> <span class="p">[</span><span class="n">iface</span><span class="o">.</span><span class="n">GetNameOf</span><span class="p">(</span><span class="s">&#39;ParTag&#39;</span><span class="p">,</span> <span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_tags</span><span class="p">)]</span>
+    <span class="n">types</span> <span class="o">=</span> <span class="p">[</span><span class="nb">map</span><span class="p">[</span><span class="n">iface</span><span class="o">.</span><span class="n">GetTagType</span><span class="p">(</span><span class="n">tag</span><span class="p">)]</span> <span class="k">for</span> <span class="n">tag</span> <span class="ow">in</span> <span class="n">tags</span><span class="p">]</span>
+    <span class="k">return</span> <span class="nb">zip</span><span class="p">(</span><span class="n">tags</span><span class="p">,</span> <span class="n">types</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="circuit_factory"><a class="viewcode-back" href="../../../../index.html#cns.equipment.TDT.rpcox.circuit_factory">[docs]</a><span class="k">def</span> <span class="nf">circuit_factory</span><span class="p">(</span><span class="n">circuit_name</span><span class="p">,</span> <span class="n">iface</span><span class="p">,</span> <span class="nb">map</span><span class="o">=</span><span class="n">rpcox_types</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39;Load RPvdsEx circuit to specified DSP.  </span>
+
+<span class="sd">    A subclass of :class:`DSPBuffer` is dynamically created via introspection of</span>
+<span class="sd">    the RPvdsEx circuit.  All tags (i.e. variables) and buffers that can be read</span>
+<span class="sd">    or written are exposed in the instance returned by this function.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    circuit_name: string</span>
+<span class="sd">        String identifying the circuit.  The rcx extension may be omitted if</span>
+<span class="sd">        desired.  Since this string is passed directly to :func:`load_cof`,</span>
+<span class="sd">        refer to that documentation for more information regarding what</span>
+<span class="sd">        directories are searched to locate the circuit.</span>
+
+<span class="sd">    iface: instance of ActiveX driver</span>
+<span class="sd">        The target DSP (e.g. RX6 or RZ5)</span>
+
+<span class="sd">    map: dictionary, optional</span>
+<span class="sd">        Optional map of DSP tag/buffer types to Python types (e.g.  a DSP buffer</span>
+<span class="sd">        should map to a :class:`DSPBuffer` instance and a TTL tag should map to</span>
+<span class="sd">        a boolean type.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    A subclass instance of :class:`DSPBuffer` containing attributes</span>
+<span class="sd">    specific to the circuit.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="c"># The class factory is a design pattern in object-oriented programming that</span>
+    <span class="c"># allows class definitions to be created on-the-fly.  Often we use &quot;static&quot;</span>
+    <span class="c"># class definitions (i.e. HardwareBuffer); however, sometimes the definition</span>
+    <span class="c"># of the class may depend on a certain &quot;state&quot; at runtime.  A good example</span>
+    <span class="c"># of this are RX6 circuits.  We encapsulate each RX6 circuit in it&#39;s own</span>
+    <span class="c"># class.  The class factory loads the circuit, inspects it to find all tags</span>
+    <span class="c"># and what the tag types are.  A class definition is then created with the</span>
+    <span class="c"># appropriate properties and methods relevant to that circuit.  This</span>
+    <span class="c"># approach is actually very similar to how Python generates the RPcoX and</span>
+    <span class="c"># PA5 classes on the fly.</span>
+
+    <span class="n">circuit_path</span> <span class="o">=</span> <span class="n">load_cof</span><span class="p">(</span><span class="n">iface</span><span class="p">,</span> <span class="n">circuit_name</span><span class="p">)</span>
+    <span class="c"># TODO: Need to add a detection routine so that appropriate constants are #</span>
+    <span class="c"># initialized at run-time (i.e. if we are using PA5 or RZ5).  properties =</span>
+    <span class="c"># RX6_constants</span>
+
+    <span class="n">properties</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+    <span class="n">properties</span><span class="p">[</span><span class="s">&#39;dsp&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">iface</span>
+    <span class="n">properties</span><span class="p">[</span><span class="s">&#39;fs&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">iface</span><span class="o">.</span><span class="n">GetSFreq</span><span class="p">()</span>
+    <span class="n">properties</span><span class="p">[</span><span class="s">&#39;MAX_FREQUENCY&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">properties</span><span class="p">[</span><span class="s">&#39;fs&#39;</span><span class="p">]</span><span class="o">/</span><span class="mf">2.</span> <span class="c"># Nyquist frequency</span>
+    <span class="n">properties</span><span class="p">[</span><span class="s">&#39;CIRCUIT_PATH&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">circuit_path</span>
+    
+    <span class="c"># TODO: most matlab programmers will have no clue what this is doing.  Need</span>
+    <span class="c"># to document this better.</span>
+    <span class="c">#circuit = type(&#39;circuit.&#39; + circuit_name, (Circuit,), properties)()</span>
+
+    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">get_tags</span><span class="p">(</span><span class="n">iface</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">key</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s">&#39;%&#39;</span><span class="p">):</span>
+            <span class="c"># These tags are returned by GetNameOf/GetNumOf.  Not really sure</span>
+            <span class="c"># what they represent so we ignore them.</span>
+            <span class="k">pass</span>
+        <span class="k">elif</span> <span class="n">value</span> <span class="o">==</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+            <span class="c"># We provide a simple interface to the RX6 buffers via a class</span>
+            <span class="c"># that handles the behind-the-scene logics and double-checks</span>
+            <span class="c"># boundary conditions (i.e. do we need to wrap around to the</span>
+            <span class="c"># beginning of the buffer).  Unfortunately the TDT drivers do not</span>
+            <span class="c"># address boundary conditions for us. For example, attempting to</span>
+            <span class="c"># write data that is longer than the memory allocated to a SerSource</span>
+            <span class="c"># does not raise an error.</span>
+            <span class="c">#setattr(circuit, key, DSPBuffer(iface, key))</span>
+            <span class="n">properties</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">DSPBuffer</span><span class="p">(</span><span class="n">iface</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">value</span> <span class="o">==</span> <span class="s">&#39;static&#39;</span><span class="p">:</span>
+            <span class="n">mesg</span> <span class="o">=</span> <span class="s">&#39;</span><span class="si">%s</span><span class="s"> tag is linked to a static parameter.  Discarding tag.&#39;</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">mesg</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c">#setattr(circuit, key, DSPTag(iface, key))</span>
+            <span class="n">properties</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">DSPTag</span><span class="p">(</span><span class="n">iface</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="s">&#39;circuit.&#39;</span> <span class="o">+</span> <span class="n">circuit_name</span><span class="p">,</span> <span class="p">(</span><span class="n">Circuit</span><span class="p">,),</span> <span class="n">properties</span><span class="p">)()</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../../../index.html">NeuroBehavior v0.3 documentation</a> &raquo;</li>
+          <li><a href="../../../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, Brad Buran.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.3.
+    </div>
+  </body>
+</html>
