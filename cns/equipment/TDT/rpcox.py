@@ -1,3 +1,12 @@
+"""
+Collection of classes and functions that generate an abstraction layer between
+Python and TDT's drivers.  Direct calls to TDT's drivers are highly discouraged
+since this means that you will have difficulty switching to a new backend in the
+future (e.g. National Instrument's PXI and FGPA system).
+
+In addition to supporting an abstraction layer, provides convenience methods and
+properties for interacting with the DSP.
+"""
 from __future__ import division
 from cns.buffer import available, BlockBuffer
 from cns.util.math import nextpow2
@@ -128,7 +137,7 @@ class DSPBuffer(BlockBuffer):
     stored on the DSP.  Since data can be compressed for storage in the DSP
     buffer and may contain multiple channels, you must tell the object how to
     interpret the data downloaded from the buffer by initializing it via
-    :method:`initialize`.
+    :func:`DSPBuffer.initialize`.
 
     This class relies on strict naming conventions for the DSP tags to correctly
     download data from the DSP.
@@ -204,7 +213,10 @@ class DSPBuffer(BlockBuffer):
 
     def initialize(self, src_type=np.float32, channels=1, read_mode='continuous', 
                    multiple=1, compression=None, fs=None, sf=1):
-
+        """
+        Configures class with appropriate information to interpret data acquired
+        from the DSP buffer.
+        """
         self.__dict__.update(locals())
 
         if read_mode == 'continuous':
@@ -555,7 +567,7 @@ def load_cof(iface, circuit_name):
 
     return circuit_path
 
-def get_tags(iface, map=rpcox_types):
+def get_tags(iface):
     '''Queries the DSP for information regarding available tags.
 
     Args:
@@ -563,15 +575,19 @@ def get_tags(iface, map=rpcox_types):
     '''
     num_tags = iface.GetNumOf('ParTag')
     tags = [iface.GetNameOf('ParTag', i+1) for i in range(num_tags)]
-    types = [map[iface.GetTagType(tag)] for tag in tags]
+    types = [rpcox_types[iface.GetTagType(tag)] for tag in tags]
     return zip(tags, types)
 
-def circuit_factory(circuit_name, iface, map=rpcox_types):
+def circuit_factory(circuit_name, iface):
     '''Load RPvdsEx circuit to specified DSP.  
 
     A subclass of :class:`DSPBuffer` is dynamically created via introspection of
     the RPvdsEx circuit.  All tags (i.e. variables) and buffers that can be read
     or written are exposed in the instance returned by this function.
+
+    This uses a map of DSP tag/buffer types to Python types (e.g.  a DSP buffer
+    should map to a :class:`DSPBuffer` instance and a TTL tag should map to a
+    boolean type.  See `rpcox_types` in this module for the actual mapping.
 
     Parameters
     ----------
@@ -581,13 +597,8 @@ def circuit_factory(circuit_name, iface, map=rpcox_types):
         refer to that documentation for more information regarding what
         directories are searched to locate the circuit.
 
-    iface: instance of ActiveX driver
+    iface: instance of ActiveX driver 
         The target DSP (e.g. RX6 or RZ5)
-
-    map: dictionary, optional
-        Optional map of DSP tag/buffer types to Python types (e.g.  a DSP buffer
-        should map to a :class:`DSPBuffer` instance and a TTL tag should map to
-        a boolean type.
 
     Returns
     -------
