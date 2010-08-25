@@ -1,3 +1,58 @@
+'''
+Overview
+========
+
+This file contains four key classes that work together:
+
+    PumpInterface
+        Handles communication with the pump hardware (e.g. changing rate,
+        querying volume dispensed, determining whether there's an error).  This
+        is the abstraction layer.
+    PumpController
+        Contains logic for responding to user interaction (e.g.  what should
+        happen when the "override" button is pressed?).  This should be able to
+        work with any abstraction layer.
+    pump_view
+        What information should the GUI have and how should it look?
+    Pump
+        The settings for the pump.
+    PumpError
+        A generic pump error.
+
+If all you care about is controlling the pump via the python shell interface or
+via your program, `PumpInterface` is the only class you need.  You can simply
+load it:
+
+>>> from cns import equipment
+>>> pump_backend = equipment.pump()
+>>> pump = pump_backend.PumpInterface()
+
+Generating a GUI
+================
+
+However, if you want help presenting a GUI that allows the user to interact with
+the pump, then the other three classes come into play.  You might be wondering
+how the `PumpController` differs from the `PumpInterface`.  While we could
+certainly combine these two classes into a single, monolithic class, I view
+these classes as serving two very different functions.  The `PumpInterface`
+class is hardware-specific.  That is, it knows how to communicate with the pump
+itself.  The `PumpController` is hardware-independent.  You simply tell the
+`PumpController` which interface to use (right now this defaults to the New Era
+pump interface).  The `PumpController` monitors the pump (via the PumpInterface)
+and tells the PumpInterface what to do in response to changes in the GUI.
+
+By splitting out functionality like this, we can swap in a different class if we
+want the behavior to be different.  For example, we can use a different
+`pump_view` class to change how the GUI looks.  If we don't like how the current
+"handler/controller" (which determines what commands to send to the pump
+interface based on user input), we can write a different handler.  Finally, a
+new PumpInterface can be written if we ever use a pump from a different
+manufacturer.
+
+pump_view <-> PumpController <-> Pump
+                                 PumpInterface
+'''
+
 import re
 import time
 import os
@@ -14,28 +69,6 @@ from cns.equipment import EquipmentError
 import logging
 log = logging.getLogger(__name__)
 
-'''This file contains four key classes.  These four classes work together to
-separate out functionality into specific modules:
-
-    PumpInterface - Handles communication with the pump hardware (e.g. changing
-    rate, querying volume dispensed, determining whether there's an error)
-    PumpController - Contains logic for responding to user interaction (e.g.
-    what should happen when the "override" button is pressed?).
-    pump_view - What information should the GUI have?
-    Pump - The settings for the pump.
-
-By splitting out functionality like this, we can swap in a different class if we
-want the behavior to be different.  For example, we can use a different "view"
-class to change how the GUI looks.  If we don't like how the current
-"handler/controller" (which determines what commands to send to the pump based
-on user input), we can write a different handler.  Finally, a new PumpInterface
-can be written if we ever use a pump from a different manufacturer.  As long as
-it knows how to transmit commands to the pump (as determined by the
-PumpController).
-
-pump_view <-> PumpController <-> Pump
-                                 PumpInterface
-'''
 
 #####################################################################
 # Custom-defined pump error messages
@@ -54,8 +87,8 @@ class PumpError(EquipmentError):
         return '%s\n\n%s: %s' % (self._todo, self.cmd, self._mesg[self.code])
 
 class PumpCommError(PumpError):
-    '''Handles error messages carried by the RS232 response packets from the
-    pump.'''
+    '''Handles error messages resulting from problems with communication via the
+    pump's serial port.'''
 
     _mesg = {
             # Actual codes returned by the pump
@@ -74,7 +107,7 @@ class PumpCommError(PumpError):
             'try power-cycling the entire system (rack and computer).'
 
 class PumpHardwareError(PumpError):
-    '''Handles errors specific to the pump hardware itself.'''
+    '''Handles errors specific to the pump hardware.'''
 
     _mesg = {
             'R'     : 'Pump was reset due to power interrupt',
@@ -107,9 +140,11 @@ try:
             dsrdtr=None, interCharTimeout=None)
     SERIAL = serial.Serial(**connection_settings)
 except serial.SerialException, e:
-    raise PumpCommError('SER', 'serial.Serial')
+    #raise PumpCommError('SER', 'serial.Serial')
+    pass
 
 class PumpInterface(object):
+
     # The Syringe Pump uses a standard 8N1 frame with a default baud rate of
     # 19200.  These are actually the default parameters when calling the command
     # to init the serial port, but I define them here for clarity.
@@ -252,8 +287,9 @@ class PumpInterface(object):
         changes to the TTL level, pass trigger='start' as one of the
         arguments.
 
-        e.g. pump.run(trigger='start', volume=10, rate=1.0) will cause the pump
-        to continuously dispense 10 mL at a rate of 1 mL/min.
+        To make the pump continuosly dispense 10 mL at a rate of 1 mL/min:
+
+        >>>  pump.run(trigger='start', volume=10, rate=1.0) will cause the pump
         '''
         for k, v in kw.items():
             setattr(self, k, v)
@@ -262,7 +298,7 @@ class PumpInterface(object):
             #self.xmit('RUN')
 
     def run_if_TTL(self, **kw):
-        '''In contrast to run, the state of the TTL is inspected.  If the TTL is
+        '''In contrast to `run`, the state of the TTL is inspected.  If the TTL is
         high, and the pump is stopped, a RUN command will be sent.  If the TTL
         state is low and the pump is running, a STOP command will be sent.
 
@@ -271,9 +307,10 @@ class PumpInterface(object):
         the TTL logic controls the pump (also change rate while an animal is
         drinking).
 
-        TODO: This handling does not factor in TTL modes where a low or falling
-        edge is meant to START the pump (not stop it).  Right now we do not have
-        a need for this, so I will not worry about it.
+        ..note:: 
+            This handling does not factor in TTL modes where a low or falling
+            edge is meant to START the pump (not stop it).  Right now we do not
+            have a need for this, so I will not worry about it.
         '''
         # Some changes to properties are stored in volatile memory if the pump
         # is currently executing a program.  Once the pump stops (e.g. if the
@@ -484,7 +521,8 @@ class PumpToolBar(HasTraits):
         kw = dict(height=18, width=18)
         increase = SVGButton(filename=icons.up, **kw)
         decrease = SVGButton(filename=icons.down, **kw)
-        override = SVGButton(filename=icons.right2, tooltip='override', toggle=True, **kw)
+        override = SVGButton(filename=icons.right2, tooltip='override',
+                             toggle=True, **kw)
         #initialize  = SVGButton(filename=icons.first, **kw)
         #shutdown    = SVGButton(filename=icons.last, **kw)
         item_kw = dict(show_label=False)

@@ -11,14 +11,11 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
+   equipment.rst
+
 Indices and tables
 ==================
 
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-
-.. automodule:: cns.experiment.controller
-    :members:
-.. automodule:: cns.equipment.TDT.rpcox
-    :members:
