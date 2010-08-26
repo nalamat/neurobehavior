@@ -1,3 +1,15 @@
+"""
+This will hopefully be replaced by the new system that is developed by our
+programmer.  For now, this is just quick and dirty documentation to get started.
+I'm not a fan of how I implemented this, and won't be upset to see it replaced
+by a better, more streamlined system (that can handle calibration, etc).
+
+Simply put, if you want to be able to define your own signals, you need to
+create a subclass of this.
+
+If you want
+
+"""
 from cns.signal.view_factory import signal_view_factory
 from cns.buffer import BlockBuffer
 from enthought.traits.api import HasTraits, Str, Property, Float, CFloat, Range, \
@@ -30,20 +42,20 @@ class Signal(Waveform):
     coerced_samples = Property(Int, depends_on='coerced_duration')
     amplitude = Range(0.0, 10.0, value=1, unit='volt', store='attribute')
 
-    duration = CFloat(1.0, configurable=True,
-                              label='Requested duration', unit='sec',
-                              store='attribute')
+    duration = CFloat(1.0, configurable=True, label='Requested duration',
+                      unit='sec', store='attribute')
     t = Property(Array(dtype='f'), depends_on='coerced_duration, fs')
     period = Property(Float)
-    attenuation = Range(0.0, 120.0, value=60, configurable=True, label='Attenuation', 
-                        unit='dB ATT', store='attribute')
+    attenuation = Range(0.0, 120.0, value=60, configurable=True,
+                        label='Attenuation', unit='dB ATT', store='attribute')
+    variable = Str(editor=EnumEditor(name='parameters'), store='attribute')
+
+    #variables_store = Property(Str, depends_on='variables', store='attribute')
     #variables = List(Str, [])
     #static = Bool(False)
-    variable = Str(editor=EnumEditor(name='parameters'), store='attribute')
-    #variables_store = Property(Str, depends_on='variables', store='attribute')
 
-    average_power = Property(Float)
-    rms_power = Property(Float)
+    #average_power = Property(Float)
+    #rms_power = Property(Float)
     parameters = Property
 
     def amplitude_sf(self, dB):

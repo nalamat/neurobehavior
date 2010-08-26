@@ -7,6 +7,9 @@ installed, the equipment modules are only loaded when requested.
 DSP hardware
 ============
 
+How the backends work
+---------------------
+
 Right now only one DSP backend (TDT) is supported.  A backend module deals with
 the hardware and driver-specific implementation details.  For example, to read
 from a buffer on a TDT DSP device without using the backend:
@@ -27,7 +30,10 @@ from a buffer on a TDT DSP device without using the backend:
 ...         data_a = RX6.ReadTagV('contact_buf', last_read_index, length_a)
 ...         data_b = RX6.ReadTagV('contact_buf', 0, next_index)
 ...         data = np.concatenate(data_a, data_b)
->>>     last_read_index = next_index
+...     last_read_index = next_index
+...     if some_condition_met:
+...         break
+>>> # do something with the data
 
 Phew!  That was a lot of boilerplate code just to load a circuit, run it, and
 continously read any new data in the contact buffer.  You have to continuously
@@ -39,6 +45,9 @@ the beginning, and acquire the data.  Wouldn't it be easier to just write:
 >>> circuit.start()
 >>> while True:
 ...     data = circuit.contact_buf.next()
+...     if some_condition_met:
+...         break
+>>> # do something with the data
 
 This is precisely how the backend works.  All the hardware-specific
 implementation details of how to access the DSP variables (e.g.
@@ -65,8 +74,68 @@ as long as you restrict yourself to the API.
     (e.g. National Instruments or Neurolarynx), we will have to put some thought
     into the mechanism for loading multiple backends.
 
+What can you expect from a backend?
+-----------------------------------
+
+Each backend should, at the minimum, support initializing the DSP and
+controller, load a specified circuit and allow the program to read/write to
+buffers, get/set tag values and send TTLs.
+
+First, let's load and initialze our backend:
+
+>>> from cns import equipment
+>>> dsp = equipment.dsp()
+>>> circuit = dsp.load('circuit-name', 'device-name')
+>>> circuit.run()
+
+Lets say the circuit has the buffers microphone and speaker as well as the
+tags record_duration_n and record_delay_n.  Note that both tag names end in
+'_n'.  This is a special naming convention that tells the backend what unit
+these tags accept('n' indicates number of ticks of the DSP clock while 'ms'
+indicates milliseconds).  The circuit is configured to deliver the data stored
+in the speaker buffer to DAC channel 1 (which is connected to a speaker) and
+record the resulting microphone waveform.  The entire process is controlled by a
+software trigger.
+
+To write a 1 second, 1 kHz tone to the speaker buffer:
+
+>>> from numpy import arange, sin, pi
+>>> t = arange(0, dsp.convert('s', 'n', 1))/dsp.fs
+>>> waveform = sin(2*pi*1e3*t)
+>>> circuit.speaker.write(waveform)
+
+Now we want to configure the microphone to record for a duration of 500 ms with
+a 25 ms delay.  Remember that record_delay_n and record_duration_n both require
+the number of samples.  Since number of samples depends on the sampling
+frequency of the DSP, we would have to compute this:
+
+>>> circuit.record_delay_n.value = int(25e-3*circuit.fs)
+>>> circuit.record_duration.value = int(500e-3*circuit.fs)
+
+Alternatively, we can use a convenience method:
+
+>>> circuit.record_delay_n.set(25, src_unit='ms')
+>>> circuit.record_duration_n.set(500, src_unit='ms')
+
+Both approaches are fine; however, we recommend that you use the `DSPTag.set`
+method rather than computing the value yourself.  This makes the code more
+readable.  Now that you've configured the circuit and are ready to record:
+
+>>> import time
+>>> circuit.trigger(1)
+>>> time.sleep(1)
+>>> microphone = circuit.microphone.read()
+
+Alternatively, you can simply use a convenience method, `DSPCircuit.acquire`:
+
+>>> num_samples = circuit.record_duration_n.value
+>>> microphone = circuit.microphone.acquire(num_samples, trigger=1, timeout=1)
+
 Pump hardware
 =============
+
+How the abstraction layer works
+-------------------------------
 
 Right now only one pump (New Era) is supported.  I'm going to briefly expand on
 how the API abstraction layer is expected to work.  New Era requires a RS-232
@@ -75,8 +144,10 @@ If we wanted to set the infusion rate on the pump, we would need to:
 
     1. Know how to initialize the serial port, set it's baud rate, and close it
     properly at program exit.
+
     2. Remember the manufacturer-specific command syntax for setting the rate.
-    In this case it's "RAT 0.300 MM<CR>".
+    Usually it's some string such as "RAT 0.300 MM<CR>".
+
     3. Know how to parse the pump's response (which conveys information about
     the status of the pump).
 
@@ -84,8 +155,8 @@ So, we'd need to do:
 
 >>> import serial
 >>> pump = serial.Serial(connection_settings)
->>> pump.write("RAT 0.300 MM\n")
->>> result = pump.readline(eol='\x03')
+>>> pump.write("RAT 0.300 MM\\n")
+>>> result = pump.readline(eol='\\x03')
 
 Result is typically an arcane string along the lines of "01I?".  This string
 contains a single letter that indicates the status of the pump.  If the string
@@ -96,6 +167,7 @@ is stalled) and raising a PumpHardwareError exception that displays a message
 that the user can understand.
 
 So, how do we use the API?
+--------------------------
 
 >>> from cns import equipment # see a pattern here?
 >>> pump = equipment.pump()
@@ -112,21 +184,20 @@ Better yet, wrap it in a try/except block.
 >>> except PumpHardwareError:
 ...     print 'Able to connect to pump, but there is a hardware problem.'
 
-.. note:: 
-    Note that `PumpCommError` and `PumpHardwareError` are subclasses of
-    `PumpError`.  In turn, `PumpError` is a subclass of `EquipmentError`.  Both
-    have subclass-specific error messages.  These error messages should be quite
-    informative and contain information to help the user solve the problem (e.g.
-    could they have forgotten to turn on something or is a cable disconnected?).
-    If the error message isn't very informative, this is considered a BUG and
-    should be reported accordingly.  So you could simply do:
+Note that `PumpCommError` and `PumpHardwareError` are subclasses of `PumpError`.
+In turn, `PumpError` is a subclass of `EquipmentError`.  Both have
+subclass-specific error messages.  These error messages should be quite
+informative and contain information to help the user solve the problem (e.g.
+could they have forgotten to turn on something or is a cable disconnected?).  If
+the error message isn't very informative, this is considered a BUG and should be
+reported accordingly.  So you could simply do:
 
-    >>> from cns import equipment
-    >>> try:
-    ...     pump = equipment.pump()
-    ...     pump.rate = 0.3
-    >>> except EquipmentError, e:
-    ...     print e
+>>> from cns import equipment
+>>> try:
+...     pump = equipment.pump()
+...     pump.rate = 0.3
+>>> except EquipmentError, e:
+...     print e
 """
 
 def dsp(dsp='TDT'):
