@@ -2,7 +2,7 @@
 Overview
 ========
 
-This file contains four key classes that work together:
+This file contains several key classes that work together:
 
     PumpInterface
         Handles communication with the pump hardware (e.g. changing rate,

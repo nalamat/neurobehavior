@@ -12,6 +12,7 @@ Contents:
    :maxdepth: 2
 
    equipment.rst
+   .. automodule:: cns.equipment.new_era
 
 Indices and tables
 ==================

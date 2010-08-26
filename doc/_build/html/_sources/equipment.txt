@@ -7,4 +7,3 @@ Interfacing with the equipment
 ==============================
 
 .. automodule:: cns.equipment
-.. automodule:: cns.equipment.new_era

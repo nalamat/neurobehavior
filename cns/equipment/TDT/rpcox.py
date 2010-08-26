@@ -41,7 +41,8 @@ rpcox_types = {
         }
 
 def convert(src_unit, dest_unit, value, dsp_fs):
-    '''Converts value to desired unit give the sampling frequency of the DSP.
+    '''
+    Converts value to desired unit give the sampling frequency of the DSP.
 
     Parameters specified in paradigms are typically expressed as
     frequency and time while many DSP parameters are expressed in number of
@@ -170,7 +171,8 @@ class DSPBuffer(BlockBuffer):
     I have been toying with the idea of creating TDT macros that handle a lot of
     the boilerplate in setting up the necessary tags for the serial buffers.  If
     I do this, then I would incorporate auto-discovery of the necessary
-    parameters (e.g. sampling rate, compression settings and number of channels).
+    parameters (e.g. sampling rate, compression settings and number of
+    channels).
     '''
 
     def __init__(self, dsp, name):
@@ -200,7 +202,8 @@ class DSPBuffer(BlockBuffer):
         """
         Returns the minimum, maximum valid value, numerical resolution of a
         32-bit float that has been scaled and compressed to an integer for
-        faster data streaming."""
+        faster data streaming.
+        """
         bits = 8*np.nbytes[self.src_type]
         return -(2**bits)/2, (2**bits)/2-1
 
@@ -347,21 +350,21 @@ class DSPBuffer(BlockBuffer):
         # are the sample number).  We need to compensate for this by using some
         # fancy indexing.
 
-        # The TDT ActiveX documentation does not appear to accurately
-        # describe how ReadTagVEX works.  ReadTagVEX wants the number of
-        # samples acquired, not the buffer index.  If two samples are
-        # compressed into a single buffer slot, then we need to multiply
-        # the read size by 2.  If four samples are compressed into a
-        # single buffer slot, the read size needs to be 4.
+        # The TDT ActiveX documentation does not appear to accurately describe
+        # how ReadTagVEX works.  ReadTagVEX wants the number of samples
+        # acquired, not the buffer index.  If two samples are compressed into a
+        # single buffer slot, then we need to multiply the read size by 2.  If
+        # four samples are compressed into a single buffer slot, the read size
+        # needs to be 4.
 
         # We also need to offset the read appropriately.  <Don't fully
         # understand this but my test code says I've got it OK>
 
-        # Do not change the four lines below unless you test it with
-        # timeit!  This has been optimized for speed.  See
-        # test_concatenate_time.py (in the same folder as this file)
-        # to see the test results.  This method is an order of a
-        # magnitude faster than any other method I have thought of.
+        # Do not change the four lines below unless you test it with timeit!
+        # This has been optimized for speed.  See test_concatenate_time.py (in
+        # the same folder as this file) to see the test results.  This method is
+        # an order of a magnitude faster than any other method I have thought
+        # of.
         c = self.c_factor
         for i in range(self.channels):
             for j in range(c):
@@ -374,6 +377,28 @@ class DSPBuffer(BlockBuffer):
 
     def _get_duration(self):
         return len(self.buffer)/self.fs
+
+    def acquire(self, samples, trigger=None, timeout=1, dt=0.01):
+        self.dsp.trigger(trigger)
+        cumtime = 0
+        cumsamples = 0
+        data = []
+        while True:
+            new_data = self.read()
+            cumsamples += len(new_data)
+            data.append(new_data)
+            if cumsamples >= samples:
+                break
+            elif len(new_data) > 0:
+                # Reset the "clock" eachtime we get new data.  Timeout is only
+                # activated when the read stalls and continually returns zero
+                # samples.
+                cumtime = 0
+            elif timeout is not None and cumtime > timeout:
+                raise IOError, 'Read from buffer %s timed out' % buffer
+            time.sleep(dt)
+            cumtime += dt
+        return np.concatenate(data)[:samples]
     
     def channel_args(self):
         return { 'channels' : self.channels,
