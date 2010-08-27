@@ -65,7 +65,7 @@ class ExperimentToolBar(ToolBar):
                         enabled_when="object.handler.pending_changes<>{}",
                         **item_kw),
                    Item('start',
-                        enabled_when="object.handler.state=='disconnected'",
+                        enabled_when="object.handler.state=='halted'",
                         **item_kw),
                    '_',
                    Item('remind',
