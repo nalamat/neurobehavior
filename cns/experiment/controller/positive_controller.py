@@ -86,7 +86,7 @@ class PositiveController(ExperimentController):
     def init_equipment(self, info):
         self.pump = equipment.pump().Pump()
         self.backend = equipment.dsp()
-        self.circuit = self.backend.load('positive-behavior-stage1', 'RX6')
+        self.circuit = self.backend.load('positive-behavior-stage2', 'RX6')
 
     def configure_circuit(self, circuit, paradigm):
         circuit.reload()
