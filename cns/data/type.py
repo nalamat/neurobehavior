@@ -43,7 +43,7 @@ class Animal(HasTraits):
     processed = Bool(False)
 
     store_node = Any # pointer to the storage node
-    #experiments     = CList(Experiment, [], store='node')          
+    #experiments     = CList(Experiment, [], store=node')          
     
     def _get_age(self):
         if self.birth is None:
@@ -61,15 +61,8 @@ class Animal(HasTraits):
                 identifier=self.identifier, sex=self.sex)
 
     def __str__(self):
-        #return '{identifier} {sex} (NYU ID {nyu_id}'.format(self.__dict__).capitalize()
         return '%s %s NYU%d' % (self.identifier, self.sex, self.nyu_id)
     
-    #def __cmp__(self, other):
-    #    if self is other:
-    #        return True
-    #    else:
-    #        return (self.sex, self.identifier) > (other.sex, other.identifier)
-
 class Cohort(HasTraits):
 
     description = CStr(store='attribute')
