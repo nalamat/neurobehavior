@@ -8,6 +8,24 @@ Simply put, if you want to be able to define your own signals, you need to
 create a subclass of this.
 
 If you want
+class Equipment(HasTraits): fs = Float(store='attribute', configurable=False,
+label='Sampling frequency', unit='Hz') attenuation = Float(store='attribute',
+log_changes=True, configurable=True, unit='dB')
+
+Basically the code attaches two properties to class Equipment using Traits.  We
+can then "inspect" the property to find out the information we need.  The
+auto-generation of the GUI that allows us to configure the properties for this
+class would look for a "label" metadata and use that label instead of the
+property name if available.  This gives us a GUI:
+
+Sampling frequency: [ enter value here ] Attenuation: [ enter value here ]
+
+I wrote a modified version of the GUI creation code to factor in additional
+metadata (specifically "configurable" and "unit").  The modified GUI creation
+code will create a GUI that looks like:
+
+Sampling frequency (Hz): 100,000 Hz <= not configurable so we don't provide a
+field for the user to enter data Attenuation (dB): [enter value here]
 
 """
 from cns.signal.view_factory import signal_view_factory
@@ -102,7 +120,8 @@ class Signal(Waveform):
         configurable = self.class_trait_names(configurable=True)
         name = self.__class__.__name__
 
-        base = u' \n\u00B7 %s: '
+        #base = u' \n\u00B7 %s: '
+        base = '-- %s: '
         for c in configurable:
             trait = self.trait(c)
             if c == self.variable:
