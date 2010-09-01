@@ -11,6 +11,7 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
+   getting_started.rst
    equipment.rst
    equipment_TDT_rpcox.rst
 
