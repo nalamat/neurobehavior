@@ -12,7 +12,7 @@ Contents:
    :maxdepth: 2
 
    equipment.rst
-   .. automodule:: cns.equipment.new_era
+   equipment_TDT_rpcox.rst
 
 Indices and tables
 ==================
