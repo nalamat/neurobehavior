@@ -25,9 +25,9 @@ def get_hdf5_dtype(trait):
 
 def get_traits(object, filter_readonly=False, filter_events=True, **metadata):
     '''Convenience function to filter out readonly traits.  This is useful for
-    reconstructing a traited class that has been persisted by avoiding writes
-    to a readonly trait.  It is expected that the traited class knows how to
-    reconstruct readonly properties.
+    reconstructing a traited class that has been persisted.  Typically readonly
+    traits are properties that the traited class reconstructs from other class
+    attributes.
     '''
     if filter_readonly:
         filter = lambda x: x() is None or x()[1].__name__ <> '_read_only'
@@ -316,11 +316,10 @@ def load_object(source, path=None):
 
     for name, trait in get_traits(type, True, store='automatic').items():
         try:
-            path = getattr(trait, 'store_path')
-            print path
+            # Traited classes do not properly raise AttributeError but return
+            # None instead.
+            path = trait.store_path if trait.store_path else name
             kw[name] = node._f_getChild(path)
-            #except (TypeError, AttributeError):
-            #    kw[name] = node._f_getChild(name)
         except tables.NoSuchNodeError:
             log.debug('Node %s from file %s does not have node "%s"',
                     node._v_pathname, node._v_file.filename, name)
