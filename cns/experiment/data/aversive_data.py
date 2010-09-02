@@ -5,6 +5,7 @@ terminology to avoid any confusion.  For example:
     TRIAL - The response to the test signal plus it's associated "false alarms".
     TRIAL BLOCK - All trials presented during an experiment.
 """
+from __future__ import division
 #from .experiment_data import ExperimentData, AnalyzedData
 from cns.experiment.data.experiment_data import ExperimentData, AnalyzedData
 from cns.channel import FileMultiChannel, FileChannel, RAMChannel
@@ -165,16 +166,20 @@ class RawAversiveData_v0_1(BaseAversiveData):
     trial_running = Property
 
     def _get_contact_digital(self):
-        return self.contact_data.get_channel('digital')
+        #return self.contact_data.get_channel('digital')
+        return self.contact_data.get_channel(0)
 
     def _get_contact_digital_mean(self):
-        return self.contact_data.get_channel('digital_mean')
+        #return self.contact_data.get_channel('digital_mean')
+        return self.contact_data.get_channel(1)
 
     def _get_contact_analog(self):
-        return self.contact_data.get_channel('analog')
+        #return self.contact_data.get_channel('analog')
+        return self.contact_data.get_channel(2)
 
     def _get_trial_running(self):
-        return self.contact_data.get_channel('trial_running')
+        #return self.contact_data.get_channel('trial_running')
+        return self.contact_data.get_channel(3)
 
     # Stores raw contact data from optical and electrical sensors as well as
     # whether a trial is running.
@@ -227,10 +232,26 @@ class RawAversiveData_v0_2(BaseAversiveData):
             store='channel', store_path='contact/trial_running')
 
     # We can switch back and forth between touch and optical as needed
-    contact_digital = Instance(FileChannel, 
-            store='channel', store_path='contact/contact_digital')
-    contact_digital_mean = Instance(FileChannel, 
-            store='channel', store_path='contact/contact_digital_mean')
+    #contact_digital = Instance(FileChannel, 
+    #        store='channel', store_path='contact/contact_digital')
+    #contact_digital_mean = Instance(FileChannel, 
+    #        store='channel', store_path='contact/contact_digital_mean')
+
+    '''During the addition of an optical sensor, changes were made to how the
+    AversiveData object stores the contact data.  We acquired data from both
+    sensors: a "touch" (for electrical) and "optical" channel.  These were
+    stored under touch_digital and optical_digital, respectively.  However, old
+    AversiveData objects continue to use contact_digital.  During the
+    transition, I forgot to ensure that some of the new AversiveData (V2)
+    objects implemented a contact_digital alias.  '''
+    contact_digital = Property
+    contact_digital_mean = Property
+
+    def _get_contact_digital(self):
+        return self.touch_digital
+
+    def _get_contact_digital_mean(self):
+        return self.touch_digital_mean
 
     water_log = Any(store='automatic')
     trial_log = Any(store='automatic')
@@ -293,23 +314,33 @@ class RawAversiveData_v0_2(BaseAversiveData):
         return append_node(self.store_node, 'trial_log', 'table', description)
 
 # For legacy reasons, we will let AversiveData = RawAversiveData_v0_1
-#AversiveData = RawAversiveData_v0_1
-AversiveData = RawAversiveData_v0_2
+AversiveData = RawAversiveData_v0_1
+#AversiveData = RawAversiveData_v0_2
 
 class AnalyzedAversiveData(AnalyzedData):
+    '''
+    Note that if you are attempting to compute d' and its related statistics (C,
+    95% CI, etc), see `cns.util.math` for standalone versions of these
+    computations.
+    '''
 
-    data = Instance(BaseAversiveData, ())
+    #data = Instance(BaseAversiveData, ())
+    data = Any
     updated = Event
 
     # The next few pars will influence the analysis of the data,
     # specifically the "score".  Anytime these pars change, the data must
     # be reanalyzed.
-    contact_offset = CFloat(0.9, store='attribute')
-    contact_dur = CFloat(0.1, store='attribute')
-    contact_fraction = Range(0.0, 1.0, 0.5, store='attribute')
+    contact_offset = CFloat(0.9, store='attribute',
+                           label='Contact offset (s)')
+    contact_dur = CFloat(0.1, store='attribute', label='Contact duration (s)')
+    contact_fraction = Range(0.0, 1.0, 0.5, store='attribute',
+                            label='Contact fraction (s)')
 
-    # Clip FA/HIT rate if it is < clip or > 1-clip (prevents unusually high
-    # z-scores)
+    contact_digital = DelegatesTo('data')
+    total_trials = DelegatesTo('data')
+
+    # Clip FA/HIT rate if < clip or > 1-clip (prevents unusually high z-scores)
     clip = Float(0.05, store='attribute')
 
     # False alarms and hits can only be determined after we score the data.
@@ -347,6 +378,8 @@ class AnalyzedAversiveData(AnalyzedData):
 
     # The summary scores
     pars = DelegatesTo('data')
+    par_hit_count = Property(List(Int), depends_on='curidx')
+    par_fa_count = Property(List(Int), depends_on='curidx')
     par_hit_frac = Property(List(Float), depends_on='curidx')
     par_fa_frac = Property(List(Float), depends_on='curidx')
     par_z_hit = Property(List(Float), depends_on='curidx')
@@ -360,24 +393,31 @@ class AnalyzedAversiveData(AnalyzedData):
 
     par_info = Property(store='table',
                         col_names=['par', 'safe_trials', 'warn_trials',
-                                   'hit_frac', 'fa_frac', 'd', 'd_global'],
-                        col_types=['f', 'i', 'i', 'f', 'f', 'f', 'f'],)
+                                   'fa_count', 'hit_count', 'hit_frac',
+                                   'fa_frac', 'd', 'd_global'],
+                        col_types=['f', 'i', 'i', 'i', 'i', 'f', 'f', 'f', 'f'],
+                       )
 
     def _get_par_info(self):
         return zip(self.pars,
                    self.data.par_safe_count,
                    self.data.par_count,
+                   self.par_fa_count,
+                   self.par_hit_count,
                    self.par_hit_frac,
                    self.par_fa_frac, 
                    self.par_dprime_nonglobal,
                    self.par_dprime_global, )
 
     def score_timestamp(self, ts):
-        ts = ts/self.data.contact_fs
-        lb, ub = ts + self.contact_offset, ts + self.contact_offset + self.contact_dur
-        return self.data.contact_digital.get_range(lb, ub)[0].mean()
+        #ts = ts/self.data.contact_digital.fs
+        ts = ts/self.contact_digital.fs
 
-    @on_trait_change('data')
+        #ts = ts/self.data.contact_fs
+        lb, ub = ts + self.contact_offset, ts + self.contact_offset + self.contact_dur
+        return self.contact_digital.get_range(lb, ub)[0].mean()
+
+    @on_trait_change('data, contact_offset, contact_dur, contact_fraction')
     def reprocess_timestamps(self):
         self.curidx = 0
         for ts in self.data.trial_data['timestamp']:
@@ -433,6 +473,14 @@ class AnalyzedAversiveData(AnalyzedData):
     @cached_property
     def _get_par_hit_frac(self):
         return apply_mask(np.mean, self.hit_seq, self.data.warn_par_mask)
+
+    @cached_property
+    def _get_par_fa_count(self):
+        return apply_mask(np.sum, self.fa_seq, self.data.safe_par_mask)
+
+    @cached_property
+    def _get_par_hit_count(self):
+        return apply_mask(np.sum, self.hit_seq, self.data.warn_par_mask)
 
     @cached_property
     def _get_par_z_hit(self):
