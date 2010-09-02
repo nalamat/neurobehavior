@@ -57,6 +57,10 @@ class SingleBarPlotView(BarChartComponentView):
 
     preprocess_values = Trait(None, Callable, sync=True)
 
+    def __init__(self, *args, **kw):
+        super(SingleBarPlotView, self).__init__(*args, **kw)
+        self.update_data()
+
     def _get_indices(self):
         raise NotImplementedError
 
