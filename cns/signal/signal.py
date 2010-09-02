@@ -121,7 +121,7 @@ class Signal(Waveform):
         name = self.__class__.__name__
 
         #base = u' \n\u00B7 %s: '
-        base = '-- %s: '
+        base = '\n-- %s: '
         for c in configurable:
             trait = self.trait(c)
             if c == self.variable:
