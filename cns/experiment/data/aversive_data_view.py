@@ -4,7 +4,7 @@ from cns.widgets.views.channel_view import MultipleChannelView, MultiChannelView
 from cns.widgets.views.chart_view import DynamicBarPlotView, HistoryBarPlotView
 from cns.widgets.views.component_view import BarChartOverlay
 from enthought.enable.component_editor import ComponentEditor
-from enthought.traits.api import Instance, DelegatesTo
+from enthought.traits.api import Instance, DelegatesTo, Any
 from enthought.traits.ui.api import View, VGroup, HGroup, Item
 from numpy import clip
 
@@ -14,6 +14,7 @@ PLOT_WIDTH = 200
 class AnalyzedAversiveDataView(AnalyzedView):
 
     analyzed = Instance(AnalyzedAversiveData, ())
+    #analyzed = Any
     data = DelegatesTo('analyzed')
 
     par_fa_frac_chart = Instance(DynamicBarPlotView)
@@ -39,19 +40,6 @@ class AnalyzedAversiveDataView(AnalyzedView):
                  decimate_mode='mean', color='black', line_width=3)
         view.add(self.analyzed.data.trial_running,
                  decimate_mode='mean', color='red', line_width=2)
-        return view
-
-    def _raw_contact_plot_default(self):
-        view = MultiChannelView(window=1, visible=[self.data.ch_monitor],
-                                channel=self.data.neural_data)
-        return view
-
-        view = MultipleChannelView(
-                value_title='Contact Fraction',
-                value_min='auto',
-                value_max='auto',
-                interactive=False,
-                window=5)
         return view
 
     def _par_count_chart_default(self):
@@ -158,17 +146,23 @@ class AnalyzedAversiveDataView(AnalyzedView):
     global_fa_frac = DelegatesTo('analyzed')
     use_global_fa_frac = DelegatesTo('analyzed')
 
-    group = HGroup([Item('object.contact_plot.component', **kw_plot),
-                    'score_chart{}@', ],
+    contact_offset = DelegatesTo('analyzed')
+    contact_dur = DelegatesTo('analyzed')
+    contact_fraction = DelegatesTo('analyzed')
+
+    group = HGroup(['contact_plot{}@', 
+                    VGroup(HGroup('contact_dur', 
+                                  Item('contact_fraction', style='text'),
+                                  'contact_offset'),
+                    'score_chart{}@'),],
                    VGroup(HGroup(VGroup(['total_trials~'],
-                                         Item('object.par_count_chart.component', **kw_plot),),
+                                         'par_count_chart{}@'),
                                  VGroup(['use_global_fa_frac{Compute using global FA fraction}'],
-                                        Item('object.par_dprime_chart.component', **kw_plot),
-                                        ),
+                                        'par_dprime_chart{}@'),
                                  ),
-                          HGroup(Item('object.par_hit_frac_chart.component', **kw_plot),
+                          HGroup('par_hit_frac_chart{}@',
                                  VGroup(['global_fa_frac{Global FA fraction}~'],
-                                        Item('object.par_fa_frac_chart.component', **kw_plot),
+                                        'par_fa_frac_chart{}@',
                                         ),
                                  ),
                           ),
