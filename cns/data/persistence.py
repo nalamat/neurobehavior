@@ -51,7 +51,7 @@ def add_or_update_object(object, node, name=None):
         object_name = name
 
     log.debug('Saving %s to %s in file %s', object_name, h5_path,
-            h5_file.filename)
+              h5_file.filename)
 
     # Check to see if node has already been set aside for the object
     try:
@@ -252,13 +252,51 @@ unsanitize_datetimes = functools.partial(switch_datetime_fmt,
         parser=strptime_arr)
 
 def append_metadata(object, source):
-    object.store_file = source._v_file.filename # TODO: we need to get abs pathource.
+    object.store_file = source._v_file.filename
     object.store_path = source._v_pathname
     object.store_name = source._v_name
     object.store_node = source
     return object
 
+class PersistenceError(BaseException):
+
+    mesg = """Attempt to reconstruct object from HDF5 file failed because the
+    required metadata is missing.  Source file: %s, Object path: %s"""
+
+    def __init__(self, file, path):
+        self.path = path
+        self.file = file
+
+    def __str__(self):
+        return self.mesg % (self.file, self.path)
+
 def load_object(source, path=None):
+    '''
+    Reconstructs original Python object from a node in a HDF5 file.
+
+    When a Python object is saved as a node in a HDF5 file, it includes two
+    attributes, klass and module, along with the object data.  This function
+    imports the class from the specified module and populates it with the data
+    in the HDF5 file.  
+
+    This function is meant to be very forgiving.  If data nodes are missing in
+    the file, a message is logged but no error is raised.  Earlier versions of
+    add_or_update object did not always create the necessary data nodes if the
+    class attribute was empty, so it's no surprise that we do not always find
+    the expected nodes!
+
+    Parameters
+    ==========
+    source
+        HDF5 node
+
+    Raises
+    ======
+    PersistenceError
+
+    Right now this function only works with subclasses of `HasTraits`.
+    '''
+
     if path is not None and '/' in path:
         node = source.getNode(path)
     elif path is not None:
@@ -270,8 +308,11 @@ def load_object(source, path=None):
     try: kw['UNIQUE_ID'] = node._f_getAttr('UNIQUE_ID')
     except AttributeError: pass
 
-    module_name = node._f_getAttr('module')
-    klass_name = node._f_getAttr('klass')
+    try:
+        module_name = node._v_attrs.module
+        klass_name = node._v_attrs.klass
+    except AttributeError:
+        raise PersistenceError(node._v_file.filename, node._v_pathname)
 
     # We need to obtain a reference to the type so we can adequately parse any
     # datetime values that are stored in the HDF5 file.  This type will also be
@@ -322,7 +363,7 @@ def load_object(source, path=None):
             kw[name] = node._f_getChild(path)
         except tables.NoSuchNodeError:
             log.debug('Node %s from file %s does not have node "%s"',
-                    node._v_pathname, node._v_file.filename, name)
+                      node._v_pathname, node._v_file.filename, name)
 
     for name, trait in get_traits(type, True, store='channel').items():
         try:
@@ -333,7 +374,7 @@ def load_object(source, path=None):
             kw[name] = load_file_channel(value)
         except tables.NoSuchNodeError:
             log.debug('Node %s from file %s does not have node "%s"',
-                    node._v_pathname, node._v_file.filename, name)
+                      node._v_pathname, node._v_file.filename, name)
 
     object = type(**kw)
     return append_metadata(object, node)
