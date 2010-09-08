@@ -36,7 +36,9 @@ class SignalEditHandler(Handler):
 
 class PositiveParadigm(Paradigm):
 
-    trial_delay = Float(0, unit='s')
+    spout_dur = Float(0.1, unit='s')
+    poke_dur_lb = Float(0.1, unit='s')
+    poke_dur_ub = Float(0.5, unit='s')
     reward_delay = Float(0, unit='s')
     reward_dur = Float(1.5, unit='s')
     timeout_dur = Float(5, unit='s')
@@ -57,7 +59,9 @@ class PositiveParadigm(Paradigm):
     #===========================================================================
     # The views available
     #===========================================================================
-    edit_view = View(VGroup('trial_delay',
+    edit_view = View(VGroup('poke_dur_lb',
+                            'poke_dur_ub',
+                            'spout_dur',
                             'pars',
                             'par_order',
                             HGroup(Item('signal', style='readonly'),

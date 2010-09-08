@@ -1,7 +1,7 @@
 from cns.channel import Channel, MultiChannel, SnippetChannel
 from cns.widgets.tools.zoom_tool import RLZoomTool
 from cns.widgets.views.decimated_plot import ChannelDataSource, TimeSeries, \
-    SharedTimeSeries
+    SharedTimeSeries, TTLTimeSeries
 from enthought.chaco.api import ArrayPlotData, DataRange1D, PlotLabel, \
     LinePlot, LinearMapper, ArrayDataSource, PlotAxis, OverlayPlotContainer, \
     VPlotContainer, FilledLinePlot, BasePlotContainer, Plot
@@ -127,6 +127,35 @@ class OverlayChannelView(Plot):
     def update_signal(self, channel, name, new):
         value_name = self.value_names[channel]
         self.data.set_data(value_name, self._clean(channel.signal_windowed))
+
+class TTLChannelView(ChannelView):
+
+    channels = List(Any, [])
+
+    idx_range = Instance(DataRange1D, kw=dict(low_setting=-10, high_setting=0))
+    idx_map = Instance(LinearMapper)
+    
+    def _idx_map_default(self):
+        return LinearMapper(range=self.idx_range)
+
+    def _component_default(self):
+        return VPlotContainer(
+                resizable='hv',
+                bgcolor='transparent',
+                fill_padding=True,
+                padding=10,
+                spacing=25,
+                stack_order='top_to_bottom',
+                )
+
+    def add(self, channel, *args, **kw):
+        val_range = DataRange1D(low_setting=-1.5, high_setting=1.5)
+        val_map = LinearMapper(range=val_range)
+        plot = TTLTimeSeries(channel=channel,
+                             index_mapper=self.idx_map,
+                             value_mapper=val_map,
+                             *args, **kw)
+        self.component.add(plot)
 
 class MultipleChannelView(ChannelView):
 
