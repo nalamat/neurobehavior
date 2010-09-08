@@ -5,7 +5,8 @@ from cns.experiment.data.positive_data import PositiveData
 from cns.experiment.paradigm.positive_paradigm import PositiveParadigm
 from cns.experiment.controller.positive_controller import PositiveController
 
-from cns.widgets.views.channel_view import MultipleChannelView, MultiChannelView
+from cns.widgets.views.channel_view import MultipleChannelView, \
+        MultiChannelView, TTLChannelView
 
 class PositiveExperiment(HasTraits):
 
@@ -15,10 +16,11 @@ class PositiveExperiment(HasTraits):
     data = Instance(PositiveData, ())
     paradigm = Instance(PositiveParadigm, ())
 
-    contact_plot = Instance(MultipleChannelView)
+    contact_plot = Instance(TTLChannelView)
 
     def _contact_plot_default(self):
-        view = MultipleChannelView(value_title='Contact Fraction',
+        view = TTLChannelView(
+                value_title='Contact Fraction',
                 value_min=0,
                 value_max=1,
                 interactive=False,

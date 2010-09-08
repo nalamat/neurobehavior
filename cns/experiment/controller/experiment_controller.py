@@ -175,7 +175,7 @@ class ExperimentController(Controller):
     pending_changes = Dict({})
     old_values = Dict({})
 
-    @on_trait_change('object.model.paradigm.+')
+    @on_trait_change('model.paradigm.+', post_init=True)
     def queue_change(self, object, name, old, new):
         print 'change detected'
         if self.state <> 'halted' and hasattr(self, '_apply_'+name):
@@ -192,7 +192,10 @@ class ExperimentController(Controller):
             raise SystemError, 'cannot change parameter'
 
     def apply(self, info=None):
-        ts = self.circuit.ts_n.value
+        try:
+            ts = self.circuit.ts_n.value
+        except:
+            ts = -1
         for key, value in self.pending_changes.items():
             object, name = key
             getattr(self, '_apply_'+name)(value)
@@ -200,7 +203,8 @@ class ExperimentController(Controller):
             del self.pending_changes[(object, name)]
             del self.old_values[(object, name)]
 
-    def log_event(ts, name, value):
+    def log_event(self, ts, name, value):
+        return
         log.debug('%d\tValue changed during experiment: %s = %r', ts, name,
                   value)
         
