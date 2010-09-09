@@ -113,6 +113,22 @@ class ChannelDataSource(HasTraits):
             new.on_trait_change(self._data_changed, "updated", dispatch="new")
     
 class TimeSeries(BaseXYPlot):
+    '''Often our neurophysiology data involves sampling at up to 200kHz.  If we
+    are viewing a second's worth of data on screen using "dumb" plotting
+    functions, then this means we are computing the data to screen coordinate
+    transform of 200,000 points every few milliseconds and then blitting this to
+    screen.
+
+    Each time a new call to render the plot on screen is made (e.g. there's new
+    data, the screen is resized, or the data bounds change), the data is
+    downsampled so there is only one vertical "line" per screen pixel.  The line
+    runs from the minimum to the maximum.  This is great for plotting
+    neurophysiology data since you can see the noise floor and individual spikes
+    will show up quite well.
+
+    In cases where there are fewer data points than screen pixels, then the plot
+    reverts to a standard "connected" XY plot.
+    '''
     
     color = black_color_trait
     line_width = Float(1.0)
@@ -149,7 +165,6 @@ class TimeSeries(BaseXYPlot):
             if self.ch_index is None:
                 self._cached_data = values
             else:
-		print self.ch_index
                 self._cached_data = values[:,self.ch_index]
             self._cached_data_bounds = t_lb, t_ub
             self._cache_valid = True
@@ -161,8 +176,8 @@ class TimeSeries(BaseXYPlot):
             screen_min, screen_max = self.index_mapper.screen_bounds
             screen_width = screen_max-screen_min
             #decimate(val_pts, screen_width, self.downsampling_cutoff)
-            values= decimate(val_pts, screen_width, self.downsampling_cutoff, 
-                             self.decimate_mode)
+            values = decimate(val_pts, screen_width, self.downsampling_cutoff,
+                              self.decimate_mode)
             if type(values) == type(()):
                 n = len(values[0])
                 s_val_min = self.value_mapper.map_screen(values[0]) 
@@ -210,25 +225,29 @@ class TimeSeries(BaseXYPlot):
             old.on_trait_change(self._data_changed, self.signal_trait, remove=True)
         if new is not None:
             new.on_trait_change(self._data_changed, self.signal_trait, dispatch="new")
+
+class TTLTimeSeries(TimeSeries):
+
+    def _gather_points(self):
+        if not self._cache_valid:
+            range = self.index_mapper.range
+            if self.reference == 'most_recent':
+                values, t_lb, t_ub = self.channel.get_recent_range(range.low, range.high)
+            else:
+                values, t_lb, t_ub = self.channel.get_range(range.low, range.high, -1)
+            #values = values.astype('f')
+            #jnp.putmask(values, values==0, np.nan)
+            #print values 
+
+            if self.ch_index is None:
+                self._cached_data = values
+            else:
+                self._cached_data = values[:,self.ch_index]
+            self._cached_data_bounds = t_lb, t_ub
+            self._cache_valid = True
+            self._screen_cache_valid = False
             
 class SharedTimeSeries(TimeSeries):
-    
-    '''Often our neurophysiology data involves sampling at up to 200kHz.  If we
-    are viewing a second's worth of data on screen using "dumb" plotting
-    functions, then this means we are computing the data to screen coordinate
-    transform of 200,000 points every few milliseconds and then blitting this to
-    screen.
-
-    Each time a new call to render the plot on screen is made (e.g. there's new
-    data, the screen is resized, or the data bounds change), the data is
-    downsampled so there is only one vertical "line" per pixel.  The line runs
-    from the minimum to the maximum.  This is great for plotting neurophysiology
-    data since you can see the noise floor and individual spikes will show up
-    quite well.
-
-    In cases where there are fewer data points than screen pixels, then the plot
-    reverts to a standard "connected" XY plot.
-    '''
 
     channel = Instance(ChannelDataSource)
     signal_trait = "data_changed"
@@ -258,4 +277,3 @@ class SharedTimeSeries(TimeSeries):
             self._screen_cache_valid = True
             
         return [self._screen_index_cache, self._screen_value_cache]
-    
