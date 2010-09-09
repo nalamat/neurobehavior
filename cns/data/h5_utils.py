@@ -34,3 +34,27 @@ def append_date_node(node, pre='date', post='', type='group', *arg, **kw):
     name = pre + datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S') + post
     return append_node(node, name, type, *arg, **kw)
 
+def walk_nodes(start, **kw):
+    '''Return all nodes hanging off of the starting node, using keyword
+    arguments as an attribute filter.
+
+    Currently supports strings that end in a wildcard (e.g. if you version your
+    class names with _v0_2, etc. then the wildcard can ignore those).
+
+    TODO: improve wildcard support
+
+    To return all nodes with the attribute klass='Animal'
+    >>> fh = tables.openFile('filename.h5', 'r')
+    >>> animal_nodes = walk_nodes(fh.root, klass='Animal')
+    '''
+    def match(n, kw):
+        attrs = node._v_attrs
+        for k, v in kw.items():
+            if k not in attrs:
+                return False
+            elif v.endswith('*') and not attrs[k].startswith(v.strip('*')):
+                return False
+            elif attrs[k]!=v:
+                return False
+        return True
+    return [node for node in start._f_walkNodes() if match(node, kw)]
