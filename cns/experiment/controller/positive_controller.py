@@ -19,6 +19,7 @@ import logging
 import time
 import numpy as np
 from cns.experiment.controller.experiment_controller import build_signal_cache
+from functools import partial
 
 log = logging.getLogger(__name__)
 
@@ -26,6 +27,7 @@ class CurrentSettings(HasTraits):
 
     paradigm = Instance(PositiveParadigm, ())
     signal = Property
+    poke_dur = Float
     
     '''Tracks the trial index for comparision with the circuit index'''
     idx = CInt(0)
@@ -50,6 +52,8 @@ class CurrentSettings(HasTraits):
 
     def next(self):
         self.par = self._choice_par.next()
+        self.poke_dur = np.random.uniform(self.paradigm.poke_dur_lb,
+                                          self.paradigm.poke_dur_ub)
 
     #===========================================================================
     # Helpers for run-time control of experiment
@@ -61,6 +65,9 @@ class CurrentSettings(HasTraits):
         # Always pass a copy of pars to other functions that may modify the
         # content of the list
         return choice.get(self.paradigm.par_order, self.paradigm.pars[:])
+
+    def _get_poke_dur(self):
+        return self._choice_poke_dur()
 
 class PositiveController(ExperimentController):
 
@@ -90,7 +97,8 @@ class PositiveController(ExperimentController):
 
     def configure_circuit(self, circuit, paradigm):
         circuit.reload()
-        circuit.trial_delay_n.set(paradigm.trial_delay, 's')
+        circuit.spout_dur_n.set(paradigm.spout_dur, 's')
+        circuit.poke_dur_n.set(self.current.poke_dur, 's')
         circuit.reward_delay_n.set(paradigm.reward_delay, 's')
         circuit.reward_dur_n.set(paradigm.reward_dur, 's')
         circuit.timeout_dur_n.set(paradigm.timeout_dur, 's')
@@ -99,6 +107,8 @@ class PositiveController(ExperimentController):
         circuit.trial_running_buf.initialize()
         circuit.reward_running_buf.initialize()
         circuit.timeout_running_buf.initialize()
+        circuit.trial_buf.set(self.current.signal)
+        self.backend.set_attenuation(self.current.signal.attenuation, 'PA5')
 
     def start(self, info=None):
         if not self.model.paradigm.is_valid():
@@ -108,9 +118,9 @@ class PositiveController(ExperimentController):
             return
 
         try:
+            self.current = CurrentSettings(paradigm=self.model.paradigm)
             self.configure_circuit(self.circuit, self.model.paradigm)
             self.fast_timer = Timer(250, self.tick, 'fast')
-            self.current = CurrentSettings(paradigm=self.model.paradigm)
             self.state = 'paused'
             self.circuit.start()
         except BaseException, e:
@@ -119,6 +129,7 @@ class PositiveController(ExperimentController):
             raise
 
     def remind(self, info=None):
+        raise NotImplementedError, 'This has not been implemented'
         self.state = 'manual'
         signal = self.current.signal
         self.circuit.trial_buf.set(signal)
@@ -156,16 +167,22 @@ class PositiveController(ExperimentController):
     @on_trait_change('fast_tick')
     def monitor_circuit(self):
         if self.circuit.trial_idx.value > self.current.idx:
+            self.current.next()
+            print 'updating information'
+            print self.current.poke_dur
             self.current.idx += 1
-            if self.state == 'manual':
-                self.state = 'paused'
-                self.current.next()
+            self.circuit.trial_buf.set(self.current.signal)
+            self.backend.set_attenuation(self.current.signal.attenuation, 'PA5')
+            self.circuit.poke_dur_n.set(self.current.poke_dur, 's')
 
     ############################################################################
     # Code to apply parameter changes
     ############################################################################
-    def _apply_trial_delay(self, value):
-        self.circuit.trial_delay_n.set(value, 's')
+    def _apply_poke_dur_lb(self, value):
+        self.current.reset()
+
+    def _apply_poke_dur_ub(self, value):
+        self.circuit.poke_dur_n.set(value, 's')
 
     def _apply_reward_delay(self, value):
         self.circuit.reward_delay_n.set(value, 's')
