@@ -315,18 +315,19 @@ class DSPBuffer(BlockBuffer):
             return np.array(data, dtype=np.float32)
         
     def _c_read(self, offset, length):
-        # We could use the TDT ReadTagVEX function and pass the appropriate data
-        # type parameters (e.g. I8 or I16) and have it expand the 32 bit value
-        # to the appropriate number; however, in my tests (see
-        # test_readtag_speed.py) it seems pretty clear that TDT uses an
-        # inefficient algorithm for converting the data.  If we are converting 4
-        # samples of data to 8 bits each then combining it into a 32 bit word,
-        # we would expect the read to be 4x faster than the uncompressed version
-        # (since we only are transferring 25% of the data); however, the
-        # ReadTagVEX function is only 1.16x faster when reading compressed data.
-        # If we just grab the raw bits using ReadTagV and use Numpy to convert
-        # the 32 bit values to the corresponding 8 bit values, it is 3.8x
-        # faster.
+        '''
+        We could use the TDT ReadTagVEX function and pass the appropriate data
+        type parameters (e.g. I8 or I16) and have it expand the 32 bit value to
+        the appropriate number; however, in my tests (see test_readtag_speed.py)
+        it seems pretty clear that TDT uses an inefficient algorithm for
+        converting the data.  If we are converting 4 samples of data to 8 bits
+        each then combining it into a 32 bit word, we would expect the read to
+        be 4x faster than the uncompressed version (since we only are
+        transferring 25% of the data); however, the ReadTagVEX function is only
+        1.16x faster when reading compressed data.  If we just grab the raw bits
+        using ReadTagV and use Numpy to convert the 32 bit values to the
+        corresponding 8 bit values, it is 3.8x faster.
+        '''
         data = self._simple_read(offset, length).view(self.src_type)
         return data/self.sf
 
@@ -341,30 +342,51 @@ class DSPBuffer(BlockBuffer):
         return self._c_read(offset, length).reshape((-1, self.channels))
     
     def _mc_dec_read(self, offset, length):
+        '''
+        Since two samples are compressed into a single word before being
+        shuffled, the data is stored in the order A1 A2 B1 B2 C1 C2 D1 D2 A3
+        A4 B3 B4 C3 C4 D3 D4 (where A through D are "channels" and 1 through 4
+        are the sample number).  We need to compensate for this by using some
+        fancy indexing.
+
+        The TDT ActiveX documentation does not appear to accurately describe
+        how ReadTagVEX works.  ReadTagVEX wants the number of samples
+        acquired, not the buffer index.  If two samples are compressed into a
+        single buffer slot, then we need to multiply the read size by 2.  If
+        four samples are compressed into a single buffer slot, the read size
+        needs to be 4.
+
+        We also need to offset the read appropriately.  <Don't fully
+        understand this but my test code says I've got it OK>
+
+        Do not change the four lines below unless you test it with timeit!
+        This has been optimized for speed.  See test_concatenate_time.py (in
+        the same folder as this file) to see the test results.  This method is
+        an order of a magnitude faster than any other method I have thought
+        of.
+
+        Use the :module:`test_readtag_speed` as needed.  The last time I ran it,
+        the output was:
+
+        LOW N
+        -----
+        ReadTagV(100)                     0.0290642656822
+        ReadTagVEX(100)                   0.0335609266096
+        ReadTagVEX(100, "I8", "F32", 1)   0.0260591935399
+        ReadTagVEX(100, "I8", "F32", 4)   0.0606774144555
+        ReadTagVEX(100, "F32", "F32", 4)  0.0733640589169
+
+        HIGH N
+        ------
+        ReadTagV(5000)                    0.739590565484
+        ReadTagVEX(5000)                  0.742036089954
+        ReadTagVEX(5000, "I8", "F32", 1)  0.584825936647
+        ReadTagVEX(5000, "I8", "F32", 4)  2.22288995722
+        ReadTagVEX(5000, "F32", "F32", 4) 2.86715288757
+        '''
         data = self._c_read(offset, length)
         temp = np.empty((len(data)/self.channels, self.channels))
 
-        # Since two samples are compressed into a single word before being
-        # shuffled, the data is stored in the order A1 A2 B1 B2 C1 C2 D1 D2 A3
-        # A4 B3 B4 C3 C4 D3 D4 (where A through D are "channels" and 1 through 4
-        # are the sample number).  We need to compensate for this by using some
-        # fancy indexing.
-
-        # The TDT ActiveX documentation does not appear to accurately describe
-        # how ReadTagVEX works.  ReadTagVEX wants the number of samples
-        # acquired, not the buffer index.  If two samples are compressed into a
-        # single buffer slot, then we need to multiply the read size by 2.  If
-        # four samples are compressed into a single buffer slot, the read size
-        # needs to be 4.
-
-        # We also need to offset the read appropriately.  <Don't fully
-        # understand this but my test code says I've got it OK>
-
-        # Do not change the four lines below unless you test it with timeit!
-        # This has been optimized for speed.  See test_concatenate_time.py (in
-        # the same folder as this file) to see the test results.  This method is
-        # an order of a magnitude faster than any other method I have thought
-        # of.
         c = self.c_factor
         for i in range(self.channels):
             for j in range(c):

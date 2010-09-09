@@ -7,19 +7,28 @@ logging.basicConfig(level=logging.DEBUG)
 
 import numpy as np
 
-"""The following code uses coroutines, which are a feature not commonly used in
-programming languages.  Before attempting to understand the code here, several
-resources are suggested:
+"""
+The following code uses coroutines, which are a feature not commonly used in
+programming languages.  As mentioned, every effort is meant to avoid using more
+arcane features of Python unless there is a good reason.  Here, coroutines are
+perfect for setting up data pipelines since they can be used to "push" data from
+one function to the next as new data comes in.
+
+Before attempting to understand the code here, several resources are suggested:
 
     1) A curious course on concurrency and coroutines:
        http://www.dabeaz.com/coroutines/
     2) PEP 342: http://www.python.org/dev/peps/pep-0342/
+
+Note that these functions fall into two categories.  Pipelines and sources.
+Sources generate data, pipelines consume data.
 """
 
 ################################################################################
 # UTILITY FUNCTIONS
 ################################################################################
 def pipeline(func):
+    '''Decorator to auto-start a coroutine.'''
     def start(*args, **kwargs):
         cr = func(*args, **kwargs)
         cr.next()
@@ -34,11 +43,28 @@ def acquire(generator, samples):
 ################################################################################
 # Note sources are not coroutines but rather generators that produce data.
 def rand_source(count, size, sleep):
-    # This is mainly used for testing, so we import time to prevent it from
-    # getting called when the module is initially loaded.  All import functions
-    # take some time to execute, so we want to restrict imports at the
-    # module-level to the minimum needed for what we typically expect will be
-    # needed during an experiment.
+    """A random number generator that produces samples at a fixed time interval.
+
+    This is mainly used for debugging and testing purposes.  Do not use this as
+    a source of random numbers!
+
+    Parameters
+    ==========
+    count
+        Number of times the generator can be called
+    size
+        Number of samples to generate on each call
+    sleep
+        Minimum time between calls
+    """
+
+    """
+    This is mainly used for testing, so we import time to prevent it from
+    getting called when the module is initially loaded.  All import functions
+    take some time to execute, so we want to restrict imports at the
+    module-level to the minimum needed for what we typically expect will be
+    needed during an experiment.
+    """
     import time
     for i in range(count):
         yield np.random.randn(size)
@@ -68,13 +94,23 @@ def sp_decimate(n, target):
 
 @pipeline
 def moving_average(n, weights, overlap, target):
-    '''Moving average of n samples using weights and sends to the target.  If
-    weights is None, then all data in the stream are assumed to have a weight of
-    1.  Offset is the downsampling factor (1=no downsampling).  Use weights to
-    create different types of moving averages (e.g. exponential averaging).
+    '''Pipeline: moving average of n samples using weights.
+
+    Parameters
+    ==========
+    n
+        Number of samples to average
+    weights
+        Weighting of each sample in the average.  It is assumed that weights are
+        normalized.  If None, then all data in the stream are assumed to have a
+        weight of 1/n.
+    overlap
+        Number of samples to overlap for subsequent averages.  This reflects the
+        downsampling factor (1=no downsampling).
+
+    If you want to set up different types of averages (e.g. exponential), use
+    functools.partial to freeze the weights parameter.
     '''
-    # NOTE TO SELF: Look into functools.partial to see if we can use this module
-    # to set up different types of averages using pre-defined weights.
     #buffered = np.ones(n)*np.nan
     #buffered = np.zeros(n)
     buffered = (yield)
