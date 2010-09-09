@@ -1,0 +1,32 @@
+from cns import equipment
+from timeit import timeit
+setup = 'from __main__ import readtagv, readtagvex' 
+
+#circuit = equipment.backend.load('test-random-buffer', 'RX6')
+#circuit.open('mc_buf', src_type=np.int8, dest_type=np.float32, channels=4)
+
+def readtagv(n):
+    circuit.dsp.ReadTagV('buf', 0, n)
+
+def readtagvex(n, s='F32', d='F32', ch=1):
+    circuit.dsp.ReadTagVEX('buf', 0, n, s, d, ch)
+
+if __name__ == '__main__':
+    print '====LOW N===='
+    print 'ReadTagV(100)\t\t\t\t', timeit('readtagv(100)', setup, number=100)
+    print 'ReadTagVEX(100)\t\t\t\t', timeit('readtagvex(100)', setup, number=100)
+    print 'ReadTagVEX(100, "I8", "F32", 1)\t', \
+            timeit('readtagvex(100, "I8", "F32", 1)', setup, number=100)
+    print 'ReadTagVEX(100, "I8", "F32", 4)\t', \
+            timeit('readtagvex(100, "I8", "F32", 4)', setup, number=100)
+    print 'ReadTagVEX(100, "F32", "F32", 4)\t', \
+            timeit('readtagvex(100, "F32", "F32", 4)', setup, number=100)
+    print '====HIGH N===='
+    print 'ReadTagV(5000)\t\t', timeit('readtagv(5000)', setup, number=100)
+    print 'ReadTagVEX(5000)\t\t', timeit('readtagvex(5000)', setup, number=100)
+    print 'ReadTagVEX(5000, "I8", "F32", 1)\t', \
+            timeit('readtagvex(5000, "I8", "F32", 1)', setup, number=100)
+    print 'ReadTagVEX(5000, "I8", "F32", 4)\t', \
+            timeit('readtagvex(5000, "I8", "F32", 4)', setup, number=100)
+    print 'ReadTagVEX(5000, "F32", "F32", 4)\t', \
+            timeit('readtagvex(5000, "F32", "F32", 4)', setup, number=100)
