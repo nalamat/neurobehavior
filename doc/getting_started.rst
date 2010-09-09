@@ -86,11 +86,15 @@ A few points for new Python programmers
 ---------------------------------------
 
 The best place to start learning Python is to download one of the distributions
-(PythonXY_ or Enthought_) and work your way through the `Python tutorial`_.  If
-you have only used Matlab before, many concepts will likely be new to you (e.g.
-Model-View-Controller_, object-oriented programming, list comprehensions,
-namespaces).  It is crucial that you become comfortable with these concepts
-before you attempt to understand the NeuroBehavior code.
+(PythonXY_ or Enthought_) and work your way through the `Python tutorial`_.
+Another project, `SAGE Math`_, brings together many open-source mathematical and
+analytic packages (e.g. optimization, number theory, symbolic calculus, etc.)
+under a Python interface; however, this project, while interesting, is primarily
+oriented towards the mathematical community.  If you have only used Matlab
+before, many concepts will likely be new to you (e.g.  Model-View-Controller_,
+object-oriented programming, list comprehensions, namespaces).  It is crucial
+that you become comfortable with these concepts before you attempt to understand
+the NeuroBehavior code.
 
 One of my favorite Python modules is IPython_, an interactive Python shell that
 contains a lot of Matlab-like functionality (e.g. typing in commands one at a
@@ -110,6 +114,7 @@ abstraction layer works.  This is a potential source of confusion since I rely
 on two key types of classes: normal Python-style classes and Enthought Traited
 classes.
 
+.. _`SAGE Math`: http://www.sagemath.org/
 .. _Model-View-Controller: https://svn.enthought.com/enthought/wiki/UnderstandingMVCAndTraitsUI
 .. _`Python tutorial`: http://docs.python.org/tutorial/
 .. _`Enthought Traits`: http://code.enthought.com/projects/traits/docs/html/traits_user_manual/index.html

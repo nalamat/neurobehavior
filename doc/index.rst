@@ -13,7 +13,6 @@ Contents:
 
    getting_started.rst
    equipment.rst
-   equipment_TDT_rpcox.rst
    aversive_behavior.rst
 
 Indices and tables

@@ -7,3 +7,16 @@ Interfacing with the equipment
 ==============================
 
 .. automodule:: cns.equipment
+
+TDT backend
+-----------
+
+DSP initialization
+------------------
+.. automodule:: cns.equipment.TDT
+    :members:
+
+DSP abstraction layer
+---------------------
+.. automodule:: cns.equipment.TDT.rpcox
+    :members:
