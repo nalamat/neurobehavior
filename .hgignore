@@ -5,4 +5,4 @@ glob:*.asv
 glob:*.log
 glob:*.*~
 glob:*.swp
-glob:doc/_build
+glob:doc/_build/*
