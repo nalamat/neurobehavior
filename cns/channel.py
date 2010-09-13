@@ -8,6 +8,7 @@
 #
 #------------------------------------------------------------------------------
 
+import warnings
 from cns.buffer import SoftwareRingBuffer
 from cns.data.h5_utils import append_node
 from cns.util.signal import rfft
@@ -18,14 +19,58 @@ import numpy as np
 import tables
 
 class AbstractChannel(HasTraits):
+    '''
+    Base class for dealing with a continuous stream of data.  Facilitates
+    extracting a segment of the waveform (for analysis or plotting)
+    :func:`get_range` and :func:`get_recent_range`.
+
+    fs
+        Sampling frequency (number of samples per second)
+    t0
+        Time offset (i.e. time of first sample) relative to the start of
+        acquisition.  This typically defaults to zero; however, some subclasses
+        may discard old data (e.g.  :class:`RAMChannel`), so we need to factor
+        in the time offset when attempting to extract a given segment of the
+        waveform for analysis.  
+
+    trigger_indices
+        Indices of triggers relative to the start of acquisition.  Eventually I
+        want to split this out of the class and simply provide the value to
+        :func:`get_range` that way we can select which trigger we want to
+        reference the data to.
+    '''
 
     def to_index(self, time):
+        '''Convert time to the corresponding index in the waveform.  Note that
+        the index may be negative if the time is less than t0.  Since Numpy
+        allows negative indices, be sure to check the value.
+        '''
         return int((time-self.t0)*self.fs)
 
-    def get_indices(self, *args):
-        return [self.get_index(a) for a in args]
+    # Is this used???
+    #def get_indices(self, *args):
+    #    return [self.get_index(a) for a in args]
 
     def get_range(self, start, end, reference=None):
+        '''
+        Returns a subset of the range.
+
+        Parameters
+        ----------
+        start : float, sec
+            Start time.
+        end : float, sec
+            End time.
+        reference : int, optional
+            Trigger index to reference to.  If None, start is referenced to
+            start of data acquisition.  If -1, start is referenced to the time
+            of the most recent trigger.
+
+        Note: Eventually reference will be deprecated in favor of passing the
+        actual trigger time.  Right now we can associate only a single set of
+        triggers with a channel!
+        '''
+
         if reference is not None:
             if len(self.trigger_indices):
                 ref_idx = self.trigger_indices[reference]
@@ -41,6 +86,18 @@ class AbstractChannel(HasTraits):
         return signal, lb_time, ub_time
 
     def get_recent_range(self, start, end=0):
+        '''
+        Returns a subset of the range, with start and end referenced to the most
+        recent sample.
+
+        Parameters
+        ==========
+        start
+            Start time
+        end
+            End time
+        '''
+        
         lb = min(-1, int(start*self.fs))
         ub = min(-1, int(end*self.fs))
         # This check is necessary to avoid raising an error in the HDF5
@@ -54,6 +111,7 @@ class AbstractChannel(HasTraits):
         return signal, lb_time, ub_time
 
     def filter(self, filter):
+        raise NotImplementedException
         '''Takes b,a parameters for filter'''
         self.signal = filtfilt(self.signal, **filter)
 
@@ -70,16 +128,47 @@ class Channel(AbstractChannel):
         raise NotImplementedError, 'Use a subclass of Channel'
 
 class FileChannel(Channel):
+    '''
+    An implementation of `Channel` that streams acquired data to a HDF5_ EArray.
+    Note that if no buffer is availale, then one will be created automatically.
 
-    # Default settings for the filter should create the smallest possible file
-    # size while providing adequate read/write performance.  Checksumming allows
-    # us to check for data integrity.  I have it disabled by default because
-    # small aberrations in a large, continuous waveform are not of as much
-    # concern to us and I understand there can be a sizable performance
-    # penalty.
-    #
-    # If compression_level is > 0 and compression_type is None, tables.Filter
-    # will raise an exception.
+    .. _HDF5: http://www.hdfgroup.org/HDF5/
+
+    Properties
+    ==========
+    dtype
+        Default is float64.  It is a good idea to set dtype appropriately for
+        the waveform (e.g. use bool for TTL data) to minimize file size.  Note
+        that Matlab does not currently support the HDF5 BITFIELD (e.g. boolean)
+        type and will be unable to read waveforms stored in this format.
+    node
+        A HDF5 node that the array should be added to
+    name
+        Name of the array
+    expected_duration
+        Rough estimate of how long the waveform will be.  This is used (in
+        conjunction with fs) to optimize the "chunksize" when creating the
+        array.
+
+    Compression properties
+    ======================
+    compression_level
+        Between 0 and 9, with 0=uncompressed and 9=maximum
+    compression_type
+        zlib, lzo or bzip
+    use_checksum
+        Ensures data integrity, but at cost of degraded read/write performance
+
+    Default settings for the compression filter should create the smallest
+    possible file size while providing adequate read/write performance.
+    Checksumming allows us to check for data integrity.  I have it disabled by
+    default because small aberrations in a large, continuous waveform are not of
+    as much concern to us and I understand there can be a sizable performance
+    penalty.
+    
+    Note that if compression_level is > 0 and compression_type is None,
+    tables.Filter will raise an exception.
+    '''
     compression_level = Int(1)
     compression_type = Enum('zlib', 'lzo', 'bzip', None)
     use_checksum = Bool(False)
@@ -92,6 +181,7 @@ class FileChannel(Channel):
     node = Instance(tables.group.Group)
     name = String('FileChannel')
     expected_duration = Float(60) # seconds
+
     shape = Property
     
     buffer = Instance(tables.array.Array)
@@ -123,6 +213,16 @@ class FileChannel(Channel):
         self.updated = True
 
 class RAMChannel(Channel):
+    '''Buffers data in memory without saving it to disk.
+
+    Uses a ringbuffer algorithm designed for efficient reads (writes are not as
+    efficient, but should still be fairly quick).
+
+    Parameters
+    ==========
+    window
+        Number of seconds to buffer
+    '''
 
     window = Float(10)
     samples = Property(Int, depends_on='window, fs')
@@ -178,7 +278,9 @@ class RAMChannel(Channel):
             self.dropped += size-self.samples
             self.offset += size-self.samples
         else:
-            # Shift elements at end of buffer to beginning so we can write new data.  Old data at beginning is discarded.  If old data is discarded, we update offset.
+            # Shift elements at end of buffer to beginning so we can write new
+            # data.  Old data at beginning is discarded.  If old data is
+            # discarded, we update offset.
             remainder = self.samples-size
             if remainder:
                 self.buffer[:remainder] = self.buffer[-remainder:]

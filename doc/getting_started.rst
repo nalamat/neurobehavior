@@ -1,8 +1,9 @@
+===============
 Getting Started
 ===============
 
 Organization of the code
-------------------------
+========================
 The code is structured into several folders:
     cns
         This is the namespace under which much of the code I have written lives.
@@ -37,7 +38,7 @@ to me why they chose this terminology, but I adopt it for the sake of
 consistency.
 
 Dependencies
-------------
+============
 
 This code has several dependencies, most of which can be satisfied by several
 prebuilt Python distributions.  Two that seem to be particularly comprehensive
@@ -46,6 +47,8 @@ are PythonXY_  and Enthought_).  Both are free for academic use.
 .. _PythonXY: http://www.pythonxy.org
 .. _Enthought: http://www.enthought.com/products/epd.php
 
+Core (mandatory) dependencies
+-----------------------------
 Numpy_
     Used for numerical and vector analysis.  If you're coming from Matlab, be
     sure to check out their excellent `Numpy for Matlab Users`_ tutorial.
@@ -59,9 +62,6 @@ wxPython_ or PyQt_
     prefer PyQt because it looks better out of the box.
 Scipy_
     Filtering and statistical analysis.
-Matplotlib_
-    Offline plotting and generating presentation quality figures (the figures
-    are much nicer than what Matlab generates).
 Chaco_
     Interactive plotting.  This is what we use in our experiments.  Be sure to
     check out the examples provided with the library.
@@ -73,7 +73,6 @@ PyTables_
 
 .. _Numpy: http://numpy.scipy.org/
 .. _Scipy: http://www.scipy.org/
-.. _Matplotlib: http://matplotlib.sourceforge.net/
 .. _Chaco: http://code.enthought.com/projects/chaco/
 .. _`Numpy for Matlab Users`: http://www.scipy.org/NumPy_for_Matlab_Users
 .. _wxPython: http://www.wxpython.org/
@@ -82,8 +81,22 @@ PyTables_
 .. _PyTables: http://www.pytables.org/
 .. _`summary of HDF5 capabilities in Matlab`: http://www.mathworks.com/access/helpdesk/help/techdoc/ref/hdf5.html
 
+Recommended
+-----------
+Matplotlib_
+    Offline plotting and generating presentation quality figures (the figures
+    are much nicer than what Matlab generates).
+Sphinx_
+    Auto-generation of HTML/PDF documentation
+NumpyDoc_
+    Extra modules used with Sphinx to format docstrings
+
+.. _Matplotlib: http://matplotlib.sourceforge.net/
+.. _Sphinx: http://sphinx.pocoo.org/ 
+.. _NumpyDoc: http://pypi.python.org/pypi/numpydoc/
+
 A few points for new Python programmers
----------------------------------------
+=======================================
 
 The best place to start learning Python is to download one of the distributions
 (PythonXY_ or Enthought_) and work your way through the `Python tutorial`_.
@@ -156,7 +169,6 @@ then using pdfTeX_ to compile it).
 .. _Mercurial: http://mercurial.selenic.com/
 .. _BitBucket.org: http://bitbucket.org/
 .. _`master repository for NeuroBehavior`: http://bitbucket.org/bburan/neurobehavior
-.. _Sphinx: http://sphinx.pocoo.org/ 
 .. _`restructured text`: http://docutils.sourceforge.net/rst.html
 .. _Latex: http://www.latex-project.org/
 .. _pdfTeX: http://tug.org/applications/pdftex/
