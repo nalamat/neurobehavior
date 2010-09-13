@@ -13,7 +13,10 @@ Contents:
 
    getting_started.rst
    equipment.rst
+   TDT_backend.rst
+   experiment.rst
    aversive_behavior.rst
+   data_processing.rst
 
 Indices and tables
 ==================

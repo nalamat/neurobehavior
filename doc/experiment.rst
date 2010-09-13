@@ -1,3 +1,6 @@
+.. toctree::
+    :maxdepth: 2
+
 Defining an experiment
 ======================
 
@@ -17,5 +20,7 @@ We need several pieces to define an experiment:
         data file, configuring the equipment, and periodically polling the
         equipment and saving new data to the file.
     Paradigm
+        <todo>
     GUI
         These are classes that define how the user interface looks
+

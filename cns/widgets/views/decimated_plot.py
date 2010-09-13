@@ -17,9 +17,9 @@ def decimate(data, screen_width, downsampling_cutoff=4, mode='extremes'):
 
 def decimate_extremes(data, downsample):
     offset = len(data) % downsample
-    # Force a copy to be made, which speeds up min()/max().
-    # Apparently min/max make a copy of a reshaped array before
-    # performing the operation, so we force it now so the copy only occurs once.
+    # Force a copy to be made, which speeds up min()/max().  Apparently min/max
+    # make a copy of a reshaped array before performing the operation, so we
+    # force it now so the copy only occurs once.
     if data.ndim == 2:
         shape = (-1, downsample, data.shape[-1])
     else:
@@ -113,14 +113,17 @@ class ChannelDataSource(HasTraits):
             new.on_trait_change(self._data_changed, "updated", dispatch="new")
     
 class TimeSeries(BaseXYPlot):
-    '''Often our neurophysiology data involves sampling at up to 200kHz.  If we
-    are viewing a second's worth of data on screen using "dumb" plotting
+    '''
+    Often our neurophysiology data involves sampling at up to 200kHz.  If we
+    are viewing a second's worth of data on screen using standard plotting
     functions, then this means we are computing the data to screen coordinate
     transform of 200,000 points every few milliseconds and then blitting this to
     screen.
 
-    Each time a new call to render the plot on screen is made (e.g. there's new
-    data, the screen is resized, or the data bounds change), the data is
+    This function speeds up plotting using two approaches.
+
+    1.  Each time a new call to render the plot on screen is made (e.g. there's
+    new data, the screen is resized, or the data bounds change), the data is
     downsampled so there is only one vertical "line" per screen pixel.  The line
     runs from the minimum to the maximum.  This is great for plotting
     neurophysiology data since you can see the noise floor and individual spikes
@@ -128,6 +131,10 @@ class TimeSeries(BaseXYPlot):
 
     In cases where there are fewer data points than screen pixels, then the plot
     reverts to a standard "connected" XY plot.
+
+    2.  TODO: is this true?  Have I implemented this???  Unless the user zooms
+    or pans, the screen transforms for the X-axis (index) do not need to be
+    re-computed.  
     '''
     
     color = black_color_trait

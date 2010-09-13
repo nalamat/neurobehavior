@@ -6,7 +6,46 @@ future (e.g. National Instrument's PXI and FGPA system).
 
 In addition to supporting an abstraction layer, provides convenience methods and
 properties for interacting with the DSP.
+
+There are two main types of output DSP circuits: real-time and buffered.
+
+Real-time circuit
+    A real-time circuit contains the appropriate processing chain that generates
+    the signal.  Signal parameters are exposed via tags.  Since the signal is
+    computed on a sample-by-sample basis, changes to signal parameters are
+    applied instantly.
+
+Buffered circuit
+    A buffered circuit is more generic, containing a memory buffer that stores a
+    pre-generated signal that is played to the speaker on a sample-by-sample
+    basis.  Since the entire signal waveform must be computed via software and
+    uploaded to the DSP before it can be played, changes to signal parameters
+    are not applied instantly.  The circuit can rotate through multiple buffers,
+    allowing us to randomize presentations.
+
+DSP circuits also can contain data buffers that acquire data.  These data
+buffers fall into several categories
+
+Continuous waveform
+    Data is acquired continuously.  It may be decimated (i.e. a data sample is
+    recorded only on every 10 DSP cycles), meaning that the actual sampling
+    frequency is a fraction of the DSP clock.
+Waveform segment
+    In response to some external trigger, a fixed-length segment of a waveform
+    is stored.  The segments are not continuous (e.g. there is a gap between
+    segments).
+Event times
+    Circuits will have a master clock that reports time as the total number of
+    cycles since the circuit was started.  This master clock is an unsigned
+    32-bit integer with a maximum value of 2,147,483,647.  At a clock rate of
+    200 kHz (maximum for the RX6), the clock will roll over every 2.98 hours.
+    At a clock rate of 25 kHz (maximum for the RZ5), the clock will roll over
+    every 23.9 hours.  Currently, rollover is unlikely to be an issue.
+Post-trigger times
+    Certain events can be referenced to the time of a trigger.
+
 """
+
 from __future__ import division
 from cns.buffer import available, BlockBuffer
 from cns.util.math import nextpow2
@@ -144,20 +183,20 @@ class DSPBuffer(BlockBuffer):
     download data from the DSP.
 
     Continuous acquire
-    ------------------
-        <buffer>
+        <buffer>_in_<type>
             name of tag connected to data port of buffer
         <buffer>_idx
             tag connected to index port of buffer
         <buffer>_n
             tag connected to size port of buffer
+        <buffer>_cyc
+            number of times buffer has wrapped around to the beginning
 
         Each time a read is requested, <buffer>_idx is checked to see if it has
         incremented since the last read.  If it has, the new data is acquired
         and returned.
 
     Triggered acquire 
-    -----------------
         In addition to the tags required for continuous aquisition, we need an
         additional tag.
 
@@ -167,6 +206,16 @@ class DSPBuffer(BlockBuffer):
         Each time a read is requested, <buffer>_idx_trig is checked to see if it
         has changed since the last read.  If it has, the new data up to
         <buffer>_idx_trig is returned.
+
+    Buffer types
+        c
+            continuous waveform
+        s
+            segment of a waveform
+        et
+            event times
+        ptt
+            post-trigger event times
 
     I have been toying with the idea of creating TDT macros that handle a lot of
     the boilerplate in setting up the necessary tags for the serial buffers.  If
@@ -186,7 +235,8 @@ class DSPBuffer(BlockBuffer):
         self._bind_activex_functions()
         
     def _bind_activex_functions(self):
-        '''Freezes the Name parameter of the ActiveX function.
+        '''Freezes the Name parameter of the ActiveX function.  Do not use these
+        unless absolutely necessary!
         '''
         functions = ['ReadTagV', 'ReadTagVEX', 'WriteTagV', 'WriteTagVEX']
         for f in functions:

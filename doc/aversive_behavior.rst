@@ -2,6 +2,21 @@
 Aversive Behavior Paradigm
 ==========================
 
+Supplies needed
+===============
+
+- Cree XR emitter (DigiKey_)
+- Optical sensor
+    - Infrared LED, OPV380 (DigiKey_)
+    - Photodiode, PNZ335-ND (DigiKey_)
+- Air puff
+    - Pipe adapter 1/8" NPT x 1/4" ID (Cole-Parmer Part #A2-4NP)
+    - PVC braided tubing 1/4" ID x 7/16" OD x 3/32" wall (Nalgene Part #8005-0070)
+    - Solenoid air control valve 1/8" port (ARO Model #P251SS-012-D via DrillSpot_)
+
+.. _DigiKey: http://digikey.com
+.. _DrillSpot: http://www.drillspot.com
+
 Equipment configuration
 =======================
 
@@ -15,7 +30,7 @@ RX6 ID Bit Mask PP24 ID Direction Signal
 4      16       5       OUT       Shock trigger
 5      32       6       IN        Electrical contact 2
 6      64       7       OUT       Pump trigger
-7      128      8       IN        
+7      128      8       IN        Unused
 ====== ======== ======= ========= ======
 
 Sync trigger
