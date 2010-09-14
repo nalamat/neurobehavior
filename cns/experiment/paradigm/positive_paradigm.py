@@ -36,43 +36,34 @@ class SignalEditHandler(Handler):
 
 class PositiveParadigm(Paradigm):
 
-    spout_dur = Float(0.1, unit='s')
-    poke_dur_lb = Float(0.1, unit='s')
-    poke_dur_ub = Float(0.5, unit='s')
-    reward_delay = Float(0, unit='s')
-    reward_dur = Float(1.5, unit='s')
-    timeout_dur = Float(5, unit='s')
-    allow_timeout = Bool(False)
+    go_signal = Instance(Signal, Noise(), store='child')
+    nogo_signal = Instance(Signal, Tone(), store='child')
+    go_probability = Float(0.5)
 
-    par_order = Trait('descending', choice.options,
-                      label='Parameter order',
-                      store='attribute', log_change=True)
+    intertrial_duration = Float(0.5, unit='s')
+    response_window_delay = Float(0, unit='s')
+    response_window_duration = Float(1.5, unit='s')
 
-    pars = List(CFloat, [1, .5, .25, .125], 
-                minlen=1,
-                label='Parameters',
-                editor=ListAsStringEditor(),
-                store='attribute')
+    score_window_duration = Float(3, unit='s')
+    reward_duration = Float(0.5, unit='s')
 
-    signal = Instance(Signal, Tone(), store='child')
+    poke_duration_lb = Float(0.1, unit='s')
+    poke_duration_ub = Float(0.5, unit='s')
 
     #===========================================================================
     # The views available
     #===========================================================================
-    edit_view = View(VGroup('poke_dur_lb',
-                            'poke_dur_ub',
-                            'spout_dur',
-                            'pars',
-                            'par_order',
-                            HGroup(Item('signal', style='readonly'),
-                                   spring, 'handler.edit_signal',
-                                   show_labels=False),
-                            'reward_delay',
-                            'reward_dur',
-                            'timeout_dur',
-                            'allow_timeout',
-                           ),
-                     handler=SignalEditHandler,
+    edit_view = View(VGroup('go_signal',
+                            'nogo_signal',
+                            'go_probability',
+                            'intertrial_duration',
+                            'response_window_delay',
+                            'response_window_duration',
+                            'score_window_duration',
+                            'reward_duration',
+                            'poke_duration_lb',
+                            )
+                     #handler=SignalEditHandler,
                      resizable=True,
                      title='Positive paradigm editor',
                     )
