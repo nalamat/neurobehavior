@@ -30,16 +30,16 @@ computer) to a buffer (accessed via the FPGA).  These segments are played out in
 succession to one of DACs.  This DAC is connected to an attenuator/amplifier
 series that drives the speaker.  Since we utilize auditory stimuli up to 50 kHz,
 we need to run the RX6 unit at ~100 kHz (the Nyquist frequency).  Thus, the
-waveform must be generated with an identical sampling frequency (~100 kHz).  This
-is a raw waveform (e.g. a point-by-point value representing the actual voltage
-on the DAC on each "tick" of the FPGA clock).  Each point is a 32-bit float,
-meaning that the RX6 consumes ~0.4 MB/s when playing out to a single speaker.
-The interface between the RX6 and the computer can support write speeds of 1.0
-MB/s.  However, if I am currently running an experiment with a 5 second
-waveform, a single waveform is 2 MB in size.  Each time I change a parameter in
-the GUI, this means that we must update the FPGA buffer with the new waveform.
-At the FPGA's maximum transfer rate, this means it takes 2 seconds to upload the
-entire waveform.
+waveform must be generated with an identical sampling frequency (~100 kHz).
+This is a raw waveform (e.g. a point-by-point value representing the actual
+voltage on the DAC on each "tick" of the FPGA clock).  Each point is a 32-bit
+float, meaning that the RX6 consumes ~0.4 MB/s when playing out to a single
+speaker.  The interface between the RX6 and the computer can support write
+speeds of 1.0 MB/s.  However, if I am currently running an experiment with a 5
+second waveform, a single waveform is 2 MB in size.  Each time I change a
+parameter in the GUI, this means that we must update the FPGA buffer with the
+new waveform.  At the FPGA's maximum transfer rate, this means it takes 2
+seconds to upload the entire waveform.
 
 .. _RZ5: http://www.tdt.com/products/RZ5.htm
 .. _RX6: http://www.tdt.com/products/RX6.htm
