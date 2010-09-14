@@ -93,7 +93,7 @@ class PositiveController(ExperimentController):
     def init_equipment(self, info):
         self.pump = equipment.pump().Pump()
         self.backend = equipment.dsp()
-        self.circuit = self.backend.load('positive-behavior-stage2', 'RX6')
+        self.circuit = self.backend.load('positive-behavior-stage3', 'RX6')
 
     def configure_circuit(self, circuit, paradigm):
         circuit.reload()
@@ -159,17 +159,16 @@ class PositiveController(ExperimentController):
 
     @on_trait_change('fast_tick')
     def monitor_buffers(self):
-        self.model.data.optical_digital.send(self.circuit.contact_buf.read())
-        self.model.data.trial_running.send(self.circuit.trial_running_buf.read())
-        self.model.data.reward_running.send(self.circuit.reward_running_buf.read())
-        self.model.data.timeout_running.send(self.circuit.timeout_running_buf.read())
+        #self.model.data.optical_digital.send(self.circuit.contact_buf.read())
+        #self.model.data.trial_running.send(self.circuit.trial_running_buf.read())
+        #self.model.data.reward_running.send(self.circuit.reward_running_buf.read())
+        #self.model.data.timeout_running.send(self.circuit.timeout_running_buf.read())
+        pass
 
     @on_trait_change('fast_tick')
     def monitor_circuit(self):
         if self.circuit.trial_idx.value > self.current.idx:
             self.current.next()
-            print 'updating information'
-            print self.current.poke_dur
             self.current.idx += 1
             self.circuit.trial_buf.set(self.current.signal)
             self.backend.set_attenuation(self.current.signal.attenuation, 'PA5')
@@ -178,20 +177,26 @@ class PositiveController(ExperimentController):
     ############################################################################
     # Code to apply parameter changes
     ############################################################################
+    def _apply_go_probability(self, value): 
+        raise NotImplementedError
+
+    def _apply_intertrial_duration(self, value):
+        self.circuit.int_dur_n.value = value
+
+    def _apply_response_window_delay(self, value):
+        self.circuit.resp_del_n.value = value
+
+    def _apply_response_window_duration(self, value):
+        self.circuit.resp_dur_n.value = value
+
+    def _score_window_duration(self, value):
+        self.circuit.score_dur_n.value = value
+
+    def _apply_reward_duration(self, value):
+        self.circuit.pump_dur_n.value = value
+
     def _apply_poke_dur_lb(self, value):
         self.current.reset()
 
     def _apply_poke_dur_ub(self, value):
         self.circuit.poke_dur_n.set(value, 's')
-
-    def _apply_reward_delay(self, value):
-        self.circuit.reward_delay_n.set(value, 's')
-
-    def _apply_reward_dur(self, value):
-        self.circuit.reward_dur_n.set(value, 's')
-
-    def _apply_timeout_dur(self, value):
-        circuit.timeout_dur_n.set(paradigm.timeout_dur, 's')
-
-    def _apply_allow_timeout(self, value):
-        circuit.allow_timeout.value = value
