@@ -29,11 +29,15 @@ def int_to_TTL(array, width):
         The dtype (either int8, int16 or int32) of the array is used to figure
         out the size of the second dimension.  This will depend on your
         combination of `FromBits` and the shuffle/compression components.
+
+    Returns
+    =======
+    bitfield : array
+        2D boolean array repesenting the bits in little-endian order
     
     Example
     =======
-    >>> x = np.array([4, 8, 5], dtype=int8)
-    >>> int_to_ttl(x, width=6)
+    >>> int_to_TTL([4, 8, 5], width=6)
     array([[False, False,  True, False, False, False],
            [False, False, False,  True, False, False],
            [ True, False,  True, False, False, False]], dtype=bool)
@@ -54,3 +58,16 @@ def bin_array(number, bits):
     '''
     return [(number>>bit)&1 for bit in range(bits)]
 
+def test_speed():
+    import timeit
+    setup = """
+    from numpy.random import randint
+    from cns.util.binary_funcs import int_to_TTL
+    arr = randint(0, 8, 10e3)
+    """
+    print timeit.timeit("int_to_TTL(arr, 8)", setup, number=20)
+
+if __name__ == "__main__":
+    #import doctest
+    #doctest.testmod()
+    test_speed()

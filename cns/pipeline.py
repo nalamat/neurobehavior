@@ -65,6 +65,15 @@ def rand_source(count, size, sleep):
 # PIPELINES
 ################################################################################
 @pipeline
+def int_to_TTL(bit_depth, target):
+    '''
+    Pipeline wrapper around :func:`cns.util.binary_func.int_to_TTL`
+    '''
+    from cns.util.binary_funcs import int_to_TTL
+    while True:
+        target.send(int_to_TTL((yield), bit_depth)
+
+@pipeline
 def adapter(source, target):
     while True:
         target.send(source.next())
