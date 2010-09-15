@@ -32,7 +32,9 @@ from cns.signal.view_factory import signal_view_factory
 from cns.buffer import BlockBuffer
 from enthought.traits.api import HasTraits, Str, Property, Float, CFloat, Range, \
     Array, List, Int
-from enthought.traits.ui.api import EnumEditor
+from enthought.traits.ui.api import EnumEditor, Handler, View
+from enthought.savage.traits.ui.svg_button import SVGButton
+from cns.widgets import icons
 from cns.signal.calibration import DummyCalibration
 import numpy as np
 import logging
@@ -45,6 +47,7 @@ log = logging.getLogger(__name__)
 #   configurable - Means the parameter can be configured
 
 class Waveform(HasTraits, BlockBuffer):
+    '''Orphaned class'''
 
     fs = CFloat(100, store='attribute')
     signal = Property(Array(dtype='f'))
@@ -120,8 +123,9 @@ class Signal(Waveform):
         configurable = self.class_trait_names(configurable=True)
         name = self.__class__.__name__
 
+        # Unicode characters are not handled well by the console
         #base = u' \n\u00B7 %s: '
-        base = '\n-- %s: '
+        base = '\n - %s: '
         for c in configurable:
             trait = self.trait(c)
             if c == self.variable:
@@ -148,10 +152,16 @@ class Signal(Waveform):
     def parameter_view(self, parent=None):
         return signal_view_factory(self)
 
+    def parameter_popup_view(self, parent=None):
+        return View('handler.edit_signal{}', handler=SignalEditHandler)
+
     def preferred_attenuation(self, calibration):
         raise NotImplementedError, 'Use a subclass of signal'
 
 if __name__ == '__main__':
     from cns.signal import type
-    t = type.Tone(calibration=DummyCalibration())
-    t.level = 90
+    #t = type.Tone(calibration=DummyCalibration())
+    #t.level = 90
+    #Signal().configure_traits(view='parameter_popup')
+
+    #type.Tone().configure_traits(view='parameter_popup_view')
