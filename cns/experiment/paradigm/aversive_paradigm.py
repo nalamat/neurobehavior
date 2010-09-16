@@ -1,109 +1,20 @@
 from cns import choice
 from cns import equipment
-#Pump = equipment.pump().Pump
-from cns.experiment.paradigm.paradigm import Paradigm
-from cns.signal import Signal
-from cns.signal.signal_dialog import SignalDialog
-from cns.signal.type import Tone
 from cns.traits.ui.api import ListAsStringEditor
-from cns.widgets import icons
-from enthought.savage.traits.ui.svg_button import SVGButton
+from cns.signal.signal_dialog import SignalSelector
+from cns.experiment.paradigm.paradigm import Paradigm
+from cns.signal.type import Tone
 from enthought.traits.api import Button, on_trait_change, HasTraits, Any, Range, \
-    CFloat, Property, Instance, Trait, Int, Dict, Float, List, Bool, Enum
-from enthought.traits.ui.api import Handler, View, spring, \
-    Item, InstanceEditor, ListEditor
-import logging
-log = logging.getLogger(__name__)
+    CFloat, Property, Instance, Trait, Int, Dict, Float, List, Bool, Enum, \
+    DelegatesTo
+from enthought.traits.ui.api import View, Item, VGroup, Include
 
-class ParadigmSignalEditHandler(Handler):
-
-    from enthought.etsconfig.api import ETSConfig
-
-    if ETSConfig.toolkit == 'wx':
-        edit_signal_safe = Button('E')
-        edit_signal_warn = Button('E')
-
-    else:
-        item_kw = dict(height=24, width=24)
-        edit_signal_safe    = SVGButton(filename=icons.configure,
-                                        tooltip='Edit Safe',
-                                        **item_kw)
-        edit_signal_warn    = SVGButton(filename=icons.configure,
-                                        tooltip='Edit Warn',
-                                        **item_kw)
-
-    def handler_edit_signal_safe_changed(self, info):
-        dlg = SignalDialog(signal=info.object.signal_safe,
-                           title='Edit safe signal',
-                           allow_par=False)
-        if dlg.edit_traits(parent=info.ui.control).result:
-            info.object.signal_safe = dlg.signal
-
-    def handler_edit_signal_warn_changed(self, info):
-        dlg = SignalDialog(signal=info.object.signal_warn,
-                           title='Edit warn signal',
-                           allow_par=True)
-        if dlg.edit_traits(parent=info.ui.control).result:
-            info.object.signal_warn = dlg.signal
-
-class ShockSettings(HasTraits):
-
-    class Setting(HasTraits):
-        par = Float
-        level = Range(0.0, 1, 0)
-        def __cmp__(self, other):
-            if type(other) == type(self):
-                return self.par-other.par
-            else:
-                return self.par-other
-        def __hash__(self):
-            return self.par.__hash__()
-        def __repr__(self):
-            return'Setting(par=%f, level=%f)' % (self.par, self.level)
-        traits_view = View(['par{}~', 'level{}', '-'])
-
-    paradigm = Any
-    max_shock = Range(0.0, 5.0, 2.5, store='attribute')
-
-    levels = List(Setting)
-    #cache = Dict(Float, Setting, store='attribute')
-    cache = Dict(Float, Float, store='attribute')
-    
-    def update(self):
-        return
-        #self.levels = []
-        #self._add_pars(self.paradigm.pars)
-
-    @on_trait_change('paradigm')
-    def _paradigm_changed(self, new):
-        self.update()
-
-    @on_trait_change('paradigm:pars')
-    def _new_items(self, object, name, old, new):
-        return
-        if old:
-            for par in old:
-                self.levels.remove(par)
-        if new:
-            self._add_pars(new)
-            
-    def _add_pars(self, pars):
-        return
-        for par in pars:
-            level = self.cache.setdefault(par, 0)
-            self.levels.append(self.Setting(par=par, level=level))
-        self.levels.sort()
-
-    def get_level(self, par):
-        return 0
-        #return self.cache[par]*self.max_shock
-
-    editor = ListEditor(editor=InstanceEditor(), mutable=False, style='custom')
-    traits_view = View([['max_shock{Maximum shock}'],
-                        Item('levels{}', editor=editor), '|[Shock settings]'],
-                       resizable=True)
-
-class AversiveParadigm(Paradigm):
+class BaseAversiveParadigm(Paradigm):
+    '''Defines an aversive paradigm, but not the signals that will be used.
+    This allows us to use either a generic circuit with two buffers for the
+    warn/safe signal, or a circuit that is specialized for a specific kind of
+    signal (e.g. FM).
+    '''
 
     contact_method = Enum('touch', 'optical', store='attribute')
 
@@ -120,17 +31,6 @@ class AversiveParadigm(Paradigm):
     lick_th = Range(0.0, 1.0, 0.75,
                     label='Contact threshold',
                     store='attribute', log_change=True)
-    shock_settings = Instance(ShockSettings,
-                           label='Shock level (V)',
-                           store='child', log_change=True)
-
-    #pump = Instance(Pump, (), label='Pump Settings', store='child',
-    #                log_change=True)
-
-    def _shock_settings_default(self):
-        return ShockSettings(paradigm=self)
-
-    #default_pump_rate       = CFloat(0.3, store='attribute')
 
     # Actual lick_fs depends on the system clock.  We can only downsample at
     # multiples of the clock.
@@ -148,22 +48,14 @@ class AversiveParadigm(Paradigm):
     min_safe = Int(2, store='attribute', label='Min safe trials')
     max_safe = Int(4, store='attribute', label='Max safe trials')
 
-    signal_safe = Instance(Signal, Tone(), store='child')
-    signal_warn = Instance(Signal, Tone(), store='child')
-
     #===========================================================================
     # Error checks
     #===========================================================================
     err_num_trials = Property(Bool, depends_on='min_safe, max_safe')
-    err_signal_warn = Property(Bool, depends_on='signal_warn, signal_warn.variable')
     err_par_string = Bool(False)
 
     mesg_signal_warn = 'Warn signal must have one variable'
     mesg_num_trials = 'Max trials must be >= min trials'
-
-    def _get_err_signal_warn(self):
-        return self.signal_warn.variable is None
-        #return len(self.signal_warn.variables) != 1
 
     def _get_err_num_trials(self):
         return self.min_safe > self.max_safe
@@ -171,24 +63,54 @@ class AversiveParadigm(Paradigm):
     #===========================================================================
     # The views available
     #===========================================================================
-    def edit_view(self, parent=None):
-        par_gr = ['par_remind', 'par_order', 'pars', '|[Parameters]']
-        shock_gr = Item('shock_settings{}@')
+    par_group = VGroup('par_remind', 'par_order', 'pars', 
+                       show_border=True, label='Parameters')
+    trial_group = VGroup(Item('min_safe', label='', invalid='err_num_trials'),
+                         Item('max_safe', label='', invalid='err_num_trials'),)
+    timing_group = VGroup(trial_group, 'shock_delay', 'lick_th', 
+                          show_border=True, label='Trial settings')
 
-        timing_gr = [['{Num safe trials:}',
-                      Item('min_safe{}', invalid='err_num_trials'), '{to}',
-                      Item('max_safe{}', invalid='err_num_trials'), '-'],
-                      'shock_delay', 'contact_method', 'lick_th{Contact threshold}', 
-                      '|[Trial settings]']
+    edit_view = View(VGroup(par_group, timing_group, Include('signal_group')),
+                     resizable=True,
+                     title='Aversive Paradigm editor')
 
-        return View(par_gr, shock_gr, timing_gr,
-                    ['signal_safe{}~', spring, 'handler.edit_signal_safe{}', '-[SAFE signal]'],
-                    ['signal_warn{}~', spring, 'handler.edit_signal_warn{}', '-[WARN signal]'],
-                    handler=ParadigmSignalEditHandler,
-                    resizable=True,
-                    title='Aversive paradigm editor')
+    run_view = View(par_group)
 
     def run_view(self, parent=None):
         par_gr = ['par_remind', 'par_order', 'pars', '|[Parameters]']
         shock_gr = Item('shock_settings{}@')
         return View(par_gr, shock_gr)
+
+class AversiveParadigm(BaseAversiveParadigm):
+    '''Generic aversive paradigm designed to work with most classe of signals.
+    Note that this will not work well with modulated tones!
+    '''
+
+    signal_safe_selector = Instance(SignalSelector, {'allow_par': False},
+                                    label='Safe signal')
+    signal_safe = DelegatesTo('signal_safe_selector', 'signal', store='child')
+    signal_warn_selector = Instance(SignalSelector, (), label='Warn signal')
+    signal_warn = DelegatesTo('signal_warn_selector', 'signal', store='child')
+
+    signal_group = VGroup(Item('signal_safe_selector', style='custom'),
+                          Item('signal_warn_selector', style='custom'))
+
+    err_signal_warn = Property(Bool, 
+                               depends_on='signal_warn, signal_warn.variable')
+
+    def _get_err_signal_warn(self):
+        return self.signal_warn.variable is None
+
+class AversiveFMParadigm(BaseAversiveParadigm):
+    '''Aversive paradigm designed exclusively for FM tones.  Be sure to use with
+    the appropriate DSP circuit.
+    '''
+
+    center_frequency = Float(4000)
+    attenuation = Range(0, 120, 40)
+
+    signal_group = VGroup('center_frequency', 'attenuation', 
+                          show_border=True, label='FM parameters')
+
+if __name__ == '__main__':
+    AversiveParadigm().configure_traits(view='edit_view')
