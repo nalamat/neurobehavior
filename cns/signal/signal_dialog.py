@@ -2,7 +2,7 @@ from cns.widgets import icons
 from cns.signal import Signal, type as st
 from cns.signal.type import signal_types
 from cns.signal.view_factory import signal_view_factory
-from enthought.traits.api import HasTraits, Instance, Str, Bool
+from enthought.traits.api import HasTraits, Instance, Str, Bool, Button
 from enthought.traits.ui.api import View, Item, InstanceEditor, Handler, spring
 from enthought.traits.ui.instance_choice import InstanceFactoryChoice
 from enthought.savage.traits.ui.svg_button import SVGButton
@@ -42,7 +42,7 @@ class SignalSelector(HasTraits):
     '''Generates a signal selector dialog using the
     :module:`enthought.traits.ui.api.InstanceEditor` class.
     '''
-    signal = Instance(Signal)
+    signal = Instance(Signal, st.Tone())
     title = Str('Edit Signal')
     allow_par = Bool(True)
 

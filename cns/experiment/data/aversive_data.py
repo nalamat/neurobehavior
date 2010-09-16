@@ -243,7 +243,8 @@ class RawAversiveData_v0_2(BaseAversiveData):
     stored under touch_digital and optical_digital, respectively.  However, old
     AversiveData objects continue to use contact_digital.  During the
     transition, I forgot to ensure that some of the new AversiveData (V2)
-    objects implemented a contact_digital alias.  '''
+    objects implemented a contact_digital alias.
+    '''
     contact_digital = Property
     contact_digital_mean = Property
 
@@ -259,15 +260,15 @@ class RawAversiveData_v0_2(BaseAversiveData):
 
     # Stores raw contact data from optical and electrical sensors as well as
     # whether a trial is running.
-    def _contact_data_default(self):
-        targets = [self.touch_digital,
-                   self.touch_digital_mean,
-                   self.optical_digital,
-                   self.optical_digital_mean,
-                   self.contact_digital,
-                   self.contact_digital_mean,
-                   self.trial_running, ]
-        return deinterleave(targets)
+    #def _contact_data_default(self):
+    #    targets = [self.touch_digital,
+    #               self.touch_digital_mean,
+    #               self.optical_digital,
+    #               self.optical_digital_mean,
+    #               self.contact_digital,
+    #               self.contact_digital_mean,
+    #               self.trial_running, ]
+    #    return deinterleave(targets)
 
     def _create_channel(self, name, dtype):
         contact_node = get_or_append_node(self.store_node, 'contact')
@@ -314,8 +315,8 @@ class RawAversiveData_v0_2(BaseAversiveData):
         return append_node(self.store_node, 'trial_log', 'table', description)
 
 # For legacy reasons, we will let AversiveData = RawAversiveData_v0_1
-AversiveData = RawAversiveData_v0_1
-#AversiveData = RawAversiveData_v0_2
+#AversiveData = RawAversiveData_v0_1
+AversiveData = RawAversiveData_v0_2
 
 class AnalyzedAversiveData(AnalyzedData):
     '''
@@ -518,3 +519,4 @@ if __name__ == '__main__':
     #analyzed = AnalyzedAversiveData(data=data)
     from cns.data.persistence import add_or_update_object
     add_or_update_object(data, f.root)
+

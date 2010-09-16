@@ -54,7 +54,7 @@ import numpy as np
 from functools import partial
 log = logging.getLogger(__name__)
 
-import os, time
+import os, time, re
 
 from cns.equipment import EquipmentError
 #from cns.equipment.TDT import set_attenuation
@@ -78,6 +78,9 @@ rpcox_types = {
         76:     'Trigger',      # Not sure how to implement this (this is a
                                 # software trigger?)
         }
+
+VALID_UNITS = 'fs', 'Hz', 's', 'ms', 'nPow2', 'n', 'nPer'
+P_UNIT = re.compile(r".*_(%s)$" % '|'.join(VALID_UNITS))
 
 def convert(src_unit, dest_unit, value, dsp_fs):
     '''
@@ -508,7 +511,10 @@ class DSPTag(object):
         self.dsp = dsp
         self.fs = dsp.GetSFreq()
         self.name = name
-        self.unit = name.split('_')[-1]
+        try:
+            self.unit, = P_UNIT.match(name).groups()
+        except AttributeError:
+            self.unit = None
 
     def _get_value(self):
         value = self.dsp.GetTagVal(self.name)

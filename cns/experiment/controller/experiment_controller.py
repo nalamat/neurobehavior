@@ -1,14 +1,16 @@
-from enthought.traits.api import Enum, Int, Instance, Dict, \
-        on_trait_change, Property, Str, Button
-from enthought.traits.ui.api import Controller, Handler, HGroup, Item, \
-        spring, View
-from enthought.savage.traits.ui.svg_button import SVGButton
-from enthought.etsconfig.api import ETSConfig
-from enthought.pyface.api import error
 from cns import equipment
-
 from cns.widgets import icons
 from cns.widgets.toolbar import ToolBar
+from enthought.etsconfig.api import ETSConfig
+from enthought.pyface.api import error
+from enthought.savage.traits.ui.svg_button import SVGButton
+from enthought.traits.api import Enum, Int, Instance, Dict, on_trait_change, \
+    Property, Str, Button, Tuple
+from enthought.traits.ui.api import Controller, Handler, HGroup, Item, spring, \
+    View
+
+import logging
+log = logging.getLogger(__name__)
 
 def build_signal_cache(signal, *parameters):
 
@@ -52,10 +54,13 @@ class ExperimentToolBar(ToolBar):
         # buttons instead.  Eventually I'd like to unite these under ONE
         # backend.
         apply = Button('A', action=True)
+        revert = Button('R', action=True)
         start = Button('>>', action=True)
         pause = Button('||', action=True)
+        resume = Button('>', action=True)
         stop = Button('X', action=True)
         remind = Button('!', action=True)
+
         item_kw = dict(show_label=False, height=-size[0], width=-size[1])
 
     group = HGroup(Item('apply',
@@ -88,12 +93,26 @@ class ExperimentToolBar(ToolBar):
     trait_view = View(group, kind='subpanel')
 
     #@on_trait_change('+action')
-    @on_trait_change('start, stop, pause, revert, apply, resume, remind')
-    def process_action(self, trait, value):
-        if self.traits_inited():
-            getattr(self.handler, trait)(self.info)
+    #@on_trait_change('start, stop, pause, revert, apply, resume, remind')
+    #def process_action(self, trait, value):
+    #    log.debug('process_action %r %r', trait, value)
+    #    if self.traits_inited():
+    #        getattr(self.handler, trait)(self.info)
 
 class ExperimentController(Controller):
+    """Primary controller for TDT System 3 hardware.  This class must be
+    configured with a model that contains the appropriate parameters (e.g.
+    Paradigm) and a view to show these parameters.
+
+    As changes are applied to the view, the necessary changes to the hardware
+    (e.g. RX6 tags and PA5 attenuation) will be made and the model will be
+    updated.
+
+    For a primer on model-view-controller architecture and its relation to the
+    Enthought libraries (e.g. Traits), refer to the Enthought Tool Suite
+    documentation online at:
+    https://svn.enthought.com/enthought/wiki/UnderstandingMVCAndTraitsUI
+    """
 
     toolbar = Instance(ExperimentToolBar, ())
     
@@ -128,19 +147,29 @@ class ExperimentController(Controller):
     parameter_map = Dict
 
     def init(self, info):
-        self.model = info.object
-        self.toolbar.install(self, info)
-
-    def initialize_experiment(self, info):
+        '''Post-construction init.  Determines whether it is able to connect
+        with the hardware.'''
         try:
-            self.init_dsp(info)
-            self.autoconfigure_dsp_tags(self.model.paradigm, info)
-            self.post_init(info)
+            self.model = info.object
+            self.toolbar.install(self, info)
+            self.init_equipment(info)
         except equipment.EquipmentError, e:
             self.state = 'disconnected'
             error(info.ui.control, str(e))
 
+    def init_equipment(self, info):
+        '''Attempts to connect with the hardware.  Called when the class is
+        first constructed.'''
+        self.init_dsp(info)
+
+    def init_experiment(self, info):
+        '''Called when start is pressed.  Place paradigm-specific initialization
+        code here.
+        '''
+        self.autoconfigure_dsp_tags(self.model.paradigm, info)
+
     def init_dsp(self, info):
+        '''Loads circuits specified in `circuits`'''
         self.backend = equipment.dsp()
         for name, values in self.circuits.items():
             circuit = self.backend.load(*values)
@@ -158,11 +187,10 @@ class ExperimentController(Controller):
             else:
                 circuit = getattr(self, obj_name)
                 unit = paradigm.trait(par).unit
-                getattr(self, obj_name).set(ref_name, value, unit)
+                log.debug('autoconfigure_dsp_tags: tag %s set to %r %r',
+                          ref_name, value, unit)
+                getattr(circuit, ref_name).set(value, unit)
 
-    def post_init(self, info):
-        raise NotImplementedError
-    
     def tick(self, speed):
         setattr(self, speed + '_tick', True)
 
@@ -223,8 +251,8 @@ class ExperimentController(Controller):
 
     @on_trait_change('model.paradigm.+', post_init=True)
     def queue_change(self, object, name, old, new):
-        print 'change detected'
-        if self.state <> 'halted' and hasattr(self, '_apply_'+name):
+        #if self.state <> 'halted' and hasattr(self, '_apply_'+name):
+        if self.state <> 'halted':
             key = object, name
             if key not in self.old_values:
                 self.old_values[key] = old
@@ -234,8 +262,8 @@ class ExperimentController(Controller):
                 del self.old_values[key]
             else:
                 self.pending_changes[key] = new
-        else:
-            raise SystemError, 'cannot change parameter'
+        #else:
+        #    raise SystemError, 'cannot change parameter'
 
     def apply(self, info=None):
         try:

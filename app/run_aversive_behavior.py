@@ -5,7 +5,8 @@ from cns.data.view.cohort import CohortView, CohortViewHandler
 from cns.data import persistence
 from cns.data.h5_utils import get_or_append_node
 from cns.experiment.controller.aversive_controller import AversiveController
-from cns.experiment.experiment.aversive_experiment import AversiveExperiment
+from cns.experiment.experiment.aversive_experiment import AversiveExperiment,\
+    AversiveFMExperiment
 import sys
 import tables
 from enthought.traits.api import Any, Trait, TraitError
@@ -13,9 +14,10 @@ from enthought.traits.api import Any, Trait, TraitError
 import logging
 log = logging.getLogger(__name__)
 
-class ExperimentHandler(CohortViewHandler):
+class ExperimentLauncher(CohortViewHandler):
 
     last_paradigm = Trait(None, Any)
+    experiment = AversiveFMExperiment
 
     def init(self, info):
         if not self.load_file(info):
@@ -38,23 +40,25 @@ class ExperimentHandler(CohortViewHandler):
             store_node = get_or_append_node(animal_node, 'experiments')
             try:
                 paradigm = persistence.load_object(store_node, 'last_paradigm')
-                paradigm.shock_settings.paradigm = paradigm
             except (tables.NoSuchNodeError, TraitError):
                 log.debug('No prior paradigm found.  Creating new paradigm.')
                 paradigm = None
                 
-            handler = AversiveController()
-            model = AversiveExperiment(store_node=store_node, animal=item)
+            #handler = AversiveController()
+            model = self.experiment(store_node=store_node, animal=item)
             
-            if paradigm is not None:
-                log.debug('Using paradigm from last time this animal was run')
-                model.paradigm = paradigm
-            elif self.last_paradigm is not None:
-                log.debug('Animal does not have any prior paradigm.')
-                log.debug('Using paradigm from previous animal.')
-                model.paradigm = self.last_paradigm
+            try:
+                if paradigm is not None:
+                    log.debug('Using paradigm from last time this animal was run')
+                    model.paradigm = paradigm
+                elif self.last_paradigm is not None:
+                    log.debug('Animal does not have any prior paradigm.')
+                    log.debug('Using paradigm from previous animal.')
+                    model.paradigm = self.last_paradigm
+            except TraitError:
+                log.debug('Paradigm is not compatible with experiment')
 
-            model.edit_traits(handler=handler, parent=info.ui.control, kind='livemodal')
+            model.edit_traits(parent=info.ui.control, kind='livemodal')
             
             # Check to see if a trial block was collected
             if model.trial_blocks > 0:
@@ -66,7 +70,9 @@ class ExperimentHandler(CohortViewHandler):
             try: file.close()
             except NameError: pass
             
-        except AttributeError: pass
+        except AttributeError, e: 
+            print e
+            pass
         except SystemError, e:
             from textwrap import dedent
             mesg = """\
@@ -84,10 +90,10 @@ class ExperimentHandler(CohortViewHandler):
         
 def test_experiment():
     store = tables.openFile('test.h5', 'w')
-    ae = AversiveExperiment(store_node=store.root)
-    ae.paradigm.signal_warn.variables = ['frequency']
+    ae = AversiveFMExperiment(store_node=store.root)
+    #ae.paradigm.signal_warn.variables = ['frequency']
     ae.configure_traits()
 
 if __name__ == '__main__':
-    CohortView().configure_traits(handler=ExperimentHandler)
+    CohortView().configure_traits(handler=ExperimentLauncher)
     #test_experiment()

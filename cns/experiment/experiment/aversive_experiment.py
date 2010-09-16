@@ -3,10 +3,11 @@ from enthought.traits.ui.api import View, Item, VGroup, HGroup, InstanceEditor
 
 from cns.experiment.data.aversive_data import AversiveData
 from cns.experiment.data.aversive_data_view import AnalyzedAversiveDataView
-#from cns.experiment.data.aversive_data import AversiveData_v0_2 as AversiveData
-#from cns.experiment.data.aversive_data import AnalyzedAversiveData
-from cns.experiment.paradigm.aversive_paradigm import AversiveParadigm 
-from cns.experiment.controller.aversive_controller import AversiveController
+
+from cns.experiment.paradigm.aversive_paradigm import (AversiveParadigm,
+                                                       AversiveFMParadigm)
+from cns.experiment.controller.aversive_controller import (AversiveController,
+                                                           AversiveFMController)
 
 class AversiveExperiment(HasTraits):
 
@@ -46,3 +47,17 @@ class AversiveExperiment(HasTraits):
     def traits_view(self, parent=None):
         return View(self._get_view_group(), resizable=True, kind='live', 
                     handler=AversiveController)
+
+class AversiveFMExperiment(AversiveExperiment):
+
+    paradigm = Instance(AversiveFMParadigm, ())
+
+    def traits_view(self, parent=None):
+        return View(self._get_view_group(), resizable=True, kind='live', 
+                    handler=AversiveFMController)
+
+if __name__ == "__main__":
+    import tables
+    store = tables.openFile('test.h5', 'w')
+    ae = AversiveFMExperiment(store_node=store.root)
+    ae.configure_traits()

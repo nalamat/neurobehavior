@@ -6,7 +6,7 @@ from cns.experiment.paradigm.paradigm import Paradigm
 from cns.signal.type import Tone
 from enthought.traits.api import Button, on_trait_change, HasTraits, Any, Range, \
     CFloat, Property, Instance, Trait, Int, Dict, Float, List, Bool, Enum, \
-    DelegatesTo
+    DelegatesTo, Constant
 from enthought.traits.ui.api import View, Item, VGroup, Include
 
 class BaseAversiveParadigm(Paradigm):
@@ -34,16 +34,16 @@ class BaseAversiveParadigm(Paradigm):
 
     # Actual lick_fs depends on the system clock.  We can only downsample at
     # multiples of the clock.
-    requested_lick_fs = CFloat(500, store='attribute')
+    requested_lick_fs = CFloat(500, unit='fs', store='attribute')
 
     # We set this to -1 so we know that it hasn't been set yet as we can never
     # have a negative sampling rate.
-    actual_lick_fs = CFloat(-1, store='attribute')
-    shock_delay = CFloat(1, store='attribute', label='Shock delay (s)')
+    actual_lick_fs = CFloat(-1, unit='fs', store='attribute')
+    shock_delay = CFloat(1, unit='s', store='attribute', label='Shock delay (s)')
 
     # Currently the shock duration cannot be controlled because it is hard
     # wired into the shock controller/spout contact circuitry.
-    #shock_duration          = CFloat(0.3)
+    shock_duration = Constant(0.3, unit='s')
 
     min_safe = Int(2, store='attribute', label='Min safe trials')
     max_safe = Int(4, store='attribute', label='Max safe trials')
@@ -64,7 +64,7 @@ class BaseAversiveParadigm(Paradigm):
     # The views available
     #===========================================================================
     par_group = VGroup('par_remind', 'par_order', 'pars', 
-                       show_border=True, label='Parameters')
+                       show_border=True, label='Parameters',)
     trial_group = VGroup(Item('min_safe', label='', invalid='err_num_trials'),
                          Item('max_safe', label='', invalid='err_num_trials'),)
     timing_group = VGroup(trial_group, 'shock_delay', 'lick_th', 
@@ -75,11 +75,6 @@ class BaseAversiveParadigm(Paradigm):
                      title='Aversive Paradigm editor')
 
     run_view = View(par_group)
-
-    def run_view(self, parent=None):
-        par_gr = ['par_remind', 'par_order', 'pars', '|[Parameters]']
-        shock_gr = Item('shock_settings{}@')
-        return View(par_gr, shock_gr)
 
 class AversiveParadigm(BaseAversiveParadigm):
     '''Generic aversive paradigm designed to work with most classe of signals.
@@ -106,10 +101,13 @@ class AversiveFMParadigm(BaseAversiveParadigm):
     the appropriate DSP circuit.
     '''
 
-    center_frequency = Float(4000, store='attribute')
+    carrier_frequency = Float(4000, store='attribute')
+    modulation_frequency = Float(5, store='attribute')
     attenuation = Range(0, 120, 40, store='attribute')
+    trial_duration = Float(1, unit='s', store='attribute')
 
-    signal_group = VGroup('center_frequency', 'attenuation', 
+    signal_group = VGroup('carrier_frequency', 'modulation_frequency',
+                          'trial_duration', 'attenuation', 
                           show_border=True, label='FM parameters')
 
 if __name__ == '__main__':
