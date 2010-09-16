@@ -125,14 +125,18 @@ def convert(src_unit, dest_unit, value, dsp_fs):
     -------
     numerical value
     '''
-    
+
     def fs_to_nPer(req_fs, dsp_fs):
         if dsp_fs < req_fs:
             raise SamplingRateError(dsp_fs, req_fs)
         return int(dsp_fs/req_fs)
+
+    Hz_to_nPer = fs_to_nPer
     
     def nPer_to_fs(nPer, dsp_fs):
         return dsp_fs/nPer
+
+    nPer_to_Hz = nPer_to_fs
     
     def n_to_s(n, dsp_fs):
         return n/dsp_fs
