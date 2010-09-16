@@ -1,6 +1,6 @@
 import numpy as np
 
-def int_to_TTL(array, width):
+def int_to_TTL(a, width):
     '''
     Converts a 1D array of integers to a 2D boolean array based on the binary
     representation of each integer.
@@ -22,9 +22,12 @@ def int_to_TTL(array, width):
     Using this approach, the memory overhead and amount of data being
     transferred has been reduced by a factor of 24.
 
+    This function uses Numpy's bitshift and bitmask operators, so the algorithm
+    should be pretty efficient.
+
     Parameters
     ==========
-    a : array
+    a : array_like
         Sequence of integers to expand into the corresponding boolean array.
         The dtype (either int8, int16 or int32) of the array is used to figure
         out the size of the second dimension.  This will depend on your
@@ -42,8 +45,10 @@ def int_to_TTL(array, width):
            [False, False, False,  True, False, False],
            [ True, False,  True, False, False, False]], dtype=bool)
     '''
-    array = map(lambda x: bin_array(x, width), array)
-    return np.array(array, dtype=np.bool)
+    a = np.array(a)
+    bitarray = [(a>>bit) & 1 for bit in range(width)]
+    #bitarray = map(lambda x: bin_array(x, width), a)
+    return np.array(bitarray, dtype=np.bool).T
 
 def bin_array(number, bits):
     '''Return binary representation of an integer as an integer array
@@ -61,9 +66,9 @@ def bin_array(number, bits):
 def test_speed():
     import timeit
     setup = """
-    from numpy.random import randint
-    from cns.util.binary_funcs import int_to_TTL
-    arr = randint(0, 8, 10e3)
+from numpy.random import randint
+from cns.util.binary_funcs import int_to_TTL
+arr = randint(0, 8, 10e3)
     """
     print timeit.timeit("int_to_TTL(arr, 8)", setup, number=20)
 
