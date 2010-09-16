@@ -106,8 +106,8 @@ class AversiveFMParadigm(BaseAversiveParadigm):
     the appropriate DSP circuit.
     '''
 
-    center_frequency = Float(4000)
-    attenuation = Range(0, 120, 40)
+    center_frequency = Float(4000, store='attribute')
+    attenuation = Range(0, 120, 40, store='attribute')
 
     signal_group = VGroup('center_frequency', 'attenuation', 
                           show_border=True, label='FM parameters')

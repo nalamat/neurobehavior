@@ -71,6 +71,14 @@ class CurrentSettings(HasTraits):
 
 class PositiveController(ExperimentController):
 
+    circuits = { 'circuit': ('positive-behavior-stage3', 'RX6') }
+
+    parameter_map = {'intertrial_duration': 'circuit.int_dur_n',
+                     'response_window_delay': 'circuit.resp_del_n',
+                     'response_window_duration': 'circuit.resp_dur_n',
+                     'score_window_duration': 'circuit.score_dur_n', 
+                     'reward_duration': 'circuit.pump_dur_n', }
+
     current = Instance(CurrentSettings)
 
     backend = Any
@@ -92,17 +100,9 @@ class PositiveController(ExperimentController):
 
     def init_equipment(self, info):
         self.pump = equipment.pump().Pump()
-        self.backend = equipment.dsp()
-        self.circuit = self.backend.load('positive-behavior-stage3', 'RX6')
 
     def configure_circuit(self, circuit, paradigm):
         circuit.reload()
-        circuit.spout_dur_n.set(paradigm.spout_dur, 's')
-        circuit.poke_dur_n.set(self.current.poke_dur, 's')
-        circuit.reward_delay_n.set(paradigm.reward_delay, 's')
-        circuit.reward_dur_n.set(paradigm.reward_dur, 's')
-        circuit.timeout_dur_n.set(paradigm.timeout_dur, 's')
-        circuit.allow_timeout.value = paradigm.allow_timeout
         circuit.contact_buf.initialize()
         circuit.trial_running_buf.initialize()
         circuit.reward_running_buf.initialize()
@@ -129,12 +129,7 @@ class PositiveController(ExperimentController):
             raise
 
     def remind(self, info=None):
-        raise NotImplementedError, 'This has not been implemented'
-        self.state = 'manual'
-        signal = self.current.signal
-        self.circuit.trial_buf.set(signal)
-        self.backend.set_attenuation(signal.attenuation, 'PA5')
-        self.circuit.trigger(1)
+        raise NotImplementedError
 
     def stop(self, info=None):
         self.state = 'halted'

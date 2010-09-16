@@ -96,26 +96,72 @@ class ExperimentToolBar(ToolBar):
 class ExperimentController(Controller):
 
     toolbar = Instance(ExperimentToolBar, ())
-    #time_elapsed = Property(Str, depends_on='slow_tick', label='Time')
     
-    # SYSTEM STATE
-    # - Halted: The system is waiting for the user to configure parameters.  No
-    #   data acquisition is in progress nor is a signal being played.  
-    # - Paused: The system is configured, spout contact is being monitored, and
-    #   the intertrial signal is being played. 
-    # - Running: The system is playing the sequence of safe and warn signals. 
-    # - Disconnected: Could not connect to the equipment.
+    '''
+    SYSTEM STATE
+     - Halted: The system is waiting for the user to configure parameters.  No
+       data acquisition is in progress nor is a signal being played.  
+     - Paused: The system is configured, spout contact is being monitored, and
+       the intertrial signal is being played. 
+     - Running: The system is playing the sequence of safe and warn signals. 
+     - Disconnected: Could not connect to the equipment.
+    '''
     state = Enum('halted', 'paused', 'running', 'manual',  'disconnected')
+
+    '''Number of experiments run before window is closed.'''
     runs = Int(0)
+
+    """Dictionary of circuits to be loaded.  Keys correspond to the name the
+    DSPCircuit object will be bound to on the controller.  Value is a tuple of
+    the circuit name (and path if not on the default search path) and the target
+    DSP.  For example:
+
+    >>> circuits = { 'circuit': ('positive-behavior-stage3', 'RX6') }
+    """
+    circuits = Dict(Str, Tuple(Str, Str))
+
+    """Map of paradigm parameters with their corresponding circuit value (if
+    applicable).  Value should be in the format circuit_name.tag_name where
+    circuit_name is a reference to the name specified in
+    `ExperimentController.circuits`.
+    """
+    parameter_map = Dict
 
     def init(self, info):
         self.model = info.object
         self.toolbar.install(self, info)
+
+    def initialize_experiment(self, info):
         try:
-            self.init_equipment(info)
+            self.init_dsp(info)
+            self.autoconfigure_dsp_tags(self.model.paradigm, info)
+            self.post_init(info)
         except equipment.EquipmentError, e:
             self.state = 'disconnected'
             error(info.ui.control, str(e))
+
+    def init_dsp(self, info):
+        self.backend = equipment.dsp()
+        for name, values in self.circuits.items():
+            circuit = self.backend.load(*values)
+            setattr(self, name, circuit)
+
+    def autoconfigure_dsp_tags(self, paradigm, info):
+        '''Using the parameter map provided, automatically configure circuit
+        variables or call the appropriate function.
+        '''
+        for par, ref in self.parameter_map.items():
+            obj_name, ref_name = ref.split('.')
+            value = getattr(paradigm, par)
+            if obj_name == 'handler':
+                getattr(self, ref_name)(value)
+            else:
+                circuit = getattr(self, obj_name)
+                unit = paradigm.trait(par).unit
+                getattr(self, obj_name).set(ref_name, value, unit)
+
+    def post_init(self, info):
+        raise NotImplementedError
     
     def tick(self, speed):
         setattr(self, speed + '_tick', True)
@@ -197,6 +243,7 @@ class ExperimentController(Controller):
         except:
             ts = -1
         for key, value in self.pending_changes.items():
+            log.debug("Apply: setting %s to %r", key, value)
             object, name = key
             getattr(self, '_apply_'+name)(value)
             self.log_event(ts, name, value)
@@ -204,9 +251,7 @@ class ExperimentController(Controller):
             del self.old_values[(object, name)]
 
     def log_event(self, ts, name, value):
-        return
-        log.debug('%d\tValue changed during experiment: %s = %r', ts, name,
-                  value)
+        raise NotImplementedError
         
     def revert(self, info=None):
         '''Revert changes requested while experiment is running.'''
