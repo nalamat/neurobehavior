@@ -17,7 +17,7 @@ import numpy as np
 
 log = logging.getLogger(__name__)
 
-class CurrentSettings(HasTraits):
+class BaseCurrentSettings(HasTraits):
 
     paradigm = Instance(AversiveParadigm)
     
@@ -35,13 +35,10 @@ class CurrentSettings(HasTraits):
 
     _choice_num_safe = Any
     _choice_par = Any
-    _signal_warn_cache = {}
-    _shock_level_cache = {}
 
+    _signal_warn_cache = {}
     signal_warn = Property
     signal_remind = Property
-    shock_warn = Property
-    shock_remind = Property
 
     def __init__(self, **kw):
         super(CurrentSettings, self).__init__(**kw)
@@ -54,7 +51,6 @@ class CurrentSettings(HasTraits):
         self._choice_par = self._get_choice_par(paradigm)
         self._choice_num_safe = self._get_choice_num_safe(paradigm)
         self.build_signal_cache(paradigm)
-        self.build_shock_level_cache(paradigm)
         self.par_remind = paradigm.par_remind
         self.next()
 
@@ -62,7 +58,7 @@ class CurrentSettings(HasTraits):
         self.par = self._choice_par.next()
         self.safe_trials = self._choice_num_safe.next()
         self.trial = 1
-        self.shock_level = self.paradigm.shock_settings.get_level(self.par)
+        #self.shock_level = self.paradigm.shock_settings.get_level(self.par)
 
     #===========================================================================
     # Helpers for run-time control of experiment
@@ -72,14 +68,6 @@ class CurrentSettings(HasTraits):
 
     def _get_signal_remind(self):
         return self._signal_warn_cache[self.par_remind]
-
-    def _get_shock_warn(self):
-        return 0
-        #return self._shock_level_cache[self.par]
-
-    def _get_shock_remind(self):
-        return 0
-        #return self._shock_level_cache[self.par_remind]
 
     def _get_choice_num_safe(self, paradigm):
         trials = range(paradigm.min_safe, paradigm.max_safe + 1)
@@ -106,14 +94,8 @@ class CurrentSettings(HasTraits):
         signal = self._generate_signal(paradigm.signal_warn, paradigm.par_remind)
         self._signal_warn_cache[paradigm.par_remind] = signal
 
-    def build_shock_level_cache(self, paradigm):
-        self._shock_level_cache = {}
-        for setting in paradigm.shock_settings.levels:
-            self._shock_level_cache[setting.par] = setting.level
-        remind_shock = paradigm.shock_settings.max_shock
-        self._shock_level_cache[paradigm.par_remind] = remind_shock
 
-class AversiveController(ExperimentController):
+class BaseAversiveController(ExperimentController):
     """Primary controller for TDT System 3 hardware.  This class must be
     configured with a model that contains the appropriate parameters (e.g.
     Paradigm) and a view to show these parameters.
@@ -128,8 +110,15 @@ class AversiveController(ExperimentController):
     https://svn.enthought.com/enthought/wiki/UnderstandingMVCAndTraitsUI
     """
 
+    circuits = { 'circuit': ('aversive-behavior', 'RX6') }
+
+    parameter_map = {'lick_th': 'circuit.lick_th',
+                     'shock_duration': 'circuit.shock_n',
+                     'shock_delay': 'circuit.shock_delay_n',
+                     'requested_lick_fs': 'circuit.lick_nPer',
+                     'contact_method': 'handler._apply_contact_method', }
+
     backend = Any
-    circuit = Any
     pump = Any
 
     exp_node = Any
@@ -165,57 +154,20 @@ class AversiveController(ExperimentController):
     slow_tick = Event
     fast_tick = Event
 
-    def init_equipment(self, info):
+    def post_init(self, info):
+        '''Called after circuit has been loaded and DSP tags have been
+        auto-configured.  Place paradigm-specific initialization code here.
+        '''
         self.pump = equipment.pump().Pump()
         self.backend = equipment.dsp()
-        self.circuit = self.backend.load('aversive-behavior', 'RX6')
-        #self.atten = equipment.attenuator()
-
-    def configure_circuit(self, circuit, paradigm):
-        if circuit is None:
-            return
-        elif circuit.running:
-            raise SystemError, 'Cannot configure circuit while it is running'
-
-        # This is an example of the "handler" approach.  The model
-        # ('paradigm') does not have to concern itself about how the
-        # equipment needs to be configured.  If we ever get a new set of
-        # hardware, this code would be the only stuff that needs changing.
-        circuit.reload()
-
-        if paradigm.contact_method == 'touch':
-            circuit.contact_method.value = 0
-        else:
-            circuit.contact_method.value = 1
-
-        circuit.lick_th.value = paradigm.lick_th
-        circuit.shock_n.set(0.3, src_unit='s')
-        circuit.shock_delay_n.set(paradigm.shock_delay, src_unit='s')
-        circuit.lick_nPer.set(paradigm.requested_lick_fs, 'fs')
-
-        circuit.trial_buf.initialize(fs=circuit.fs)
-        circuit.int_buf.initialize(fs=circuit.fs)
-        circuit.int_buf.set(paradigm.signal_safe)
-
-        circuit.contact_buf.initialize(channels=7, sf=127, src_type=np.int8,
-                compression='decimated', fs=circuit.lick_nPer.get('fs'))
-        circuit.touch_buf.initialize(sf=3276, src_type=np.int16,
-                compression='decimated', fs=circuit.lick_nPer.get('fs'))
-        circuit.optical_buf.initialize(sf=3276, src_type=np.int16,
-                compression='decimated', fs=circuit.lick_nPer.get('fs'))
-
-        circuit.pause_state.value = True
-        self.backend.set_attenuation(paradigm.signal_safe.attenuation, 'PA5')
-        
-        #self.atten.register(paradigm.signal_safe)
-
-    def initialize_data(self, model):
-        model.exp_node = append_date_node(model.store_node, pre='aversive_date_')
-        model.data_node = append_node(model.exp_node, 'Data')
-
-        # This is a hack.  The buffer objects should just communicate their fs directly.
+        self.circuit.contact_buf.intialize(channels=7, sf=127, src_type=np.int8,
+                                           compression='decimated',
+                                           fs=self.circuit.lick_nPer.get('fs'))
+        model.exp_node = append_date_node(self.model.store_node,
+                                          pre='aversive_date_')
+        model.data_node = append_node(self.model.exp_node, 'Data')
         model.data = AversiveData(contact_fs=self.circuit.lick_nPer.get('fs'),
-                                  store_node=model.data_node)
+                                  store_node=self.model.data_node)
 
     def start(self, info=None):
         if not self.model.paradigm.is_valid():
@@ -225,27 +177,11 @@ class AversiveController(ExperimentController):
             return
 
         try:
-            # Order is important.  The data depends on several properties set in
-            # the circuit, so initialize_data must be called after
-            # initialize_circuit
-            self.configure_circuit(self.circuit, self.model.paradigm)
-            self.initialize_data(self.model)
-
-            #===================================================================
-            # Initialize parameters
-            #===================================================================
-            self.current = CurrentSettings(paradigm=self.model.paradigm)
-            self.circuit.trial_buf.set(self.current.signal_warn)
-
-            #===================================================================
-            # Finally, everything's a go!
-            #===================================================================
+            self.initialize_experiment()
             self.fast_timer = Timer(250, self.tick, 'fast')
             self.slow_timer = Timer(1000, self.tick, 'slow')
+            self.pause()
 
-            # Setting state to paused should be one of the last things we do to
-            # prevent the UI from changing the controls to the 'running' state.
-            self.state = 'paused'
             self.model.data.start_time = datetime.now()
             self.circuit.start()
             self.model.trial_blocks += 1
@@ -257,15 +193,8 @@ class AversiveController(ExperimentController):
 
     def remind(self, info=None):
         self.state = 'manual'
-        # The actual sequence is important.  We must finish uploading the signal
-        # before we set the circuit flags to allow commencement of a trial.
-        self.circuit.trial_buf.set(self.current.signal_remind)
-        self.backend.set_attenuation(self.current.signal_remind.attenuation, 'PA5')
-        self.circuit.shock_level.value = self.current.shock_remind
-        #print self.circuit.shock_level.value
-        #print self.circuit.actual_shock.value
-        #self.circuit.trigger(1) # Go into warning on next trial
-        self.circuit.pause_state.value = False # Everything's ready. GO!
+        self._apply_signal_remind(info)
+        self.circuit.pause_state.value = False
         self.circuit.trigger(2)
         self.circuit.trigger(1)
 
@@ -276,7 +205,6 @@ class AversiveController(ExperimentController):
 
     def resume(self, info=None):
         self.model.data.log_event(self.circuit.ts_n.value, 'pause', False)
-        #self.circuit.trigger(1)
         self.state = 'running'
         self.circuit.pause_state.value = False
         self.circuit.trigger(1)
@@ -292,8 +220,7 @@ class AversiveController(ExperimentController):
         self.model.data.stop_time = datetime.now()
 
         # Gather post-experiment information
-        view = View(Item('comment', style='custom'),
-                    'exit_status', 
+        view = View(Item('comment', style='custom'), 'exit_status', 
                     height=200, width=300, 
                     buttons=['OK'], 
                     kind='livemodal')
@@ -319,14 +246,6 @@ class AversiveController(ExperimentController):
     @on_trait_change('fast_tick')
     def task_update_data(self):
         self.model.data.contact_data.send(self.circuit.contact_buf.read())
-        self.model.data.touch_analog.send(self.circuit.touch_buf.read())
-        self.model.data.optical_analog.send(self.circuit.optical_buf.read())
-
-    @on_trait_change('fast_tick')
-    def task_monitor_signal_safe(self):
-        if self.circuit.int_buf.block_processed():
-            samples = self.model.paradigm.signal_safe.read_block()
-            self.circuit.int_buf.write(samples)
 
     @on_trait_change('fast_tick')
     def task_monitor_circuit(self):
@@ -341,9 +260,7 @@ class AversiveController(ExperimentController):
                                        self.current.par_remind,
                                        self.current.shock_remind,
                                        'remind')
-                self.circuit.trial_buf.set(self.current.signal_warn)
-                self.backend.set_attenuation(self.current.signal_warn.attenuation, 'PA5')
-                self.circuit.shock_level.value = self.current.shock_level
+                self._apply_signal_warn()
 
             # Warning was just presented.
             else:
@@ -361,18 +278,17 @@ class AversiveController(ExperimentController):
                     self.current.next()
                 elif last_trial == self.current.safe_trials: 
                     self.model.data.update(ts, self.current.par, 0, 'safe')
-                    self.circuit.trial_buf.set(self.current.signal_warn)
-                    self.backend.set_attenuation(self.current.signal_warn.attenuation, 'PA5')
-                    self.circuit.shock_level.value = self.current.shock_warn
+                    self._apply_signal_warn()
                     self.circuit.trigger(2)
                 elif last_trial < self.current.safe_trials:
                     self.model.data.update(ts, self.current.par, 0, 'safe')
                 else:
                     raise SystemError, 'There is a mismatch.'
-                    # TODO: Data has not been lost so we should not halt execution.
-                    # However an appropriate warning should be sent.
+                    # TODO: Data has not been lost so we should not halt
+                    # execution.  However an appropriate warning should be sent.
                     
-            # Signal to the circuit that data processing is done and it can commence execution
+            # Signal to the circuit that data processing is done and it can
+            # commence execution
             self.circuit.trigger(1)
 
     def _get_time_elapsed(self):
@@ -414,18 +330,54 @@ class AversiveController(ExperimentController):
     def _reset_current(self, value):
         self.current.reset()
 
-    _apply_lick_th = _reset_current
     _apply_par_order = _reset_current
     _apply_par_remind = _reset_current
     _apply_pars = _reset_current
-    _apply_level = _reset_current
-    _apply_levels_items = _reset_current
-
-    def _apply_lick_th(self, value):
-        self.circuit.lick_th.value = value
 
     def _apply_contact_method(self, value):
         if value == 'touch':
             self.circuit.contact_method.value = 0
         else:
             self.circuit.contact_method.value = 1
+
+class AversiveController(BaseAversiveController):
+    parameter_map = {'signal_warn': 'handler._apply_signal_warn',
+                     'signal_safe': 'handler._apply_signal_safe'}
+    parameter_map.update(BaseAversiveController.parameter_map)
+
+    @on_trait_change('fast_tick')
+    def task_monitor_signal_safe(self):
+        if self.circuit.int_buf.block_processed():
+            samples = self.model.paradigm.signal_safe.read_block()
+            self.circuit.int_buf.write(samples)
+    
+    def _apply_signal_remind(self):
+        # The actual sequence is important.  We must finish uploading the signal
+        # before we set the circuit flags to allow commencement of a trial.
+        self.circuit.trial_buf.set(self.current.signal_remind)
+        self.backend.set_attenuation(self.current.signal_remind.attenuation, 'PA5')
+
+    def _apply_signal_warn(self):
+        self.circuit.trial_buf.set(self.current.signal_warn)
+        self.backend.set_attenuation(self.current.signal_warn.attenuation,
+                                     'PA5')
+
+    def post_init(self, info):
+        super(AversiveController, self).post_init(info)
+        self.current = CurrentSettings(paradigm=self.model.paradigm)
+        self.circuit._apply_signal_warn(self)
+
+class AversiveFMController(BaseAversiveController):
+    parameter_map = {'center_frequency': 'circuit.cf',
+                     'attenuation': 'handler._apply_attenuation'}
+    parameter_map.update(BaseAversiveController.parameter_map)
+
+    def _apply_signal_warn(self):
+        self.circuit.depth.value = self.current.par
+
+    def _apply_signal_remind(self):
+        self.circuit.depth.value = self.current.par_remind
+
+    def _apply_attenuation(self, value):
+        self.backend.set_attenuation(value)
+        self.circuit._apply_signal_warn(self)
