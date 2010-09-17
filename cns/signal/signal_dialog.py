@@ -3,7 +3,8 @@ from cns.signal import Signal, type as st
 from cns.signal.type import signal_types
 from cns.signal.view_factory import signal_view_factory
 from enthought.traits.api import HasTraits, Instance, Str, Bool, Button
-from enthought.traits.ui.api import View, Item, InstanceEditor, Handler, spring
+from enthought.traits.ui.api import View, Item, InstanceEditor, Handler, \
+        spring, HGroup
 from enthought.traits.ui.instance_choice import InstanceFactoryChoice
 from enthought.savage.traits.ui.svg_button import SVGButton
 
@@ -47,7 +48,8 @@ class SignalSelector(HasTraits):
     allow_par = Bool(True)
 
     def traits_view(self, parent=None):
-        return View(['signal{}~', spring, 'handler.edit_signal{}', '-'],
+        return View(HGroup('signal{}~', spring, 'handler.edit_signal{}',
+                           label=self.title, show_border=True),
                     handler=SignalEditHandler)
 
     def popup_view(self, parent=None):

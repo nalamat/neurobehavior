@@ -27,49 +27,36 @@ class PositiveData_0_1(ExperimentData):
 
     contact_data = Any
 
-    '''
-    touch_digital = Instance(FileChannel, 
-            store='channel', store_path='contact/touch_digital')
-    touch_digital_mean = Instance(FileChannel, 
-            store='channel', store_path='contact/touch_digital_mean')
-    touch_analog = Instance(FileChannel, 
-            store='channel', store_path='contact/touch_analog')
-    '''
-    optical_digital = Instance(FileChannel, 
-            store='channel', store_path='contact/optical_digital')
-    optical_digital_mean = Instance(FileChannel, 
-            store='channel', store_path='contact/optical_digital_mean')
-    optical_analog = Instance(FileChannel, 
-            store='channel', store_path='contact/optical_analog')
-    trial_running = Instance(FileChannel, 
-            store='channel', store_path='contact/trial_running')
-    reward_running = Instance(FileChannel,
-            store='channel', store_path='contact/reward_running')
-    timeout_running = Instance(FileChannel,
-            store='channel', store_path='contact/timeout_running')
+    poke_TTL = Instance(FileChannel, 
+            store='channel', store_path='contact/poke_TTL')
+    spout_TTL = Instance(FileChannel, 
+            store='channel', store_path='contact/spout_TTL')
+    trial_TTL = Instance(FileChannel, 
+            store='channel', store_path='contact/trial_TTL')
+    score_TTL = Instance(FileChannel, 
+            store='channel', store_path='contact/score_TTL')
+    pump_TTL = Instance(FileChannel,
+            store='channel', store_path='contact/pump_TTL')
 
     def _create_channel(self, name, dtype):
         contact_node = get_or_append_node(self.store_node, 'contact')
         return FileChannel(node=contact_node, fs=self.contact_fs,
                            name=name, dtype=dtype)
 
-    def _optical_digital_default(self):
-        return self._create_channel('optical_digital', np.bool)
+    def _poke_TTL_default(self):
+        return self._create_channel('poke_TTL', np.bool)
 
-    def _optical_digital_mean_default(self):
-        return self._create_channel('optical_digital_mean', np.float32)
+    def _spout_TTL_default(self):
+        return self._create_channel('spout_TTL', np.bool)
 
-    def _optical_analog_default(self):
-        return self._create_channel('optical_analog', np.float32)
+    def _trial_TTL_default(self):
+        return self._create_channel('trial_TTL', np.bool)
 
-    def _trial_running_default(self):
-        return self._create_channel('trial_running', np.bool)
+    def _score_TTL_default(self):
+        return self._create_channel('score_TTL', np.bool)
 
-    def _reward_running_default(self):
-        return self._create_channel('reward_running', np.bool)
-
-    def _timeout_running_default(self):
-        return self._create_channel('timeout_running', np.bool)
+    def _pump_TTL_default(self):
+        return self._create_channel('pump_TTL', np.bool)
 
 PositiveData = PositiveData_0_1
 
