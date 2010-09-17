@@ -305,7 +305,7 @@ class BaseAversiveController(ExperimentController):
         self.model.data.log_event(ts, name, value)
 
     def _reset_current(self, value):
-        self.current.reset()
+        self.init_current()
 
     _apply_par_order = _reset_current
     _apply_par_remind = _reset_current

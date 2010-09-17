@@ -149,11 +149,14 @@ class ExperimentController(Controller):
     def init(self, info):
         '''Post-construction init.  Determines whether it is able to connect
         with the hardware.'''
+        log.debug("Initializing equipment")
         try:
             self.model = info.object
             self.toolbar.install(self, info)
             self.init_equipment(info)
+            log.debug("Successfully initialized equipment")
         except equipment.EquipmentError, e:
+            log.error(e)
             self.state = 'disconnected'
             error(info.ui.control, str(e))
 
@@ -170,8 +173,11 @@ class ExperimentController(Controller):
 
     def init_dsp(self, info):
         '''Loads circuits specified in `circuits`'''
+        log.debug("Loading DSP backend")
         self.backend = equipment.dsp()
+        log.debug("Loading circuits")
         for name, values in self.circuits.items():
+            log.debug("loading %s to %s as %s", values[0], values[1], name)
             circuit = self.backend.load(*values)
             setattr(self, name, circuit)
 
@@ -180,16 +186,19 @@ class ExperimentController(Controller):
         variables or call the appropriate function.
         '''
         for par, ref in self.parameter_map.items():
-            obj_name, ref_name = ref.split('.')
-            value = getattr(paradigm, par)
-            if obj_name == 'handler':
-                getattr(self, ref_name)(value)
-            else:
-                circuit = getattr(self, obj_name)
-                unit = paradigm.trait(par).unit
-                log.debug('autoconfigure_dsp_tags: tag %s set to %r %r',
-                          ref_name, value, unit)
-                getattr(circuit, ref_name).set(value, unit)
+            self.autoconfigure_dsp_tag(par, ref, paradigm)
+
+    def autoconfigure_dsp_tag(self, par, ref, paradigm):
+        obj_name, ref_name = ref.split('.')
+        value = getattr(paradigm, par)
+        if obj_name == 'handler':
+            getattr(self, ref_name)(value)
+        else:
+            circuit = getattr(self, obj_name)
+            unit = paradigm.trait(par).unit
+            log.debug('autoconfigure_dsp_tags: tag %s set to %r %r',
+                      ref_name, value, unit)
+            getattr(circuit, ref_name).set(value, unit)
 
     def tick(self, speed):
         setattr(self, speed + '_tick', True)
@@ -273,8 +282,18 @@ class ExperimentController(Controller):
         for key, value in self.pending_changes.items():
             log.debug("Apply: setting %s to %r", key, value)
             object, name = key
-            getattr(self, '_apply_'+name)(value)
-            self.log_event(ts, name, value)
+
+            try:
+                getattr(self, '_apply_'+name)(value)
+                self.log_event(ts, name, value)
+            except TypeError:
+                try:
+                    ref = self.parameter_map[name]
+                    self.autoconfigure_dsp_tag(name, ref, self.model.paradigm)
+                except TypeError:
+                    log.warn("Can't set %s to %r", name, value)
+                    log.warn("Removing this from the stack")
+
             del self.pending_changes[(object, name)]
             del self.old_values[(object, name)]
 

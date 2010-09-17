@@ -85,8 +85,17 @@ class ExperimentLauncher(CohortViewHandler):
 
 from .experiment.aversive_experiment import AversiveFMExperiment
 from .experiment.aversive_experiment import AversiveExperiment
+from .experiment.positive_experiment import PositiveExperiment
 
 def load_experiment_launcher(experiment):
     from cns.data.view.cohort import CohortView
     handler = ExperimentLauncher(experiment=globals()[experiment])
     CohortView().configure_traits(handler=handler)
+
+def test_experiment(experiment):
+    import tables
+    test_file = tables.openFile('test.hd5', 'w')
+    globals()[experiment](store_node=test_file.root).configure_traits()
+
+if __name__ == '__main__':
+    test_experiment('PositiveExperiment')
