@@ -36,7 +36,103 @@ def get_traits(object, filter_readonly=False, filter_events=True, **metadata):
         metadata['type'] = lambda x: x <> 'event'
     return object.class_traits(**metadata)
 
+def store_attribute(node, object, name, trait):
+    # this is a bit of a hack to ensure we get the raw value since we normally get
+    # a list or dict back wrapped in a trait object
+    value = getattr(object, name)
+    if trait.is_trait_type(List):
+        value = value[:]
+    elif trait.is_trait_type(Dict):
+        value = dict(value)
+
+    if value is None:
+        value = 'None'
+    if value.__class__ in date_classes:
+        # The HDF5 datetime datatype requires seconds since the Unix epoch
+        # (POSIX time_t).  We just convert the datetime to a string and
+        # store it that way instead.  It avoids cross-platform
+        # inconsistencies with the POSIX timestamps.
+        value = strftime(value)
+    node._f_setAttr(name, value)
+
+def store_array(node, object, name, trait):
+    value = getattr(object, name)
+    try: getattr(node, name)._f_remove()
+    except tables.NoSuchNodeError: pass
+    if len(value)==0:
+        # Create a blank array
+        atom = tables.atom.Atom.from_dtype(value.dtype)
+        h5_file.createEArray(node._v_pathname, name, atom, (0,))
+    else:
+        h5_file.createArray(node._v_pathname, name, value)
+
+def store_table(node, object, name, trait):
+    # Create copy of value since we may need to convert the datetime series.
+    value = array(getattr(object, name))
+    trait = object.trait(name)
+    # When datteime support is added to Numpy, we can delete the following
+    # line and uncomment the line after
+    value = sanitize_datetimes(value, trait)
+    #value = array(value, dtype=get_np_dtype(trait))
+    value = array(value, dtype=get_hdf5_dtype(trait))
+
+    try:
+        # Table already exists.  We delete the data in the table and
+        # re-add it.  This is not really efficient, but the current use
+        # case for this type of table will only have up to 100 rows so
+        # we should not see much of a performance hit.
+        table = getattr(node, name)
+        table.truncate(0)
+        table.append(value)
+    except tables.NoSuchNodeError:
+        table = h5_file.createTable(node._v_pathname, name, value)
+
+def store_child(node, object, name, trait):
+    value = getattr(object, name)
+
+    try: group_node = getattr(node, name)
+    except tables.NoSuchNodeError:
+        object_path = node._v_pathname
+        group_node = h5_file.createGroup(object_path, name)
+
+    if hasattr(value, '__iter__'): # This is a list of items
+        #children.append(group_node)
+        group_children = []
+        for v in value:
+            child = add_or_update_object(v, group_node)
+            group_children.append(child)
+        # We need to think about whether we should be deleting records.
+        # Maybe just add a deleted attribute so we know not to load the
+        # node when the parent object is loaded.
+        for child in group_node._v_children.values():
+            if child not in group_children:
+                child._f_remove(recursive=True)
+    else: # nope, it's not a list, just a single object
+        add_or_update_object(value, node, name)
+
 def add_or_update_object(object, node, name=None):
+    '''
+    Persists Python object to a node in a HDF5 file.
+
+    When the Python object is saved as a node in a HDF5 file two attributes,
+    klass and module, are stored along with the object data.  These attributes
+    are used by `load_object` to recreate the original object.
+
+    Parameters
+    ==========
+    object
+        Object to be saved
+    node
+        HDF5 node to save object data to
+    name
+        Name of object node that serves as the root of the object data.  The
+        object node will be appended to node.  If None, then the node will be
+        used as the root for the object data.
+
+    Right now this function only works with subclasses of `HasTraits` since it
+    requires some metadata to be set for each trait that is being saved.
+    '''
+
     h5_file = node._v_file
     h5_path = node._v_pathname
     base_name = object.__class__.__name__
@@ -61,8 +157,8 @@ def add_or_update_object(object, node, name=None):
         # A bit redundant since the name of the node also contains the ID
         try: object_node._f_setAttr('UNIQUE_ID', object.UNIQUE_ID)
         except: pass
-        # Info that allows us to recreate the object later
 
+    # Info that allows us to recreate the object later
     object_node._f_setAttr('module', object.__class__.__module__)
     object_node._f_setAttr('klass', object.__class__.__name__)
     #else: # We are supposed to use this node!
@@ -71,93 +167,18 @@ def add_or_update_object(object, node, name=None):
     # Now we add the metadata for the object
     # TODO: add support for deleted metadata.  Right now this is unsupported
     # because we don't need this use case.
-    for name, trait in object.class_traits(store='attribute').items():
-        # this is a bit of a hack to ensure we get the raw value since we normally get
-        # a list or dict back wrapped in a trait object
-        value = getattr(object, name)
-        if trait.is_trait_type(List):
-            value = value[:]
-        elif trait.is_trait_type(Dict):
-            value = dict(value)
 
-        if value is None:
-            value = 'None'
-        if value.__class__ in date_classes:
-            # The HDF5 datetime datatype requires seconds since the Unix epoch
-            # (POSIX time_t).  We just convert the datetime to a string and
-            # store it that way instead.  It avoids cross-platform
-            # inconsistencies with the POSIX timestamps.
-            value = strftime(value)
-        object_node._f_setAttr(name, value)
+    store_map = (('attribute', store_attribute),
+                 ('array', store_array),
+                 ('table', store_table),
+                 ('child', store_child),
+                )
 
-    for name in object.class_trait_names(store='array'):
-        value = getattr(object, name)
-        try: getattr(object_node, name)._f_remove()
-        except tables.NoSuchNodeError: pass
-        if len(value)==0:
-            # Create a blank array
-            atom = tables.atom.Atom.from_dtype(value.dtype)
-            h5_file.createEArray(object_node._v_pathname, name, atom, (0,))
-        else:
-            h5_file.createArray(object_node._v_pathname, name, value)
-
-    # We need to track children nodes now since we will delete any old nodes
-    # that the object may no longer have.  All nodes to be protected from
-    # deletion must be added to the children list.
-    # Actually, I have decided this is a bad idea since it risks losing data
-    #children = []
-    for name in object.class_trait_names(store='table'):
-        # Create copy of value since we may need to convert the datetime series.
-        value = array(getattr(object, name))
-        trait = object.trait(name)
-        # When datteime support is added to Numpy, we can delete the following
-        # line and uncomment the line after
-        value = sanitize_datetimes(value, trait)
-        #value = array(value, dtype=get_np_dtype(trait))
-        value = array(value, dtype=get_hdf5_dtype(trait))
-
-        try:
-            # Table already exists.  We delete the data in the table and
-            # re-add it.  This is not really efficient, but the current use
-            # case for this type of table will only have up to 100 rows so
-            # we should not see much of a performance hit.
-            table = getattr(object_node, name)
-            table.truncate(0)
-            table.append(value)
-        except tables.NoSuchNodeError:
-            table = h5_file.createTable(object_node._v_pathname,
-                                        name, value)
-        #children.append(table)
-
-    # add all existing children
-    for name in object.class_trait_names(store='child'):
-        value = getattr(object, name)
-
-        try: group_node = getattr(object_node, name)
-        except tables.NoSuchNodeError:
-            object_path = object_node._v_pathname
-            group_node = h5_file.createGroup(object_path, name)
-
-        if hasattr(value, '__iter__'): # This is a list of items
-            #children.append(group_node)
-            group_children = []
-            for v in value:
-                child = add_or_update_object(v, group_node)
-                group_children.append(child)
-            # We need to think about whether we should be deleting records.
-            # Maybe just add a deleted attribute so we know not to load the
-            # node when the parent object is loaded.
-            for child in group_node._v_children.values():
-                if child not in group_children:
-                    child._f_remove(recursive=True)
-        else: # nope, it's not a list, just a single object
-            add_or_update_object(value, object_node, name)
-
-    # Ok, remove any children that don't belong (i.e. that were not added or
-    # updated)!
-    #for child in object_node._v_children.values():
-    #    if child not in children:
-    #        child._f_remove(recursive=True)
+    for mode, store in store_map:
+        log.debug('Storing %s data', mode)
+        for name, trait in object.class_trait_names(store=mode).items():
+            log.debug('Storing %s', name)
+            store(object_node, object, name, trait)
 
     append_metadata(object, object_node)
     h5_file.flush()
@@ -242,7 +263,7 @@ def switch_datetime_fmt(table, trait, parser):
         # This is an ugly hack required by Numpy v1.3.  Once datetime support is
         # included in Numpy (possibly v1.5) much of the work can be delegated to
         # Numpy.  Possibly some of the other libraries that depend on numpy
-        # (e.g. PyTables) will support it better.
+        # (e.g. PyTables) will support it better as well.
         return [tuple(e) for e in table.tolist()]
     else:
         return table
@@ -258,10 +279,12 @@ def append_metadata(object, source):
     object.store_node = source
     return object
 
-class PersistenceError(BaseException):
+class PersistenceReadError(BaseException):
+    '''Unable to recreate persisted object.'''
 
     mesg = """Attempt to reconstruct object from HDF5 file failed because the
-    required metadata is missing.  Source file: %s, Object path: %s"""
+    required metadata (module and classname) are missing.  Source file: %s,
+    Object path: %s"""
 
     def __init__(self, file, path):
         self.path = path
@@ -269,6 +292,43 @@ class PersistenceError(BaseException):
 
     def __str__(self):
         return self.mesg % (self.file, self.path)
+
+def load_table(node, name, trait):
+    return unsanitize_datetimes(getattr(node, name)[:], trait)
+
+def load_child(node, name, trait):
+    value = getattr(node, name)
+    if trait.is_trait_type(List) or trait.is_trait_type(Array):
+        return [load_object(o) for o in value._v_children.values()]
+    else:
+        return load_object(value)
+
+def load_automatic(node, name, trait):
+    # Traited classes do not properly raise AttributeError but return None
+    # instead.
+    path = trait.store_path if trait.store_path else name
+    return node._f_getChild(path)
+
+def load_channel(node, name, trait):
+    try:
+        value = getattr(node, trait.store_path)
+    except (TypeError, AttributeError):
+        value = getattr(node, name)
+    return load_file_channel(value)
+
+def load_attribute(node, name, trait):
+    value = node._f_getAttr(name)
+    # TraitMap will raise an error here
+    try:
+        klass = trait.trait_type.klass
+    except:
+        klass = None
+    # We just want to check on the datetime
+    if klass is not None and klass in date_classes:
+        value = strptime(value)
+    elif isinstance(value, int):
+        value = int(value)
+    return value
 
 def load_object(source, path=None):
     '''
@@ -285,6 +345,9 @@ def load_object(source, path=None):
     class attribute was empty, so it's no surprise that we do not always find
     the expected nodes!
 
+    Readonly traits are *not* loaded.  It is assumed that the class knows how to
+    reconstruct readonly values.
+
     Parameters
     ==========
     source
@@ -292,9 +355,10 @@ def load_object(source, path=None):
 
     Raises
     ======
-    PersistenceError
+    PersistenceReadError
 
-    Right now this function only works with subclasses of `HasTraits`.
+    Right now this function only works with subclasses of `HasTraits` since it
+    requires some metadata to be set for each trait that is being loaded.
     '''
 
     if path is not None and '/' in path:
@@ -312,73 +376,33 @@ def load_object(source, path=None):
         module_name = node._v_attrs.module
         klass_name = node._v_attrs.klass
     except AttributeError:
-        raise PersistenceError(node._v_file.filename, node._v_pathname)
+        raise PersistenceReadError(node._v_file.filename, node._v_pathname)
 
     # We need to obtain a reference to the type so we can adequately parse any
     # datetime values that are stored in the HDF5 file.  This type will also be
     # used to create a class instance once we are done loading the data.
     type = getattr(__import__(module_name, fromlist=[klass_name]), klass_name)
 
-    #for name, trait in type.class_traits(store='attribute').items():
-    for name, trait in get_traits(type, True,  store='attribute').items():
-        try:
-            value = node._f_getAttr(name)
-            # TraitMap will raise an error here
+    loaders = (('channel', load_channel),
+               #('node', load_node),
+               ('automatic', load_automatic),
+               ('child', load_child),
+               ('table', load_table),
+               ('attribute', load_attribute),
+              )
+
+    for mode, load in loaders:
+        log.debug('Loading data stored as %s', mode)
+        for name, trait in get_traits(type, True, store=mode).items():
+            log.debug('Loading %s', name)
             try:
-                klass = trait.trait_type.klass
-            except:
-                klass = None
-            # We just want to check on the datetime
-            if klass is not None and klass in date_classes:
-                value = strptime(value)
-            elif isinstance(value, int):
-                value = int(value)
-            kw[name] = value
-        except AttributeError:
-            # This information was not saved to the node, which suggests that
-            # the data stored in the node may be an older version.
-            log.debug('Node %s from file %s does not have attribute "%s"',
-                    node._v_pathname, node._v_file.filename, name)
-
-    #for name, trait in type.class_traits(store='table').items():
-    for name, trait in get_traits(type, True,  store='table').items():
-        # Converts datetime back from string to Python datetime format
-        data = getattr(node, name)[:]
-        data = unsanitize_datetimes(data, trait)
-        kw[name] = data
-
-    #for name, trait in type.class_traits(store='child').items():
-    for name, trait in get_traits(type, True, store='child').items():
-        value = getattr(node, name)
-        if trait.is_trait_type(List) or trait.is_trait_type(Array):
-            kw[name] = [load_object(o) for o in value._v_children.values()]
-        else:
-            kw[name] = load_object(value)
-
-    for name, trait in get_traits(type, True, store='automatic').items():
-        try:
-            # Traited classes do not properly raise AttributeError but return
-            # None instead.
-            path = trait.store_path if trait.store_path else name
-            kw[name] = node._f_getChild(path)
-        except tables.NoSuchNodeError:
-            log.debug('Node %s from file %s does not have node "%s"',
-                      node._v_pathname, node._v_file.filename, name)
-
-    for name, trait in get_traits(type, True, store='channel').items():
-        try:
-            try:
-                value = getattr(node, trait.store_path)
-            except (TypeError, AttributeError):
-                value = getattr(node, name)
-            kw[name] = load_file_channel(value)
-        except tables.NoSuchNodeError:
-            log.debug('Node %s from file %s does not have node "%s"',
-                      node._v_pathname, node._v_file.filename, name)
+                kw[name] = load(node, name, trait)
+            except tables.NoSuchNodeError:
+                log.warn('Node %s from file %s does not have node "%s"',
+                          node._v_pathname, node._v_file.filename, name)
 
     object = type(**kw)
     return append_metadata(object, node)
-    #return kw
 
 def load_file_channel(node):
     kw = {}
