@@ -1,26 +1,45 @@
-"""Note that the function and variable names may be a bit ambiguous since I'm
+"""
+Data storage philosophy
+=======================
+There are two fundamental kinds of data, raw and derived (i.e. analyzed).  Raw
+data is collected during the course of an experiment with as little processing
+as possible.  Examples of raw data include traces from sensors and electrodes as
+well as event times. 
+
+Note that there isn't always a clear distinction between raw and derived data.
+For example, there is some filtering on the spout contact data, optical sensor
+data and neural waveforms during acquisition.
+
+Aversive data terminology
+=========================
+
+Note that the function and variable names may be a bit ambiguous since I'm
 not sure what to call the SAFE/WARN trials.  We need to agree on some sensible
 terminology to avoid any confusion.  For example:
 
-    TRIAL - The response to the test signal plus it's associated "false alarms".
-    TRIAL BLOCK - All trials presented during an experiment.
+    trial
+        The response to the test (warn) signal plus associated intertrial (safe)
+        signal
+    trial block
+        All trials presented during an experiment.
 """
 from __future__ import division
-#from .experiment_data import ExperimentData, AnalyzedData
 from cns.experiment.data.experiment_data import ExperimentData, AnalyzedData
-from cns.channel import FileMultiChannel, FileChannel, RAMChannel
-from enthought.traits.api import Instance, List, CFloat, Int, Float, Any, \
+from cns.channel import FileMultiChannel, FileChannel
+from enthought.traits.api import Instance, List, Int, Float, Any, \
     Range, DelegatesTo, cached_property, on_trait_change, Array, Event, \
-    Property, Undefined, Callable, Str, Enum, Bool
+    Property, Undefined, Str, Enum, Bool
 from datetime import datetime
 import numpy as np
 from cns.data.h5_utils import append_node, get_or_append_node
-from cns.pipeline import deinterleave, broadcast
 from scipy.stats import norm
-from cns.traits.api import Alias
+
+from enthought.traits.ui.api import View
 
 def apply_mask(fun, seq, mask):
-    seq = np.array(seq).ravel()
+    #seq = np.array(seq).ravel()
+    seq = np.array(seq)
+    #return [fun(np.take(seq, m)) for m in mask]
     return [fun(seq[m]) for m in mask]
 
 # All timestamps reflect the sample number of the contact data
@@ -29,6 +48,9 @@ TRIAL_DTYPE = [('timestamp', 'i'), ('par', 'f'), ('shock', 'f'), ('type', 'S16')
 LOG_DTYPE = [('timestamp', 'i'), ('name', 'S64'), ('value', 'S128'), ]
 
 class BaseAversiveData(ExperimentData):
+    '''
+    Container for raw data from an aversive behavior experiment.
+    '''
 
     version = Float(0.0)
     latest_version = 0.1
@@ -70,15 +92,26 @@ class BaseAversiveData(ExperimentData):
 
     comment = Str('', store='attribute')
     exit_status = Enum('complete', 'partial', 'aborted', store='attribute')
+    date = Property
     start_time = Instance(datetime, store='attribute')
     stop_time = Instance(datetime, store='attribute')
     duration = Property(store='attribute')
+    water_infused = Property
+    
+    def _get_date(self):
+        return self.start_time.date()
 
     def _get_duration(self):
         if self.stop_time is None:
             return datetime.now()-self.start_time
         else:
             return self.stop_time-self.start_time
+
+    def _get_water_infused(self):
+        try:
+            return self.water_log[-1][1]
+        except:
+            return 0
 
     def _get_warn_ts(self):
         return self.trial_data[self.warn_indices]['timestamp']
@@ -148,6 +181,8 @@ class BaseAversiveData(ExperimentData):
     @cached_property
     def _get_par_safe_count(self):
         return apply_mask(len, self.safe_trials, self.safe_par_mask)
+
+    trait_view = View('total_trials')
 
 class RawAversiveData_v0_1(BaseAversiveData):
 
@@ -312,10 +347,28 @@ class RawAversiveData_v0_2(BaseAversiveData):
 
     def _trial_log_default(self):
         description = np.recarray((0,), dtype=LOG_DTYPE)
-        return append_node(self.store_node, 'trial_log', 'table', description)
+        return ap
 
-# For legacy reasons, we will let AversiveData = RawAversiveData_v0_1
-#AversiveData = RawAversiveData_v0_1
+    '''Since the store nodes for channels are not generated until the channel is
+    actually requested, the data file should not have nodes for these channels
+    when the behavior-only paradigm is run.
+    '''
+    # Contains
+    physiology_fs = Float(-1)
+    physiology_data = Instance(FileMultiChannel, store='automatic',
+                           store_path='physiology/electrode')
+    physiology_triggers = Any(store='automatic', store_path='physiology/triggers')
+
+    def _physiology_data_default(self):
+        node = get_or_append_node(self.store_node, 'physiology')
+        return FileMultiChannel(node=node, fs=self.physiology_fs,
+                                name='electrode', dtype=np.float32)
+
+    def _physiology_triggers_default(self):
+        description = np.recarray((0,), dtype=[('timestamp', 'i')])
+        node = get_or_append_node(self.store_node, 'physiology')
+        return append_node(node, 'triggers', 'table', description)
+
 AversiveData = RawAversiveData_v0_2
 
 class AnalyzedAversiveData(AnalyzedData):
@@ -325,18 +378,16 @@ class AnalyzedAversiveData(AnalyzedData):
     computations.
     '''
 
-    #data = Instance(BaseAversiveData, ())
-    data = Any
+    data = Instance(BaseAversiveData)
     updated = Event
 
     # The next few pars will influence the analysis of the data,
     # specifically the "score".  Anytime these pars change, the data must
     # be reanalyzed.
-    contact_offset = CFloat(0.9, store='attribute',
-                           label='Contact offset (s)')
-    contact_dur = CFloat(0.1, store='attribute', label='Contact duration (s)')
-    contact_fraction = Range(0.0, 1.0, 0.5, store='attribute',
-                            label='Contact fraction (s)')
+    contact_offset = Float(0.9, store='attribute', label='Contact offset (s)')
+    contact_dur = Float(0.1, store='attribute', label='Contact duration (s)')
+    contact_fraction = Range(0.0, 1.0, 0.5, store='attribute', 
+                             label='Contact fraction (s)')
 
     contact_digital = DelegatesTo('data')
     total_trials = DelegatesTo('data')
@@ -348,12 +399,13 @@ class AnalyzedAversiveData(AnalyzedData):
     # Scores contains the actual contact ratio for each trial.  False alarms and
     # hits are then computed against these scores (using the contact_fraction as
     # the threshold).
-    _contact_scores = Array(dtype='f', shape=(1000,))
-    contact_scores = Property(Array(dtype='f'), store='array', depends_on='curidx')
-    curidx = Int(0)
+    contact_scores = List(Float, store='array')
 
-    def _get_contact_scores(self):
-        return self._contact_scores[:self.curidx]
+    #contact_scores = Property(Array(dtype='f'), store='array', depends_on='curidx')
+    #curidx = Int(0)
+
+    #def _get_contact_scores(self):
+    #    return self._contact_scores[:self.curidx]
 
     # These are really just contact scores, hits, misses, etc. made available as
     # various arrays to facilitate analysis and plotting.  Very little
@@ -361,34 +413,35 @@ class AnalyzedAversiveData(AnalyzedData):
 
     # True/False sequence indicating whether animal was in contact with the
     # spout during the check.
-    fa_seq = Property(Array(dtype='f'), depends_on='curidx')
-    hit_seq = Property(Array(dtype='f'), depends_on='curidx')
-    remind_seq = Property(Array(dtype='f'), depends_on='curidx')
+    fa_seq = Property(Array(dtype='f'), depends_on='updated')
+    hit_seq = Property(Array(dtype='f'), depends_on='updated')
+    remind_seq = Property(Array(dtype='f'), depends_on='updated')
 
     # Fraction (0 to 1) indicating degree of animal's contact with spout during
     # the check.
-    safe_scores = Property(Array(dtype='f'), depends_on='curidx')
-    warn_scores = Property(Array(dtype='f'), depends_on='curidx')
-    remind_scores = Property(Array(dtype='f'), depends_on='curidx')
+    safe_scores = Property(Array(dtype='f'), depends_on='updated')
+    warn_scores = Property(Array(dtype='f'), depends_on='updated')
+    remind_scores = Property(Array(dtype='f'), depends_on='updated')
 
     # Actual position in the sequence (used in conjunction with the *_seq
     # properties to generate the score chart used in the view.
     safe_indices = DelegatesTo('data')
     warn_indices = DelegatesTo('data')
     remind_indices = DelegatesTo('data')
+    total_indices = Property(Int, depends_on='updated')
 
     # The summary scores
     pars = DelegatesTo('data')
-    par_hit_count = Property(List(Int), depends_on='curidx')
-    par_fa_count = Property(List(Int), depends_on='curidx')
-    par_hit_frac = Property(List(Float), depends_on='curidx')
-    par_fa_frac = Property(List(Float), depends_on='curidx')
-    par_z_hit = Property(List(Float), depends_on='curidx')
-    par_z_fa = Property(List(Float), depends_on='curidx')
-    par_dprime = Property(List(Float), depends_on='curidx, use_global_fa_frac')
-    par_dprime_nonglobal = Property(List(Float), depends_on='curidx')
-    par_dprime_global = Property(List(Float), depends_on='curidx')
-    global_fa_frac = Property(Float, depends_on='curidx', store='attribute')
+    par_hit_count = Property(List(Int), depends_on='updated')
+    par_fa_count = Property(List(Int), depends_on='updated')
+    par_hit_frac = Property(List(Float), depends_on='updated')
+    par_fa_frac = Property(List(Float), depends_on='updated')
+    par_z_hit = Property(List(Float), depends_on='updated')
+    par_z_fa = Property(List(Float), depends_on='updated')
+    par_dprime = Property(List(Float), depends_on='updated, use_global_fa_frac')
+    par_dprime_nonglobal = Property(List(Float), depends_on='updated')
+    par_dprime_global = Property(List(Float), depends_on='updated')
+    global_fa_frac = Property(Float, depends_on='updated', store='attribute')
 
     use_global_fa_frac = Bool(False)
 
@@ -398,6 +451,37 @@ class AnalyzedAversiveData(AnalyzedData):
                                    'fa_frac', 'd', 'd_global'],
                         col_types=['f', 'i', 'i', 'i', 'i', 'f', 'f', 'f', 'f'],
                        )
+
+    # Reaction times.  Offset and duration are relative to trial timestamp
+    # (negative offsets are allowed).
+    reaction_offset = Float(-1, store='attribute', label='Reaction offset',
+                            unit='s')
+    reaction_dur = Float(3.0, store='attribute', label='Reaction duration',
+                         unit='s')
+
+    reaction_snippets = List(Array(dtype='f'))
+
+    safe_reaction_snippets = Property(List(Array(dtype='f')))
+    mean_safe_reaction_snippets = Property(Array(dtype='f'))
+    warn_reaction_snippets = Property(List(Array(dtype='f')))
+    par_warn_reaction_snippets = Property(List(Array(dtype='f')))
+    par_mean_warn_reaction_snippets = Property(List(Array(dtype='f')))
+
+    def _get_mean_safe_reaction_snippets(self):
+        return self.safe_reaction_snippets.mean(0)
+
+    def _get_safe_reaction_snippets(self):
+        return np.take(self.reaction_snippets, self.safe_indices, axis=0)
+
+    def _get_warn_reaction_snippets(self):
+        return np.take(self.reaction_snippets, self.warn_indices, axis=0)
+
+    def _get_par_warn_reaction_snippets(self):
+        return apply_mask(lambda x: x, self.warn_reaction_snippets,
+                          self.data.warn_par_mask)
+
+    def _get_par_mean_warn_reaction_snippets(self):
+        return [arr.mean(0) for arr in self.par_warn_reaction_snippets]
 
     def _get_par_info(self):
         return zip(self.pars,
@@ -410,29 +494,49 @@ class AnalyzedAversiveData(AnalyzedData):
                    self.par_dprime_nonglobal,
                    self.par_dprime_global, )
 
-    def score_timestamp(self, ts):
-        #ts = ts/self.data.contact_digital.fs
-        ts = ts/self.contact_digital.fs
+    def reaction_snippet(self, ts):
+        '''Extracts segment of contact waveform
+        
+        Start offset (relative to the timestamp) and duration of the segment are
+        determined by `reaction_offset` and `reaction_dur`.
+        '''
+        contact = self.contact_digital
+        lb_index = contact.to_samples(self.reaction_offset)
+        ub_index = contact.to_samples(self.reaction_offset+self.reaction_dur)
+        return contact.get_range_index(lb_index, ub_index, ts)
 
-        #ts = ts/self.data.contact_fs
-        lb, ub = ts + self.contact_offset, ts + self.contact_offset + self.contact_dur
-        return self.contact_digital.get_range(lb, ub)[0].mean()
+    def score_timestamp(self, ts):
+        contact = self.contact_digital
+        lb_index = contact.to_samples(self.contact_offset)
+        ub_index = contact.to_samples(self.contact_offset+self.contact_dur)
+        return contact.get_range_index(lb_index, ub_index, ts).mean()
 
     @on_trait_change('data, contact_offset, contact_dur, contact_fraction')
-    def reprocess_timestamps(self):
-        self.curidx = 0
+    def reprocess_contact_scores(self):
+        self.contact_scores = []
         for ts in self.data.trial_data['timestamp']:
-            self.process_timestamp(ts)
+            self.contact_scores.append(self.score_timestamp(ts))
+        self.updated = True
+
+    @on_trait_change('data, reaction_offset, reaction_dur')
+    def reprocess_reaction_snippets(self):
+        self.reaction_snippets = []
+        for ts in self.data.trial_data['timestamp']:
+            self.reaction_snippets.append(self.reaction_snippet(ts))
+        self.updated = True
 
     @on_trait_change('data.updated')
     def process_timestamp(self, timestamp):
-        # need to check if timestamp is undefined because this apparently fires
-        # when the class is initialized
+        # Check if timestamp is undefined.  When the class is first initialized,
+        # we recieve a data.updated event with a value of Undefined.
         if timestamp is not Undefined:
-            score = self.score_timestamp(timestamp)
-            self._contact_scores[self.curidx] = score
-            self.curidx += 1
+            self.contact_scores.append(self.score_timestamp(timestamp))
+            self.reaction_snippets.append(self.reaction_snippet(timestamp))
             self.updated = True
+
+    @cached_property
+    def _get_total_indices(self):
+        return len(self.contact_scores)
 
     @cached_property
     def _get_fa_seq(self):
@@ -446,26 +550,25 @@ class AnalyzedAversiveData(AnalyzedData):
     def _get_remind_seq(self):
         return self.remind_scores < self.contact_fraction
 
-    # We need to check curidx to see if there are any contact scores.  If curidx
-    # is 0, this means that code somewhere has requested the value of these
-    # properties before any data is available. 
+    def _get_scores(self, indices):
+        # We need to check curidx to see if there are any contact scores.  If
+        # curidx is 0, this means that code somewhere has requested the value of
+        # these properties before any data is available. 
+        if len(self.contact_scores) == 0:
+            return np.array([])
+        return np.take(self.contact_scores, indices)
+
     @cached_property
     def _get_safe_scores(self):
-        if self.curidx == 0:
-            return np.array([])
-        return self.contact_scores[self.safe_indices]
+        return self._get_scores(self.safe_indices)
 
     @cached_property
     def _get_warn_scores(self):
-        if self.curidx == 0:
-            return np.array([])
-        return self.contact_scores[self.warn_indices]
+        return self._get_scores(self.warn_indices)
 
     @cached_property
     def _get_remind_scores(self):
-        if self.curidx == 0:
-            return np.array([])
-        return self.contact_scores[self.remind_indices]
+        return self._get_scores(self.remind_indices)
 
     @cached_property
     def _get_par_fa_frac(self):
@@ -512,6 +615,23 @@ class AnalyzedAversiveData(AnalyzedData):
     def _get_global_fa_frac(self):
         return self.fa_seq.mean()
 
+#class CollatedAnalyzedData(HasTraits):
+#
+#    data = List(Instance(BaseAversiveData))
+#
+#    contact_scores = Property(depends_on='data')
+#
+#    @cached_property
+#    def _get_contact_scores(self):
+#        scores = []
+#        for data in self.data:
+#            for ts in data.trial_data['timestamp']:
+#                ts = data.contact_digital.fs
+#                lb = ts+self.contact_offset
+#                ub = ts+self.contact_offset+self.contact_dur
+#                score = data.contact_digital.get_range(lb, ub)[0].mean()
+#                scores.append(score)
+
 if __name__ == '__main__':
     import tables
     f = tables.openFile('test2.h5', 'w')
@@ -519,4 +639,3 @@ if __name__ == '__main__':
     #analyzed = AnalyzedAversiveData(data=data)
     from cns.data.persistence import add_or_update_object
     add_or_update_object(data, f.root)
-
