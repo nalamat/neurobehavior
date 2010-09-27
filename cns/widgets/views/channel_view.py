@@ -148,13 +148,15 @@ class TTLChannelView(ChannelView):
                 stack_order='top_to_bottom',
                 )
 
-    def add(self, channel, *args, **kw):
+    def add(self, channel, label='', *args, **kw):
         val_range = DataRange1D(low_setting=-1.5, high_setting=1.5)
         val_map = LinearMapper(range=val_range)
         plot = TTLTimeSeries(channel=channel,
                              index_mapper=self.idx_map,
                              value_mapper=val_map,
                              *args, **kw)
+        plot.overlays.append(PlotLabel(component=plot, text=label,
+            overlay_position='top'))
         self.component.add(plot)
 
 class MultipleChannelView(ChannelView):
