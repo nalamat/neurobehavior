@@ -76,6 +76,8 @@ class PositiveController(ExperimentController):
         self.current_idx += 1
         last_trial = self.current_trial
         self.current_trial += 1
+        print 'num nogo', self.current_num_nogo
+        print 'last trial', last_trial
 
         if last_trial == self.current_num_nogo + 1:
             log.debug('Processing GO trial')
@@ -174,8 +176,8 @@ class PositiveController(ExperimentController):
     def _reset_current(self, value):
         self.init_current()
 
-    _apply_poke_dur_lb = _reset_current
-    _apply_poke_dur_lb = _reset_current
+    _apply_poke_duration_lb = _reset_current
+    _apply_poke_duration_ub = _reset_current
     _apply_min_nogo = _reset_current
     _apply_max_nogo = _reset_current
 
