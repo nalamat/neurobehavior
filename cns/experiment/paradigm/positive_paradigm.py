@@ -44,6 +44,7 @@ class PositiveParadigm(Paradigm):
                        'score_window_duration',
                        'reward_duration',
                        'poke_duration_lb',
+                       'poke_duration_ub',
                        resizable=True,
                        title='Positive paradigm editor',
                     )
