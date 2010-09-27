@@ -112,19 +112,43 @@ class ExperimentController(Controller):
     Enthought libraries (e.g. Traits), refer to the Enthought Tool Suite
     documentation online at:
     https://svn.enthought.com/enthought/wiki/UnderstandingMVCAndTraitsUI
+
+    The controller has one of several states:
+    Halted
+        The system is waiting for the user to configure parameters.  No data
+        acquisition is in progress nor is a signal being played.  
+    Paused
+        The system is configured, spout contact is being monitored, and the
+        intertrial signal is being played. 
+    Manual
+        The user has requested a manual trial.  Once the trial is over, the
+        controller will go back to the paused state.
+    Running
+        The system is playing the sequence of safe and warn signals. 
+    Disconnected
+        Could not connect to the equipment.
+
+    The controller listens for changes to paradigm parameters.  All requested
+    changes are intercepted and cached.  If a parameter is changed several times
+    (before applying or reverting), the cache is updated with the most recent
+    value.  To make a parameter configurable during an experiment it must
+    either:
+    - Have a function handler named `_apply_<parameter name>` that takes the new
+      value of the parameter and performs the necessary logic to update the
+      experiment state.
+    - Have an entry in `parameter_map` 
+
+    If both methods of configuring a parameter are present, the first method
+    encountered (i.e. `_apply_<parameter name>`) takes precedence.  If the
+    change is not allowed, a warning will be raised (but the handler will
+    continue running).  If a parameter is not configurable, be sure to set the
+    view accordingly.
+
+    Typically handlers need to work closely with a DSP device.
     """
 
     toolbar = Instance(ExperimentToolBar, ())
     
-    '''
-    SYSTEM STATE
-     - Halted: The system is waiting for the user to configure parameters.  No
-       data acquisition is in progress nor is a signal being played.  
-     - Paused: The system is configured, spout contact is being monitored, and
-       the intertrial signal is being played. 
-     - Running: The system is playing the sequence of safe and warn signals. 
-     - Disconnected: Could not connect to the equipment.
-    '''
     state = Enum('halted', 'paused', 'running', 'manual',  'disconnected')
 
     '''Number of experiments run before window is closed.'''
@@ -246,15 +270,6 @@ class ExperimentController(Controller):
     ############################################################################
     # Apply/Revert code
     ############################################################################
-    # This code listens for any potential changes to the parameters listed under
-    # paradigm.  All requested changes are captured and stored in a dictionary.
-    # If a parameter is changed several times (before applying or reverting),
-    # the dictionary is updated with the latest value.  To make a parameter
-    # modifiable, an _apply_<parameter name> method must be available that
-    # accepts the new value of the parameter and performs whatever work must be
-    # done to apply this change.  If this method is not allowed, a warning will
-    # be generated.
-
     pending_changes = Dict({})
     old_values = Dict({})
 

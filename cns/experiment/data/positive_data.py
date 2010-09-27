@@ -37,6 +37,10 @@ class PositiveData_0_1(ExperimentData):
             store='channel', store_path='contact/score_TTL')
     pump_TTL = Instance(FileChannel,
             store='channel', store_path='contact/pump_TTL')
+    signal_TTL = Instance(FileChannel,
+            store='channel', store_path='contact/signal_TTL')
+    response_TTL = Instance(FileChannel,
+            store='channel', store_path='contact/response_TTL')
 
     def _create_channel(self, name, dtype):
         contact_node = get_or_append_node(self.store_node, 'contact')
@@ -57,6 +61,12 @@ class PositiveData_0_1(ExperimentData):
 
     def _pump_TTL_default(self):
         return self._create_channel('pump_TTL', np.bool)
+
+    def _signal_TTL_default(self):
+        return self._create_channel('signal_TTL', np.bool)
+
+    def _response_TTL_default(self):
+        return self._create_channel('response_TTL', np.bool)
 
 PositiveData = PositiveData_0_1
 
