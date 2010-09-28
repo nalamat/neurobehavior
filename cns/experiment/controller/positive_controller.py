@@ -29,7 +29,7 @@ class PositiveController(ExperimentController):
                      'response_window_duration': 'circuit.resp_dur_n',
                      'score_window_duration': 'circuit.score_dur_n', 
                      'reward_duration': 'circuit.pump_dur_n', 
-                     #'signal_offset_delay': 'circuit.sig_offset_del_n', 
+                     'signal_offset_delay': 'circuit.sig_offset_del_n', 
                      'TTL_fs': 'circuit.TTL_nPer' }
 
     backend = Any
