@@ -21,6 +21,7 @@ class PositiveParadigm(Paradigm):
     min_nogo = Int(0, label='Minimum NOGO', store='attribute')
     max_nogo = Int(3, label='Maximum NOGO', store='attribute')
 
+    signal_offset_delay = Float(0.5, unit='s', store='attribute')
     intertrial_duration = Float(0.5, unit='s', store='attribute')
     response_window_delay = Float(0, unit='s', store='attribute')
     response_window_duration = Float(1.5, unit='s', store='attribute')
@@ -38,6 +39,7 @@ class PositiveParadigm(Paradigm):
                        #'go_probability{GO probability}',
                        'min_nogo',
                        'max_nogo',
+                       'signal_offset_delay',
                        'intertrial_duration',
                        'response_window_delay',
                        'response_window_duration',
