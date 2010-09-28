@@ -605,6 +605,7 @@ class Circuit(object):
     status = property(_get_status)
 
     def trigger(self, trig):
+        log.debug('Trigger %r fired', trig)
         if trig == 'A':
             raise NotImplementedError
         elif trig == 'B':
