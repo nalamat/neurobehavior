@@ -19,7 +19,8 @@ class ComponentView(HasTraits):
     index_title = DelegatesTo('index_label', 'title')
     value_title = DelegatesTo('value_label', 'title')
     #title = DelegatesTo('title_label', 'text')
-    title = Str
+    title = Str('')
+    label = Str('')
 
     index_label = Instance(PlotAxis)
     value_label = Instance(PlotAxis)
@@ -127,7 +128,7 @@ class BarChartOverlay(ComponentView):
         return self.template.trait_view(parent)
 
     def add_legend(self):
-        leg_data = dict([(c.title, c.component) for c in self.components])
+        leg_data = dict([(c.label, c.component) for c in self.components])
         legend = Legend(plots=leg_data, component=self.component,
                         border_visible=False)
         self.component.underlays.append(legend)
