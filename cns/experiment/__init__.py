@@ -1,5 +1,5 @@
 from enthought.pyface.api import error
-from cns.data.view.cohort import CohortViewHandler
+from cns.data.ui.cohort import CohortViewHandler
 from cns.data import persistence
 from cns.data.h5_utils import get_or_append_node
 import sys
@@ -88,7 +88,7 @@ from .experiment.aversive_experiment import AversiveExperiment
 from .experiment.positive_experiment import PositiveExperiment
 
 def load_experiment_launcher(experiment):
-    from cns.data.view.cohort import CohortView
+    from cns.data.ui.cohort import CohortView
     handler = ExperimentLauncher(experiment=globals()[experiment])
     CohortView().configure_traits(handler=handler)
 
