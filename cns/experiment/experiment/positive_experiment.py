@@ -31,19 +31,21 @@ class PositiveExperiment(HasTraits):
                 clean_data=True,)
 
         view.add(self.data.poke_TTL, label='Nose Poke',
-                 decimate_mode='mean', color='black', line_width=4)
-        view.add(self.data.trial_TTL, label='Trial Running',
-                 decimate_mode='mean', color='red', line_width=4)
+                 decimate_mode='mean', color='black', line_width=2)
+        #view.add(self.data.trial_TTL, label='Trial Running',
+                 #decimate_mode='mean', color='red', line_width=2)
         view.add(self.data.signal_TTL, label='Signal Playing',
-                 decimate_mode='mean', color='yellow', line_width=4)
+                 decimate_mode='mean', color='yellow', line_width=2)
         view.add(self.data.response_TTL, label='Response Window',
-                 decimate_mode='mean', color='purple', line_width=4)
+                 decimate_mode='mean', color='purple', line_width=2)
         view.add(self.data.score_TTL, label='Score Window',
-                 decimate_mode='mean', color='green', line_width=4)
+                 decimate_mode='mean', color='green', line_width=2)
+        view.add(self.data.reward_TTL, label='Reward Window',
+                 decimate_mode='mean', color='brown', line_width=2)
         view.add(self.data.spout_TTL, label='Spout Contact',
-                 decimate_mode='mean', color='orange', line_width=4)
+                 decimate_mode='mean', color='orange', line_width=2)
         view.add(self.data.pump_TTL, label='Pump Running',
-                 decimate_mode='mean', color='blue', line_width=4)
+                 decimate_mode='mean', color='blue', line_width=2)
         return view
     
     def _data_default(self):
