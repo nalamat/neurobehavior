@@ -20,6 +20,8 @@ import numpy as np
 log = logging.getLogger(__name__)
 
 class PositiveController(ExperimentController):
+    '''
+    '''
 
     circuits = { 'circuit': ('positive-behavior-stage3', 'RX6') }
     circuit = Any
@@ -30,7 +32,6 @@ class PositiveController(ExperimentController):
                      'score_window_duration': 'circuit.score_dur_n', 
                      'reward_duration': 'circuit.pump_dur_n', 
                      'TTL_fs': 'circuit.TTL_nPer' }
-
     backend = Any
     circuit = Any
     pump = Any

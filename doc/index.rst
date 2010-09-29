@@ -16,6 +16,7 @@ Contents:
    TDT_backend.rst
    experiment.rst
    aversive_behavior.rst
+   positive_behavior.rst
    data_processing.rst
 
 Indices and tables
