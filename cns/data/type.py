@@ -1,7 +1,7 @@
 from cns.data.constants import ANIMAL_IDS, ANIMAL_STATUS
 from cns.data.trait_types import CTuple, CDate
 from enthought.traits.api import HasTraits, Date, Enum, Instance, CList, \
-    Property, Int, CStr, CInt, CFloat, List, Any, Bool
+    Property, Int, Str, CInt, CFloat, List, Any, Bool
 import datetime
 
 #from cns.experiment.data import ExperimentData
@@ -30,7 +30,7 @@ class Animal(HasTraits):
     identifier = Enum(*ANIMAL_IDS, store='attribute')
     sex = Enum('U', 'M', 'F', store='attribute')
     birth = Date(store='attribute')
-    parents = CStr(store='attribute')
+    parents = Str(store='attribute')
     age = Property(Int, depends_on='birth')
     weight_log = CList(CTuple(CDate, CFloat), [],
                             store='table',
@@ -41,6 +41,7 @@ class Animal(HasTraits):
                             col_names=['date', 'status'],
                             col_types=['datetime64[M]', 'S32'])
     processed = Bool(False)
+    experiments = List
 
     store_node = Any # pointer to the storage node
     #experiments     = CList(Experiment, [], store=node')          
@@ -61,11 +62,11 @@ class Animal(HasTraits):
                 identifier=self.identifier, sex=self.sex)
 
     def __str__(self):
-        return '%s %s NYU%d' % (self.identifier, self.sex, self.nyu_id)
+        return '%s %s NYU ID %d' % (self.identifier.capitalize(), self.sex, self.nyu_id)
     
 class Cohort(HasTraits):
 
-    description = CStr(store='attribute')
+    description = Str(store='attribute')
     animals = List(Instance(Animal), store='child')
     size = Property(Int, depends_on=['animals[]'])
 

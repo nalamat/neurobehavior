@@ -4,7 +4,6 @@ Created on Jul 20, 2010
 @author: Brad
 '''
 import tables
-import datetime
 import logging
 log = logging.getLogger(__name__)
 
@@ -30,8 +29,19 @@ def append_node(node, name, type='group', *arg, **kw):
     #file.flush()
     return new_node
 
+time_fmt = '%Y_%m_%d_%H_%M_%S'
+
+def extract_date_from_name(node, pre='date', post=''):
+    from datetime import datetime
+    import re
+    name = node._v_name
+    string = re.sub('^'+pre, '', name)
+    string = re.sub(post+'$', '', string)
+    return datetime.strptime(string, time_fmt)
+    
 def append_date_node(node, pre='date', post='', type='group', *arg, **kw):
-    name = pre + datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S') + post
+    from datetime import datetime
+    name = pre + datetime.now().strftime(time_fmt) + post
     return append_node(node, name, type, *arg, **kw)
 
 def walk_nodes(start, **kw):

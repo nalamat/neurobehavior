@@ -10,7 +10,7 @@ from datetime import timedelta, datetime
 from enthought.pyface.api import error
 from enthought.pyface.timer.api import Timer
 from enthought.traits.api import Any, Instance, CInt, CFloat, Str, Float, \
-    Property, HasTraits, Bool, on_trait_change, Dict, Button, Event
+    Property, HasTraits, Bool, on_trait_change, Dict, Button, Event, Range
 from enthought.traits.ui.api import HGroup, spring, Item, View
 import logging
 import time
@@ -415,6 +415,47 @@ class AversiveFMController(BaseAversiveController):
                                             compression='decimated',
                                             fs=self.circuit.lick_nPer.get('fs'))
         super(AversiveFMController, self).init_experiment(info)
+
+class AversivePhysiologyController(AversiveController):
+
+    circuits = {'circuit': ('aversive-behavior', 'RX6'),
+                'circuit_physiology': ('aversive-physiology', 'RZ5'), 
+               }
+
+    circuit_physiology = Any
+    ch_monitor = Range(1, 16, 1)
+    
+    def init_equipment(self, info):
+        super(AversivePhysiologyController, self).init_equipment(info)
+        self.circuit_physiology = equipment.dsp().load('aversive-physiology', 'RZ5')
+        self.circuit_physiology.open('mc_sig', 'r', 
+                                     src_type=np.float32, 
+                                     dest_type=np.float32, 
+                                     channels=17, 
+                                     read='continuous',
+                                     sf=1)
+        self.circuit_physiology.open('triggers', 'r')
+        self.circuit_physiology.start()
+        
+    @on_trait_change('fast_tick')
+    def task_update_physiology(self):
+        try:
+            data = self.circuit_physiology.mc_sig.next()
+            self.model.data.neural_data.send(data)
+            data = self.circuit_physiology.triggers.next()
+            self.model.data.neural_triggers.send(data)
+        except StopIteration:
+            pass
+
+    def initialize_data(self, model):
+        exp_name = 'date_' + datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
+        model.exp_node = append_node(model.store_node, exp_name)
+        model.data_node = append_node(model.exp_node, 'AversiveData')
+        model.data = AversivePhysiologyData(contact_fs=model.paradigm.actual_lick_fs,
+                                  store_node=model.data_node)
+        
+    def _ch_monitor_changed(self, new):
+        self.circuit_physiology.ch_monitor = new
 
 if __name__ == "__main__":
     print AversiveController().parameter_map

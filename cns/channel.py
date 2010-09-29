@@ -51,6 +51,29 @@ class AbstractChannel(HasTraits):
     #def get_indices(self, *args):
     #    return [self.get_index(a) for a in args]
 
+    def to_samples(self, time):
+        return int(time*self.fs)
+
+    def get_range_index(self, start, end, reference=0):
+        '''
+        Returns a subset of the range specified in samples
+
+        The samples must be speficied relative to start of data acquisition.
+
+        Parameters
+        ----------
+        start : num samples (int)
+            Start index in samples
+        end : num samples (int)
+            End index in samples
+        reference : num samples (int), optional
+            Time of trigger to reference start and end to
+        '''
+        t0_index = int(self.t0*self.fs)
+        lb = max(0, start-t0_index+reference)
+        ub = max(0, end-t0_index+reference)
+        return self.signal[lb:ub]
+
     def get_range(self, start, end, reference=None):
         '''
         Returns a subset of the range.
