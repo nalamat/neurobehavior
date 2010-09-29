@@ -11,21 +11,118 @@ import tables
 import logging
 logging.root.setLevel(logging.WARN)
 
-def process_animal(node):
-    #nodes = h5_utils.walk_nodes(node.experiments, klass='RawAversiveData*')
-    with open('summary.txt', 'w') as fout:
-        for subnode in node.experiments._f_listNodes():
-            if 'aversive' in  subnode._v_name:
-                print node._v_pathname
-                data = persistence.load_object(node)
-                analyzed = AnalyzedAversiveData(data=data)
-                try:
-                    fout.write('Experiment: ' + data.start_time.strftime('%x %X') + '\n')
-                except AttributeError:
-                    pass
-                #fout.write(repr(analyzed.par_info))
-                #print data.water_log[-1]
-                #print analyzed.par_info
+from enthought.traits.ui.tabular_adapter import TabularAdapter
+from enthought.traits.api import *
+from enthought.traits.ui.api import *
+from enthought.traits.ui.api import TabularEditor
+from enthought.traits.ui.table_column import ObjectColumn
+from enthought.traits.ui.table_filter import TableFilter
+
+class ListColumn(ObjectColumn):
+    
+    format_func = Any(lambda x: ', '.join([str(e) for e in x]))
+    
+    def cmp(self, object1, object2):
+        return cmp(list(self.get_raw_value(object1)),
+                   list(self.get_raw_value(object2)))
+
+experiment_table = TableEditor(editable=False,
+                           filter_name='filter',
+                           filtered_indices='filtered_experiments',
+                           columns=[ObjectColumn(name='duration'),
+                                    #ObjectColumn(name='date'),
+                                    ObjectColumn(name='water_infused'),
+                                    ListColumn(name='pars'),
+                                    ObjectColumn(name='total_trials')])
+
+from cns.data.ui.cohort import simple_cohort_table
+
+class ExperimentCollection(HasTraits):
+    
+    animals = List
+    experiments = Property(List, depends_on='selected_animals')
+    filter = Property(depends_on='+filter')
+    filtered_experiments = List
+    selected_animals = List
+    
+    # filters
+    min_trials = Int(5, filter=True)
+    min_water = Float(0.5, filter=True)
+    
+    num_experiments = Property(Int, depends_on='filtered_experiments')
+    
+    def _get_num_experiments(self):
+        return len(self.filtered_experiments)
+    
+    @cached_property
+    def _get_experiments(self):
+        if self.selected_animals:
+            animals = self.animals[self.selected_animals]
+        else:
+            animals = self.animals
+        experiments = []
+        for animal in animals:
+            experiments.extend(animal.experiments)
+        return experiments
+        
+    def _get_filter(self):
+        return lambda o: (o.total_trials >= self.min_trials) and \
+                         (o.water_infused >= self.min_water)
+    
+    filter_view = VGroup('min_trials', 
+                         'min_water', 
+                         Item('num_experiments', 
+                              label='Selected experiments',
+                              style='readonly'),
+                         label='Filters', 
+                         show_border=True)
+
+    traits_view = View(Tabbed(filter_view,
+                              Item('animals',
+                                   label='Animals',
+                                   editor=simple_cohort_table),
+                              Item('experiments',
+                                   label='Experiments',
+                                   editor=experiment_table),
+                              show_labels=False),
+                       dock='horizontal',
+                       resizable=True)
+
+def process_file(filename):
+    fin = tables.openFile(filename)
+    animals = []
+    for node in fin.walkNodes():
+        if 'Animal' in node._v_name:
+            animal = persistence.load_object(node)
+            animal.experiments = []
+            animals.append(animal)
+            for subnode in node._f_walkNodes():
+                if 'aversive' in subnode._v_name:
+                    experiment = persistence.load_object(subnode.Data)
+                    animal.experiments.append(experiment)
+    ExperimentCollection(animals=animals).configure_traits()
+            
+def process_node(node, summary):
+    #par_info = node.Data.Analyzed.AnalyzedAversiveData_0.par_info[:]
+    data = persistence.load_object(node.Data)
+    analyzed = AnalyzedAversiveData(data=data)
+    par_info = analyzed.par_info
+    paradigm = persistence.load_object(node.Paradigm)
+    if analyzed.data.total_trials < 20:
+        return summary
+    if paradigm.signal_warn.variable == 'ramp_duration':
+        dB = 97-paradigm.signal_warn.attenuation
+        for row in par_info:
+            key = row[0], dB
+            append = row[1:5]
+            summary[key] = summary.get(key, array([0, 0, 0, 0])) + append
+    elif paradigm.signal_warn.variable == 'attenuation':
+         dur = paradigm.signal_warn.ramp_duration
+         for row in par_info:
+            key = dur, 97-row[0]
+            append = row[1:5]
+            summary[key] = summary.get(key, array([0, 0, 0, 0])) + append
+    return summary
 
 def process_node(node, summary):
     #par_info = node.Data.Analyzed.AnalyzedAversiveData_0.par_info[:]
@@ -49,42 +146,8 @@ def process_node(node, summary):
             summary[key] = summary.get(key, array([0, 0, 0, 0])) + append
     return summary
 
-'''
-data = {}
-for group in f.walkGroups():
-    animals = {}
-    if 'klass' in group._v_attrs and group._v_attrs.klass == 'Animal':
-        for node in group.experiments._v_children.values():
-            if 'aversive' in node._v_name:
-                try:
-                    process_node(node, data)
-                except persistence.PersistenceError:
-                    pass
-                except tables.FileModeError:
-                    pass
-
-keys = data.keys()
-keys.sort()
-
-grouped = {}
-for k in keys:
-    dur, dB = k
-    value = data[k]
-    grouped.setdefault(dur, []).append((dB, d_prime(*value))) 
-
-from pylab import *
-i = 1
-for k, v in grouped.items():
-    title('%f' % k)
-    subplot(4, 4, i);
-    v.sort()
-    plot(*zip(*v))
-    i += 1
-
-show()
-'''
 if __name__ == '__main__':
     #filename = 'c:/users/brad/desktop/BNB_dt_group_5_control.cohort.hd5'
     filename = '/home/brad/projects/data/BNB_dt_group_5_control.cohort.hd5'
-    f = tables.openFile(filename, 'r')
-    process_animal(f.root.Cohort_0.animals.Animal_0)
+    #f = tables.openFile(filename, 'r')
+    #process_animal(f.root.Cohort_0.animals.Animal_0)
