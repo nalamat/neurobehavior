@@ -371,51 +371,21 @@ class RawAversiveData_v0_2(BaseAversiveData):
 
 AversiveData = RawAversiveData_v0_2
 
-class AnalyzedAversiveData(AnalyzedData):
+class BaseAnalyzedAversiveData(AnalyzedData):
     '''
+    Computes basic analysis given data.
+
+    Subclasses must provide contact_scores and trial_data attributes.  See
+    :class:`AnalyzedAversiveData` and :class:`CollatedAnalyzedAversiveData` for
+    examples.
+
     Note that if you are attempting to compute d' and its related statistics (C,
-    95% CI, etc), see `cns.util.math` for standalone versions of these
-    computations.
+    95% CI, etc), `cns.util.math` has standalone versions of these computations.
     '''
-
-    data = Instance(BaseAversiveData)
-    updated = Event
-
-    # The next few pars will influence the analysis of the data,
-    # specifically the "score".  Anytime these pars change, the data must
-    # be reanalyzed.
-    contact_offset = Float(0.9, store='attribute', label='Contact offset (s)')
-    contact_dur = Float(0.1, store='attribute', label='Contact duration (s)')
-    contact_fraction = Range(0.0, 1.0, 0.5, store='attribute', 
-                             label='Contact fraction (s)')
-
-    contact_digital = DelegatesTo('data')
-    total_trials = DelegatesTo('data')
 
     # Clip FA/HIT rate if < clip or > 1-clip (prevents unusually high z-scores)
     clip = Float(0.05, store='attribute')
 
-    # False alarms and hits can only be determined after we score the data.
-    # Scores contains the actual contact ratio for each trial.  False alarms and
-    # hits are then computed against these scores (using the contact_fraction as
-    # the threshold).
-    contact_scores = List(Float, store='array')
-
-    #contact_scores = Property(Array(dtype='f'), store='array', depends_on='curidx')
-    #curidx = Int(0)
-
-    #def _get_contact_scores(self):
-    #    return self._contact_scores[:self.curidx]
-
-    # These are really just contact scores, hits, misses, etc. made available as
-    # various arrays to facilitate analysis and plotting.  Very little
-    # computation is done here, just filtering of the data.
-
-    # True/False sequence indicating whether animal was in contact with the
-    # spout during the check.
-    fa_seq = Property(Array(dtype='f'), depends_on='updated')
-    hit_seq = Property(Array(dtype='f'), depends_on='updated')
-    remind_seq = Property(Array(dtype='f'), depends_on='updated')
 
     # Fraction (0 to 1) indicating degree of animal's contact with spout during
     # the check.
@@ -428,7 +398,28 @@ class AnalyzedAversiveData(AnalyzedData):
     safe_indices = DelegatesTo('data')
     warn_indices = DelegatesTo('data')
     remind_indices = DelegatesTo('data')
+
+    safe_indices = Property(Array('i'), store='array')
+    warn_indices = Property(Array('i'), store='array')
+    remind_indices = Property(Array('i'), store='array')
     total_indices = Property(Int, depends_on='updated')
+
+    @cached_property
+    def _get_safe_indices(self):
+        return np.flatnonzero(self.trial_data['type'] == 'safe')
+
+    @cached_property
+    def _get_warn_indices(self):
+        return np.flatnonzero(self.trial_data['type'] == 'warn')
+
+    @cached_property
+    def _get_remind_indices(self):
+        return np.flatnonzero(self.trial_data['type'] == 'remind')
+
+    @cached_property
+    def _get_total_indices(self):
+        return len(self.contact_scores)
+
 
     # The summary scores
     pars = DelegatesTo('data')
@@ -493,62 +484,6 @@ class AnalyzedAversiveData(AnalyzedData):
                    self.par_fa_frac, 
                    self.par_dprime_nonglobal,
                    self.par_dprime_global, )
-
-    def reaction_snippet(self, ts):
-        '''Extracts segment of contact waveform
-        
-        Start offset (relative to the timestamp) and duration of the segment are
-        determined by `reaction_offset` and `reaction_dur`.
-        '''
-        contact = self.contact_digital
-        lb_index = contact.to_samples(self.reaction_offset)
-        ub_index = contact.to_samples(self.reaction_offset+self.reaction_dur)
-        return contact.get_range_index(lb_index, ub_index, ts)
-
-    def score_timestamp(self, ts):
-        contact = self.contact_digital
-        lb_index = contact.to_samples(self.contact_offset)
-        ub_index = contact.to_samples(self.contact_offset+self.contact_dur)
-        return contact.get_range_index(lb_index, ub_index, ts).mean()
-
-    @on_trait_change('data, contact_offset, contact_dur, contact_fraction')
-    def reprocess_contact_scores(self):
-        self.contact_scores = []
-        for ts in self.data.trial_data['timestamp']:
-            self.contact_scores.append(self.score_timestamp(ts))
-        self.updated = True
-
-    @on_trait_change('data, reaction_offset, reaction_dur')
-    def reprocess_reaction_snippets(self):
-        self.reaction_snippets = []
-        for ts in self.data.trial_data['timestamp']:
-            self.reaction_snippets.append(self.reaction_snippet(ts))
-        self.updated = True
-
-    @on_trait_change('data.updated')
-    def process_timestamp(self, timestamp):
-        # Check if timestamp is undefined.  When the class is first initialized,
-        # we recieve a data.updated event with a value of Undefined.
-        if timestamp is not Undefined:
-            self.contact_scores.append(self.score_timestamp(timestamp))
-            self.reaction_snippets.append(self.reaction_snippet(timestamp))
-            self.updated = True
-
-    @cached_property
-    def _get_total_indices(self):
-        return len(self.contact_scores)
-
-    @cached_property
-    def _get_fa_seq(self):
-        return self.safe_scores < self.contact_fraction
-
-    @cached_property
-    def _get_hit_seq(self):
-        return self.warn_scores < self.contact_fraction
-
-    @cached_property
-    def _get_remind_seq(self):
-        return self.remind_scores < self.contact_fraction
 
     def _get_scores(self, indices):
         # We need to check curidx to see if there are any contact scores.  If
@@ -615,22 +550,126 @@ class AnalyzedAversiveData(AnalyzedData):
     def _get_global_fa_frac(self):
         return self.fa_seq.mean()
 
-#class CollatedAnalyzedData(HasTraits):
-#
-#    data = List(Instance(BaseAversiveData))
-#
-#    contact_scores = Property(depends_on='data')
-#
-#    @cached_property
-#    def _get_contact_scores(self):
-#        scores = []
-#        for data in self.data:
-#            for ts in data.trial_data['timestamp']:
-#                ts = data.contact_digital.fs
-#                lb = ts+self.contact_offset
-#                ub = ts+self.contact_offset+self.contact_dur
-#                score = data.contact_digital.get_range(lb, ub)[0].mean()
-#                scores.append(score)
+class AnalyzedAversiveData(BaseAnalyzedAversiveData):
+
+    updated = Event
+
+    data = Instance(BaseAversiveData)
+    trial_data = DelegatesTo('data')
+    contact_digital = DelegatesTo('data')
+    total_trials = DelegatesTo('data')
+
+    # The next few pars will influence the analysis of the data, specifically
+    # the "score".  Anytime these change, the data must be reanalyzed.
+    contact_offset = Float(0.9, store='attribute', label='Contact offset (s)')
+    contact_dur = Float(0.1, store='attribute', label='Contact duration (s)')
+    contact_fraction = Range(0.0, 1.0, 0.5, store='attribute', 
+                             label='Contact fraction (s)')
+
+    # False alarms and hits can only be determined after we score the data.
+    # Scores contains the actual contact ratio for each trial.  False alarms and
+    # hits are then computed against these scores (using the contact_fraction as
+    # the threshold).
+    contact_scores = List(Float, store='array')
+
+    # True/False sequence indicating whether animal was in contact with the
+    # spout during the check.
+    fa_seq = Property(Array(dtype='f'), depends_on='updated')
+    hit_seq = Property(Array(dtype='f'), depends_on='updated')
+    remind_seq = Property(Array(dtype='f'), depends_on='updated')
+
+    def reaction_snippet(self, ts):
+        '''Extracts segment of contact waveform
+        
+        Start offset (relative to the timestamp) and duration of the segment are
+        determined by `reaction_offset` and `reaction_dur`.
+        '''
+        contact = self.contact_digital
+        lb_index = contact.to_samples(self.reaction_offset)
+        ub_index = contact.to_samples(self.reaction_offset+self.reaction_dur)
+        return contact.get_range_index(lb_index, ub_index, ts)
+
+    def score_timestamp(self, ts):
+        '''Computes contact score for timestamp
+        '''
+        contact = self.contact_digital
+        lb_index = contact.to_samples(self.contact_offset)
+        ub_index = contact.to_samples(self.contact_offset+self.contact_dur)
+        return contact.get_range_index(lb_index, ub_index, ts).mean()
+
+    @on_trait_change('data, contact_offset, contact_dur, contact_fraction')
+    def reprocess_contact_scores(self):
+        self.contact_scores = []
+        for ts in self.data.trial_data['timestamp']:
+            self.contact_scores.append(self.score_timestamp(ts))
+        self.updated = True
+
+    @on_trait_change('data, reaction_offset, reaction_dur')
+    def reprocess_reaction_snippets(self):
+        self.reaction_snippets = []
+        for ts in self.data.trial_data['timestamp']:
+            self.reaction_snippets.append(self.reaction_snippet(ts))
+        self.updated = True
+
+    @on_trait_change('data.updated')
+    def process_timestamp(self, timestamp):
+        # Check if timestamp is undefined.  When the class is first initialized,
+        # we recieve a data.updated event with a value of Undefined.
+        if timestamp is not Undefined:
+            self.contact_scores.append(self.score_timestamp(timestamp))
+            self.reaction_snippets.append(self.reaction_snippet(timestamp))
+            self.updated = True
+
+    @cached_property
+    def _get_fa_seq(self):
+        return self.safe_scores < self.contact_fraction
+
+    @cached_property
+    def _get_hit_seq(self):
+        return self.warn_scores < self.contact_fraction
+
+    @cached_property
+    def _get_remind_seq(self):
+        return self.remind_scores < self.contact_fraction
+
+class GrandAnalyzedAversiveData(BaseAnalyzedAversiveData):
+    '''Grand analysis using scored data from multiple experiments.
+    '''
+
+    data = List(Instance(AnalyzedAversiveData))
+
+    trial_data = Property
+    contact_scores = Property(depends_on='data', store='array')
+    
+    remind_seq = Property
+    hit_seq = Property
+    fa_seq = Property
+
+    def reaction_snippet(self, ts):
+        return [0]
+
+    def _concatenate(self, attr):
+        return np.concatenate([getattr(d, attr) for d in self.data])
+
+    @cached_property
+    def _get_contact_scores(self):
+        return self._concatenate('contact_scores')
+
+    @cached_property
+    def _get_trial_data(self):
+        return self._concatenate('trial_data')
+
+    @cached_property
+    def _get_remind_seq(self):
+        return self._concatenate('remind_seq')
+
+    @cached_property
+    def _get_hit_seq(self):
+        return self._concatenate('hit_seq')
+
+    @cached_property
+    def _get_fa_seq(self):
+        return self._concatenate('fa_seq')
 
 if __name__ == '__main__':
     import tables
