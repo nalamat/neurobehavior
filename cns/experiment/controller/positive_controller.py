@@ -28,8 +28,9 @@ class PositiveController(ExperimentController):
                      'response_window_delay': 'circuit.resp_del_n',
                      'response_window_duration': 'circuit.resp_dur_n',
                      'score_window_duration': 'circuit.score_dur_n', 
-                     'reward_duration': 'circuit.pump_dur_n', 
+                     'reward_duration': 'circuit.reward_dur_n', 
                      'signal_offset_delay': 'circuit.sig_offset_del_n', 
+                     'spout_smooth_duration': 'circuit.spout_smooth_n', 
                      'TTL_fs': 'circuit.TTL_nPer' }
 
     backend = Any
@@ -138,9 +139,10 @@ class PositiveController(ExperimentController):
                    self.model.data.spout_TTL,
                    self.model.data.signal_TTL,
                    self.model.data.score_TTL,
-                   self.model.data.pump_TTL,
+                   self.model.data.reward_TTL,
                    self.model.data.trial_TTL,
                    self.model.data.response_TTL,
+                   self.model.data.pump_TTL,
                    ]
         return int_to_TTL(len(targets), deinterleave(targets))
 
