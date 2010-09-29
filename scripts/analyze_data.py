@@ -84,6 +84,7 @@ for k, v in grouped.items():
 show()
 '''
 if __name__ == '__main__':
-    filename = 'c:/users/brad/desktop/BNB_dt_group_5_control.cohort.hd5'
+    #filename = 'c:/users/brad/desktop/BNB_dt_group_5_control.cohort.hd5'
+    filename = '/home/brad/projects/data/BNB_dt_group_5_control.cohort.hd5'
     f = tables.openFile(filename, 'r')
     process_animal(f.root.Cohort_0.animals.Animal_0)
