@@ -235,6 +235,9 @@ class FileChannel(Channel):
         self.buffer.append(data)
         self.updated = True
 
+    def write(self, data):
+        self.send(data)
+
 class RAMChannel(Channel):
     '''Buffers data in memory without saving it to disk.
 

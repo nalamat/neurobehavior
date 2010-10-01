@@ -4,7 +4,7 @@ from cns.pipeline import deinterleave
 from cns.data.h5_utils import append_node, append_date_node, \
     get_or_append_node
 from cns.data.persistence import add_or_update_object
-from cns.experiment.data import AversiveData
+from cns.experiment.data.aversive_data import RawAversiveData as AversiveData
 from cns.experiment.paradigm.aversive_paradigm import BaseAversiveParadigm
 from datetime import timedelta, datetime
 from enthought.pyface.api import error

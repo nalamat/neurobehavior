@@ -1,6 +1,6 @@
 import tables
 from cns.data.type import Animal, Cohort
-from cns.data.persistence import load_object, add_or_update_object
+from cns.data import persistence
 
 import logging
 log = logging.getLogger(__name__)
@@ -19,17 +19,15 @@ def load_cohort(id, filename):
     in the future though."""
     try:
         fh = tables.openFile(filename, 'r')
-        obj = load_object(getattr(fh.root, 'Cohort_' + str(id)))
+        obj = persistence.load_object(getattr(fh.root, 'Cohort_' + str(id)))
         fh.close()
         return obj
-    except BaseException:
-        mesg = 'Attempt to load cohort %d from file %s failed'
-        log.exception(mesg, id, filename)
+    except persistence.PersistenceReadError, e:
         raise BadCohortFile(filename)
 
 def save_cohort(cohort, filename):
     fh = tables.openFile(filename, 'a')
-    node = add_or_update_object(cohort, fh.root)
+    node = persistence.add_or_update_object(cohort, fh.root)
     #fh.flush()
     fh.close()
     return node

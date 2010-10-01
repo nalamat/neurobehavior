@@ -5,7 +5,7 @@ import operator as op
 from cns.widgets.handler import FileHandler, filehandler_menubar
 from enthought.pyface.api import YES, confirm
 from enthought.traits.api import HasTraits, Button, Instance, Event, \
-    on_trait_change, Property, File, Bool, Str
+    on_trait_change, Property, File, Bool, Str, List
 from enthought.traits.ui.api import View, HGroup, Item, VGroup, spring, \
     InstanceEditor, TabularEditor, Group
 from enthought.traits.ui.tabular_adapter import TabularAdapter
@@ -70,7 +70,10 @@ class SimpleAnimalAdapter(TabularAdapter):
             return '#D3D3D3'
     
 simple_cohort_table = TabularEditor(adapter=SimpleAnimalAdapter(),
-                                    editable=False)
+                                    editable=False,
+                                    dclicked='dclicked',
+                                    selected='selected',
+                                    multi_select=True)
 
 class CohortViewHandler(FileHandler):
 
@@ -112,6 +115,8 @@ dynamic_cohort_table = TabularEditor(adapter=AnimalAdapter(), update='update',
                                      column_clicked='column_clicked',
                                      right_clicked='rclicked')
 
+from enthought.traits.api import Any
+
 class CohortView(HasTraits):
 
     cohort = Instance(Cohort, ())
@@ -122,6 +127,8 @@ class CohortView(HasTraits):
     column_clicked = Event
     
     _modified = Bool(False)
+
+    application = Any
     
     @on_trait_change('column_clicked')
     def sort(self, event):
@@ -137,12 +144,20 @@ class CohortView(HasTraits):
     def set_modified(self, object, name, old, new):
         if name != 'processed':
             self._modified = True
+
+    @on_trait_change('dclicked')
+    def open_view(self):
+        print 'detected'
+        view = TraitsUIView(id='foo',
+                            name='foo',
+                            obj=self.selected)
+        self.window.add_view(view)
         
-    @on_trait_change('cohort.animals.+')
-    def sort_animals(self):
-        #self.cohort.animals.sort()
-        #self.update = True
-        return
+    #@on_trait_change('cohort.animals.+')
+    #def sort_animals(self):
+    #    #self.cohort.animals.sort()
+    #    #self.update = True
+    #    return
 
     log_view = View(VGroup(Group('object.cohort.description~',
                        ),
@@ -202,6 +217,9 @@ class CohortEditView(CohortView):
         return view
 
 class CohortView(HasTraits):
+
+    dclicked = Event
+    selected = List(Instance('cns.data.type.Animal'))
 
     cohort = Instance('cns.data.type.Cohort')
     simple_view = View(Item('object.cohort.animals{}',

@@ -9,7 +9,7 @@ import tables
 #base = '/Cohort_0/animals/Animal_%d/'
 
 import logging
-logging.root.setLevel(logging.WARN)
+logging.root.setLevel(logging.ERROR)
 
 from enthought.traits.ui.tabular_adapter import TabularAdapter
 from enthought.traits.api import *
@@ -35,12 +35,19 @@ experiment_table = TableEditor(editable=False,
                                     ListColumn(name='pars'),
                                     ObjectColumn(name='total_trials')])
 
+analyzed_table = TableEditor(editable=False,
+                            #filter_name='filter',
+                            columns=[ListColumn(name='pars'),
+                                     ListColumn(name='par_fa_frac')])
+
 from cns.data.ui.cohort import simple_cohort_table
 
 class ExperimentCollection(HasTraits):
     
     animals = List
     experiments = Property(List, depends_on='selected_animals')
+    #analyzed = Property(List, depends_on='experiments')
+
     filter = Property(depends_on='+filter')
     filtered_experiments = List
     selected_animals = List
@@ -50,7 +57,10 @@ class ExperimentCollection(HasTraits):
     min_water = Float(0.5, filter=True)
     
     num_experiments = Property(Int, depends_on='filtered_experiments')
-    
+
+    #def _get_analyzed(self):
+    #    return [AnalyzedAversiveData(data=data) for data in self.experiments]
+
     def _get_num_experiments(self):
         return len(self.filtered_experiments)
     
@@ -84,13 +94,20 @@ class ExperimentCollection(HasTraits):
                               Item('experiments',
                                    label='Experiments',
                                    editor=experiment_table),
+                              Item('analyzed',
+                                   label='Analyzed',
+                                   editor=analyzed_table),
                               show_labels=False),
                        dock='horizontal',
                        resizable=True)
 
-def process_file(filename):
-    fin = tables.openFile(filename)
+from cns.experiment.data.aversive_data import GrandAnalyzedAversiveData
+
+
+def process_file(filename, filter=None):
+    fin = tables.openFile(filename, 'r')
     animals = []
+    analyzed = []
     for node in fin.walkNodes():
         if 'Animal' in node._v_name:
             animal = persistence.load_object(node)
@@ -98,56 +115,16 @@ def process_file(filename):
             animals.append(animal)
             for subnode in node._f_walkNodes():
                 if 'aversive' in subnode._v_name:
+                    print subnode._v_name
                     experiment = persistence.load_object(subnode.Data)
                     animal.experiments.append(experiment)
-    ExperimentCollection(animals=animals).configure_traits()
+                    analyzed.append(AnalyzedAversiveData(data=experiment))
+    #ExperimentCollection(animals=animals).configure_traits()
+    ga = GrandAnalyzedAversiveData(data=analyzed)
+    print ga.par_info
             
-def process_node(node, summary):
-    #par_info = node.Data.Analyzed.AnalyzedAversiveData_0.par_info[:]
-    data = persistence.load_object(node.Data)
-    analyzed = AnalyzedAversiveData(data=data)
-    par_info = analyzed.par_info
-    paradigm = persistence.load_object(node.Paradigm)
-    if analyzed.data.total_trials < 20:
-        return summary
-    if paradigm.signal_warn.variable == 'ramp_duration':
-        dB = 97-paradigm.signal_warn.attenuation
-        for row in par_info:
-            key = row[0], dB
-            append = row[1:5]
-            summary[key] = summary.get(key, array([0, 0, 0, 0])) + append
-    elif paradigm.signal_warn.variable == 'attenuation':
-         dur = paradigm.signal_warn.ramp_duration
-         for row in par_info:
-            key = dur, 97-row[0]
-            append = row[1:5]
-            summary[key] = summary.get(key, array([0, 0, 0, 0])) + append
-    return summary
-
-def process_node(node, summary):
-    #par_info = node.Data.Analyzed.AnalyzedAversiveData_0.par_info[:]
-    data = persistence.load_object(node.Data)
-    analyzed = AnalyzedAversiveData(data=data)
-    par_info = analyzed.par_info
-    paradigm = persistence.load_object(node.Paradigm)
-    if analyzed.data.total_trials < 20:
-        return summary
-    if paradigm.signal_warn.variable == 'ramp_duration':
-        dB = 97-paradigm.signal_warn.attenuation
-        for row in par_info:
-            key = row[0], dB
-            append = row[1:5]
-            summary[key] = summary.get(key, array([0, 0, 0, 0])) + append
-    elif paradigm.signal_warn.variable == 'attenuation':
-         dur = paradigm.signal_warn.ramp_duration
-         for row in par_info:
-            key = dur, 97-row[0]
-            append = row[1:5]
-            summary[key] = summary.get(key, array([0, 0, 0, 0])) + append
-    return summary
-
 if __name__ == '__main__':
-    #filename = 'c:/users/brad/desktop/BNB_dt_group_5_control.cohort.hd5'
-    filename = '/home/brad/projects/data/BNB_dt_group_5_control.cohort.hd5'
-    #f = tables.openFile(filename, 'r')
-    #process_animal(f.root.Cohort_0.animals.Animal_0)
+    import sys
+    lambda o: (o.total_trials >= 20) and \
+              (o.water_infused >= 0.5)
+    process_file(sys.argv[1])

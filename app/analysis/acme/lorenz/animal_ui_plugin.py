@@ -46,7 +46,6 @@ class AnimalUIPlugin(Plugin):
 
     def _views_default(self):
         """ Trait initializer. """
-        
         return [self._create_data_view, self._create_plot2d_view]
 
     ###########################################################################
@@ -58,12 +57,13 @@ class AnimalUIPlugin(Plugin):
 
         #from acme.lorenz.api import DataView, Lorenz
         from cns.data.type import Animal
+        from cns.data.ui.cohort import CohortView
 
         data_view = TraitsUIView(
             id   = 'lorenz.data',
             name = 'Data',
             #obj  = DataView(lorenz=self.application.get_service(Lorenz)),
-            obj  = self.application.get_service(Animal),
+            obj  = CohortView(cohort=self.application.get_services(Cohort)[-1]),
             **traits
         )
 

@@ -8,10 +8,11 @@ from enthought.pyface.workbench.api import TraitsUIView
 class LoadCohortAction(ActionClass):
 
     name = 'Load Cohort'
+
     def perform(self, event):
         from enthought.pyface.api import FileDialog, confirm, NO, error, OK
         from cns.data.io import load_cohort
-        from cns.data.view.cohort import CohortView
+        from cns.data.ui.cohort import CohortView
         fd = FileDialog(action='open',
                         default_directory='c:/users/brad/desktop/BNB',
                         wildcard='*.cohort.hd5')
@@ -19,11 +20,22 @@ class LoadCohortAction(ActionClass):
             if self.window.get_view_by_id(fd.path) is not None:
                 return
             cohort = load_cohort(0, fd.path)
+
+            app = self.window.application
+            klass = 'cns.data.type.Cohort'
+            #for animal in cohort.animals:
+            #    app.register_service(klass, animal)
+            app.register_service(klass, cohort)
+
             view = TraitsUIView(id=fd.path,
                                 name=cohort.description,
-                                obj=CohortView(cohort=cohort),
+                                obj=CohortView(cohort=cohort,
+                                               application=self.window.application),
                                 view='simple_view')
             self.window.add_view(view)
+            #self.window.edit(CohortView(cohort=cohort))
+            print self.window
+            print dir(self.window)
 
 class CohortActionSet(WorkbenchActionSet):
 

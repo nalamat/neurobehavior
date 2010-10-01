@@ -1,7 +1,7 @@
 from enthought.traits.api import HasTraits, Any, Instance, DelegatesTo, Int
 from enthought.traits.ui.api import View, Item, VGroup, HGroup, InstanceEditor
 
-from cns.experiment.data.aversive_data import AversiveData
+from cns.experiment.data.aversive_data import RawAversiveData as AversiveData
 from cns.experiment.data.aversive_data_view import AnalyzedAversiveDataView
 
 from cns.experiment.paradigm.aversive_paradigm import (AversiveParadigm,

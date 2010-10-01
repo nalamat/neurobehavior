@@ -1,4 +1,5 @@
-'''The simplest way to connect to a backend is:
+'''
+The simplest way to connect to a backend is:
 
 from cns import equipment
 circuit = equipment.dsp(backend_name).connect(circuit_name, device_name)
@@ -14,16 +15,39 @@ PXI and FGPA system).
 
 This module describes the expected interface (API) that backends should follow.
 '''
+
 from cns.equipment import EquipmentError
 
-def load(circuit, device):
-    raise NotImplementedError
+def load(microcode, device):
+    '''
+    Loads the specified microcode to the specified device.  The microcode should
+    be somewhere on a predefined search path, which must include the current
+    working directory.
 
-def init_device(circuit, device, **kwargs):
+    To specify that the microcode is contained in a subfolder, just append it to
+    the name (e.g. test/positive-behavior.rcx).
+
+    Parameters
+    -----_----
+    microcode : string
+        name (can include subfolders off the search path)
+    device : string
+        ID of the device
+
+    Returns
+    -------
+    circuit : subclass of AbstractCircuit
+    '''
     raise NotImplementedError
 
 def set_attenuation(atten, device):
+    '''
+    This hasn't really been worked out yet.
+    '''
     raise NotImplementedError
+
+VALID_UNITS = 'fs', 'Hz', 's', 'ms', 'nPow2', 'n', 'nPer'
+P_UNIT = re.compile(r".*_(%s)$" % '|'.join(VALID_UNITS))
 
 def convert(src_unit, dest_unit, value, dsp_fs):
     '''
@@ -69,7 +93,7 @@ def convert(src_unit, dest_unit, value, dsp_fs):
 
     Returns
     -------
-    numerical value
+    converted unit : numerical value
     '''
     
     def fs_to_nPer(req_fs, dsp_fs):
@@ -125,8 +149,12 @@ class SamplingRateError(UnitError):
 
 class AbstractDSPBuffer(BlockBuffer):
     '''
-    Provides simple read/write access to the DSP buffers.  
-    
+    Provides read/write access to a hardware buffer.
+
+    Typically hardware buffers are fixed-length circular buffers.  When the last
+    slot in the buffer is reached, the pointer wraps to the beginning of the
+    buffer.
+
     This class is meant to handle the various methods via which data can be
     stored on the DSP.  Since data can be compressed for storage in the DSP
     buffer and may contain multiple channels, you must tell the object how to
@@ -251,19 +279,33 @@ class AbstractDSPBuffer(BlockBuffer):
             return curidx-self.idx
 
     def block_processed(self):
-        """Indicates that the next block has been processed.  If this is
-        primarily an input buffer, it means the block has data that is ready for
-        acquisition.  If this is primarily an output buffer, it means the data
-        in the block has been processed by the system (e.g.  played to the
-        speaker) and can be overwritten safely using writeBlock.
+        """
+        Indicates that the next block has been processed.  
+        
+        If this is primarily an input buffer, it means the block has data that
+        is ready for acquisition.  If this is primarily an output buffer, it
+        means the data in the block has been processed by the system (e.g.
+        played to the speaker) and can be overwritten safely using writeBlock.
+
+        Returns
+        -------
+        block_procesed : boolean
         """
         return self.samples_processed()>=self.block_size
 
     def available(self):
+        '''
+        Number of samples available for acquisition.
+
+        Returns
+        -------
+        int
+        '''
         raise NotImplementedError
     
     def _write(self, offset, data):
-        '''Actual implementation of write
+        '''
+        Hardware-specific implementation of writing data to buffer goes here.  
         '''
 
     def acquire(self, samples, trigger=None, timeout=1, dt=0.01):
