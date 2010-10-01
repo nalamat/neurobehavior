@@ -15,43 +15,22 @@ class LorenzPerspective(Perspective):
         PerspectiveItem(id='lorenz.plot2d')
     ]
 
-
 class LorenzUIPlugin(Plugin):
-    """ The Lorenz UI plugin.
 
-    This plugin is part of the 'Lorenz' example application.
-
-    """
+    id = 'acme.lorenz.ui'
+    name = 'Lorenz UI'
 
     # Extension points Ids.
     PERSPECTIVES   = 'enthought.envisage.ui.workbench.perspectives'
     VIEWS          = 'enthought.envisage.ui.workbench.views'
-
-    #### 'IPlugin' interface ##################################################
-
-    # The plugin's unique identifier.
-    id = 'acme.lorenz.ui'
-
-    # The plugin's name (suitable for displaying to the user).
-    name = 'Lorenz UI'
-
-    #### Contributions to extension points made by this plugin ################
-
-    # Perspectives.
-    perspectives = List(contributes_to=PERSPECTIVES)
+    perspectives   = List(contributes_to=PERSPECTIVES)
+    views = List([], contributes_to=VIEWS)
 
     def _perspectives_default(self):
-        """ Trait initializer. """
-
         return [LorenzPerspective]
 
-    # Views.
-    views = List([] ,contributes_to=VIEWS)
-
-    #def _views_default(self):
-    #    """ Trait initializer. """
-    #    
-    #    return [self._create_data_view, self._create_plot2d_view]
+    def _views_default(self):
+        return [self._create_data_view, self._create_plot2d_view]
 
     ###########################################################################
     # Private interface.
@@ -62,16 +41,19 @@ class LorenzUIPlugin(Plugin):
 
         #from acme.lorenz.api import DataView, Lorenz
         #from cns.data.type import Animal
-        from cns.data.io import load_cohort
-        from cns.data.view.cohort import CohortView
-        fname = 'c:/users/brad/desktop/BNB/simple.cohort.hd5'
-        cohort = load_cohort(0, fname)
+        #from cns.data.io import load_cohort
+        from cns.data.ui.cohort import CohortView
+        #fname = 'c:/users/brad/desktop/BNB/simple.cohort.hd5'
+        #fname = '/home/bburan/projects/data/BNB_dt_group_6_CHL.cohort.hd5'
+        #cohort = load_cohort(0, fname)
         #fd = FileDialog(action='open',
                         #default_directory='c:/users/brad/desktop/BNB',
                         #wildcard='*.cohort.hd5')
         #fd.open()
         #if fd.open() ==  OK and fd.path <> '':
             #cohort = load_cohort(0, fname)
+
+        cohort = self.application.get_service('cns.data.type.Cohort')
 
         data_view = TraitsUIView(
             id   = 'lorenz.data',

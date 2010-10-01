@@ -26,8 +26,6 @@ def main():
         ]
     )
 
-    # Run it! This starts the application, starts the GUI event loop, and when
-    # that terminates, stops the application.
     lorenz_application.run()
     return
 

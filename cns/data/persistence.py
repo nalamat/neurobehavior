@@ -253,9 +253,15 @@ def switch_datetime_fmt(table, trait, parser):
     # TODO: this is obviously not the most efficient implementation; however,
     # it works!
     if len(table):
+        try:
+            dtype = trait.dtype
+        except AttributeError:
+            dtype = get_np_dtype(trait)
+
         table = [tuple(row) for row in table]
-        table = array(table, dtype=get_np_dtype(trait))
-        for cname, ctype in zip(trait.col_names, trait.col_types):
+        table = array(table, dtype=dtype)
+
+        for cname, ctype in dtype:
             if ctype.startswith('datetime'):
                 res = ctype[-2]
                 table[cname] = parser(table[cname], res)
@@ -266,11 +272,11 @@ def switch_datetime_fmt(table, trait, parser):
         # (e.g. PyTables) will support it better as well.
         return [tuple(e) for e in table.tolist()]
     else:
-        return table
+        return []
 
 sanitize_datetimes = functools.partial(switch_datetime_fmt, parser=strftime_arr)
 unsanitize_datetimes = functools.partial(switch_datetime_fmt,
-        parser=strptime_arr)
+                                         parser=strptime_arr)
 
 def append_metadata(object, source):
     object.store_file = source._v_file.filename
@@ -400,6 +406,9 @@ def load_object(source, path=None):
             except tables.NoSuchNodeError:
                 log.warn('Node %s from file %s does not have node "%s"',
                           node._v_pathname, node._v_file.filename, name)
+            except AttributeError:
+                log.warn('Node %s from file %s does not have attribute "%s"',
+                         node._v_pathname, node._v_file.filename, name)
 
     object = type(**kw)
     return append_metadata(object, node)
