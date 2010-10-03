@@ -57,6 +57,7 @@ def walk_nodes(start, **kw):
     >>> fh = tables.openFile('filename.h5', 'r')
     >>> animal_nodes = walk_nodes(fh.root, klass='Animal')
     '''
+    import re
     def match(n, kw):
         attrs = node._v_attrs
         for k, v in kw.items():
@@ -68,3 +69,4 @@ def walk_nodes(start, **kw):
                 return False
         return True
     return [node for node in start._f_walkNodes() if match(node, kw)]
+
