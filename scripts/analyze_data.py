@@ -103,25 +103,20 @@ class ExperimentCollection(HasTraits):
 
 from cns.experiment.data.aversive_data import GrandAnalyzedAversiveData
 
+filter = lambda o: o.total_trials >= 20
 
 def process_file(filename, filter=None):
     fin = tables.openFile(filename, 'r')
     animals = []
     analyzed = []
-    for node in fin.walkNodes():
-        if 'Animal' in node._v_name:
-            animal = persistence.load_object(node)
-            animal.experiments = []
-            animals.append(animal)
-            for subnode in node._f_walkNodes():
-                if 'aversive' in subnode._v_name:
-                    print subnode._v_name
-                    experiment = persistence.load_object(subnode.Data)
-                    animal.experiments.append(experiment)
-                    analyzed.append(AnalyzedAversiveData(data=experiment))
-    #ExperimentCollection(animals=animals).configure_traits()
-    ga = GrandAnalyzedAversiveData(data=analyzed)
-    print ga.par_info
+    for node in fin.root.Cohort_0.animals:
+        for experiment in node.experiments:
+            print experiment
+            if experiment._v_name.startswith('aversive_date_'):
+                data = persistence.load_object(experiment.Data)
+                if filter(data):
+                    analyzed.append(AnalyzedAversiveData(data=data))
+    return GrandAnalyzedAversiveData(data=analyzed)
             
 if __name__ == '__main__':
     import sys
