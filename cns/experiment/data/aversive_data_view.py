@@ -11,97 +11,28 @@ from numpy import clip
 PLOT_HEIGHT = 200
 PLOT_WIDTH = 200
 
-class Test(object):
+class Test(AnalyzedView):
 
+    analyzed = Instance(BaseAnalyzedAversiveData, ())
     data = DelegatesTo('analyzed')
 
-    fa_chart = Instance(HistoryBarPlotView)
-    score_chart = Instance(BarChartOverlay)
-    contact_plot = Instance(MultipleChannelView)
-    raw_contact_plot = Instance(MultiChannelView)
+    par_count_chart = Instance(DynamicBarPlotView)
 
-    def _contact_plot_default(self):
-        view = MultipleChannelView(value_title='Contact Fraction',
+    def _par_count_chart_default(self):
+        return DynamicBarPlotView(
+                source=self.analyzed.data,
+                value='par_warn_count',
+                label='pars',
+                index_title='Parameter',
+                value_title='Number',
+                title='Trials Presented',
+                bar_color='black',
+                bar_width=0.9,
                 value_min=0,
-                value_max=1,
-                interactive=False,
-                window=5,
-                clean_data=True,)
-        view.add(self.analyzed.data.contact_digital,
-                 decimate_mode='mean', color='gray', line_width=1)
-        view.add(self.analyzed.data.contact_digital_mean, 
-                 decimate_mode='mean', color='black', line_width=3)
-        view.add(self.analyzed.data.trial_running,
-                 decimate_mode='mean', color='red', line_width=2)
-        return view
-
-    def _fa_chart_default(self):
-        return HistoryBarPlotView(value_min=0, value_max=1, index_title='Trial',
-                value_title='FA Fraction', history=30, title='FA history',
-                source=self.analyzed, value='fa_seq', bar_width=1)
-
-    def _score_chart_default(self):
-        template = HistoryBarPlotView(is_template=True,
-                                      preprocess_values=lambda x: clip(x, 0.2, 1.0),
-                                      value_min=0,
-                                      value_max=1,
-                                      index_title='Trial',
-                                      value_title='Score',
-                                      history=60,
-                                      title='')
-        self.analyzed.sync_trait('total_indices', template, 'current_index',
-                                 mutual=False)
-        view = BarChartOverlay(template=template)
-        view.add(source=self.analyzed,
-                 index='remind_indices',
-                 value='remind_seq',
-                 bar_color='lightgray',
-                 bar_width=1,
-                 label='HIT (reminder)',
-                 show_labels=False,
+                value_max='auto',
                 )
-        view.add(source=self.analyzed,
-                 index='safe_indices',
-                 value='fa_seq',
-                 bar_color='lightpink',
-                 bar_width=1,
-                 title='FA',
-                 show_labels='False',
-                )
-        view.add(source=self.analyzed,
-                 index='warn_indices',
-                 value='hit_seq',
-                 bar_color='red',
-                 bar_width=1,
-                 title='HIT',
-                 show_labels='False',
-                 )
-        view.add_legend()
-        return view
 
-    traits_view = View(
-        Tabbed(
-            #'contact_plot{}@',
-            VGroup(
-                #HGroup('contact_dur'
-                #       'contact_fraction~'
-                #       'contact_offset'),
-                'score_chart{}@'),
-            #VGroup(Group('total_trials~'),
-            #       'par_count_chart{}@'),
-            #      ),
-            #VGroup(Group('use_global_fa_frac'),
-            #       'par_dprime_chart{}@'),
-            #'par_hit_frac_chart{}@',
-            #VGroup(Group('global_fa_frac~'),
-            #       'par_fa_frac_chart{}@'),
-            id='cns.experiment.data_aversive_data_view.analyzed',
-        ),
-        title='Analyzed Data',
-        resizable=True,
-        dock='horizontal',
-        id='cns.experiment.data.aversive_data_view'
-    )
+    traits_view = View('par_count_chart{}@')
 
 class AnalyzedAversiveDataView(AnalyzedView):
 
