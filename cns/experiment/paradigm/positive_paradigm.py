@@ -6,11 +6,14 @@ from enthought.traits.ui.api import View, spring, VGroup
 
 class PositiveParadigm(Paradigm):
 
-    go_signal_selector = Instance(SignalSelector, dict(signal=Noise(duration=3), 
+    go_signal_selector = Instance(SignalSelector, dict(signal=Noise(duration=3,
+                                                                    attenuation=20), 
                                                        title='GO signal',
                                                        allow_par=False))
 
-    nogo_signal_selector = Instance(SignalSelector, dict(signal=Tone(duration=3), 
+    nogo_signal_selector = Instance(SignalSelector, dict(signal=Tone(duration=3,
+                                                                     attenuation=20,
+                                                                     frequency=1000), 
                                                          title='NOGO signal',
                                                          allow_par=False))
 

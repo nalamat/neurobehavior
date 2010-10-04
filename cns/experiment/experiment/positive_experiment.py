@@ -1,5 +1,6 @@
 from enthought.traits.api import HasTraits, Any, Instance, DelegatesTo, Int
-from enthought.traits.ui.api import View, Item, VGroup, HGroup, InstanceEditor
+from enthought.traits.ui.api import View, Item, VGroup, HGroup, InstanceEditor,\
+    VSplit, HSplit
 
 from cns.experiment.data.positive_data import PositiveData
 from cns.experiment.paradigm.positive_paradigm import PositiveParadigm
@@ -52,7 +53,7 @@ class PositiveExperiment(HasTraits):
         return PositiveData(store_node=self.store_node)
 
     def _get_view_group(self):
-        return HGroup(VGroup('handler.toolbar@',
+        return HSplit(VGroup('handler.toolbar@',
                               [['animal{}~',
                                'handler.status{}~',],
                                'handler.time_elapsed{Time}~',
@@ -68,5 +69,6 @@ class PositiveExperiment(HasTraits):
                        )
     
     def traits_view(self, parent=None):
-        return View(self._get_view_group(), resizable=True, kind='live', 
-                    handler=PositiveController)
+        return View(self._get_view_group(), resizable=True, kind='live',
+                id='cns.experiment.positive_experiment',
+                handler=PositiveController)
