@@ -169,6 +169,7 @@ class PositiveController(ExperimentController):
             log.debug('NEW CURRENT TRIAL: %d', self.current_trial)
 
         if self.current_trial == self.current_num_nogo + 1:
+            log.debug('GO TRIAL')
             self.circuit.trigger(2)
 
         self.current_poke_dur = self.choice_poke_dur()
