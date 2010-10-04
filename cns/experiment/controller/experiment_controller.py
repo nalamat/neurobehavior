@@ -193,6 +193,8 @@ class ExperimentController(Controller):
         '''Called when start is pressed.  Place paradigm-specific initialization
         code here.
         '''
+        for name in self.circuits:
+            getattr(self, name).reload()
         self.autoconfigure_dsp_tags(self.model.paradigm, info)
 
     def init_dsp(self, info):
