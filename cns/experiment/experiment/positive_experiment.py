@@ -28,13 +28,13 @@ class PositiveExperiment(HasTraits):
                 value_min=0,
                 value_max=1,
                 interactive=False,
-                window=5,
+                window=.5,
                 clean_data=True,)
 
         view.add(self.data.poke_TTL, label='Nose Poke',
                  decimate_mode='mean', color='black', line_width=2)
-        #view.add(self.data.trial_TTL, label='Trial Running',
-                 #decimate_mode='mean', color='red', line_width=2)
+        view.add(self.data.trial_TTL, label='Trial Running',
+                 decimate_mode='mean', color='red', line_width=2)
         view.add(self.data.signal_TTL, label='Signal Playing',
                  decimate_mode='mean', color='yellow', line_width=2)
         view.add(self.data.response_TTL, label='Response Window',
@@ -54,8 +54,9 @@ class PositiveExperiment(HasTraits):
 
     def _get_view_group(self):
         return HSplit(VGroup('handler.toolbar@',
-                              [['animal{}~',
-                               'handler.status{}~',],
+                              [['animal{}~'],
+                               'handler.status~',
+                               'handler.current_poke_dur{Poke duration (s)}~',
                                'handler.time_elapsed{Time}~',
                                'handler.water_infused{Water infused}~',
                                '|[Experiment status]'],

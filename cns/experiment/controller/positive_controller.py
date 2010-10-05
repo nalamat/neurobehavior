@@ -43,7 +43,6 @@ class PositiveController(ExperimentController):
     # A coroutine pipeline that acquires contact data from the RX6 and sends it
     # to the TrialData object
     pipeline = Any
-    start_time = Float
     completed = Bool(False)
     water_infused = Float(0)
 
@@ -127,13 +126,15 @@ class PositiveController(ExperimentController):
     def _get_status(self):
         if self.state == 'disconnected':
             return 'Cannot connect to equipment'
-        if self.state == 'halted':
+        elif self.state == 'halted':
             return 'System is halted'
+
+        base = 'Next trial: '
         if self.current_trial <= self.current_num_nogo:
-            return 'NOGO trial %d of %d' % (self.current_trial,
-                                            self.current_num_nogo)
+            return base + 'NOGO %d of %d' % (self.current_trial,
+                    self.current_num_nogo)
         else:
-            return 'GO trial'
+            return base + 'GO'
             
     def _pipeline_default(self):
         targets = [self.model.data.poke_TTL,
@@ -158,7 +159,6 @@ class PositiveController(ExperimentController):
             self.process_next()
 
     def process_next(self):
-        #self.current_idx += 1
         self.current_trial += 1
         log.debug('NUM NOGO: %d', self.current_num_nogo)
         log.debug('CURRENT TRIAL: %d', self.current_trial)
