@@ -87,15 +87,20 @@ from .experiment.aversive_experiment import AversiveFMExperiment
 from .experiment.aversive_experiment import AversiveExperiment
 from .experiment.positive_experiment import PositiveExperiment
 
-def load_experiment_launcher(experiment):
+experiment_map = {'appetitive': PositiveExperiment,
+                  'aversive': AversiveExperiment,
+                  'aversiveFM': AversiveFMExperiment }
+
+def load_experiment_launcher(etype):
     from cns.data.ui.cohort import CohortView
-    handler = ExperimentLauncher(experiment=globals()[experiment])
+    #handler = ExperimentLauncher(experiment=globals()[experiment])
+    handler = ExperimentLauncher(experiment=experiment_map[etype])
     CohortView().configure_traits(handler=handler)
 
-def test_experiment(experiment):
+def test_experiment(etype):
     import tables
     test_file = tables.openFile('test.hd5', 'w')
-    globals()[experiment](store_node=test_file.root).configure_traits()
+    experiment_map[etype](store_node=test_file.root).configure_traits()
 
 if __name__ == '__main__':
     test_experiment('PositiveExperiment')
