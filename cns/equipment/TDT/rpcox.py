@@ -545,9 +545,7 @@ class DSPTag(object):
         except AttributeError:
             self.unit = None
 
-        if type is None:
-            self._get_value = self._get_any_value
-        else:
+        if type is not None:
             self._get_value = self._get_coerced_value
 
     def _get_any_value(self):
@@ -555,6 +553,9 @@ class DSPTag(object):
 
     def _get_coerced_value(self):
         return self.type(self.dsp.GetTagVal(self.name))
+
+    # Default to no type coercion
+    _get_value = _get_any_value
 
     def _set_value(self, value):
         success = self.dsp.SetTagVal(self.name, value)
