@@ -216,13 +216,13 @@ class CohortEditView(CohortView):
 
         return view
 
-class CohortView(HasTraits):
-
-    dclicked = Event
-    selected = List(Instance('cns.data.type.Animal'))
-
-    cohort = Instance('cns.data.type.Cohort')
-    simple_view = View(Item('object.cohort.animals{}',
-                            editor=simple_cohort_table))
-    detailed_view = View(Item('object.cohort.animals{}',
-                              editor=detailed_cohort_table))
+#class CohortView(HasTraits):
+#
+#    dclicked = Event
+#    selected = List(Instance('cns.data.type.Animal'))
+#
+#    cohort = Instance('cns.data.type.Cohort')
+#    simple_view = View(Item('object.cohort.animals{}',
+#                            editor=simple_cohort_table))
+#    detailed_view = View(Item('object.cohort.animals{}',
+#                              editor=detailed_cohort_table))
