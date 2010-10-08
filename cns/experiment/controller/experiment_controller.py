@@ -8,6 +8,7 @@ from enthought.traits.api import Enum, Int, Instance, Dict, on_trait_change, \
     Property, Str, Button, Tuple
 from enthought.traits.ui.api import Controller, Handler, HGroup, Item, spring, \
     View
+from datetime import datetime, timedelta
 
 import logging
 log = logging.getLogger(__name__)
@@ -170,6 +171,9 @@ class ExperimentController(Controller):
     """
     parameter_map = Dict
 
+    start_time = Instance(datetime)
+    time_elapsed = Property(Instance(timedelta), depends_on='slow_tick')
+
     def init(self, info):
         '''Post-construction init.  Determines whether it is able to connect
         with the hardware.'''
@@ -193,7 +197,10 @@ class ExperimentController(Controller):
         '''Called when start is pressed.  Place paradigm-specific initialization
         code here.
         '''
+        for name in self.circuits:
+            getattr(self, name).reload()
         self.autoconfigure_dsp_tags(self.model.paradigm, info)
+        self.start_time = datetime.now()
 
     def init_dsp(self, info):
         '''Loads circuits specified in `circuits`'''
@@ -229,9 +236,9 @@ class ExperimentController(Controller):
 
     def _get_time_elapsed(self):
         if self.state is 'halted':
-            return '%s' % timedelta()
+            return timedelta()
         else:
-            return '%s' % self.model.data.duration
+            return datetime.now()-self.start_time
 
     def close(self, info, is_ok):
         '''Prevent user from closing window while an experiment is running since

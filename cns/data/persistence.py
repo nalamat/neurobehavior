@@ -19,9 +19,10 @@ def get_np_dtype(trait):
     types = ['object' if t.startswith('date') else t for t in trait.col_types]
     return dtype(zip(trait.col_names, types))
 
-def get_hdf5_dtype(trait):
-    types = ['S32' if t.startswith('date') else t for t in trait.col_types]
-    return dtype(zip(trait.col_names, types))
+# This is a pain!!!!
+#def get_hdf5_dtype(trait):
+#    types = ['S32' if t.startswith('date') else t for t in trait.col_types]
+#    return dtype(zip(trait.col_names, types))
 
 def get_traits(object, filter_readonly=False, filter_events=True, **metadata):
     '''Convenience function to filter out readonly traits.  This is useful for
@@ -62,9 +63,9 @@ def store_array(node, object, name, trait):
     if len(value)==0:
         # Create a blank array
         atom = tables.atom.Atom.from_dtype(value.dtype)
-        h5_file.createEArray(node._v_pathname, name, atom, (0,))
+        node._v_file.createEArray(node._v_pathname, name, atom, (0,))
     else:
-        h5_file.createArray(node._v_pathname, name, value)
+        node._v_file.createArray(node._v_pathname, name, value)
 
 def store_table(node, object, name, trait):
     # Create copy of value since we may need to convert the datetime series.
@@ -74,7 +75,8 @@ def store_table(node, object, name, trait):
     # line and uncomment the line after
     value = sanitize_datetimes(value, trait)
     #value = array(value, dtype=get_np_dtype(trait))
-    value = array(value, dtype=get_hdf5_dtype(trait))
+    #value = array(value, dtype=get_hdf5_dtype(trait))
+    value = array(value, dtype=trait.dtype)
 
     try:
         # Table already exists.  We delete the data in the table and
@@ -85,7 +87,7 @@ def store_table(node, object, name, trait):
         table.truncate(0)
         table.append(value)
     except tables.NoSuchNodeError:
-        table = h5_file.createTable(node._v_pathname, name, value)
+        table = node._v_file.createTable(node._v_pathname, name, value)
 
 def store_child(node, object, name, trait):
     value = getattr(object, name)
@@ -93,7 +95,7 @@ def store_child(node, object, name, trait):
     try: group_node = getattr(node, name)
     except tables.NoSuchNodeError:
         object_path = node._v_pathname
-        group_node = h5_file.createGroup(object_path, name)
+        group_node = node._v_file.createGroup(object_path, name)
 
     if hasattr(value, '__iter__'): # This is a list of items
         #children.append(group_node)
@@ -176,7 +178,7 @@ def add_or_update_object(object, node, name=None):
 
     for mode, store in store_map:
         log.debug('Storing %s data', mode)
-        for name, trait in object.class_trait_names(store=mode).items():
+        for name, trait in object.class_traits(store=mode).items():
             log.debug('Storing %s', name)
             store(object_node, object, name, trait)
 

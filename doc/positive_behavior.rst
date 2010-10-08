@@ -36,7 +36,7 @@ Trial block timeline::
     [] Variable length window that has a maximum duration but can be shorter if
        a certain event occurs
        -- Denotes actual duration of the window
-       ]  Denotes maximum possible extent of window
+        ] Denotes maximum possible extent of window
 
 On each trial the duration for nose poke is randomly selected from the range
 defined by `poke_duration_lb` and `poke_duration_ub`.  The subject must
@@ -66,16 +66,38 @@ ensure that they have the same amount of time to provide their response
 regardless of whether they left the nose-poke at the beginning of the
 reaction window or the end.
 
-NOGO trial
+Potential subject actions
+-------------------------
 
-* Go to the spout (false alarm)
-* Initiate a new nose-poke (correct reject)
+1. Actions when there's no trial
+   a. Spout contact
+   b. Nose-poke and withdraw before trial onset
 
-GO trial
+2. Actions during a trial
+   a. Failure to withdraw during reaction window
+   b. Withdraw but failure to go to spout or repoke during response window
+   c. Withdraw and repoke during response window [*]_
+   d. Withdraw and goto spout during response window
 
-* Go to the spout (hit)
-* Initiate a new nose-poke (miss)
+.. [*] Repokes during the intertrial period are ignored
 
-If the subject does not perform either action, the trial is not scored
-(however, the data is saved so one can choose to re-score the trial if they
-wish).
+Detection of actions
+--------------------
+
+trial = response ^ score ^ reward
+
+1a = spout & !trial
+1b = ???
+2a = trial & !score
+2c = ???
+2d = trial & reward
+
+
+Current scoring rules
+---------------------
+
+Actions 1a, 1b, and 2b are not included in computation of hit and false alarm
+rate.  During a nogo trial, 2c indicates a correct reject and 2d indicates a
+false alarm.  During a GO trial, 2d indicates a hit and 2c indicates a miss.
+Note that all subject actions are saved in the trial log so you may choose to
+reanalyze them.
