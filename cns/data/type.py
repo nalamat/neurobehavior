@@ -7,14 +7,9 @@ import datetime
 #from cns.experiment.data import ExperimentData
 
 #class Experiment(HasTraits):
-#    pass
 #
-#class BehaviorExperiment(HasTraits):
-#    
-#    paradigm        = Instance(Paradigm, store='node')
-#    date            = Date(store='attribute')
-#    experimenter    = Enum(*EXPERIMENTERS, store='attribute')
-#    #data            = Instance(ExperimentData, store='node')
+#    paradigm = Instance(Paradigm, store='node')
+#    data = Instance(ExperimentData, store='node')
 
 class Animal(HasTraits):
 
@@ -41,10 +36,12 @@ class Animal(HasTraits):
                             col_names=['date', 'status'],
                             col_types=['datetime64[M]', 'S32'])
     processed = Bool(False)
-    experiments = List
+    experiments = List([])
 
     store_node = Any # pointer to the storage node
     #experiments     = CList(Experiment, [], store=node')          
+
+    name = Property(Str)
     
     def _get_age(self):
         if self.birth is None:
@@ -59,16 +56,23 @@ class Animal(HasTraits):
         except: date = 'no_birth'
         template = 'Litter_%(parents)s_%(identifier)s_%(sex)s_%(date)s'
         return template % dict(date=date, parents=self.parents,
-                identifier=self.identifier, sex=self.sex)
+                               identifier=self.identifier, sex=self.sex)
 
     def __str__(self):
-        return '%s %s NYU ID %d' % (self.identifier.capitalize(), self.sex, self.nyu_id)
+        return '%s %s NYU ID %d' % (self.identifier.capitalize(), self.sex,
+                                    self.nyu_id)
+
+    def _get_name(self):
+        return '%s %s' % (self.identifier.capitalize(), self.sex)
+
+    def __cmp__(self, other):
+        return cmp(self.name, other.name)
     
 class Cohort(HasTraits):
 
     description = Str(store='attribute')
     animals = List(Instance(Animal), store='child')
-    size = Property(Int, depends_on=['animals[]'])
+    size = Property(Int, depends_on='animals[]')
 
     def _get_size(self):
         return len(self.animals)

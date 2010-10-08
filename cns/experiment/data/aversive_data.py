@@ -28,7 +28,7 @@ from cns.experiment.data.experiment_data import ExperimentData, AnalyzedData
 from cns.channel import FileMultiChannel, FileChannel
 from enthought.traits.api import Instance, List, Int, Float, Any, \
     Range, DelegatesTo, cached_property, on_trait_change, Array, Event, \
-    Property, Undefined, Str, Enum, Bool
+    Property, Undefined, Str, Enum, Bool, DelegatesTo
 from datetime import datetime
 import numpy as np
 from cns.data.h5_utils import append_node, get_or_append_node
@@ -217,6 +217,7 @@ class RawAversiveData_v0_2(ExperimentData):
     # Information that does not depend on analysis parameters
     #------------------------------------------------------------------- 
 
+    # Splits trial_log by column
     ts_seq = Property(Array('i'))
     par_seq = Property(Array('f'))
     ttype_seq = Property(Array('S'))
@@ -226,14 +227,12 @@ class RawAversiveData_v0_2(ExperimentData):
     warn_indices = Property(Array('i'))
     remind_indices = Property(Array('i'))
     total_indices = Property(Int)
-    safe_trials = Property(Array('f'))
-    warn_trials = Property(Array('f'))
     safe_par_mask = Property(List(Array('b')))
     warn_par_mask = Property(List(Array('b')))
     par_warn_count = Property(List(Int))
     par_safe_count = Property(List(Int))
     pars = Property(List(Int))
-    total_trials = Property(Int, store='attribute')
+    warn_trial_count = Property(Int, store='attribute')
 
     @cached_property
     def _get_ts_seq(self):
@@ -270,43 +269,35 @@ class RawAversiveData_v0_2(ExperimentData):
     def _get_remind_indices(self):
         return self._get_indices('remind')
 
-    @cached_property
-    def _get_safe_trials(self):
-        return np.take(self.trial_log, self.safe_indices, axis=0)
-
-    @cached_property
-    def _get_warn_trials(self):
-        return np.take(self.trial_log, self.warn_indices, axis=0)
-
-    @cached_property
-    def _get_par_mask(self, trials):
-        trial_pars = np.take(trials, [1], axis=1).ravel()
-        return [trial_pars == par for par in self.pars]
+    def _get_par_mask(self, ttype):
+        ttype_mask = np.array(self.ttype_seq) == ttype
+        return [np.equal(self.par_seq, par) & ttype_mask for par in self.pars]
 
     @cached_property
     def _get_safe_par_mask(self):
-        return self._get_par_mask(self.safe_trials)
+        return self._get_par_mask('safe')
 
     @cached_property
     def _get_warn_par_mask(self):
-        return self._get_par_mask(self.warn_trials)
+        return self._get_par_mask('warn')
 
     @cached_property
     def _get_par_warn_count(self):
-        return apply_mask(len, self.warn_trials, self.warn_par_mask)
+        return apply_mask(len, self.par_seq, self.warn_par_mask)
 
     @cached_property
     def _get_par_safe_count(self):
-        return apply_mask(len, self.safe_trials, self.safe_par_mask)
+        return apply_mask(len, self.par_seq, self.safe_par_mask)
 
     @cached_property
     def _get_pars(self):
-        return np.unique(self.par_seq)
-        #return np.unique(np.take(self.warn_trials, [1], axis=1).ravel())
+        # We only want to return pars for complete trials (e.g. ones for which a
+        # warn was presented).
+        return np.unique(np.take(self.par_seq, self.warn_indices, axis=0))
 
     @cached_property
-    def _get_total_trials(self):
-        return len(self.warn_trials)
+    def _get_warn_trial_count(self):
+        return len(self.warn_indices)
 
 RawAversiveData = RawAversiveData_v0_2
 
@@ -314,6 +305,12 @@ class BaseAnalyzedAversiveData(AnalyzedData):
     '''
     Note that if you are attempting to compute d' and its related statistics (C,
     95% CI, etc), `cns.util.math` has standalone versions of these computations.
+
+    Subclasses must implement
+    * pars
+    * par_fa_frac
+    * par_hit_frac
+    * global_fa_frac
     '''
 
     # Clip FA/HIT rate if < clip or > 1-clip (prevents unusually high z-scores)
@@ -326,16 +323,20 @@ class BaseAnalyzedAversiveData(AnalyzedData):
     # Summary scores for the parameters.  Subclasses must implement the property
     # getters for these!
     pars = Property(List(Float))
-    par_fa_frac = Property(List(Float), depends_on='updated')
-    global_fa_frac = Property(Float, depends_on='updated', store='attribute')
-    par_hit_frac = Property(List(Float), depends_on='updated')
+    par_fa_frac = Property(List(Float))
+    global_fa_frac = Property(Float)
+    par_hit_frac = Property(List(Float))
 
     # Computed based on the summary scores provided above
-    par_z_fa = Property(List(Float), depends_on='updated')
-    par_z_hit = Property(List(Float), depends_on='updated')
-    par_dprime = Property(List(Float), depends_on='updated, use_global_fa_frac')
-    par_dprime_nonglobal = Property(List(Float), depends_on='updated')
-    par_dprime_global = Property(List(Float), depends_on='updated')
+    par_z_fa = Property(List(Float), depends_on='par_fa_frac')
+    par_z_hit = Property(List(Float), depends_on='par_hit_frac')
+    par_dprime = Property(List(Float), depends_on=['use_global_fa_frac',
+                                                   'par_fa_frac',
+                                                   'par_hit_frac'])
+    par_dprime_nonglobal = Property(List(Float), 
+                                    depends_on='par_fa_frac, par_hit_frac')
+    par_dprime_global = Property(List(Float), 
+                                 depends_on='par_fa_frac, par_hit_frac')
 
     @cached_property
     def _get_par_z_hit(self):
@@ -380,21 +381,32 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
     '''
     Scored data from a single experiment
     '''
+    label = Property(Str, depends_on='contact_offset')
 
-    updated = Event
+    def _get_label(self):
+        return 'Contact %.2f to %.2f > %.2f' % (self.contact_offset,
+                                                self.contact_offset+self.contact_dur,
+                                                self.contact_fraction)
 
-    data = Instance(RawAversiveData)
+    data = Instance(RawAversiveData_v0_2, ())
+    #data = Any
+
+    # Override depends_on parameter
+    pars = Property(List(Float), depends_on='contact_scores')
+    par_fa_frac = Property(List(Float), depends_on='fa_seq')
+    global_fa_frac = Property(Float, depends_on='fa_seq', store='attribute')
+    par_hit_frac = Property(List(Float), depends_on='hit_seq')
+
+    warn_trial_count = DelegatesTo('data')
 
     # The next few pars will influence the analysis of the data, specifically
     # the "score".  Anytime these change, the data must be reanalyzed.
-    contact_offset = Float(0.9, store='attribute', label='Contact offset (s)')
-    contact_dur = Float(0.1, store='attribute', label='Contact duration (s)')
-    contact_fraction = Range(0.0, 1.0, 0.5, store='attribute', 
-                             label='Contact fraction (s)')
-    reaction_offset = Float(-1, store='attribute', label='Reaction offset',
-                            unit='s')
-    reaction_dur = Float(3.0, store='attribute', label='Reaction duration',
-                         unit='s')
+    contact_offset = Float(0.9, store='attribute')
+    contact_dur = Float(0.1, store='attribute')
+    contact_fraction = Range(0.0, 1.0, 0.5, store='attribute')
+
+    reaction_offset = Float(-1, store='attribute')
+    reaction_dur = Float(3.0, store='attribute')
 
     # False alarms and hits can only be determined after we score the data.
     # Scores contains the actual contact ratio for each trial.  False alarms and
@@ -405,18 +417,24 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
     contact_scores = List(Float, store='array')
 
     # Views of contact scores for the indicated trial type
-    safe_scores = Property(Array(dtype='f'), depends_on='updated')
-    warn_scores = Property(Array(dtype='f'), depends_on='updated')
-    remind_scores = Property(Array(dtype='f'), depends_on='updated')
+    safe_scores = Property(Array(dtype='f'), depends_on='contact_scores')
+    warn_scores = Property(Array(dtype='f'), depends_on='contact_scores')
+    remind_scores = Property(Array(dtype='f'), depends_on='contact_scores')
+
+    remind_indices = DelegatesTo('data')
+    safe_indices = DelegatesTo('data')
+    warn_indices = DelegatesTo('data')
+    total_indices = DelegatesTo('data')
 
     # True/False sequence indicating whether animal was in contact with the
     # spout during the check based on `contact_fraction`.
-    fa_seq = Property(Array(dtype='f'), depends_on='updated')
-    hit_seq = Property(Array(dtype='f'), depends_on='updated')
-    remind_seq = Property(Array(dtype='f'), depends_on='updated')
+    contact_seq = Property(Array(dtype='b'), depends_on='contact_scores')
+    fa_seq = Property(Array(dtype='f'), depends_on='safe_scores')
+    hit_seq = Property(Array(dtype='f'), depends_on='safe_scores')
+    remind_seq = Property(Array(dtype='f'), depends_on='safe_scores')
 
-    par_fa_count = Property(Array(dtype='i'))
-    par_hit_count = Property(Array(dtype='i'))
+    par_fa_count = Property(Array(dtype='i'), depends_on='fa_seq')
+    par_hit_count = Property(Array(dtype='i'), depends_on='hit_seq')
 
     reaction_snippets = List(Array(dtype='f'))
 
@@ -434,12 +452,8 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
     def _get_safe_reaction_snippets(self):
         return np.take(self.reaction_snippets, self.safe_indices, axis=0)
 
-    def _get_warn_reaction_snippets(self):
-        return np.take(self.reaction_snippets, self.warn_indices, axis=0)
-
     def _get_par_warn_reaction_snippets(self):
-        return apply_mask(lambda x: x, self.warn_reaction_snippets,
-                          self.data.warn_par_mask)
+        return apply_mask(self.reaction_snippets, self.data.warn_par_mask)
 
     def _get_par_mean_warn_reaction_snippets(self):
         return [arr.mean(0) for arr in self.par_warn_reaction_snippets]
@@ -471,6 +485,10 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
     # Sequences
     #------------------------------------------------------------------- 
     @cached_property
+    def _get_contact_seq(self):
+        return np.array(self.contact_scores) < self.contact_fraction
+
+    @cached_property
     def _get_fa_seq(self):
         return self.safe_scores < self.contact_fraction
 
@@ -487,11 +505,11 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
     #------------------------------------------------------------------- 
     @cached_property
     def _get_par_fa_count(self):
-        return apply_mask(np.sum, self.fa_seq, self.data.safe_par_mask)
+        return apply_mask(np.sum, self.contact_seq, self.data.safe_par_mask)
 
     @cached_property
     def _get_par_hit_count(self):
-        return apply_mask(np.sum, self.hit_seq, self.data.warn_par_mask)
+        return apply_mask(np.sum, self.contact_seq, self.data.warn_par_mask)
 
     par_safe_count = DelegatesTo('data')
     par_warn_count = DelegatesTo('data')
@@ -503,7 +521,11 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
 
     @cached_property
     def _get_par_fa_frac(self):
-        return apply_mask(np.mean, self.fa_seq, self.data.safe_par_mask)
+        try:
+            return apply_mask(np.mean, self.contact_seq, self.data.safe_par_mask) 
+        except:
+            print FOOBAR
+            print self.contact_seq, self.data.safe_par_mask
 
     @cached_property
     def _get_global_fa_frac(self):
@@ -511,7 +533,7 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
     
     @cached_property
     def _get_par_hit_frac(self):
-        return apply_mask(np.mean, self.hit_seq, self.data.warn_par_mask)
+        return apply_mask(np.mean, self.contact_seq, self.data.warn_par_mask)
 
     #-------------------------------------------------------------------
     # Reaction snippets
@@ -549,10 +571,10 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
 
     @on_trait_change('data, contact_offset, contact_dur, contact_fraction')
     def reprocess_contact_scores(self):
-        self.contact_scores = []
+        contact_scores = []
         for ts in self.data.ts_seq:
-            self.contact_scores.append(self.score_timestamp(ts))
-        self.updated = True
+            contact_scores.append(self.score_timestamp(ts))
+        self.contact_scores = contact_scores
 
     @on_trait_change('data, reaction_offset, reaction_dur')
     def reprocess_reaction_snippets(self):
@@ -568,27 +590,38 @@ class GrandAnalyzedAversiveData(BaseAnalyzedAversiveData):
     overriding the contact fraction, etc.
     '''
     data = List(Instance(AnalyzedAversiveData))
+    filtered_data = Property(List, depends_on='+filter')
 
-    par_safe_count = Property(List(Int), depends_on='updated')
-    par_warn_count = Property(List(Int), depends_on='updated')
-    par_hit_count = Property(List(Int), depends_on='updated')
-    par_fa_count = Property(List(Int), depends_on='updated')
+    par_safe_count = Property(List(Int), depends_on='filtered_data')
+    par_warn_count = Property(List(Int), depends_on='filtered_data')
+    par_hit_count = Property(List(Int), depends_on='filtered_data')
+    par_fa_count = Property(List(Int), depends_on='filtered_data')
+
+    filter = Property
+
+    min_trials = Int(20, filter=True)
+
+    def _get_filter(self):
+        return lambda o: (o.warn_trial_count >= self.min_trials) 
+
+    @cached_property
+    def _get_filtered_data(self):
+        return [d for d in self.data if self.filter(d)]
 
     @cached_property
     def _get_pars(self):
-        pars = np.concatenate([d.pars for d in self.data])
+        pars = np.concatenate([d.pars for d in self.filtered_data])
         return np.unique(pars)
 
     def _get_par_count(self, item):
         cumsum = {}
-        for d in self.data:
+        for d in self.filtered_data:
             for par, count in zip(d.pars, getattr(d, item)):
                 cumsum[par] = cumsum.get(par, 0) + count
         return [v for k, v in sorted(cumsum.items())]
 
     @cached_property
     def _get_par_safe_count(self):
-        print 'getting'
         return self._get_par_count('par_safe_count')
 
     @cached_property
@@ -605,15 +638,15 @@ class GrandAnalyzedAversiveData(BaseAnalyzedAversiveData):
 
     @cached_property
     def _get_par_fa_frac(self):
-        return np.divide(self.par_fa_count, self.par_safe_count)
+        return np.true_divide(self.par_fa_count, self.par_safe_count)
 
     @cached_property
     def _get_par_hit_frac(self):
-        return np.divide(self.par_hit_count, self.par_warn_count)
+        return np.true_divide(self.par_hit_count, self.par_warn_count)
 
     @cached_property
     def _get_global_fa_frac(self):
-        return np.concatenate([d.fa_seq for d in self.data]).mean()
+        return np.concatenate([d.fa_seq for d in self.filtered_data]).mean()
 
 if __name__ == '__main__':
     import tables
