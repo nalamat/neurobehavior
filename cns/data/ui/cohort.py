@@ -71,9 +71,9 @@ class SimpleAnimalAdapter(TabularAdapter):
     
 simple_cohort_table = TabularEditor(adapter=SimpleAnimalAdapter(),
                                     editable=False,
-                                    dclicked='dclicked_animal',
-                                    selected='selected_animal',
-                                    multi_select=False)
+                                    dclicked='dclicked',
+                                    selected='selected',
+                                    multi_select=True)
 
 class CohortViewHandler(FileHandler):
 
@@ -216,17 +216,13 @@ class CohortEditView(CohortView):
 
         return view
 
-class CohortView(HasTraits):
-
-    cohort = Instance('cns.data.type.Cohort')
-
-    dclicked = Event
-    selected = Instance('cns.data.type.Animal')
-
-    simple_view = View(Item('object.cohort.animals{}',
-                            editor=simple_cohort_table),
-                       height=0.5, width=0.1)
-
-    detailed_view = View(Item('object.cohort.animals{}',
-                              editor=detailed_cohort_table),
-                         height=0.5, width=0.5)
+#class CohortView(HasTraits):
+#
+#    dclicked = Event
+#    selected = List(Instance('cns.data.type.Animal'))
+#
+#    cohort = Instance('cns.data.type.Cohort')
+#    simple_view = View(Item('object.cohort.animals{}',
+#                            editor=simple_cohort_table))
+#    detailed_view = View(Item('object.cohort.animals{}',
+#                              editor=detailed_cohort_table))

@@ -494,31 +494,61 @@ class DSPBuffer(BlockBuffer):
                   }
 
 class DSPTag(object):
-    '''Wrapper around a RPvdsEx circuit tag that facilitates getting and setting
-    the value.  If you follow appropriate naming conventions in the DSP circuit,
-    the get and set methods will be able to convert the provided value to the
-    appropriate type.  For example, if the DSP tag expects number of samples
-    (i.e. cycles of the DSP clock) and you provide the value in seconds, then
-    the tag name must be <name>_n (the _n indicates it requires number of
-    samples), and you can call circuit.name_n.set(value, src_unit='s').  The
-    value you provided will be multiplied by the DSP clock frequency to get the
-    appropriate unit which is then uploaded to the DSP.
+    '''
+    Wrapper around a RPvdsEx circuit tag
+    
+    Arguments
+    ---------
+    dsp : `DSPCircuit`
+        Reference to circuit the tag is associated with
+    name : string
+        Name of tag in circuit
+    type : type
+        Type of tag.  When tag is accessed, it will be coerced to this type.  If
+        none, no type coercion is performed.
+    
+    If you follow appropriate naming conventions in the DSP circuit, the get and
+    set methods will be able to convert the provided value to the appropriate
+    type.  For example, if the DSP tag expects number of samples (i.e. cycles of the
+    DSP clock), the tag name must end in '_n'.
+
+    >>> tag_n.set(3, src_unit='s')
+
+    The value will then be multiplied by the DSP clock frequency and converted
+    to the nearest integer before being sent to the DSP.
+
+    To do the conversion yourself.
+
+    >>> value = int(tag_n.dsp.fs*3)
+    >>> tag_n.value = value
+
+    Alternatively, if you do not provide a src_unit (i.e. source unit), no
+    conversion is done to the value.
+
+    >>> tag_n.set(value)
+
+    Likewise, `DSPTag.get` supports units using the req_unit parameter (i.e.
+    requested unit).  
+
+    >>> tag_n.get(req_unit='s')
     '''
 
     epsilon = 1e-6
 
-    def __init__(self, dsp, name):
+    def __init__(self, dsp, name, type):
         self.dsp = dsp
         self.fs = dsp.GetSFreq()
         self.name = name
+        self.type = type
         try:
             self.unit, = P_UNIT.match(name).groups()
         except AttributeError:
             self.unit = None
 
     def _get_value(self):
-        value = self.dsp.GetTagVal(self.name)
-        return value
+        if type is not None:
+            return self.type(self.dsp.GetTagVal(self.name))
+        return self.dsp.GetTagVal(self.name)
 
     def _set_value(self, value):
         success = self.dsp.SetTagVal(self.name, value)
@@ -533,14 +563,16 @@ class DSPTag(object):
     value = property(_get_value, _set_value)
 
     def set(self, value, src_unit=None, lb=-np.inf, ub=np.inf):
-        '''The converted value is coerced to the range [lb, ub].  Since lb and
-        ub are set to -inf and +inf by default, no coercion is typically done.
-        This clipping is useful for some TDT compnents such as TTLDelay2.  If
-        N1+N2=0 for TTLDelay2, the component will not relay any TTLs it
-        recieves.  By ensuring that N1+N2!=1 when you want a delay of 0, you can
-        avoid this issue.  Note that I typically solve this problem by making N1
-        configurable via a tag, and setting N2 to 1 that way the software does
-        not need to worry about avoiding setting N1 to 0.
+        '''
+        Convert value, coerce to range [lb, ub] and upload to DPS variable
+        
+        Since lb and ub are set to -inf and +inf by default, no coercion is
+        typically done.  This clipping is useful for some DSP components such as
+        TTLDelay2.  If N1+N2=0 for TTLDelay2, the component will not relay any
+        TTLs it recieves.  By ensuring that N1+N2!=1 when you want a delay of 0,
+        you can avoid this issue.  Note that I typically solve this problem by
+        making N1 configurable via a tag, and setting N2 to 1 that way the
+        software does not need to worry about avoiding setting N1 to 0.
         '''
         if src_unit is not None:
             value = convert(src_unit, self.unit, value, self.fs)
@@ -553,20 +585,28 @@ class DSPTag(object):
             return self.value
 
 class Circuit(object):
-    '''Acts as a loose wrapper around a RPvdsEx circuit.  The circuit exposes
-    the circuit tags (i.e. variables) and buffers as class attributes.
-    Technically these attributes are instances of :class:`DSPTag` and
-    :class:`DSPBuffer`, respectively.  These instances provide many convenience
-    methods and attributes that facilitate coding of software for the RPvdsEx
-    circuit.
+    '''
+    Acts as a loose wrapper around a RPvdsEx circuit.  The circuit exposes the
+    circuit tags (i.e. variables) and buffers as class attributes.  Technically
+    these attributes are instances of :class:`DSPTag` and :class:`DSPBuffer`,
+    respectively.  These instances provide many convenience methods and
+    attributes that facilitate coding of software for the RPvdsEx circuit.
 
-    This class is not meant to be instantiated directly as a factory function
-    must be used to inspect the RPvdsEx circuit, create the appropriate
-    :class:`DSPTag` and :class:`DSPBuffer` instances and bind them to the
-    Circuit instance.  See :func:`circuit_factory` for more information.
+    This class is not meant to be instantiated directly.  Typically you will use
+    the factory function :func:`circuit_factory` to inspect the RPvdsEx circuit
+    and attach the appropriate :class:`DSPTag` and :class:`DSPBuffer` instances
+    to the Circuit instance.
     '''
 
     def reload(self):
+        '''
+        Clear DSP RAM set all variables to default value
+
+        The circuit is reloaded from disk, so any recent edits to the circuit
+        will be reflected in the running program.
+        '''
+        # Note that ClearCOF alone does not apear to reset all variables to
+        # default value, so we reload the circuit.  This is also useful.
         self.dsp.ClearCOF()
         self.dsp.LoadCOF(self.CIRCUIT_PATH)
 
@@ -734,16 +774,23 @@ def circuit_factory(circuit_name, iface):
     properties['fs'] = iface.GetSFreq()
     properties['MAX_FREQUENCY'] = properties['fs']/2. # Nyquist frequency
     properties['CIRCUIT_PATH'] = circuit_path
-    
-    # TODO: most matlab programmers will have no clue what this is doing.  Need
-    # to document this better.
-    #circuit = type('circuit.' + circuit_name, (Circuit,), properties)()
 
     for key, value in get_tags(iface):
         if key.startswith('%'):
             # These tags are returned by GetNameOf/GetNumOf.  Not really sure
             # what they represent so we ignore them.
             pass
+        elif value is None:
+            import textwrap
+            mesg = """
+            Could not determine type for tag %s.  
+            
+            This often occurs when you link a tag to a port of type Any (e.g.
+            the outpout of a Latch).  Use a type converter (e.g. Int2Int or
+            Float2Float) to provide the necessary type information.
+            """ % key
+            mesg = textwrap.dedent(mesg).replace('\n', '')
+            raise CircuitError(mesg)
         elif value == np.ndarray:
             # We provide a simple interface to the RX6 buffers via a class
             # that handles the behind-the-scene logics and double-checks
@@ -759,6 +806,6 @@ def circuit_factory(circuit_name, iface):
             log.debug(mesg, key)
         else:
             #setattr(circuit, key, DSPTag(iface, key))
-            properties[key] = DSPTag(iface, key)
+            properties[key] = DSPTag(iface, key, value)
 
     return type('circuit.' + circuit_name, (Circuit,), properties)()
