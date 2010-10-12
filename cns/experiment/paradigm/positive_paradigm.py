@@ -33,6 +33,8 @@ class PositiveParadigm(Paradigm):
     reward_duration = Float(0.5, unit='s', store='attribute')
     spout_smooth_duration = Float(0.25, unit='s', store='attribute')
 
+    timeout_duration = Float(5, unit='s', store='attribute')
+
     poke_duration_lb = Float(0.1, unit='s', store='attribute')
     poke_duration_ub = Float(0.5, unit='s', store='attribute')
 
@@ -49,6 +51,7 @@ class PositiveParadigm(Paradigm):
                        'response_window_duration',
                        'score_window_duration',
                        'reward_duration',
+                       'timeout_duration',
                        'spout_smooth_duration',
                        'poke_duration_lb',
                        'poke_duration_ub',

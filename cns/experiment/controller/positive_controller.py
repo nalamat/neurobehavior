@@ -34,6 +34,7 @@ class PositiveController(ExperimentController):
                      'reward_duration': 'circuit.reward_dur_n', 
                      'signal_offset_delay': 'circuit.sig_offset_del_n', 
                      'spout_smooth_duration': 'circuit.spout_smooth_n', 
+                     'timeout_duration': 'circuit.to_dur_n', 
                      'TTL_fs': 'circuit.TTL_nPer' }
     backend = Any
     circuit = Any
