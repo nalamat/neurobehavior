@@ -143,7 +143,13 @@ class ExperimentController(Controller):
     encountered (i.e. `_apply_<parameter name>`) takes precedence.  If the
     change is not allowed, a warning will be raised (but the handler will
     continue running).  If a parameter is not configurable, be sure to set the
-    view accordingly.
+    view accordingly (e.g. hide or disable the field).
+
+    Very important!  To ensure that your controller logic ties in cleanly with
+    the apply/revert mechanism, never read values directly from the paradigm
+    itself.  Always make a copy of the variable and store it elsewhere (e.g. in
+    the controller object) and create an apply handler to update the copy of the
+    variable from the paradigm.
 
     Typically handlers need to work closely with a DSP device.
     """

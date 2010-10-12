@@ -62,6 +62,7 @@ class PositiveController(ExperimentController):
     current_trial = Int
     current_poke_dur = Float
     current_num_nogo = Int
+    current_repeat_FA = Bool
 
     choice_poke_dur = Any
     choice_num_nogo = Any
@@ -151,26 +152,64 @@ class PositiveController(ExperimentController):
                    ]
         return int_to_TTL(len(targets), deinterleave(targets))
 
+    #@on_trait_change('fast_tick')
+    #def monitor_circuit(self):
+    #    self.pipeline.send(self.circuit.TTL.read().astype(np.int8))
+    #    self.model.data._generate_action_log()
+
+    #    # Process trial_end before trial_start to avoid potential race condition
+    #    # since trial_end algorithm depends on some variables processed by the
+    #    # trial_start block to determine what the "last" trial was.
+    #    if self.circuit.trial_end_idx.value > self.current_trial_end_idx:
+    #        self.current_trial_end_idx += 1
+
+    #        ts_start = self.circuit.trial_start_ts.value
+    #        ts_end = self.circuit.trial_end_ts.value
+    #        if self.current_trial == 1:
+    #            self.model.data.log_trial(ts_start, ts_end, 'GO')
+    #        else:
+    #            self.model.data.log_trial(ts_start, ts_end, 'NOGO')
+
+    #    if self.circuit.trial_start_idx.value > self.current_trial_start_idx:
+    #        self.current_trial_start_idx += 1
+    #        self.current_trial += 1
+
+    #        if self.current_trial == self.current_num_nogo + 2:
+    #            self.current_num_nogo = self.choice_num_nogo()
+    #            self.current_trial = 1
+    #        if self.current_trial == self.current_num_nogo + 1:
+    #            self.circuit.trigger(2)
+
+    #        self.current_poke_dur = self.choice_poke_dur()
+    #        self.circuit.poke_dur_n.set(self.current_poke_dur, 's')
+    #        self.circuit.trigger(1)
+
     @on_trait_change('fast_tick')
     def monitor_circuit(self):
         self.pipeline.send(self.circuit.TTL.read().astype(np.int8))
         self.model.data._generate_action_log()
 
-        # Process trial_end before trial_start to avoid potential race condition
-        # since trial_end algorithm depends on some variables processed by the
-        # trial_start block to determine what the "last" trial was.
         if self.circuit.trial_end_idx.value > self.current_trial_end_idx:
-            self.current_trial_end_idx += 1
-
+            # Trial is over.  Process new data and set up for next trial.
             ts_start = self.circuit.trial_start_ts.value
             ts_end = self.circuit.trial_end_ts.value
-            if self.current_trial == 1:
-                self.model.data.log_trial(ts_start, ts_end, 'GO')
-            else:
-                self.model.data.log_trial(ts_start, ts_end, 'NOGO')
 
-        if self.circuit.trial_start_idx.value > self.current_trial_start_idx:
-            self.current_trial_start_idx += 1
+            # In this context, current_trial reflects the trial that just
+            # occured
+            if self.current_trial == self.current_num_nogo + 1:
+                last_ttype = 'GO'
+            else:
+                last_ttype = 'NOGO'
+            self.model.data.log_trial(ts_start, ts_end, last_ttype)
+
+            if last_ttype == 'NOGO' and self.current_repeat_FA:
+                if self.model.data.trial_log[-1][3] == 'SPOUT':
+                    # Gerbil false alarmed, add NOGO trial
+                    log.debug("FA detected, adding a NOGO trial")
+                    self.current_num_nogo += 1
+
+            # From now on, current_trial indicates the next trial that will
+            # occur
             self.current_trial += 1
 
             if self.current_trial == self.current_num_nogo + 2:
@@ -179,6 +218,7 @@ class PositiveController(ExperimentController):
             if self.current_trial == self.current_num_nogo + 1:
                 self.circuit.trigger(2)
 
+            self.current_trial_end_idx += 1
             self.current_poke_dur = self.choice_poke_dur()
             self.circuit.poke_dur_n.set(self.current_poke_dur, 's')
             self.circuit.trigger(1)
@@ -199,6 +239,8 @@ class PositiveController(ExperimentController):
         self.current_poke_dur = self.choice_poke_dur()
         self.circuit.poke_dur_n.set(self.current_poke_dur, 's')
 
+        self.current_repeat_FA = self.model.paradigm.repeat_FA
+
         if self.current_trial == self.current_num_nogo + 1:
             self.circuit.trigger(2)
 
@@ -212,6 +254,7 @@ class PositiveController(ExperimentController):
     _apply_poke_duration_ub = _reset_current
     _apply_min_nogo = _reset_current
     _apply_max_nogo = _reset_current
+    _apply_repeat_FA = _reset_current
 
     def _apply_go_signal(self):
         signal = self.model.paradigm.go_signal
