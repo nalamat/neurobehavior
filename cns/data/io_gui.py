@@ -19,3 +19,4 @@ def paradigm_save_prompt(self, info):
         self.par_file = fd.path
         with open(self.par_file, 'wb') as fh:
             pickle.dump(info.object.paradigm, fh, -1)
+
