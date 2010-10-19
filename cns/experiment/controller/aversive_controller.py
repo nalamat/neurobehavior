@@ -117,7 +117,8 @@ class BaseAversiveController(ExperimentController):
     # A coroutine pipeline that acquires contact data from the RX6 and sends it
     # to the TrialData object
     data_pipe = Any
-    start_time = Float
+
+    #start_time = Float
     completed = Bool(False)
     water_infused = Float(0)
 
