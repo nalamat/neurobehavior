@@ -30,10 +30,18 @@ class SingleBarPlot(BarPlot):
         return range(0, len(values) * self.index_spacing, self.index_spacing)
 
     def _source_changed(self, old, new):
+        #if old is not None:
+        #    old.on_trait_change(self._data_changed, "updated", remove=True)
+        #if new is not None:
+        #    new.on_trait_change(self._data_changed, "updated")
         if old is not None:
-            old.on_trait_change(self._data_changed, "updated", remove=True)
+            old.on_trait_change(self._data_changed, self.index_trait,
+                                remove=True)
+            old.on_trait_change(self._data_changed, self.value_trait,
+                                remove=True)
         if new is not None:
-            new.on_trait_change(self._data_changed, "updated")
+            new.on_trait_change(self._data_changed, self.index_trait)
+            new.on_trait_change(self._data_changed, self.value_trait)
 
     def _data_changed(self):
         index = self._get_index()

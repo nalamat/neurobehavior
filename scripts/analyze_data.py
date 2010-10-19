@@ -31,9 +31,10 @@ experiment_table = TableEditor(editable=False,
                            filtered_indices='filtered_experiments',
                            columns=[ObjectColumn(name='duration'),
                                     #ObjectColumn(name='date'),
-                                    ObjectColumn(name='water_infused'),
+                                    ObjectColumn(name='water_infused',
+                                                 format='%.2f'),
                                     ListColumn(name='pars'),
-                                    ObjectColumn(name='total_trials')])
+                                    ObjectColumn(name='warn_trial_count')])
 
 analyzed_table = TableEditor(editable=False,
                             #filter_name='filter',
@@ -103,23 +104,49 @@ class ExperimentCollection(HasTraits):
 
 from cns.experiment.data.aversive_data import GrandAnalyzedAversiveData
 
-filter = lambda o: o.total_trials >= 20
+def process_animal(animal):
+    analyzed = []
+    for experiment in animal.experiments:
+        if experiment._v_name.startswith('aversive_date_'):
+            try:
+                data = persistence.load_object(experiment.Data)
+                if filter(data):
+                    analyzed.append(AnalyzedAversiveData(data=data))
+            except persistence.PersistenceReadError:
+                print 'Unable to parse ' + experiment._v_pathname
+    return GrandAnalyzedAversiveData(data=analyzed)
 
-def process_file(filename, filter=None):
+def process_file(filename):
     fin = tables.openFile(filename, 'r')
     animals = []
     analyzed = []
     for node in fin.root.Cohort_0.animals:
         for experiment in node.experiments:
-            print experiment
+            #print experiment
             if experiment._v_name.startswith('aversive_date_'):
-                data = persistence.load_object(experiment.Data)
-                if filter(data):
+                print experiment._v_pathname
+                try:
+                    data = persistence.load_object(experiment.Data)
                     analyzed.append(AnalyzedAversiveData(data=data))
+                except persistence.PersistenceReadError:
+                    print 'Unable to parse ' + experiment._v_pathname
     return GrandAnalyzedAversiveData(data=analyzed)
-            
+
+def foo():
+    import tables
+    from cns.data import persistence
+    f = tables.openFile('BNB_dt_group_5_control.cohort.hd5', 'r')
+    data = persistence.load_object(f.root.Cohort_0.animals.Animal_0.experiments.aversive_date_2010_08_26_17_42_27.Data)
+    data = persistence.load_object(f.root.Cohort_0.animals.Animal_0.experiments.aversive_date_2010_08_20_08_12_14.Data) 
+    print data.warn_par_mask
+    print data.par_warn_count
+    print data.pars
+    from cns.experiment.data.aversive_data import AnalyzedAversiveData
+    print AnalyzedAversiveData(data=data).par_info
+    return data
+
 if __name__ == '__main__':
-    import sys
-    lambda o: (o.total_trials >= 20) and \
-              (o.water_infused >= 0.5)
-    process_file(sys.argv[1])
+    foo()
+    #import sys
+    #ga = process_file(sys.argv[1])
+    #print ga.par_info
