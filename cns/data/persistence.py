@@ -19,11 +19,6 @@ def get_np_dtype(trait):
     types = ['object' if t.startswith('date') else t for t in trait.col_types]
     return dtype(zip(trait.col_names, types))
 
-# This is a pain!!!!
-#def get_hdf5_dtype(trait):
-#    types = ['S32' if t.startswith('date') else t for t in trait.col_types]
-#    return dtype(zip(trait.col_names, types))
-
 def get_traits(object, filter_readonly=False, filter_events=True, **metadata):
     '''Convenience function to filter out readonly traits.  This is useful for
     reconstructing a traited class that has been persisted.  Typically readonly
@@ -169,7 +164,6 @@ def add_or_update_object(object, node, name=None):
     # Now we add the metadata for the object
     # TODO: add support for deleted metadata.  Right now this is unsupported
     # because we don't need this use case.
-
     store_map = (('attribute', store_attribute),
                  ('array', store_array),
                  ('table', store_table),
@@ -281,10 +275,9 @@ unsanitize_datetimes = functools.partial(switch_datetime_fmt,
                                          parser=strptime_arr)
 
 def append_metadata(object, source):
-    object.store_file = source._v_file.filename
-    object.store_path = source._v_pathname
-    object.store_name = source._v_name
-    object.store_node = source
+    from os.path import abspath
+    object.store_node_source = abspath(source._v_file.filename)
+    object.store_node_path = source._v_pathname
     return object
 
 class PersistenceReadError(BaseException):
@@ -338,9 +331,57 @@ def load_attribute(node, name, trait):
         value = int(value)
     return value
 
-def load_object(source, path=None):
+
+def get_object(filename, path):
     '''
     Reconstructs original Python object from a node in a HDF5 file.
+
+    Parameters
+    ----------
+    filename : string
+        File to load object from
+    path : string
+        Path to object
+
+    Returns
+    -------
+    object
+
+    This function is a loose wrapper around `load_object that opens the
+    file then passes the handle to `load_object`, refer to :func:`load_object`
+    for more detail.
+    '''
+    source = tables.openFile(filename, 'r')
+    return load_object(source, path)
+
+def get_objects(filename, path, child=None, **filter):
+    source = tables.openFile(filename, 'r')
+    return load_objects(source.getNode(path), child, **filter)
+
+def load_objects(source, child=None, **filter):
+    '''
+    Attempt to load all children in a group and return the list
+
+    Parameters
+    ----------
+    source : node
+        Open HDF5 node (PyTables format)
+    filter : kwargs
+        List of kwargs to be passed to :func:`h5_utils.iter_nodes` to filter
+        against
+    child : string
+        Path relative to the child to be loaded
+    '''
+    from h5_utils import iter_nodes
+    iter = iter_nodes(source, **filter)
+    if child is not None:
+        return [load_object(node._f_getChild(child)) for node in iter]
+    else:
+        return [load_object(node) for node in iter]
+
+def load_object(source, path=None, type=None):
+    '''
+    Reconstructs original Python object from a node in an open HDF5 file.
 
     When a Python object is saved as a node in a HDF5 file, it includes two
     attributes, klass and module, along with the object data.  This function
@@ -360,15 +401,22 @@ def load_object(source, path=None):
     ==========
     source
         HDF5 node
+    type
+        Datatype of object to be loaded.  If None, the type will be inferred
+        from the module_name and klass_name attributes of the node.
 
     Raises
     ======
     PersistenceReadError
+        Raised if there is insufficient information to determine the original
+        type of the object.
 
     Right now this function only works with subclasses of `HasTraits` since it
     requires some metadata to be set for each trait that is being loaded.
-    '''
 
+    TODO: Create a "dummy" class if we cannot infer the type.  This will allow
+    us to load "static" objects without the appropriate class methods.
+    '''
     if path is not None and '/' in path:
         node = source.getNode(path)
     elif path is not None:
@@ -380,16 +428,18 @@ def load_object(source, path=None):
     try: kw['UNIQUE_ID'] = node._f_getAttr('UNIQUE_ID')
     except AttributeError: pass
 
-    try:
-        module_name = node._v_attrs.module
-        klass_name = node._v_attrs.klass
-    except AttributeError:
-        raise PersistenceReadError(node._v_file.filename, node._v_pathname)
-
-    # We need to obtain a reference to the type so we can adequately parse any
-    # datetime values that are stored in the HDF5 file.  This type will also be
-    # used to create a class instance once we are done loading the data.
-    type = getattr(__import__(module_name, fromlist=[klass_name]), klass_name)
+    if type is None:
+        # We need to obtain a reference to the type so we can adequately parse
+        # any datetime values that are stored in the HDF5 file.  This type will
+        # also be used to create a class instance once we are done loading the
+        # data.
+        try:
+            module_name = node._v_attrs.module
+            klass_name = node._v_attrs.klass
+            module = __import__(module_name, fromlist=[klass_name])
+            type = getattr(module, klass_name)
+        except AttributeError:
+            raise PersistenceReadError(node._v_file.filename, node._v_pathname)
 
     loaders = (('channel', load_channel),
                #('node', load_node),
