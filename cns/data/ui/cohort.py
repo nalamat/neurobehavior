@@ -145,13 +145,13 @@ class CohortView(HasTraits):
         if name != 'processed':
             self._modified = True
 
-    @on_trait_change('dclicked')
-    def open_view(self):
-        print 'detected'
-        view = TraitsUIView(id='foo',
-                            name='foo',
-                            obj=self.selected)
-        self.window.add_view(view)
+    #@on_trait_change('dclicked')
+    #def open_view(self):
+    #    print 'detected'
+    #    view = TraitsUIView(id='foo',
+    #                        name='foo',
+    #                        obj=self.selected)
+    #    self.window.add_view(view)
         
     #@on_trait_change('cohort.animals.+')
     #def sort_animals(self):
