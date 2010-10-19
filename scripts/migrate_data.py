@@ -3,15 +3,9 @@
 with the original AversiveData structure.  Consequently, we implemented a
 versioning scheme (RawAversiveData_v0_1, RawAversiveData_v0_2, etc).
 AversiveData was renamed to RawAversiveData_v0_1 during this process.  This
-function scans the file for any references to the old classname and updates it
-to the correct classname.
-
-- Experiment start time was originally stored in the name of the node for the
-experiment itself.  Newer versions of the program store it as an attribute in
-the Data node (as well as stop_time).  This function scans the file for
-experiment data missing the start_time and stop_time attributes.  If missing,
-the start_time is derived from the name of the node, while stop_time is
-estimated by checking the last timestamp recorded in that experiment.
+function scans the file for data stored in RawAversiveData_v0_1 format and
+converts it to a format suitable for loading into RawAversiveData_v0_2
+structures.
 
 Repair functions must be run in a very specific order that's listed in the tuple
 below.
@@ -139,12 +133,16 @@ def move_analyzed_nodes(node):
 def fix_node_attr_names(node):
 
     if hasattr(node, '_v_children'):
+        if 'trial_log' in node._v_children and len(node.trial_log.cols) == 3:
+            print 'Correcting trial_log to event_log'
+            node.trial_log._f_move(newname='event_log')
         if 'trial_data' in node._v_children:
-            print 'Renaming trial_data: ' + node._v_name
-            if 'trial_log' in node._v_children:
-                print 'Renaming trial_log: ' + node._v_name
-                node.trial_log._f_move(newname='event_log')
+            print 'Correcting trial_data to trial_log'
             node.trial_data._f_move(newname='trial_log')
+
+    if 'total_trials' in node._v_attrs:
+        print 'Renaming total_trials'
+        node._v_attrs._f_rename('total_trials', 'warn_trial_count')
 
 cleanup = (move_experiment_nodes,
            move_analyzed_nodes,
