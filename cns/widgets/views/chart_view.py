@@ -2,53 +2,50 @@ from cns.widgets.views.component_view import BarChartComponentView, BarChartOver
 from enthought.chaco.api import BarPlot, DataRange1D, LinearMapper, LabelAxis, ArrayDataSource
 from enthought.traits.ui.api import View, Item, Group
 from enthought.enable.component_editor import ComponentEditor
-from enthought.traits.api import Str, Int, Float, Trait, Any, Callable, Instance, HasTraits, DelegatesTo
+from enthought.traits.api import Str, Int, Float, Trait, Any, Callable, \
+    Instance, HasTraits, DelegatesTo, on_trait_change
 import numpy as np
 
-class SingleBarPlot(BarPlot):
-
-    source = Instance(HasTraits, ())
-    index_trait = Str
-    value_trait = Str
-
-    index = Instance(ArrayDataSource, ())
-    value = Instance(ArrayDataSource, ())
-
-    index_spacing = Int(1)
-
-    def _get_values(self):
-        if self.source is not None:
-            value = np.array(getattr(self.source, self.value))
-            if self.preprocess_values is not None:
-                value = self.preprocess_values(value)
-            return value
-        else:
-            return []
-
-    def _get_indices(self):
-        values = self._get_values()
-        return range(0, len(values) * self.index_spacing, self.index_spacing)
-
-    def _source_changed(self, old, new):
-        #if old is not None:
-        #    old.on_trait_change(self._data_changed, "updated", remove=True)
-        #if new is not None:
-        #    new.on_trait_change(self._data_changed, "updated")
-        if old is not None:
-            old.on_trait_change(self._data_changed, self.index_trait,
-                                remove=True)
-            old.on_trait_change(self._data_changed, self.value_trait,
-                                remove=True)
-        if new is not None:
-            new.on_trait_change(self._data_changed, self.index_trait)
-            new.on_trait_change(self._data_changed, self.value_trait)
-
-    def _data_changed(self):
-        index = self._get_index()
-        value = self._get_value()
-        if len(index) == len(value):
-            self.index.set_data(index)
-            self.value.set_data(value)
+#class SingleBarPlot(BarPlot):
+#
+#    source = Instance(HasTraits, ())
+#    index_trait = Str
+#    value_trait = Str
+#
+#    index = Instance(ArrayDataSource, ())
+#    value = Instance(ArrayDataSource, ())
+#
+#    index_spacing = Int(1)
+#
+#    def _get_values(self):
+#        if self.source is not None:
+#            value = np.array(getattr(self.source, self.value))
+#            if self.preprocess_values is not None:
+#                value = self.preprocess_values(value)
+#            return value
+#        else:
+#            return []
+#
+#    def _get_indices(self):
+#        values = self._get_values()
+#        return range(0, len(values) * self.index_spacing, self.index_spacing)
+#
+#    def _source_changed(self, old, new):
+#        if old is not None:
+#            old.on_trait_change(self._data_changed, self.index_trait,
+#                                remove=True)
+#            old.on_trait_change(self._data_changed, self.value_trait,
+#                                remove=True)
+#        if new is not None:
+#            new.on_trait_change(self._data_changed, self.index_trait)
+#            new.on_trait_change(self._data_changed, self.value_trait)
+#
+#    def _data_changed(self):
+#        index = self._get_index()
+#        value = self._get_value()
+#        if len(index) == len(value):
+#            self.index.set_data(index)
+#            self.value.set_data(value)
 
 class SingleBarPlotView(BarChartComponentView):
 
@@ -94,7 +91,6 @@ class SingleBarPlotView(BarChartComponentView):
                 border_visible=False,
                 )
         self._add_underlays(component)
-        self.update_data()
         return component
 
     def _index_label_default(self):
@@ -121,6 +117,10 @@ class DynamicBarPlotView(SingleBarPlotView):
 
     label = Trait(None, Str)
 
+    def __init__(self, *args, **kw):
+        super(DynamicBarPlotView, self).__init__(*args, **kw)
+        self.update_labels()
+
     def _get_indices(self):
         values = self._get_values()
         return range(0, len(values) * self.index_spacing, self.index_spacing)
@@ -131,17 +131,20 @@ class DynamicBarPlotView(SingleBarPlotView):
             labels = indices
         else:
             labels = np.array(getattr(self.source, self.label))
-        label_text = [(self.label_fmt % l) for l in labels]
+        #label_text = [(self.label_fmt % l) for l in labels]
+        label_text = [('%.4f' % l).rstrip('0') for l in labels]
         return indices, label_text
 
-    def _source_changed(self, old, new):
+    @on_trait_change('source', 'label')
+    def update_listeners(self, old, new):
         if old is not None:
-            old.on_trait_change(self.update_labels, "updated", remove=True)
+            old.on_trait_change(self.update_labels, self.label, remove=True)
             old.on_trait_change(self.update_data, "updated", remove=True)
         if new is not None:
-            new.on_trait_change(self.update_labels, "updated")
+            new.on_trait_change(self.update_labels, self.label)
             new.on_trait_change(self.update_data, "updated")
 
+    @on_trait_change('label', 'source')
     def update_labels(self):
         if self.traits_inited():
             label_position, label_text = self._get_labels()

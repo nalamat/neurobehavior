@@ -25,6 +25,15 @@ The code is structured into several folders:
         of the program.  Many of these scripts are currently broken since I
         don't maintain them well.
 
+cns library
+-----------
+    experiments.data
+        Objects that handle storing and analyzing experimental data.  Objects
+        are typically split into RawData and AnalyzedData.
+    experiments.controller
+        Objects that manage the equipment equipment, responding to user input and 
+
+
 .. _`module search path`: http://docs.python.org/tutorial/modules.html#the-module-search-path
 
 The best place to start is in the demo folder.  Each script demonstrates some
