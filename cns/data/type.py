@@ -32,9 +32,11 @@ class Animal(HasTraits):
         except:
             try:
                 from cns.data.persistence import get_objects
+                filter = {'_v_name': 'aversive_date*' }
                 exps = get_objects(self.store_node_source,
                                    self.store_node_path+'/experiments',
-                                   _v_name='aversive_date*',
+                                   filter=filter,
+                                   child='Data',
                                    type=Experiment)
                 self._experiments = exps
                 return self._experiments

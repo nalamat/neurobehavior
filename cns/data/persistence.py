@@ -332,9 +332,9 @@ def load_attribute(node, name, trait):
     return value
 
 
-def get_object(filename, path):
+def get_object(filename, path, *args, **kw):
     '''
-    Reconstructs original Python object from a node in a HDF5 file.
+    Reconstructs original Python object
 
     Parameters
     ----------
@@ -342,6 +342,8 @@ def get_object(filename, path):
         File to load object from
     path : string
         Path to object
+    *args, **kw
+        Arguments to pass to :func:`load_object`
 
     Returns
     -------
@@ -352,13 +354,34 @@ def get_object(filename, path):
     for more detail.
     '''
     source = tables.openFile(filename, 'r')
-    return load_object(source, path)
+    return load_object(source, path, *args, **kw)
 
-def get_objects(filename, path, child=None, **filter):
+def get_objects(filename, path, *args, **kw):
+    '''
+    Attempt to load all children in a group and return the list
+
+    Parameters
+    ----------
+    filename : string
+        File to load object from
+    path : string
+        Path to object
+    *args, **kw
+        Arguments to pass to :func:`load_objects`
+
+    Returns
+    -------
+    object
+
+    This function is a loose wrapper around `load_objects' that opens the
+    file then passes the handle to `load_object`, refer to :func:`load_objects`
+    for more detail.
+    '''
+
     source = tables.openFile(filename, 'r')
-    return load_objects(source.getNode(path), child, **filter)
+    return load_objects(source.getNode(path), *args, **kw)
 
-def load_objects(source, child=None, **filter):
+def load_objects(source, filter, child=None, type=None):
     '''
     Attempt to load all children in a group and return the list
 
@@ -366,14 +389,13 @@ def load_objects(source, child=None, **filter):
     ----------
     source : node
         Open HDF5 node (PyTables format)
-    filter : kwargs
-        List of kwargs to be passed to :func:`h5_utils.iter_nodes` to filter
-        against
+    filter : dict
+        Dictionary to be passed to :func:`h5_utils.iter_nodes` to filter against
     child : string
         Path relative to the child to be loaded
     '''
     from h5_utils import iter_nodes
-    iter = iter_nodes(source, **filter)
+    iter = iter_nodes(source, filter)
     if child is not None:
         return [load_object(node._f_getChild(child)) for node in iter]
     else:
