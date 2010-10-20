@@ -77,14 +77,30 @@ class PositiveData_0_1(ExperimentData):
 
     TRIAL_DTYPE = [('ts_start', 'i'), ('ts_end', 'i'), ('type', 'S4'),
                    ('response', 'S16')]
-    ACTION_DTYPE = [('ts', 'i'), ('action', 'S16')]
+    #ACTION_DTYPE = [('ts', 'i'), ('action', 'S16')]
 
     trial_log = List(Tuple(Int, Int, Str, Str), store='table', dtype=TRIAL_DTYPE)
-    action_log = List(Tuple(Int, Str), store='table', dtype=ACTION_DTYPE)
+    #action_log = List(Tuple(Int, Str), store='table', dtype=ACTION_DTYPE)
 
+    # Total GO trials presented
+    num_go = Int(store='attribute')
+    # Total GO trials where subject provided response
+    num_go_response = Int(store='attribute')
+    # Total NOGO trials presented
+    num_nogo = Int(store='attribute')
+    # Total NOGO trials where subject provided response
+    num_nogo_response = Int(store='attribute')
+    # Total false alarms
+    num_fa = Int(store='attribute')
+    # Total hits
+    num_hit = Int(store='attribute')
+    # num_fa/num_nogo
     fa_frac = Float(store='attribute')
+    # num_hit/num_go
     hit_frac = Float(store='attribute')
+    # num_fa/num_nogo_response
     response_fa_frac = Float(store='attribute')
+    # num_hit/num_go_response
     response_hit_frac = Float(store='attribute')
 
     def log_trial(self, ts_start, ts_end, ttype):
@@ -97,8 +113,7 @@ class PositiveData_0_1(ExperimentData):
         else:
             response = 'NO_RESPONSE'
 
-        self.trial_log.append((ts_start, ts_end, ttype, response))
-
+        self.trial_log.insert(0, (ts_start, ts_end, ttype, response))
         self.update_score()
 
     def update_score(self):
@@ -110,55 +125,64 @@ class PositiveData_0_1(ExperimentData):
         NOGO = trial_log[:,2]=='NOGO'
         GO = trial_log[:,2]=='GO'
 
-        self.response_hit_frac = (GO&SPOUT).sum()/(GO&RESPONSE).sum()
-        self.hit_frac = (GO&SPOUT).sum()/(GO).sum()
+        self.num_go = (GO).sum()
+        self.num_go_response = (GO&RESPONSE).sum()
+        self.num_hit = (GO&SPOUT).sum()
 
-        self.response_fa_frac = (NOGO&SPOUT).sum()/(NOGO&RESPONSE).sum()
-        self.fa_frac = (NOGO&SPOUT).sum()/NOGO.sum()
+        #self.response_hit_frac = (GO&SPOUT).sum()/(GO&RESPONSE).sum()
+        self.response_hit_frac = self.num_hit/self.num_go_response
+        self.hit_frac = self.num_hit/self.num_go
 
-    def _score_trial(self, ts, type):
-        pass
+        self.num_nogo = (NOGO).sum()
+        self.num_nogo_response = (NOGO&RESPONSE).sum()
+        self.num_fa = (NOGO&SPOUT).sum()
 
-    def _generate_action_log(self):
-        ts = lambda TTL: np.flatnonzero(TTL)
-        edge_rising = lambda TTL: np.r_[0, np.diff(TTL.astype('i'))] == 1
-        edge_falling = lambda TTL: np.r_[0, np.diff(TTL.astype('i'))] == -1
+        self.response_fa_frac = self.num_fa/self.num_nogo_response
+        self.fa_frac = self.num_fa/self.num_nogo
 
-        spout_TTL = self.spout_TTL.buffer[:]
-        poke_TTL = self.poke_TTL.buffer[:]
-        trial_TTL = self.trial_TTL.buffer[:]
-        score_TTL = self.score_TTL.buffer[:]
-        response_TTL = self.response_TTL.buffer[:]
+    #def _score_trial(self, ts, type):
+    #    pass
 
-        # Spout contact when there's no trial
-        TTL = edge_rising(spout_TTL) & ~score_TTL
-        nontrial_spout_ts = ts(TTL).tolist()
+    #def _generate_action_log(self):
+    #    ts = lambda TTL: np.flatnonzero(TTL)
+    #    edge_rising = lambda TTL: np.r_[0, np.diff(TTL.astype('i'))] == 1
+    #    edge_falling = lambda TTL: np.r_[0, np.diff(TTL.astype('i'))] == -1
 
-        # Poke-withdraw when there's no trial
-        TTL = edge_falling(poke_TTL) & ~response_TTL
-        nontrial_poke_wd_ts = ts(TTL).tolist()
+    #    spout_TTL = self.spout_TTL.buffer[:]
+    #    poke_TTL = self.poke_TTL.buffer[:]
+    #    trial_TTL = self.trial_TTL.buffer[:]
+    #    score_TTL = self.score_TTL.buffer[:]
+    #    response_TTL = self.response_TTL.buffer[:]
 
-        # Repoke during response window
-        TTL = edge_rising(poke_TTL) & score_TTL
-        trial_poke_ts = ts(TTL).tolist()
+    #    # Spout contact when there's no trial
+    #    TTL = edge_rising(spout_TTL) & ~score_TTL
+    #    nontrial_spout_ts = ts(TTL).tolist()
 
-        # Spout contact during response window
-        TTL = edge_rising(spout_TTL) & score_TTL
-        trial_spout_ts = ts(TTL).tolist()
+    #    # Poke-withdraw when there's no trial
+    #    TTL = edge_falling(poke_TTL) & ~response_TTL
+    #    nontrial_poke_wd_ts = ts(TTL).tolist()
 
-        actions = ('nontrial_spout',
-                   'nontrial_poke_wd',
-                   'trial_poke',
-                   'trial_spout'
-                   )
+    #    # Repoke during response window
+    #    TTL = edge_rising(poke_TTL) & score_TTL
+    #    trial_poke_ts = ts(TTL).tolist()
 
-        self.action_log = []
-        for action in actions:
-            timestamps = locals()[action+'_ts']#[getattr(self, action+'_ts')
-            action = action.upper()
-            data = [(ts, action) for ts in timestamps]
-            self.action_log.extend(data)
-        self.action_log.sort(reverse=True)
+    #    # Spout contact during response window
+    #    TTL = edge_rising(spout_TTL) & score_TTL
+    #    trial_spout_ts = ts(TTL).tolist()
+
+    #    actions = ('nontrial_spout',
+    #               'nontrial_poke_wd',
+    #               'trial_poke',
+    #               'trial_spout'
+    #               )
+
+    #    self.action_log = []
+    #    for action in actions:
+    #        timestamps = locals()[action+'_ts']#[getattr(self, action+'_ts')
+    #        action = action.upper()
+    #        data = [(ts, action) for ts in timestamps]
+    #        self.action_log.extend(data)
+    #    self.action_log.sort(reverse=True)
 
 PositiveData = PositiveData_0_1
 

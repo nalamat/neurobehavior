@@ -16,21 +16,21 @@ colors = {'light green': '#98FB98',
           'light red': '#FFC8CB',
           'dark red': '#FA8072', }
 
-class ActionLogAdapter(TabularAdapter):
-    """
-    Adapt action log to a table view
-    """
-
-    columns = ('ts', 'action')
-
-    colormap = {'TRIAL_SPOUT': '#ADD8E6',
-                'TRIAL_POKE': '#FFB6C1',
-                'NONTRIAL_POKE_WD': '#D3D3D3',
-                'NONTRIAL_SPOUT' : '#D3F3F3',
-                }
-
-    def _get_bg_color(self):
-        return self.colormap[self.item[1]]
+#class ActionLogAdapter(TabularAdapter):
+#    """
+#    Adapt action log to a table view
+#    """
+#
+#    columns = ('ts', 'action')
+#
+#    colormap = {'TRIAL_SPOUT': '#ADD8E6',
+#                'TRIAL_POKE': '#FFB6C1',
+#                'NONTRIAL_POKE_WD': '#D3D3D3',
+#                'NONTRIAL_SPOUT' : '#D3F3F3',
+#                }
+#
+#    def _get_bg_color(self):
+#        return self.colormap[self.item[1]]
 
 class TrialLogAdapter(TabularAdapter):
     """
@@ -54,8 +54,8 @@ class TrialLogAdapter(TabularAdapter):
             else: #CR
                 return colors['light red']
 
-action_log_table = TabularEditor(adapter=ActionLogAdapter(),
-                                 editable=False)
+#action_log_table = TabularEditor(adapter=ActionLogAdapter(),
+#                                 editable=False)
 trial_log_table = TabularEditor(adapter=TrialLogAdapter(),
                                 editable=False)
 
@@ -160,6 +160,14 @@ class PositiveExperiment(HasTraits):
             ),
             VGroup(
                 VGroup(
+                    Item('object.data.num_go', label='Total GO'),
+                    Item('object.data.num_go_response', 
+                         label='Total GO with response'),
+                    Item('object.data.num_hit', label='Total hits'),
+                    Item('object.data.num_nogo', label='Total NOGO'),
+                    Item('object.data.num_nogo_response', 
+                         label='Total NOGO with response'),
+                    Item('object.data.num_fa', label='Total FA'),
                     Item('object.data.fa_frac', label='FA fraction'),
                     Item('object.data.response_fa_frac', 
                          label='FA fraction (all)'),
