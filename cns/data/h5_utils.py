@@ -44,26 +44,19 @@ def append_date_node(node, pre='date', post='', type='group', *arg, **kw):
     name = pre + datetime.now().strftime(time_fmt) + post
     return append_node(node, name, type, *arg, **kw)
 
-import re
-#_METADATA_PATTERN = re.compile('^_v_')
-
-#def node_match(n, **kw):
 def node_match(n, filter):
     '''Checks for match against each keyword.  If an attribute is missing or
     any match fails, returns False.
 
     Filter must be a dictionary
     '''
+    import re
+
     for k, v in filter.items():
         value = n
         # Traverse object tree to get final attribute
         for attr in k.split('.'):
             try:
-                #print attr
-                #if _METADATA_PATTERN.match(attr):
-                #    print 'we are here', attr, value.__dict__
-                #    value = getattr(value._v_attrs, attr)
-                #else:
                 value = getattr(value, attr)
             except AttributeError:
                 return False
