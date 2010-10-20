@@ -86,19 +86,12 @@ class RampMixin(EnvelopeMixin):
             self.set(trait_change_notify=False, ramp_duration=max_ramp)
 
     def generate_ramp(self):
-        n = int(self.ramp_time * self.fs)
-
-        if self.ramp_type == 'cosine squared':
-            return np.sin(np.linspace(0, np.pi / 2., n)) ** 2
-        elif self.ramp_type == 'cosine':
-            return np.sin(np.linspace(0, np.pi / 2., n))
-        elif self.ramp_type == 'linear':
-            return np.arange(n, dtype='f') / n
+        return generate_ramp(self.ramp_type, n)
 
     def _get_envelope(self):
-        ramp = self.generate_ramp()
-        n = int(self.ramp_duration * self.fs) - len(ramp)
-        envelope = np.r_[ramp, np.ones(n), ramp[::-1]]
+        ramp_n = int(self.ramp_time * self.fs)
+        env_n = int(self.ramp_duration * self.fs)
+        envelope = generate_envelope(env_n, self.ramp_type, ramp_n)
 
         if self.ramp_delay_ref == 'onset':
             pre_n = int(self.ramp_delay * self.fs)
