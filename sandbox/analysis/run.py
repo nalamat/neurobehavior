@@ -64,9 +64,6 @@ class LoadCohortAction(ActionClass):
     def perform(self, event):
         from enthought.pyface.api import confirm, YES
         if confirm(None, "Would you like to load the cohort?") == YES:
-            print "FOOBAR"
-            log.debug('Added TRAITS VIEW')
-            log.debug('Added SELECTED VIEW')
             items=[CohortItem(name='Red', id=1, description="Test"),
                    CohortItem(name='Green', id=2, description="Test"),
                    CohortItem(name='Blue', id=3, description="Test"),
@@ -77,6 +74,7 @@ class LoadCohortAction(ActionClass):
                             selected=items[0])
             cohort.app = self.window
             self.window.application.register_service(Cohort, cohort)
+
             selected_view = TraitsUIView(id='seleted item',
                                          name=cohort.description + 'selected',
                                          obj=cohort,
@@ -109,7 +107,7 @@ class AnalysisApplication(WorkbenchApplication):
 
 if __name__ == '__main__':
     plugins = [
-        CorePlugin(), 
+        #CorePlugin(), 
         WorkbenchPlugin(), 
         CohortPlugin(), 
         ]

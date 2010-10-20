@@ -37,9 +37,7 @@ from scipy.stats import norm
 from enthought.traits.ui.api import View
 
 def apply_mask(fun, seq, mask):
-    #seq = np.array(seq).ravel()
     seq = np.array(seq)
-    #return [fun(np.take(seq, m)) for m in mask]
     return [fun(seq[m]) for m in mask]
 
 # Datatype information for the various tables and lists used in this module. All
@@ -64,6 +62,9 @@ class RawAversiveData_v0_2(ExperimentData):
     Low-level container for data.  Absolutely no post-processing, metadata or
     analysis of this data is made.
     '''
+    
+    selected = Bool(False)
+
     # TODO: This is a bit of a hack but I'm not sure of a better way to send the
     # datafile down the hierarchy.  We need access to this data file so we can
     # stream data to disk rather than storing it in a temporary buffer.
@@ -313,6 +314,10 @@ class BaseAnalyzedAversiveData(AnalyzedData):
     * global_fa_frac
     '''
 
+    # Checkbox indicating that data should be included in analysis.  Primarily
+    # for syncing with GUI
+    selected = Bool(False)
+
     # Clip FA/HIT rate if < clip or > 1-clip (prevents unusually high z-scores)
     clip = Float(0.05, store='attribute')
 
@@ -322,10 +327,10 @@ class BaseAnalyzedAversiveData(AnalyzedData):
 
     # Summary scores for the parameters.  Subclasses must implement the property
     # getters for these!
-    pars = Property(List(Float))
-    par_fa_frac = Property(List(Float))
-    global_fa_frac = Property(Float)
-    par_hit_frac = Property(List(Float))
+    pars = Property
+    par_fa_frac = Property
+    global_fa_frac = Property
+    par_hit_frac = Property
 
     # Computed based on the summary scores provided above
     par_z_fa = Property(List(Float), depends_on='par_fa_frac')
@@ -380,27 +385,52 @@ class BaseAnalyzedAversiveData(AnalyzedData):
 class AnalyzedAversiveData(BaseAnalyzedAversiveData):
     '''
     Scored data from a single experiment
-    '''
-    label = Property(Str, depends_on='contact_offset')
 
-    def _get_label(self):
-        return 'Contact %.2f to %.2f > %.2f' % (self.contact_offset,
-                                                self.contact_offset+self.contact_dur,
-                                                self.contact_fraction)
+    False alarms and hits can only be determined after we score the data.  Prior
+    to scoring the data, we must decide what trials need to be excluded: e.g.
+    the subject may have been inattentive in the beginning or have grown bored
+    with the task towards the end.  
+
+    Scores contains the actual contact ratio for each trial.  False alarms and
+    hits are then computed against these scores (using the contact_fraction as
+    the threshold).  Scores are a fraction (0 ot 1) indicating degree of
+    animal's contact with spout during the check period defined by
+    `contact_offset` and `contact_dur` (relative to the trial timestamp).
+
+    Parameters
+    ----------
+    exclude_first : int
+        Number of trials at beginning to ignore
+    exclude_last : int
+        Number trials at end to ignore
+    contact_offset : float (seconds)
+        Start of check period relative to trial timestamp, can be a negative
+        value
+    contact_dur : float (seconds)
+        Duration of check period
+    reaction_offset : float (seconds)
+        Start of snippet to extract relative to trial timestamp, can be a
+        negative value
+    reaction_dur : float (seconds)
+        Duration of snippet to extract
+
+    Computed properties
+    -------------------
+    masked_trial_log : record array
+        Trial log (as record array) with trials excluded
+    contact scores : array_like
+        Fraction of check period that subject was in contact with spout
+    contact_seq : array_like
+        True/False sequence indicating whether animal was in contact with the
+        spout during the check period based on `contact_fraction`.
+    '''
 
     data = Instance(RawAversiveData_v0_2, ())
-    #data = Any
 
-    # Override depends_on parameter
-    pars = Property(List(Float), depends_on='contact_scores')
-    par_fa_frac = Property(List(Float), depends_on='fa_seq')
-    global_fa_frac = Property(Float, depends_on='fa_seq', store='attribute')
-    par_hit_frac = Property(List(Float), depends_on='hit_seq')
+    # Analysis parameters
+    exclude_first = Int(0, store='attribute')
+    exclude_last = Int(0, store='attribute')
 
-    warn_trial_count = DelegatesTo('data')
-
-    # The next few pars will influence the analysis of the data, specifically
-    # the "score".  Anytime these change, the data must be reanalyzed.
     contact_offset = Float(0.9, store='attribute')
     contact_dur = Float(0.1, store='attribute')
     contact_fraction = Range(0.0, 1.0, 0.5, store='attribute')
@@ -408,55 +438,116 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
     reaction_offset = Float(-1, store='attribute')
     reaction_dur = Float(3.0, store='attribute')
 
-    # False alarms and hits can only be determined after we score the data.
-    # Scores contains the actual contact ratio for each trial.  False alarms and
-    # hits are then computed against these scores (using the contact_fraction as
-    # the threshold).  Scores are a fraction (0 ot 1) indicating degree of
-    # animal's contact with spout during the check period defined by
-    # `contact_offset` and `contact_dur` (relative to the trial timestamp).
-    contact_scores = List(Float, store='array')
+    # Masked data
+    masked_trial_log = Property(depends_on='data.trial_log, exclude+')
+
+    # Basic analysis of masked data
+    contact_scores = Property(store='array')
+    contact_seq = Property(store='array')
+
+    # Parameter summary based on masked data
+    pars = Property(depends_on='masked_trial_log')
+    par_fa_count = Property(depends_on='fa_seq')
+    par_hit_count = Property(depends_on='hit_seq')
+    par_safe_count = Property(depends_on='contact_scores')
+    par_warn_count = Property(depends_on='contact_scores')
+
+    # Overview information
+    warn_trial_count = Property(depends_on='masked_trial_log')
+
+    #-------------------------------------------------------------------
+    # Compute masked data
+    #-------------------------------------------------------------------
+    def _get_masked_trial_log(self):
+        '''
+        Convert `data.trial_log` to record array and mask unwanted trials
+        '''
+        log = np.array(self.data.trial_log, dtype=TRIAL_DTYPE)
+        if self.exclude_last != 0:
+            # x[0:-0] returns empty array
+            return log[self.exclude_first:-self.exclude_last]
+        else:
+            return log[self.exclude_first:]
+
+    safe_par_mask = Property(depends_on='masked_trial_log')
+    warn_par_mask = Property(depends_on='masked_trial_log')
+
+    def _get_pars(self):
+        mask = self.masked_trial_log['type'] == 'warn'
+        return np.unique(self.masked_trial_log[mask]['par'])
+
+    def _get_par_mask(self, ttype):
+        ttype_mask = self.masked_trial_log['type'] == ttype
+        par_mask = [self.masked_trial_log['par'] == par for par in self.pars]
+        return par_mask & ttype_mask
+
+    def _get_warn_par_mask(self):
+        return self._get_par_mask('warn')
+
+    def _get_safe_par_mask(self):
+        return self._get_par_mask('safe')
+
+    #-------------------------------------------------------------------
+    # Basic analysis
+    #-------------------------------------------------------------------
 
     # Views of contact scores for the indicated trial type
-    safe_scores = Property(Array(dtype='f'), depends_on='contact_scores')
-    warn_scores = Property(Array(dtype='f'), depends_on='contact_scores')
-    remind_scores = Property(Array(dtype='f'), depends_on='contact_scores')
+    #safe_scores = Property(Array(dtype='f'), depends_on='contact_scores')
+    #warn_scores = Property(Array(dtype='f'), depends_on='contact_scores')
+    #remind_scores = Property(Array(dtype='f'), depends_on='contact_scores')
 
-    remind_indices = DelegatesTo('data')
-    safe_indices = DelegatesTo('data')
-    warn_indices = DelegatesTo('data')
-    total_indices = DelegatesTo('data')
+    #remind_indices = DelegatesTo('data')
+    #safe_indices = DelegatesTo('data')
+    #warn_indices = DelegatesTo('data')
+    #total_indices = DelegatesTo('data')
 
-    # True/False sequence indicating whether animal was in contact with the
-    # spout during the check based on `contact_fraction`.
-    contact_seq = Property(Array(dtype='b'), depends_on='contact_scores')
-    fa_seq = Property(Array(dtype='f'), depends_on='safe_scores')
-    hit_seq = Property(Array(dtype='f'), depends_on='safe_scores')
-    remind_seq = Property(Array(dtype='f'), depends_on='safe_scores')
+    #contact_seq = Property(Array(dtype='b'), depends_on='contact_scores')
+    #fa_seq = Property(Array(dtype='f'), depends_on='safe_scores')
+    #hit_seq = Property(Array(dtype='f'), depends_on='safe_scores')
+    #remind_seq = Property(Array(dtype='f'), depends_on='safe_scores')
 
-    par_fa_count = Property(Array(dtype='i'), depends_on='fa_seq')
-    par_hit_count = Property(Array(dtype='i'), depends_on='hit_seq')
-
-    reaction_snippets = List(Array(dtype='f'))
+    #reaction_snippets = List(Array(dtype='f'))
 
     # Views of reaction snippet for the indicated trial type
-    safe_reaction_snippets = Property(List(Array(dtype='f')))
-    mean_safe_reaction_snippets = Property(Array(dtype='f'))
-    warn_reaction_snippets = Property(List(Array(dtype='f')))
+    #safe_reaction_snippets = Property(List(Array(dtype='f')))
+    #mean_safe_reaction_snippets = Property(Array(dtype='f'))
+    #warn_reaction_snippets = Property(List(Array(dtype='f')))
 
-    par_warn_reaction_snippets = Property(List(Array(dtype='f')))
-    par_mean_warn_reaction_snippets = Property(List(Array(dtype='f')))
+    #par_warn_reaction_snippets = Property(List(Array(dtype='f')))
+    #par_mean_warn_reaction_snippets = Property(List(Array(dtype='f')))
 
-    def _get_mean_safe_reaction_snippets(self):
-        return self.safe_reaction_snippets.mean(0)
+    #-------------------------------------------------------------------
+    # Process raw data based on masks
+    #------------------------------------------------------------------- 
 
-    def _get_safe_reaction_snippets(self):
-        return np.take(self.reaction_snippets, self.safe_indices, axis=0)
+    @cached_property
+    def _get_contact_scores(self):
+        contact = self.data.contact_digital
+        lb_index = contact.to_samples(self.contact_offset)
+        ub_index = contact.to_samples(self.contact_offset+self.contact_dur)
 
-    def _get_par_warn_reaction_snippets(self):
-        return apply_mask(self.reaction_snippets, self.data.warn_par_mask)
+        scores = []
+        for ts in self.masked_trial_log['timestamp']:
+            score = contact.get_range_index(lb_index, ub_index, ts).mean()
+            scores.append(score)
+        return scores
 
-    def _get_par_mean_warn_reaction_snippets(self):
-        return [arr.mean(0) for arr in self.par_warn_reaction_snippets]
+    @cached_property
+    def _get_reaction_snippets(self):
+        '''
+        Extracts segment of contact waveform
+        
+        Start offset (relative to the timestamp) and duration of the segment are
+        determined by `reaction_offset` and `reaction_dur`.
+        '''
+        contact = self.data.contact_digital
+        lb_index = contact.to_samples(self.reaction_offset)
+        ub_index = contact.to_samples(self.reaction_offset+self.reaction_dur)
+
+        snippets = []
+        for ts in self.masked_trial_log['timestamp']:
+            snippets.append(contact.get_range_index(lb_index, ub_index, ts))
+        return snippets
 
     #-------------------------------------------------------------------
     # Contact scores
@@ -482,7 +573,7 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
         return self._get_scores(self.data.remind_indices)
 
     #-------------------------------------------------------------------
-    # Sequences
+    # Sequences (NOT AFFECTED BY THE INCLUDE MASK)
     #------------------------------------------------------------------- 
     @cached_property
     def _get_contact_seq(self):
@@ -505,83 +596,53 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
     #------------------------------------------------------------------- 
     @cached_property
     def _get_par_fa_count(self):
-        return apply_mask(np.sum, self.contact_seq, self.data.safe_par_mask)
+        return apply_mask(np.sum, self.contact_seq, self.safe_par_mask)
 
     @cached_property
     def _get_par_hit_count(self):
-        return apply_mask(np.sum, self.contact_seq, self.data.warn_par_mask)
+        return apply_mask(np.sum, self.contact_seq, self.warn_par_mask)
 
-    par_safe_count = DelegatesTo('data')
-    par_warn_count = DelegatesTo('data')
+    @cached_property
+    def _get_par_safe_count(self):
+        return apply_mask(len, self.contact_seq, self.safe_par_mask)
+
+    @cached_property
+    def _get_par_warn_count(self):
+        return apply_mask(len, self.contact_seq, self.warn_par_mask)
 
     #-------------------------------------------------------------------
     # Implementation of required property getters
     #------------------------------------------------------------------- 
-    pars = DelegatesTo('data')
-
     @cached_property
     def _get_par_fa_frac(self):
-        try:
-            return apply_mask(np.mean, self.contact_seq, self.data.safe_par_mask) 
-        except:
-            print FOOBAR
-            print self.contact_seq, self.data.safe_par_mask
+        return apply_mask(np.mean, self.contact_seq, self.safe_par_mask)
 
     @cached_property
     def _get_global_fa_frac(self):
-        return self.fa_seq.mean()
+        mask = self.masked_trial_log['type'] == 'safe'
+        return np.array(self.contact_seq)[mask].mean()
     
     @cached_property
     def _get_par_hit_frac(self):
-        return apply_mask(np.mean, self.contact_seq, self.data.warn_par_mask)
+        return apply_mask(np.mean, self.contact_seq, self.warn_par_mask) 
+
+    def _get_warn_trial_count(self):
+        return (self.masked_trial_log['type'] == 'warn').sum()
 
     #-------------------------------------------------------------------
     # Reaction snippets
     #------------------------------------------------------------------- 
-    def reaction_snippet(self, ts):
-        '''Extracts segment of contact waveform
-        
-        Start offset (relative to the timestamp) and duration of the segment are
-        determined by `reaction_offset` and `reaction_dur`.
-        '''
-        contact = self.data.contact_digital
-        lb_index = contact.to_samples(self.reaction_offset)
-        ub_index = contact.to_samples(self.reaction_offset+self.reaction_dur)
-        return contact.get_range_index(lb_index, ub_index, ts)
+    #def _get_mean_safe_reaction_snippets(self):
+    #    return self.safe_reaction_snippets.mean(0)
 
-    #-------------------------------------------------------------------
-    # Process incoming data
-    #------------------------------------------------------------------- 
-    @on_trait_change('data.updated')
-    def process_timestamp(self, timestamp):
-        # Check if timestamp is undefined.  When the class is first initialized,
-        # we recieve a data.updated event with a value of Undefined.
-        if timestamp is not Undefined:
-            self.contact_scores.append(self.score_timestamp(timestamp))
-            self.reaction_snippets.append(self.reaction_snippet(timestamp))
-            self.updated = True
+    #def _get_safe_reaction_snippets(self):
+    #    return np.take(self.reaction_snippets, self.safe_indices, axis=0)
 
-    def score_timestamp(self, ts):
-        '''Computes contact score for timestamp
-        '''
-        contact = self.data.contact_digital
-        lb_index = contact.to_samples(self.contact_offset)
-        ub_index = contact.to_samples(self.contact_offset+self.contact_dur)
-        return contact.get_range_index(lb_index, ub_index, ts).mean()
+    #def _get_par_warn_reaction_snippets(self):
+    #    return apply_mask(self.reaction_snippets, self.warn_par_mask)
 
-    @on_trait_change('data, contact_offset, contact_dur, contact_fraction')
-    def reprocess_contact_scores(self):
-        contact_scores = []
-        for ts in self.data.ts_seq:
-            contact_scores.append(self.score_timestamp(ts))
-        self.contact_scores = contact_scores
-
-    @on_trait_change('data, reaction_offset, reaction_dur')
-    def reprocess_reaction_snippets(self):
-        self.reaction_snippets = []
-        for ts in self.data.ts_seq:
-            self.reaction_snippets.append(self.reaction_snippet(ts))
-        self.updated = True
+    #def _get_par_mean_warn_reaction_snippets(self):
+    #    return [arr.mean(0) for arr in self.par_warn_reaction_snippets]
 
 class GrandAnalyzedAversiveData(BaseAnalyzedAversiveData):
     '''
@@ -646,7 +707,7 @@ class GrandAnalyzedAversiveData(BaseAnalyzedAversiveData):
 
     @cached_property
     def _get_global_fa_frac(self):
-        return np.concatenate([d.fa_seq for d in self.filtered_data]).mean()
+        return np.sum(self.par_fa_count)/np.sum(self.par_safe_count)
 
 if __name__ == '__main__':
     import tables
