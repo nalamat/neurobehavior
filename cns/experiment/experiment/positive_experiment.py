@@ -14,8 +14,7 @@ from enthought.traits.ui.tabular_adapter import TabularAdapter
 colors = {'light green': '#98FB98',
           'dark green': '#2E8B57',
           'light red': '#FFC8CB',
-          'dark red': '#FA8072',
-          }
+          'dark red': '#FA8072', }
 
 class ActionLogAdapter(TabularAdapter):
     """
@@ -66,9 +65,9 @@ class PositiveExperiment(HasTraits):
     animal = Any
     store_node = Any
     exp_node = Any
+
     data = Instance(PositiveData, ())
     paradigm = Instance(PositiveParadigm, ())
-    trial_blocks = Int(0)
 
     contact_plot = Instance(TTLChannelView)
 
@@ -180,4 +179,5 @@ class PositiveExperiment(HasTraits):
     def traits_view(self, parent=None):
         return View(self._get_view_group(), resizable=True, kind='live',
                 id='cns.experiment.positive_experiment',
+                close_result=False,
                 handler=PositiveController)

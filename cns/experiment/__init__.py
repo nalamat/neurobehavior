@@ -23,6 +23,12 @@ class ExperimentLauncher(CohortViewHandler):
             self.run_experiment(info)
 
     def run_experiment(self, info):
+        '''
+        Runs specified experiment type.  On successful completion of an
+        experiment, marks the animal as processed and saves the last paradigm
+        used.  If the experiment is launched but not run, changes to the
+        paradigm will not be saved.
+        '''
         try:
             item = info.object.selected
             if item.store_node._v_isopen:
@@ -39,7 +45,6 @@ class ExperimentLauncher(CohortViewHandler):
                 log.debug('No prior paradigm found.  Creating new paradigm.')
                 paradigm = None
                 
-            #handler = AversiveController()
             model = self.experiment(store_node=store_node, animal=item)
             
             try:
@@ -53,14 +58,13 @@ class ExperimentLauncher(CohortViewHandler):
             except TraitError:
                 log.debug('Paradigm is not compatible with experiment')
 
-            model.edit_traits(parent=info.ui.control, kind='livemodal')
-            
-            # Check to see if a trial block was collected
-            if model.trial_blocks > 0:
-                persistence.add_or_update_object(model.paradigm, store_node, 'last_paradigm')
+            if model.edit_traits(parent=info.ui.control, kind='livemodal'):
+                log.debug('Experiment returned a result of %s', result)
+                persistence.add_or_update_object(model.paradigm, store_node,
+                                                 'last_paradigm')
                 item.processed = True
                 self.last_paradigm = model.paradigm
-                
+            
             # Close the file if we opened it
             try: file.close()
             except NameError: pass

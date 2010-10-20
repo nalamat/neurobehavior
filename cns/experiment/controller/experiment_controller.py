@@ -257,13 +257,30 @@ class ExperimentController(Controller):
         else:
             return True    
 
+    def start(self, info=None):
+        '''
+        Handles starting an experiment
+
+        Subclasses must implement `init_experiment` and `start_experiment`
+        '''
+        if not self.model.paradigm.is_valid():
+            mesg = 'Please correct the following errors first:\n'
+            mesg += self.model.paradigm.err_messages()
+            error(self.info.ui.control, mesg)
+        try:
+            self.init_experiment(info)
+            self.start_experiment(info)
+        except BaseException, e:
+            error(self.info.ui.control, str(e))
+            raise
+
+    def stop(self, info=None):
+        self.stop_experiment(self, info)
+        info.ui.view.close_result = True
+
     ############################################################################
     # Stubs to implement
     ############################################################################
-    def start(self, info=None):
-        error(info.ui.control, 'This action has not been implemented yet')
-        raise NotImplementedError
-
     def resume(self, info=None):
         error(info.ui.control, 'This action has not been implemented yet')
         raise NotImplementedError
@@ -273,10 +290,6 @@ class ExperimentController(Controller):
         raise NotImplementedError
 
     def remind(self, info=None):
-        error(info.ui.control, 'This action has not been implemented yet')
-        raise NotImplementedError
-
-    def stop(self, info=None):
         error(info.ui.control, 'This action has not been implemented yet')
         raise NotImplementedError
 

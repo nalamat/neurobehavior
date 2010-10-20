@@ -84,29 +84,15 @@ class PositiveController(ExperimentController):
         self.init_current(info)
         self.current_trial_start_idx = 0
         self.current_trial_end_idx = 0
-        self.model.trial_blocks += 1
 
+    def start_experiment(self, info):
         self.fast_timer = Timer(250, self.tick, 'fast')
         self.model.data.start_time = datetime.now()
         self.state = 'running'
         self.circuit.start()
         self.circuit.trigger(1)
 
-    def start(self, info=None):
-        if not self.model.paradigm.is_valid():
-            mesg = 'Please correct the following errors first:\n'
-            mesg += self.model.paradigm.err_messages()
-            error(self.info.ui.control, mesg)
-            return
-
-        try:
-            self.init_experiment(info)
-        except BaseException, e:
-            self.state = 'halted'
-            error(self.info.ui.control, str(e))
-            raise
-
-    def stop(self, info=None):
+    def stop_experiment(self, info=None):
         self.state = 'halted'
         self.fast_timer.stop()
         self.circuit.stop()

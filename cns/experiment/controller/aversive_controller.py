@@ -143,27 +143,12 @@ class BaseAversiveController(ExperimentController):
         self.model.data = AversiveData(contact_fs=self.circuit.lick_nPer.get('fs'),
                                        store_node=self.model.data_node)
 
+    def start_experiment(self, info):
         self.fast_timer = Timer(250, self.tick, 'fast')
         self.slow_timer = Timer(1000, self.tick, 'slow')
         self.pause()
-
         self.model.data.start_time = datetime.now()
         self.circuit.start()
-        self.model.trial_blocks += 1
-
-    def start(self, info):
-        log.debug('start')
-        if not self.model.paradigm.is_valid():
-            mesg = 'Please correct the following errors first:\n'
-            mesg += self.model.paradigm.err_messages()
-            error(self.info.ui.control, mesg)
-            return
-        try:
-            self.init_experiment(info)
-        except BaseException, e:
-            self.state = 'halted'
-            error(self.info.ui.control, str(e))
-            raise
 
     def remind(self, info=None):
         self.state = 'manual'
@@ -183,7 +168,7 @@ class BaseAversiveController(ExperimentController):
         self.circuit.pause_state.value = False
         self.circuit.trigger(1)
 
-    def stop(self, info=None):
+    def stop_experiment(self, info=None):
         self.state = 'halted'
 
         try:
