@@ -41,6 +41,22 @@ parameter in the GUI, this means that we must update the FPGA buffer with the
 new waveform.  At the FPGA's maximum transfer rate, this means it takes 2
 seconds to upload the entire waveform.
 
+Synchronizing IO
+================
+
+Due to inherent limitations in input/output channels, there is some delay in the
+process of converting from digital to analog and vice versa that must be
+accounted for.
+
+========= =====
+Type      Delay
+========= =====
+TTL DAC   2
+TTL ADC   2
+DAC       43
+ADC       70
+========= =====
+
 .. _RZ5: http://www.tdt.com/products/RZ5.htm
 .. _RX6: http://www.tdt.com/products/RX6.htm
 .. _PA5: http://www.tdt.com/products/PA5.htm

@@ -315,6 +315,7 @@ class DSPBuffer(BlockBuffer):
 
     def set(self, data):
         '''Assumes data is written starting at the first index of the buffer.'''
+        log.debug('Attempting to set buffer %s', self.name)
         try:
             data.fs = self.dsp.GetSFreq()
             self._set_length(len(data))
