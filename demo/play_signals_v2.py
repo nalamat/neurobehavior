@@ -29,45 +29,80 @@ from cns.signal.util import cos2taper
 import time
 
 def main_sequence():
-    circuit = equipment.dsp('TDT').load('output', 'RX6')
+    circuit = equipment.dsp('TDT').load('output-sequence', 'RX6')
     fs = circuit.fs
 
     token_duration = 0.005
     trial_duration = 0.010
 
+    from numpy import zeros, concatenate
+
     signal_sequence = []
-    for i in range(25):
-        #n_ramp = int(2e-3*fs)
+    trial_triggers = []
+    sequence_triggers = []
+    silence = zeros(int((trial_duration-token_duration)*fs))
+
+    for i in range(5):
         n_ramp = 2
         tone = cos2taper(Tone(duration=token_duration, fs=fs).signal, n_ramp)
         signal_sequence.append(tone)
+        signal_sequence.append(silence)
         noise = cos2taper(Noise(duration=token_duration, fs=fs).signal, n_ramp)
         signal_sequence.append(noise)
+        signal_sequence.append(silence)
+        trial_triggers.append(len(tone)+len(silence))
+        trial_triggers.append(len(noise)+len(silence))
+
+    signal_sequence.append(zeros(int(fs)))
+
+    full_waveform = concatenate(signal_sequence)
+    sequence_triggers.append(len(full_waveform))
 
     circuit.start()
-    circuit.trial_dur_n.set(trial_duration, 's')
-    circuit.token_dur_n.set(token_duration, 's')
-    circuit.reps.set(1)
-    circuit.token_del_n.set(5)
-    circuit.trigger(1) # Apply changes
 
-    for signal in signal_sequence:
-        buffer = circuit.buffer.value
-        if buffer == 1:
-            circuit.DAC1a.set(signal)
-        else:
-            circuit.DAC1b.set(signal)
-        circuit.trigger(4)
-        while buffer == circuit.buffer.value:
-            #time.sleep(0.001)
-            pass
+
+    circuit.DAC1a.set(full_waveform)
+    circuit.TTL1a.set(trial_triggers)
+    circuit.TTL3a.set(sequence_triggers)
+    print trial_triggers
+    print sequence_triggers
+
+    circuit.trigger(1) # Apply changes and start
+
+    # While circuit is playing out first sequence, prepare second sequence
+    signal_sequence = []
+    trial_triggers = []
+    sequence_triggers = []
+    silence = zeros(int(1*fs))
+
+    for i in range(25):
+        signal = cos2taper(AMNoise(duration=1, env_fm=5,
+                           env_depth=1, fs=fs).signal, 250)
+        signal_sequence.append(signal)
+        trial_triggers.append(len(noise)+len(silence))
+
+    full_waveform = concatenate(signal_sequence)
+    sequence_triggers.append(len(full_waveform))
+
+    # Write data to reserve buffers
+    circuit.DAC1b.set(full_waveform)
+    circuit.TTL1b.set(trial_triggers)
+    circuit.TTL3b.set(sequence_triggers)
+
+    # Changeover when TTL3 fires
+    circuit.switch.set(4) 
+    circuit.trigger(4)
+
+    #while 1:
+        #print "A", circuit.TTL1a_value.value
+        #print "B", circuit.TTL3a_value.value
+
+    raw_input("Enter to quit")
 
 def main():
     #---------------------------------------------------------------------------
     # Load the circuit
     #---------------------------------------------------------------------------
-    circuit = equipment.dsp('TDT').load('output', 'RX6')
-    fs = circuit.fs
 
     #---------------------------------------------------------------------------
     # Configure circuit defaults
@@ -157,25 +192,24 @@ def main():
     TODO: This dual-buffer paradigm seems to work fine for long-duration tokens.
     However, I need to test this with shorter-duration tokens (e.g. total trial
     duration 25 ms).
+
     '''
 
-    token_duration = 1
-    trial_duration = 2
-        
-    # Set DSP variable to the exact value
-    circuit.reps.value = -1 # repeat forever
-    circuit.token_del_n.value = 5 # no token delay
-    # Convert 5 sec to number of samples and set tag value.  If sampling
-    # frequency is 98,321, rep_dur_n will be set to int(5*98,321)
-    circuit.trial_dur_n.set(trial_duration, src_unit='s') 
-    circuit.token_dur_n.set(token_duration, src_unit='s') 
+    circuit = equipment.dsp('TDT').load('output-sequence', 'RX6')
+    circuit.start() # Note that circuit is still in paused state
+    fs = circuit.fs
 
     #---------------------------------------------------------------------------
     # Play!!!!
     #---------------------------------------------------------------------------
-    circuit.start()
+    token_delay = 0
+    token_duration = 1
+    trial_duration = 2
+
     circuit.trigger(1)
-    # Note that circuit is still in paused state
+
+    circuit.reset.set(1)
+    circuit.switch.set(1)
 
     import textwrap
     mesg = textwrap.dedent("""
@@ -184,12 +218,22 @@ def main():
     2. Noise
     3. AM Noise
     4. Bandlimited Noise
-    5. Change intertrial duration
+    5. Set to changeover immediately
+    6. Set to changeover at end of trial
     """)
+
+    mode = 3
 
     def set_signal(signal):
         # Apply tapered envelope to minimize spectral splatter
+        from numpy import zeros, r_, array
+
         signal = cos2taper(signal.signal, int(0.1*fs))
+
+        pad_pre = zeros(int(token_delay*fs))
+        pad_post = zeros(int((trial_duration-token_delay-token_duration)*fs))
+
+        signal = r_[pad_pre, signal, pad_post]
 
         # This circuit implements a dual-buffer scheme.  It will continue to
         # play data from one buffer until it recieves a trigger to switch to the
@@ -199,9 +243,11 @@ def main():
         # circuit to switch to the new buffer.
         if circuit.buffer.value == 1:
             circuit.DAC1a.set(signal)
+            circuit.TTL1a.set([len(signal)])
         else:
             circuit.DAC1b.set(signal)
-        circuit.trigger(4) # Apply change now!
+            circuit.TTL1b.set([len(signal)])
+        circuit.trigger(mode) 
 
     while True:
         response = raw_input(textwrap.dedent(mesg))
@@ -217,20 +263,11 @@ def main():
         elif response == '4':
             set_signal(BandlimitedNoise(duration=token_duration, fs=fs))
         elif response == '5':
-            trial_dur_mesg = "Enter new trial duration (current: %.2f)" \
-                    % trial_duration
-            try:
-                dur = float(raw_input(trial_dur_mesg))
-                if dur < token_duration:
-                    raise ValueError("Duration must be greater than %.2f" \
-                            % token_duration)
-                circuit.trial_dur_n.set(dur, src_unit='s')
-                # apply change to parameter but don't switch buffer
-                circuit.trigger(3) 
-            except ValueError, e:
-                print str(e)
+            mode = 3
+        elif response == '6':
+            mode = 4
         else:
-            signal = Silence(duration=token_duration, fs=fs)
+            print "Invalid option"
 
 if __name__ == '__main__':
     import cProfile
