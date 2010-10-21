@@ -18,5 +18,5 @@ def generate_envelope(n, ramp_type, ramp_n):
     ramp = generate_ramp(ramp_type, ramp_n)
     return np.r_[ramp, np.ones(n-2*ramp_n), ramp[::-1]]
 
-def taper(waveform, ramp_type, ramp_n):
-    return waveform * generate_envelope(len(waveform), ramp_type, ramp_n)
+def cos2taper(waveform, ramp_n):
+    return waveform * generate_envelope(len(waveform), 'cosine squared', ramp_n)

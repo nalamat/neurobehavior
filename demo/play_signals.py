@@ -25,7 +25,7 @@ from cns import equipment
 # >>>     run_test_code()
 
 from cns.signal.type import Tone, AMNoise, Noise, Silence, BandlimitedNoise
-from cns.signal.util import taper
+from cns.signal.util import cos2taper
 
 def main():
     #---------------------------------------------------------------------------
@@ -42,23 +42,73 @@ def main():
 
     DSP circuit paramters
     ---------------------
+    Trial structure
+        token_del   ---------
+        token_dur            <=========>
+        post_del                        ----------------
+        trial_dur   ------------------------------------
+
     reps : int
-        Number of times to repeat buffer.  -1 is infinite.
+        Number of times to repeat buffer (-1=continuous)
+    token_dur_n : int
+        Duration of sound token in samples.  Typically this should be set to the
+        length of the waveform.
+    token_del_n : int
+        Number of samples to delay sound token.  This is typicaly used when you
+        want to generate some event (e.g. a NMR pulse) before the token is
+        played.
     rep_dur_n : int
-        Controls trial duration (a trial is defined as the start of the signal
-        to the start of the next signal)
-    buf : int
-        The DSP is set up under a two-buffer scheme, A & B, where you can write
-        to one buffer while the other buffer is being played out.  Indicates
-        which buffer to use (0=A, 1=B).
+        Duration of the entire trial.  Includes token_del_n and token_dur_n.
+        Note that post_del (the silent period following presentation of the
+        sound token) is implicit in rep_dur_n-(token_del_n+token_dur_n).
+
+    It is your responsibility to ensure that (token_del + token_dur) >=
+    trial_dur.
+
+    All of these variables are guarded by latches.  Their values will not be
+    applied until you fire a software trigger (2 or 3).  See the section on DSP
+    circuit triggers for more information.
+
+    DSP circuit buffers
+    -------------------
+    This circuit implements a dual-buffer scheme for all buffers.  There is
+    always one active buffer (a or b) that is being played out.  The other
+    buffer is considered the reserve buffer and may be safely written to.  Once
+    the data has been uploaded, fire the appropriate trigger to switch over.
+    
+    DACNa and DACNb : array-like
+        Token waveforms for speakers 1-2.  Substitute N with the speaker number
+        (e.g. DAC1a, DAC2b).
+    TTLNa and TTLNb : array-like
+        Event times (relative to start of trial) for TTLs 3-6.  Substitute N
+        with the TTL number.
+
+    DSP circuit triggers
+    --------------------
+    soft 1
+        Unpause (note that when loaded, circuit is in a paused state so this
+        trigger must be fired once you've configured the circuit)
+    soft 2
+        Switch buffers and apply new parameters now
+    soft 3
+        Apply new parameters now, but don't switch buffers
+    soft 4
+        Switch buffers and apply new parameters when current trial is over
+    soft 5
+        Apply new parameters when current trial is over, but don't switch
+        buffers
+    soft 6
+        Pause
+    soft 7 through 10
+        unused
     '''
 
     duration = 10
         
-    # set tag value to that exact number.
-    #circuit.reps.value = -1 
-    # Convert 5 sec to sample number and set tag value.  If sampling frequency
-    # is 98,321, rep_dur_n will be set to int(5*98,321)
+    # Set DSP variable to the exact value
+    circuit.reps.value = -1 
+    # Convert 5 sec to number of samples and set tag value.  If sampling
+    # frequency is 98,321, rep_dur_n will be set to int(5*98,321)
     circuit.rep_dur_n.set(duration+1, src_unit='s') 
     circuit.sw_dur_n.set(duration, src_unit='s') 
 
@@ -92,11 +142,14 @@ def main():
         else:
             signal = Silence(duration=duration, fs=fs)
 
-        signal = taper(signal.signal, 'cosine squared', int(0.1*fs))
+        signal = cos2taper(signal.signal, int(0.1*fs))
 
-        # Check to see which buffer is current and write data to the reserve
-        # buffer.  Software trigger 1 tells the circuit to switch to the new
-        # buffer.
+        # This circuit implements a dual-buffer scheme.  It will continue to
+        # play data from one buffer until it recieves a trigger to switch to the
+        # new buffer.  The buffers are named DAC1a and DAC1b.  First, check to
+        # see which buffer is current and write data to the reserve buffer.
+        # Once the data is written, send a software trigger (1) to tell the
+        # circuit to switch to the new buffer.
         if circuit.buffer.value == 1:
             circuit.DAC1a.set(signal)
         else:
