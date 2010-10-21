@@ -81,7 +81,8 @@ def main():
         (e.g. DAC1a, DAC2b).
     TTLNa and TTLNb : array-like
         Event times (relative to start of trial) for TTLs 3-6.  Substitute N
-        with the TTL number.
+        with the TTL number (e.g. TTL3a).  Note that the first two TTLs are
+        reserved.
 
     DSP circuit triggers
     --------------------
