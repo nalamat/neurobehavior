@@ -61,6 +61,8 @@ def main():
         Duration of the entire trial.  Includes token_del_n and token_dur_n.
         Note that post_del (the silent period following presentation of the
         sound token) is implicit in rep_dur_n-(token_del_n+token_dur_n).
+    buffer : int (read only)
+        Indicates active buffer, 0 = a, 1 = b
 
     It is your responsibility to ensure that (token_del + token_dur) >=
     trial_dur.
@@ -75,6 +77,9 @@ def main():
     always one active buffer (a or b) that is being played out.  The other
     buffer is considered the reserve buffer and may be safely written to.  Once
     the data has been uploaded, fire the appropriate trigger to switch over.
+    Note that, at present, you cannot switch buffers individually.  When a
+    switch is requested, all buffers will switch from a to b or b to a
+    simultaneously.
     
     DACNa and DACNb : array-like
         Token waveforms for speakers 1-2.  Substitute N with the speaker number
@@ -102,21 +107,39 @@ def main():
         Pause
     soft 7 through 10
         unused
+
+    Triggers 2 and 3 end the current trial and apply the requested changes
+    immediately.  Triggers 4 and 5 will apply the requested changes once the
+    current trial is over.  When searching the parameter space, you would
+    typically write the new waveform to the reserve buffer then fire trigger 2
+    once the data is uploaded.  When presenting a predetermined sequence of
+    waveforms, you would typically write the next waveform in the sequence to
+    the reserve buffer then fire trigger 4.  Once trigger 4 is fired, you would
+    then have to listen for a change to circuit.buffer (which indicates that the
+    buffer has switched over and that you can now upload the next waveform to
+    the now-reserve buffer).
+    
+    TODO: This dual-buffer paradigm seems to work fine for long-duration tokens.
+    However, I need to test this with shorter-duration tokens (e.g. total trial
+    duration 25 ms).
     '''
 
-    duration = 10
+    token_duration = 10
+    trial_duration = 11
         
     # Set DSP variable to the exact value
-    circuit.reps.value = -1 
+    circuit.reps.value = -1 # repeat forever
+    circuit.token_del_n.value = 0 # no token delay
     # Convert 5 sec to number of samples and set tag value.  If sampling
     # frequency is 98,321, rep_dur_n will be set to int(5*98,321)
-    circuit.rep_dur_n.set(duration+1, src_unit='s') 
-    circuit.sw_dur_n.set(duration, src_unit='s') 
+    circuit.trial_dur_n.set(trial_duration, src_unit='s') 
+    circuit.token_dur_n.set(token_duration, src_unit='s') 
 
     #---------------------------------------------------------------------------
     # Play!!!!
     #---------------------------------------------------------------------------
     circuit.start()
+    # Note that circuit is still in paused state
 
     import textwrap
     mesg = textwrap.dedent("""
@@ -125,37 +148,53 @@ def main():
     2. Noise
     3. AM Noise
     4. Bandlimited Noise
+    5. Change intertrial duration
     """)
 
-    while True:
-        response = raw_input(textwrap.dedent(mesg))
-        if response == 'q':
-            break
-        # Configure buffer for speaker 1
-        elif response == '1':
-            signal = Tone(frequency=5000, duration=duration, fs=fs)
-        elif response == '2':
-            signal = Noise(duration=duration, fs=fs)
-        elif response == '3':
-            signal = AMNoise(duration=duration, env_fm=5, env_depth=1, fs=fs)
-        elif response == '4':
-            signal = BandlimitedNoise(duration=duration, fs=fs)
-        else:
-            signal = Silence(duration=duration, fs=fs)
-
+    def set_signal(signal):
+        # Apply tapered envelope to minimize spectral splatter
         signal = cos2taper(signal.signal, int(0.1*fs))
 
         # This circuit implements a dual-buffer scheme.  It will continue to
         # play data from one buffer until it recieves a trigger to switch to the
         # new buffer.  The buffers are named DAC1a and DAC1b.  First, check to
         # see which buffer is current and write data to the reserve buffer.
-        # Once the data is written, send a software trigger (1) to tell the
+        # Once the data is written, send a software trigger (2) to tell the
         # circuit to switch to the new buffer.
         if circuit.buffer.value == 1:
             circuit.DAC1a.set(signal)
         else:
             circuit.DAC1b.set(signal)
-        circuit.trigger(1)
+        circuit.trigger(2) # Apply change now!
+
+    while True:
+        response = raw_input(textwrap.dedent(mesg))
+        if response == 'q':
+            break
+        elif response == '1':
+            set_signal(Tone(frequency=5000, duration=duration, fs=fs))
+        elif response == '2':
+            set_signal(Noise(duration=duration, fs=fs))
+        elif response == '3':
+            set_signal(AMNoise(duration=duration, env_fm=5, env_depth=1, fs=fs))
+        elif response == '4':
+            set_signal(BandlimitedNoise(duration=duration, fs=fs))
+        elif response == '5':
+            mesg = "Enter new intertrial duration (current: %.2f)" \
+                    % trial_duration
+            try:
+                dur = float(raw_input(mesg))
+                if dur < token_duration:
+                    mesg = "Trial duration must be greater than %.2f" \
+                            % token_duration
+                    raise ValueError(mesg)
+                circuit.trial_dur_n.set(dur, src_unit='s')
+                # apply change to parameter but don't switch buffer
+                circuit.trigger(3) 
+            except ValueError, e:
+                print str(e)
+        else:
+            signal = Silence(duration=duration, fs=fs)
 
 if __name__ == '__main__':
     import cProfile
