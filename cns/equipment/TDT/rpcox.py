@@ -454,6 +454,7 @@ class DSPBuffer(BlockBuffer):
 
     def _write(self, offset, data):
         return self.dsp.WriteTagV(self.name, offset, data)
+        #return self.dsp.WriteTagVEX(self.name, offset, "I32", data)
 
     def _get_duration(self):
         return len(self.buffer)/self.fs
