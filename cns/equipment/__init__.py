@@ -11,9 +11,6 @@ def pump(pump='new_era'):
     '''
     return __import__(pump, globals=globals(), level=1)
 
-def atten():
-    return Attenuator()
-
 class EquipmentError(BaseException):
 
     def __init__(self, device, mesg):

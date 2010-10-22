@@ -82,7 +82,8 @@ Once trigger 4 is fired, you would then have to listen for a change to
 can now upload the next waveform to the now-reserve buffer).
 '''
 
-from cns.signal.type import Tone, AMNoise, Noise, Silence, BandlimitedNoise
+from cns.signal.type import Tone, AMNoise, Noise, Silence, \
+        BandlimitedNoise, FMTone
 from cns.signal.util import cos2taper
 import time
 
@@ -169,7 +170,7 @@ def demo_preset_sequence():
     # When the program exits, it calls this hook to properly shut down the DSP.
     raw_input("Enter to quit")
 
-def demo_mouse_mode():
+def demo_mouse_mode(backend='TDT'):
     '''
     This demonstrates the speed at which we can compute a waveform and upload it
     to the DSP when the user requests a change.  In the absence of a GUI, we use
@@ -177,13 +178,15 @@ def demo_mouse_mode():
     '''
 
     # Load the circuit
-    circuit = equipment.dsp('TDT').load('output-sequence', 'RX6')
-    circuit.start() # Note that circuit is still in paused state
+    circuit = equipment.dsp(backend).load('output-sequence', 'RX6')
+    #from cns.equipment.computer import OutputCircuit
+    #circuit = OutputCircuit()
+    #circuit.start() # Note that circuit is still in paused state
     fs = circuit.fs
 
     token_delay = 0
-    token_duration = 1
-    trial_duration = 2
+    token_duration = 5
+    trial_duration = 7
 
     circuit.trigger(1)
 
@@ -236,8 +239,12 @@ def demo_mouse_mode():
         response = raw_input(textwrap.dedent(mesg))
         if response == 'q':
             break
+        elif response == '0':
+            # Yes a secret option!!!
+            set_signal(FMTone(fc=1000, fm=2, delta_fc_max=500,
+                              duration=token_duration, fs=fs))
         elif response == '1':
-            set_signal(Tone(frequency=5000, duration=token_duration, fs=fs))
+            set_signal(Tone(frequency=1000, duration=token_duration, fs=fs))
         elif response == '2':
             set_signal(Noise(duration=token_duration, fs=fs))
         elif response == '3':
@@ -267,8 +274,17 @@ def demo_mouse_mode():
 # >>>     run_test_code()
 
 if __name__ == '__main__':
-    import cProfile
-    cProfile.run('main_sequence()', 'profile')
-    import pstats
-    p = pstats.Stats('profile')
-    p.strip_dirs().sort_stats('cumulative').print_stats(20)
+    import sys, cProfile
+    if len(sys.argv) == 2:
+        exec_statement = '%s("TDT")' % sys.argv[1]
+    elif len(sys.argv) == 3:
+        exec_statement = '%s("%s")' % tuple(sys.argv[1:])
+    else:
+        print 'usage: play_signals_v2.py <function> <backend>'
+        sys.exit()
+
+    #print exec_statement
+    cProfile.run(exec_statement, 'profile')
+    #import pstats
+    #p = pstats.Stats('profile')
+    #p.strip_dirs().sort_stats('cumulative').print_stats(20)
