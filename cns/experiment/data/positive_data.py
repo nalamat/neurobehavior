@@ -113,7 +113,7 @@ class PositiveData_0_1(ExperimentData):
         else:
             response = 'NO_RESPONSE'
 
-        self.trial_log.insert(0, (ts_start, ts_end, ttype, response))
+        self.trial_log.append((ts_start, ts_end, ttype, response))
         self.update_score()
 
     def update_score(self):
