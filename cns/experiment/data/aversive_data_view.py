@@ -13,7 +13,7 @@ PLOT_WIDTH = 200
 
 class SummaryAversiveDataView(AnalyzedView):
 
-    SOURCE = 'cns.experiment.data.aversive_data.GrandAnalyzedAversiveData'
+    SOURCE = 'cns.experiment.data.aversive_data.BaseAnalyzedAversiveData'
     analyzed = Instance(SOURCE)
 
     par_fa_frac_chart = Instance(DynamicBarPlotView)
@@ -41,7 +41,7 @@ class SummaryAversiveDataView(AnalyzedView):
     label = DelegatesTo('analyzed')
 
     def _par_count_chart_default(self):
-        print 'calling'
+        print 'getting chart'
         try:
             return DynamicBarPlotView(
                     source=self.analyzed,
@@ -56,9 +56,14 @@ class SummaryAversiveDataView(AnalyzedView):
                     value_max='auto',
                     )
         except BaseException, e:
+            print 'failed'
             print e
+            import traceback
+            traceback.print_exc()
+            print 'traceback'
 
     def _par_hit_frac_chart_default(self):
+        print 'attempting to get chart'
         return DynamicBarPlotView(
                 source=self.analyzed,
                 label='pars',
@@ -171,10 +176,7 @@ class AnalyzedAversiveDataView(SummaryAversiveDataView):
         view.add_legend()
         return view
 
-    #kw_component = dict(height=PLOT_HEIGHT, width=PLOT_WIDTH)
-    kw_component = dict()
-    kw_plot = dict(editor=ComponentEditor(**kw_component),
-                        show_label=False)
+    test_view = View('par_count_chart{}@')
 
     summary_group = VGroup(
         HGroup(

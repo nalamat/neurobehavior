@@ -14,7 +14,7 @@ class AversiveExperiment(HasTraits):
     # The store node should be a reference to an animal
     animal = Any
     store_node = Any
-    trial_blocks = Int(0)
+    #trial_blocks = Int(0)
     
     # Show the analyzed data
     data = Instance(AversiveData)
@@ -23,38 +23,51 @@ class AversiveExperiment(HasTraits):
     analyzed_view = Instance(AnalyzedAversiveDataView)
     paradigm = Instance(AversiveParadigm, ())
 
-    def _data_changed(self):
-        self.analyzed_view = AnalyzedAversiveDataView(data=self.data)
-    
-    def _get_view_group(self):
-        return HGroup(VGroup('handler.toolbar@',
-                              [['animal{}~',
-                               'handler.status{}~',],
-                               'handler.time_elapsed{Time}~',
-                               'handler.water_infused{Water infused}~',
-                               '|[Experiment status]'],
-                              Item('handler.pump@', editor=InstanceEditor()),
-                              Item('paradigm@', editor=InstanceEditor(view='edit_view'),
-                                   visible_when='handler.state=="halted"'),
-                              Item('paradigm@', editor=InstanceEditor(view='run_view'),
-                                   visible_when='handler.state<>"halted"'),
-                              show_labels=False,
-                              ),
-                       Item('analyzed_view', style='custom', width=1300, height=900),
-                       show_labels=False,
-                       )
-    
-    def traits_view(self, parent=None):
-        return View(self._get_view_group(), resizable=True, kind='live', 
-                    handler=AversiveController)
+    def _data_changed(self, new):
+        self.analyzed_view = AnalyzedAversiveDataView(data=self.analyzed)
 
+    traits_group = HGroup(
+            VGroup(
+                Item('handler.toolbar', style='custom'),
+                VGroup(
+                    Item('animal', show_label=False),
+                    Item('handler.status', show_label=False),
+                    Item('handler.time_elasped'),
+                    Item('handler.water_infused'),
+                    label='Experiment Status',
+                    style='readonly',
+                    show_border=True,
+                    ),
+                Item('handler.pump', editor=InstanceEditor(),
+                     style='custom'),
+                Item('paradigm', editor=InstanceEditor(view='edit_view'),
+                     style='custom',
+                     visible_when='handler.state=="halted"'),
+                Item('paradigm', editor=InstanceEditor(view='run_view'),
+                     style='custom',
+                     visible_when='handler.state<>"halted"'),
+                show_labels=False,
+                ),
+           Item('analyzed_view',
+                editor=InstanceEditor(view='test_view'),
+                style='custom', width=1300, height=900),
+           show_labels=False,
+           )
+    
+    traits_view = View(traits_group,
+                       resizable=True,
+                       kind='live',
+                       handler=AversiveController)
+
+from enthought.traits.ui.api import Include
 class AversiveFMExperiment(AversiveExperiment):
 
     paradigm = Instance(AversiveFMParadigm, ())
 
-    def traits_view(self, parent=None):
-        return View(self._get_view_group(), resizable=True, kind='live', 
-                    handler=AversiveFMController)
+    traits_view = View(Include('traits_group'),
+                       resizable=True,
+                       kind='live',
+                       handler=AversiveFMController)
 
 if __name__ == "__main__":
     import tables

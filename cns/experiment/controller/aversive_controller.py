@@ -37,7 +37,6 @@ class BaseCurrentSettings(HasTraits):
     _choice_num_safe = Any
     _choice_par = Any
 
-
     def __init__(self, **kw):
         super(BaseCurrentSettings, self).__init__(**kw)
         self.initialize(self.paradigm)
@@ -139,7 +138,10 @@ class BaseAversiveController(ExperimentController):
 
         self.model.exp_node = append_date_node(self.model.store_node,
                                                pre='aversive_date_')
+        log.debug('Created experiment node for experiment at %r',
+                  self.model.exp_node)
         self.model.data_node = append_node(self.model.exp_node, 'Data')
+        log.debug('Created data node for experiment at %r', self.model.data_node)
         self.model.data = AversiveData(contact_fs=self.circuit.lick_nPer.get('fs'),
                                        store_node=self.model.data_node)
 
