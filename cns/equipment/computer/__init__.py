@@ -12,7 +12,6 @@ class ComputerBuffer(object):
         self.buffer = np.array([])
 
     def set(self, data):
-        print 'setting', data
         self.buffer = np.array(data)
 
 class ComputerTag(object):
@@ -48,10 +47,7 @@ class OutputCircuit(object):
         self.set_current(self.buffer.value)
 
     def set_current(self, buffer):
-        print 'buffer', buffer
         current = self.DAC1a if buffer==0 else self.DAC1b
-        print current
-        print 'buffer data', current.buffer
         self.stream = self.device.open_array(current.buffer, self.fs)
         self.buffer.value = buffer
 
@@ -64,3 +60,7 @@ class OutputCircuit(object):
             self.stream.stop()
             self.set_current(int(not self.buffer.value))
             self.stream.play()
+
+    def start(self):
+        # Dummy function to be compatible with DSPCircuit
+        pass
