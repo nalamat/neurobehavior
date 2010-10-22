@@ -278,6 +278,7 @@ def append_metadata(object, source):
     from os.path import abspath
     object.store_node_source = abspath(source._v_file.filename)
     object.store_node_path = source._v_pathname
+    object.store_node = source
     return object
 
 class PersistenceReadError(BaseException):

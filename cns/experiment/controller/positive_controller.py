@@ -173,7 +173,6 @@ class PositiveController(ExperimentController):
     @on_trait_change('fast_tick')
     def monitor_circuit(self):
         self.pipeline.send(self.circuit.TTL.read().astype(np.int8))
-        self.model.data._generate_action_log()
 
         if self.circuit.trial_end_idx.value > self.current_trial_end_idx:
             # Trial is over.  Process new data and set up for next trial.

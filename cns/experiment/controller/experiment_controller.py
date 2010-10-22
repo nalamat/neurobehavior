@@ -193,6 +193,7 @@ class ExperimentController(Controller):
             log.error(e)
             self.state = 'disconnected'
             error(info.ui.control, str(e))
+        log.debug("INIT MODEL UI %r", info.ui.view.close_result)
 
     def init_equipment(self, info):
         '''Attempts to connect with the hardware.  Called when the class is
@@ -275,8 +276,11 @@ class ExperimentController(Controller):
             raise
 
     def stop(self, info=None):
-        self.stop_experiment(self, info)
+        log.debug('controller.stop()')
+        self.stop_experiment(info)
+        log.debug("STOP PRE MODEL UI %r", info.ui.view.close_result)
         info.ui.view.close_result = True
+        log.debug("STOP POST MODEL UI %r", info.ui.view.close_result)
 
     ############################################################################
     # Stubs to implement
@@ -301,7 +305,6 @@ class ExperimentController(Controller):
 
     @on_trait_change('model.paradigm.+', post_init=True)
     def queue_change(self, object, name, old, new):
-        #if self.state <> 'halted' and hasattr(self, '_apply_'+name):
         if self.state <> 'halted':
             key = object, name
             if key not in self.old_values:
@@ -312,8 +315,6 @@ class ExperimentController(Controller):
                 del self.old_values[key]
             else:
                 self.pending_changes[key] = new
-        #else:
-        #    raise SystemError, 'cannot change parameter'
 
     def apply(self, info=None):
         try:

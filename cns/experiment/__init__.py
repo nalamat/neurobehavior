@@ -35,7 +35,8 @@ class ExperimentLauncher(CohortViewHandler):
                 animal_node = item.store_node
             else:
                 log.debug('Opening node %r for %r', item.store_node, item)
-                file = tables.openFile(item.store_file, 'a', rootUEP=item.store_path)
+                file = tables.openFile(item.store_node_source, 'a',
+                                       rootUEP=item.store_node_path)
                 animal_node = file.root
             
             store_node = get_or_append_node(animal_node, 'experiments')
@@ -58,8 +59,9 @@ class ExperimentLauncher(CohortViewHandler):
             except TraitError:
                 log.debug('Paradigm is not compatible with experiment')
 
-            if model.edit_traits(parent=info.ui.control, kind='livemodal'):
-                log.debug('Experiment returned a result of %s', result)
+    
+            ui = model.edit_traits(parent=info.ui.control, kind='livemodal')
+            if ui.result:
                 persistence.add_or_update_object(model.paradigm, store_node,
                                                  'last_paradigm')
                 item.processed = True
@@ -70,8 +72,7 @@ class ExperimentLauncher(CohortViewHandler):
             except NameError: pass
             
         except AttributeError, e: 
-            print e
-            pass
+            log.error(e)
         except SystemError, e:
             from textwrap import dedent
             mesg = """\
@@ -97,9 +98,8 @@ experiment_map = {'appetitive': PositiveExperiment,
 
 def load_experiment_launcher(etype):
     from cns.data.ui.cohort import CohortView
-    #handler = ExperimentLauncher(experiment=globals()[experiment])
     handler = ExperimentLauncher(experiment=experiment_map[etype])
-    CohortView().configure_traits(handler=handler)
+    CohortView().configure_traits(view='detailed_view', handler=handler)
 
 def test_experiment(etype):
     import tables
@@ -107,4 +107,5 @@ def test_experiment(etype):
     experiment_map[etype](store_node=test_file.root).configure_traits()
 
 if __name__ == '__main__':
-    test_experiment('PositiveExperiment')
+    import sys
+    test_experiment(sys.argv[1])
