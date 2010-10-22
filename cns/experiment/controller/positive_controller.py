@@ -189,6 +189,7 @@ class PositiveController(ExperimentController):
 
             if last_ttype == 'NOGO' and self.current_repeat_FA:
                 if self.model.data.trial_log[-1][3] == 'SPOUT':
+                #if self.model.data.trial_log[0][3] == 'SPOUT':
                     # Gerbil false alarmed, add NOGO trial
                     log.debug("FA detected, adding a NOGO trial")
                     self.current_num_nogo += 1
