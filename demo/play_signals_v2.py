@@ -87,7 +87,7 @@ from cns.signal.type import Tone, AMNoise, Noise, Silence, \
 from cns.signal.util import cos2taper
 import time
 
-def demo_preset_sequence():
+def demo_preset_sequence(backend='TDT'):
     '''
     This demo explores how we would generate and upload a preset sequence to the
     DSP.  This was mainly motivated out of my concern for ensuring that we could
@@ -98,7 +98,7 @@ def demo_preset_sequence():
     each pip.
     '''
 
-    circuit = equipment.dsp('TDT').load('output-sequence', 'RX6')
+    circuit = equipment.dsp(backend).load('output-sequence', 'RX6')
     fs = circuit.fs
 
     token_duration = 0.005
@@ -181,7 +181,7 @@ def demo_mouse_mode(backend='TDT'):
     circuit = equipment.dsp(backend).load('output-sequence', 'RX6')
     #from cns.equipment.computer import OutputCircuit
     #circuit = OutputCircuit()
-    #circuit.start() # Note that circuit is still in paused state
+    circuit.start() # Note that circuit is still in paused state
     fs = circuit.fs
 
     token_delay = 0
