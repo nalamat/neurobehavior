@@ -1,6 +1,5 @@
 import os
-os.environ['ETS_TOOLKIT'] = 'qt4' # can be either WX or QT4.  QT4 has a better
-                                  # SVG renderer.
+os.environ['ETS_TOOLKIT'] = 'qt4' 
 from os.path import abspath, dirname, join
 import sys
 

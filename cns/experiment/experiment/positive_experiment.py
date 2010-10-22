@@ -176,7 +176,7 @@ class PositiveExperiment(HasTraits):
                          label='HIT fraction (all)'),
                     style='readonly',
                 ),
-                Item('object.data.action_log', editor=action_log_table),
+                #Item('object.data.action_log', editor=action_log_table),
                 Item('object.data.trial_log', editor=trial_log_table),
                 show_labels=False,
             ),
