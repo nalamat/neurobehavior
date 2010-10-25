@@ -7,7 +7,7 @@ from cns.signal.type import Tone
 from enthought.traits.api import Button, on_trait_change, HasTraits, Any, Range, \
     CFloat, Property, Instance, Trait, Int, Dict, Float, List, Bool, Enum, \
     DelegatesTo, Constant
-from enthought.traits.ui.api import View, Item, VGroup, Include
+from enthought.traits.ui.api import View, Item, VGroup, Include, CheckListEditor
 
 class BaseAversiveParadigm(Paradigm):
     '''Defines an aversive paradigm, but not the signals that will be used.
@@ -17,6 +17,10 @@ class BaseAversiveParadigm(Paradigm):
     '''
 
     contact_method = Enum('touch', 'optical', store='attribute')
+    
+    AVERSIVE = ['shock', 'info light', 'bright light', 'air puff']
+    aversive_stimulus = List(editor=CheckListEditor(values=AVERSIVE, cols=2),
+                             store='attribute', log_change=True)
 
     par_order = Trait('descending', choice.options,
                       label='Parameter order',
@@ -38,12 +42,14 @@ class BaseAversiveParadigm(Paradigm):
 
     # We set this to -1 so we know that it hasn't been set yet as we can never
     # have a negative sampling rate.
-    actual_lick_fs = CFloat(-1, unit='fs', store='attribute')
-    shock_delay = CFloat(1, unit='s', store='attribute', label='Shock delay (s)')
+    actual_lick_fs = Float(-1, unit='fs', store='attribute')
+    aversive_delay = Float(1, unit='s', store='attribute', 
+                           label='Aversive delay (s)')
 
     # Currently the shock duration cannot be controlled because it is hard
     # wired into the shock controller/spout contact circuitry.
-    shock_duration = Constant(0.3, unit='s')
+    aversive_duration = Float(0.3, unit='s', store='attribute',
+                              label='Aversive duration (s)')
 
     min_safe = Int(2, store='attribute', label='Min safe trials')
     max_safe = Int(4, store='attribute', label='Max safe trials')
@@ -67,12 +73,25 @@ class BaseAversiveParadigm(Paradigm):
                        show_border=True, label='Parameters',)
     trial_group = VGroup(Item('min_safe', label='', invalid='err_num_trials'),
                          Item('max_safe', label='', invalid='err_num_trials'),)
-    timing_group = VGroup(trial_group, 'shock_delay', 'lick_th', 
+
+    timing_group = VGroup(trial_group, 
+                          'aversive_delay', 
+                          'aversive_duration',
+                          'lick_th', 
                           show_border=True, label='Trial settings')
 
-    edit_view = View(VGroup(par_group, timing_group, Include('signal_group')),
-                     resizable=True,
-                     title='Aversive Paradigm editor')
+    edit_view = View(
+            VGroup(
+                par_group, 
+                VGroup(
+                    'contact_method', 
+                    Item('aversive_stimulus', style='custom'),
+                    label='Equipment Setup',
+                    show_border=True),
+                timing_group, 
+                Include('signal_group')),
+            resizable=True,
+            title='Aversive Paradigm editor')
 
     run_view = View(par_group)
 
@@ -83,6 +102,7 @@ class AversiveParadigm(BaseAversiveParadigm):
 
     signal_safe_selector = Instance(SignalSelector, {'allow_par': False},
                                     label='Safe signal')
+
     signal_safe = DelegatesTo('signal_safe_selector', 'signal', store='child')
     signal_warn_selector = Instance(SignalSelector, (), label='Warn signal')
     signal_warn = DelegatesTo('signal_warn_selector', 'signal', store='child')

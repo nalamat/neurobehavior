@@ -1,7 +1,9 @@
 from enthought.traits.api import HasTraits, Any, Instance, DelegatesTo, Int
-from enthought.traits.ui.api import View, Item, VGroup, HGroup, InstanceEditor
+from enthought.traits.ui.api import View, Item, VGroup, HGroup, \
+        InstanceEditor, Include
 
 from cns.experiment.data.aversive_data import RawAversiveData as AversiveData
+from cns.experiment.data.aversive_data import AnalyzedAversiveData
 from cns.experiment.data.aversive_data_view import AnalyzedAversiveDataView
 
 from cns.experiment.paradigm.aversive_paradigm import (AversiveParadigm,
@@ -14,17 +16,35 @@ class AversiveExperiment(HasTraits):
     # The store node should be a reference to an animal
     animal = Any
     store_node = Any
-    #trial_blocks = Int(0)
+
+    data = Instance(AversiveData, ())
+    analyzed = Instance(AnalyzedAversiveData)
+    analyzed_view = Instance(AnalyzedAversiveDataView)
+
+    #def _data_default(self):
+    #    return AversiveData(store_node=self.store_node)
+
+    #def _analyzed_default(self):
+    #    return AnalyzedAversiveData(data=self.data)
+
+    #def _analyzed_view_default(self):
+    #    a = AnalyzedAversiveDataView(analyzed=self.analyzed)
+
+    #analyzed_view = Instance(AnalyzedAversiveDataView, ())
+    #analyzed = DelegatesTo('analyzed_view')
+    #data = DelegatesTo('analyzed_view')
     
     # Show the analyzed data
-    data = Instance(AversiveData)
+    #data = Instance(AversiveData)
+    #analyzed = 
 
-    analyzed = DelegatesTo('analyzed_view')
-    analyzed_view = Instance(AnalyzedAversiveDataView)
+    #analyzed = DelegatesTo('analyzed_view')
+    #analyzed_view = Instance(AnalyzedAversiveDataView)
     paradigm = Instance(AversiveParadigm, ())
 
     def _data_changed(self, new):
-        self.analyzed_view = AnalyzedAversiveDataView(data=self.analyzed)
+        self.analyzed = AnalyzedAversiveData(data=self.data)
+        self.analyzed_view = AnalyzedAversiveDataView(analyzed=self.analyzed)
 
     traits_group = HGroup(
             VGroup(
@@ -49,7 +69,7 @@ class AversiveExperiment(HasTraits):
                 show_labels=False,
                 ),
            Item('analyzed_view',
-                editor=InstanceEditor(view='test_view'),
+                editor=InstanceEditor(),
                 style='custom', width=1300, height=900),
            show_labels=False,
            )
@@ -59,7 +79,6 @@ class AversiveExperiment(HasTraits):
                        kind='live',
                        handler=AversiveController)
 
-from enthought.traits.ui.api import Include
 class AversiveFMExperiment(AversiveExperiment):
 
     paradigm = Instance(AversiveFMParadigm, ())

@@ -87,6 +87,17 @@ def fix_node_contact(node):
             channel.write(node[:,i])
         node._f_remove()
 
+    remove = ['optical_digital', 'optical_analog', 'optical_digital_mean']
+    if node._v_name in ['_digital', '_analog', '_digital_mean']:
+        if node._v_name.startswith('optical_'):
+            print "Removing unused node %s" % node._v_pathname
+            node._f_remove()
+        elif node._v_name.startswith('touch_'):
+            end = node._v_name[7:]
+            print "Renaming node %s to contact*" % node._v_pathname
+            getattr(node._v_parent, 'contact_' + end)._f_remove()
+            node._f_move(newname='contact_' + end)
+
 def move_experiment_nodes(node):
     '''
     Some nodes were originally stored directly under the animal node or in a

@@ -9,6 +9,7 @@ from enthought.traits.ui.api import View, HGroup, Item, VGroup, spring, \
     InstanceEditor, TabularEditor, Group, TableEditor, ObjectColumn
 from enthought.traits.ui.tabular_adapter import TabularAdapter
 from enthought.traits.ui.extras.checkbox_column import CheckboxColumn
+from enthought.traits.ui.menu import Menu, Action, ActionGroup
 import cns
 import logging
 log = logging.getLogger(__name__)
@@ -43,7 +44,12 @@ animal_editor = TableEditor(
             AnimalColumn(name='age', editable=False),
             AnimalColumn(name='sex'),
             AnimalColumn(name='identifier'),
-            ]
+            ],
+        menu=Menu(
+            Action(name='Appetitive', action='launch_appetitive'),
+            Action(name='Aversive (FM)', action='launch_aversive_fm'),
+            Action(name='Aversive (generic)', action='launch_aversive_generic'),
+            ),
         )
 
 class AnimalAdapter(TabularAdapter):
@@ -105,7 +111,7 @@ class CohortViewHandler(FileHandler):
     path            = File(cns.COHORT_PATH)
     wildcard        = Str(cns.COHORT_WILDCARD)
     modified_trait  = '_modified'
-    
+
     def new_object(self, info):
         info.object.cohort = Cohort()
         info.object._modified = False
