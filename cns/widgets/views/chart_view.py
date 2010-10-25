@@ -131,20 +131,19 @@ class DynamicBarPlotView(SingleBarPlotView):
             labels = indices
         else:
             labels = np.array(getattr(self.source, self.label))
-        #label_text = [(self.label_fmt % l) for l in labels]
         label_text = [('%.4f' % l).rstrip('0') for l in labels]
         return indices, label_text
 
-    @on_trait_change('source', 'label')
-    def update_listeners(self, old, new):
+    def _source_changed(self, old, new):
         if old is not None:
             old.on_trait_change(self.update_labels, self.label, remove=True)
-            old.on_trait_change(self.update_data, "updated", remove=True)
+            old.on_trait_change(self.update_data, ' ' + self.label, remove=True)
+            old.on_trait_change(self.update_data, ' ' + self.value, remove=True)
         if new is not None:
-            new.on_trait_change(self.update_labels, self.label)
-            new.on_trait_change(self.update_data, "updated")
+            new.on_trait_change(self.update_labels, ' ' + self.label)
+            new.on_trait_change(self.update_data, ' ' + self.label)
+            new.on_trait_change(self.update_data, ' ' + self.value)
 
-    @on_trait_change('label', 'source')
     def update_labels(self):
         if self.traits_inited():
             label_position, label_text = self._get_labels()
@@ -165,11 +164,11 @@ class HistoryBarPlotView(SingleBarPlotView):
         else:
             index = np.asarray(getattr(self.source, self.index))
             if self.current_index is not None:
-                index -= self.current_index
-            else:
-                try: index -= index.max()
-                except ValueError: pass
-            return index
+                return index - self.current_index
+            try:
+                return index - index.max()
+            except ValueError:
+                return index
 
     def _get_labels(self):
         labels = np.arange(-self.history, 0)
@@ -179,14 +178,12 @@ class HistoryBarPlotView(SingleBarPlotView):
         return - self.history - 0.5, 0.5
 
     def _source_changed(self, old, new):
-        items = [self.value, self.value + '_items']
-        if self.index is not None:
-            items.append(self.index)
-            items.append(self.index + '_items')
-        for item in items:
-            if old is not None:
-                old.on_trait_change(self.update_data, item, remove=True)
-            new.on_trait_change(self.update_data, item)
+        if old is not None:
+            old.on_trait_change(self.update_data, ' ' + self.value, remove=True)
+            old.on_trait_change(self.update_data, ' ' + self.index, remove=True)
+        if new is not None:
+            new.on_trait_change(self.update_data, ' ' + self.value)
+            new.on_trait_change(self.update_data, ' ' + self.index)
 
     def _current_index_changed(self):
         self.update_data()
@@ -201,4 +198,3 @@ class HistoryBarPlotView(SingleBarPlotView):
 
     traits_view = View(Group(Item('history')),
                        Item('component', editor=ComponentEditor(), show_label=False))
-

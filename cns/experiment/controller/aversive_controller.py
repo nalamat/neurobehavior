@@ -223,9 +223,8 @@ class BaseAversiveController(ExperimentController):
             # Process "reminder" signals
             if self.state == 'manual':
                 self.pause()
-                self.model.data.update(ts,
-                                       self.current.par_remind,
-                                       -1, 'remind')
+                par = self.current.par_remind
+                self.model.data.log_trial(ts, par, -1, 'remind')
                 self._apply_signal_warn()
 
             # Warning was just presented.
@@ -237,16 +236,14 @@ class BaseAversiveController(ExperimentController):
                 
                 if last_trial == self.current.safe_trials + 1:
                     log.debug('processing warning trial')
-                    self.model.data.update(ts,
-                                           self.current.par,
-                                           -1, 'warn')
+                    self.model.data.log_trial(ts, self.current.par, -1, 'warn')
                     self.current.next()
                 elif last_trial == self.current.safe_trials: 
-                    self.model.data.update(ts, self.current.par, 0, 'safe')
+                    self.model.data.log_trial(ts, self.current.par, 0, 'safe')
                     self._apply_signal_warn()
                     self.circuit.trigger(2)
                 elif last_trial < self.current.safe_trials:
-                    self.model.data.update(ts, self.current.par, 0, 'safe')
+                    self.model.data.log_trial(ts, self.current.par, 0, 'safe')
                 else:
                     raise SystemError, 'There is a mismatch.'
                     # TODO: Data has not been lost so we should not halt
@@ -302,40 +299,47 @@ class BaseAversiveController(ExperimentController):
     def _apply_contact_method(self, value):
         if value == 'touch':
             self.circuit.contact_method.value = 0
+            self.circuit.contact_ch.value = 128
         else:
             self.circuit.contact_method.value = 1
+            self.circuit.contact_ch.value = 129
 
 class AversiveController(BaseAversiveController):
+
     circuits = { 'circuit': ('aversive-behavior', 'RX6') }
-    # For some reason the HasTraits machinery appears to hide the default value
-    # for attributes until an instance is created.
 
     parameter_map = {'lick_th': 'circuit.lick_th',
-                     #'shock_duration': 'circuit.shock_n',
-                     'shock_delay': 'circuit.shock_delay_n',
                      'requested_lick_fs': 'circuit.lick_nPer',
                      'contact_method': 'handler._apply_contact_method', 
-                     #'signal_warn': 'handler._apply_signal_warn',
-                     #'signal_safe': 'handler._apply_signal_safe',
+                     'aversive_stimulus': 'handler._apply_aversive_stimulus',
+                     'aversive_delay': 'circuit.aversive_del_n',
+                     'aversive_duration': 'circuit.aversive_dur_n',
                      }
 
     contact_pipe = Any
 
     def _contact_pipe_default(self):
-        targets = [self.touch_digital,
-                   self.touch_digital_mean,
-                   self.optical_digital,
-                   self.optical_digital_mean,
-                   self.contact_digital,
-                   self.contact_digital_mean,
-                   self.trial_running, ]
+        targets = [self.model.data.contact_digital,
+                   self.model.data.contact_digital_mean,
+                   self.model.data.trial_running, 
+                   self.model.data.contact_analog ]
         return deinterleave(targets)
+
+    @on_trait_change('fast_tick')
+    def task_update_data(self):
+        self.contact_pipe.send(self.circuit.contact_buf.read())
 
     @on_trait_change('fast_tick')
     def task_monitor_signal_safe(self):
         if self.circuit.int_buf.block_processed():
             samples = self.model.paradigm.signal_safe.read_block()
             self.circuit.int_buf.write(samples)
+
+    def _apply_aversive_stimulus(self, value):
+        IO = ['info light', 'bright light', 'shock', 'air puff']
+        stimuli = self.model.paradigm.aversive_stimulus
+        word = sum([2**IO.index(s) for s in value])
+        self.circuit.aversive_word.value = word
     
     def _apply_signal_remind(self):
         # The actual sequence is important.  We must finish uploading the signal
@@ -352,13 +356,14 @@ class AversiveController(BaseAversiveController):
     def init_experiment(self, info):
         self.current = CurrentSettings(paradigm=self.model.paradigm)
         self._apply_signal_warn()
-        self.circuit.contact_buf.initialize(channels=7, sf=127, src_type=np.int8,
+        self.circuit.contact_buf.initialize(channels=4, sf=127, src_type=np.int8,
                                             compression='decimated',
                                             fs=self.circuit.lick_nPer.get('fs'))
         super(AversiveController, self).init_experiment(info)
 
 
 class AversiveFMController(BaseAversiveController):
+
     circuits = { 'circuit': ('aversive-behavior-FM', 'RX6') }
 
     parameter_map = {'lick_th': 'circuit.lick_th',
@@ -370,19 +375,6 @@ class AversiveFMController(BaseAversiveController):
                      'trial_duration': 'circuit.trial_dur_n',
                      }
 
-    contact_pipe = Any
-
-    def _contact_pipe_default(self):
-        targets = [self.model.data.touch_digital,
-                   self.model.data.touch_digital_mean,
-                   self.model.data.optical_digital,
-                   self.model.data.optical_digital_mean,
-                   self.model.data.trial_running, ]
-        return deinterleave(targets)
-
-    @on_trait_change('fast_tick')
-    def task_update_data(self):
-        self.contact_pipe.send(self.circuit.contact_buf.read())
 
     def _apply_signal_warn(self):
         self.circuit.depth.value = self.current.par

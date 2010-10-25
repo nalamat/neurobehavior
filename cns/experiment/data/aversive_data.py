@@ -78,37 +78,27 @@ class RawAversiveData_v0_2(ExperimentData):
     # Logging functions
     #------------------------------------------------------------------- 
     def log_water(self, ts, infused):
-        self.water_log.append([(ts, infused)])
+        self.water_log.append((ts, infused))
 
     def log_event(self, timestamp, name, value):
-        self.event_log.append([(timestamp, name, '%r' % value)])
+        self.event_log.append((timestamp, name, '%r' % value))
 
     def log_trial(self, timestamp, par, shock, type):
-        self.trial_log.append([(timestamp, par, shock, type)])
-        self.updated = timestamp
+        self.trial_log.append((timestamp, par, shock, type))
 
     #-------------------------------------------------------------------
-    # Raw data in it's purest, most unaltered form
+    # Raw data
     #------------------------------------------------------------------- 
     water_log = List(store='table', dtype=WATER_DTYPE)
     trial_log = List(store='table', dtype=TRIAL_DTYPE)
     event_log = List(store='table', dtype=EVENT_DTYPE)
 
-    # TODO: These seem like a hack, but I am not sure of a better way to
-    # indicate store node and location.
-
-    touch_digital = Instance(FileChannel, 
-            store='channel', store_path='contact/touch_digital')
-    touch_digital_mean = Instance(FileChannel, 
-            store='channel', store_path='contact/touch_digital_mean')
-    touch_analog = Instance(FileChannel, 
-            store='channel', store_path='contact/touch_analog')
-    optical_digital = Instance(FileChannel, 
-            store='channel', store_path='contact/optical_digital')
-    optical_digital_mean = Instance(FileChannel, 
-            store='channel', store_path='contact/optical_digital_mean')
-    optical_analog = Instance(FileChannel, 
-            store='channel', store_path='contact/optical_analog')
+    contact_digital = Instance(FileChannel, 
+            store='channel', store_path='contact/contact_digital')
+    contact_digital_mean = Instance(FileChannel, 
+            store='channel', store_path='contact/contact_digital_mean')
+    contact_analog = Instance(FileChannel, 
+            store='channel', store_path='contact/contact_analog')
     trial_running = Instance(FileChannel, 
             store='channel', store_path='contact/trial_running')
 
@@ -120,14 +110,6 @@ class RawAversiveData_v0_2(ExperimentData):
     transition, I forgot to ensure that some of the new AversiveData (V2)
     objects implemented a contact_digital alias.
     '''
-    contact_digital = Property
-    contact_digital_mean = Property
-
-    def _get_contact_digital(self):
-        return self.touch_digital
-
-    def _get_contact_digital_mean(self):
-        return self.touch_digital_mean
 
     def _create_channel(self, name, dtype):
         contact_node = get_or_append_node(self.store_node, 'contact')
@@ -140,23 +122,8 @@ class RawAversiveData_v0_2(ExperimentData):
     def _contact_digital_mean_default(self):
         return self._create_channel('contact_digital_mean', np.float32)
 
-    def _touch_digital_default(self):
-        return self._create_channel('touch_digital', np.bool)
-
-    def _touch_digital_mean_default(self):
-        return self._create_channel('touch_digital_mean', np.float32)
-
-    def _touch_analog_default(self):
-        return self._create_channel('touch_analog', np.float32)
-
-    def _optical_digital_default(self):
-        return self._create_channel('optical_digital', np.bool)
-
-    def _optical_digital_mean_default(self):
-        return self._create_channel('optical_digital_mean', np.float32)
-
-    def _optical_analog_default(self): 
-        return self._create_channel('optical_analog', np.float32)
+    def _contact_analog_default(self):
+        return self._create_channel('contact_analog', np.float32)
 
     def _trial_running_default(self):
         return self._create_channel('trial_running', np.bool)
@@ -219,21 +186,21 @@ class RawAversiveData_v0_2(ExperimentData):
     #------------------------------------------------------------------- 
 
     # Splits trial_log by column
-    ts_seq = Property(Array('i'))
-    par_seq = Property(Array('f'))
-    ttype_seq = Property(Array('S'))
+    ts_seq = Property(Array('i'), depends_on='trial_log')
+    par_seq = Property(Array('f'), depends_on='trial_log')
+    ttype_seq = Property(Array('S'), depends_on='trial_log')
     # Actual position in the sequence (used in conjunction with the *_seq
     # properties to generate the score chart used in the view.
-    safe_indices = Property(Array('i'))
-    warn_indices = Property(Array('i'))
-    remind_indices = Property(Array('i'))
-    total_indices = Property(Int)
-    safe_par_mask = Property(List(Array('b')))
-    warn_par_mask = Property(List(Array('b')))
-    par_warn_count = Property(List(Int))
-    par_safe_count = Property(List(Int))
-    pars = Property(List(Int))
-    warn_trial_count = Property(Int, store='attribute')
+    safe_indices = Property(Array('i'), depends_on='ttype_seq')
+    warn_indices = Property(Array('i'), depends_on='ttype_seq')
+    remind_indices = Property(Array('i'), depends_on='ttype_seq')
+    total_indices = Property(Int, depends_on='trial_log')
+    safe_par_mask = Property(List(Array('b')), depends_on='trial_log')
+    warn_par_mask = Property(List(Array('b')), depends_on='trial_log')
+    par_warn_count = Property(List(Int), depends_on='trial_log')
+    par_safe_count = Property(List(Int), depends_on='trial_log')
+    pars = Property(List(Int), depends_on='trial_log')
+    warn_trial_count = Property(Int, store='attribute', depends_on='trial_log')
 
     @cached_property
     def _get_ts_seq(self):
@@ -268,7 +235,10 @@ class RawAversiveData_v0_2(ExperimentData):
 
     @cached_property
     def _get_remind_indices(self):
-        return self._get_indices('remind')
+        #return self._get_indices('remind')
+        x = self._get_indices('remind')
+        print '_get_remind', x
+        return x
 
     def _get_par_mask(self, ttype):
         ttype_mask = np.array(self.ttype_seq) == ttype
@@ -425,7 +395,8 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
         spout during the check period based on `contact_fraction`.
     '''
 
-    data = Instance(RawAversiveData_v0_2, ())
+    #data = Instance(RawAversiveData_v0_2, ())
+    data = Instance(RawAversiveData, ())
 
     # Analysis parameters
     exclude_first = Int(0, store='attribute')
@@ -439,18 +410,32 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
     reaction_dur = Float(3.0, store='attribute')
 
     # Masked data
+    trial_log = Property(depends_on='data.trial_log')
     masked_trial_log = Property(depends_on='data.trial_log, exclude+')
 
     # Basic analysis of masked data
-    contact_scores = Property(store='array')
-    contact_seq = Property(store='array')
+    DEP_CONTACT = ['trial_log', 'contact_dur', 'contact_offset']
+    DEP_M_CONTACT = ['masked_trial_log', 'contact_dur', 'contact_offset']
+    DEP_CONTACT_SEQ = ['contact_scores', 'contact_fraction']
+    DEP_M_CONTACT_SEQ = ['masked_contact_scores', 'contact_fraction']
+    contact_scores = Property(depends_on=DEP_CONTACT, store='array',
+                              dtype=[('scores', 'f')])
+    masked_contact_scores = Property(depends_on=DEP_M_CONTACT, store='array',
+                                     dtype=[('scores', 'bool')])
+
+    contact_seq = Property(depends_on=DEP_CONTACT_SEQ, store='array')
+    masked_contact_seq = Property(depends_on=DEP_M_CONTACT_SEQ, store='array')
 
     # Parameter summary based on masked data
     pars = Property(depends_on='masked_trial_log')
-    par_fa_count = Property(depends_on='fa_seq')
-    par_hit_count = Property(depends_on='hit_seq')
-    par_safe_count = Property(depends_on='contact_scores')
-    par_warn_count = Property(depends_on='contact_scores')
+    par_fa_count = Property(depends_on='masked_contact_seq')
+    par_hit_count = Property(depends_on='masked_contact_seq')
+    par_safe_count = Property(depends_on='masked_contact_seq')
+    par_warn_count = Property(depends_on='masked_contact_seq')
+
+    par_hit_frac = Property(depends_on='masked_contact_seq')
+    par_fa_frac = Property(depends_on='masked_contact_seq')
+    global_fa_frac = Property(depends_on='masked_contact_seq')
 
     # Overview information
     warn_trial_count = Property(depends_on='masked_trial_log')
@@ -458,6 +443,11 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
     #-------------------------------------------------------------------
     # Compute masked data
     #-------------------------------------------------------------------
+    @cached_property
+    def _get_trial_log(self):
+        return np.array(self.data.trial_log, dtype=TRIAL_DTYPE)
+
+    @cached_property
     def _get_masked_trial_log(self):
         '''
         Convert `data.trial_log` to record array and mask unwanted trials
@@ -477,9 +467,12 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
         return np.unique(self.masked_trial_log[mask]['par'])
 
     def _get_par_mask(self, ttype):
-        ttype_mask = self.masked_trial_log['type'] == ttype
-        par_mask = [self.masked_trial_log['par'] == par for par in self.pars]
-        return par_mask & ttype_mask
+        if len(self.pars):
+            ttype_mask = self.masked_trial_log['type'] == ttype
+            par_mask = [self.masked_trial_log['par'] == par for par in self.pars]
+            return par_mask & ttype_mask
+        else:
+            return []
 
     def _get_warn_par_mask(self):
         return self._get_par_mask('warn')
@@ -492,19 +485,19 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
     #-------------------------------------------------------------------
 
     # Views of contact scores for the indicated trial type
-    #safe_scores = Property(Array(dtype='f'), depends_on='contact_scores')
-    #warn_scores = Property(Array(dtype='f'), depends_on='contact_scores')
-    #remind_scores = Property(Array(dtype='f'), depends_on='contact_scores')
+    safe_scores = Property(Array(dtype='f'), depends_on='contact_scores')
+    warn_scores = Property(Array(dtype='f'), depends_on='contact_scores')
+    remind_scores = Property(Array(dtype='f'), depends_on='contact_scores')
 
-    #remind_indices = DelegatesTo('data')
-    #safe_indices = DelegatesTo('data')
-    #warn_indices = DelegatesTo('data')
-    #total_indices = DelegatesTo('data')
+    remind_indices = DelegatesTo('data')
+    safe_indices = DelegatesTo('data')
+    warn_indices = DelegatesTo('data')
+    total_indices = DelegatesTo('data')
 
-    #contact_seq = Property(Array(dtype='b'), depends_on='contact_scores')
-    #fa_seq = Property(Array(dtype='f'), depends_on='safe_scores')
-    #hit_seq = Property(Array(dtype='f'), depends_on='safe_scores')
-    #remind_seq = Property(Array(dtype='f'), depends_on='safe_scores')
+    contact_seq = Property(Array(dtype='b'), depends_on='contact_scores')
+    fa_seq = Property(Array(dtype='f'), depends_on='contact_seq')
+    hit_seq = Property(Array(dtype='f'), depends_on='contact_seq')
+    remind_seq = Property(Array(dtype='f'), depends_on='contact_seq')
 
     #reaction_snippets = List(Array(dtype='f'))
 
@@ -520,17 +513,24 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
     # Process raw data based on masks
     #------------------------------------------------------------------- 
 
-    @cached_property
-    def _get_contact_scores(self):
+    def _compute_contact_scores(self, trial_log):
         contact = self.data.contact_digital
         lb_index = contact.to_samples(self.contact_offset)
         ub_index = contact.to_samples(self.contact_offset+self.contact_dur)
 
         scores = []
-        for ts in self.masked_trial_log['timestamp']:
+        for ts in trial_log['timestamp']:
             score = contact.get_range_index(lb_index, ub_index, ts).mean()
             scores.append(score)
         return scores
+
+    @cached_property
+    def _get_contact_scores(self):
+        return self._compute_contact_scores(self.trial_log)
+
+    @cached_property
+    def _get_masked_contact_scores(self):
+        return self._compute_contact_scores(self.masked_trial_log)
 
     @cached_property
     def _get_reaction_snippets(self):
@@ -553,11 +553,6 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
     # Contact scores
     #------------------------------------------------------------------- 
     def _get_scores(self, indices):
-        # We need to check curidx to see if there are any contact scores.  If
-        # curidx is 0, this means that code somewhere has requested the value of
-        # these properties before any data is available. 
-        #if len(self.contact_scores) == 0:
-        #    return np.array([])
         return np.take(self.contact_scores, indices)
 
     @cached_property
@@ -579,6 +574,9 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
     def _get_contact_seq(self):
         return np.array(self.contact_scores) < self.contact_fraction
 
+    def _get_masked_contact_seq(self):
+        return np.array(self.masked_contact_scores) < self.contact_fraction
+
     @cached_property
     def _get_fa_seq(self):
         return self.safe_scores < self.contact_fraction
@@ -596,35 +594,35 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
     #------------------------------------------------------------------- 
     @cached_property
     def _get_par_fa_count(self):
-        return apply_mask(np.sum, self.contact_seq, self.safe_par_mask)
+        return apply_mask(np.sum, self.masked_contact_seq, self.safe_par_mask)
 
     @cached_property
     def _get_par_hit_count(self):
-        return apply_mask(np.sum, self.contact_seq, self.warn_par_mask)
+        return apply_mask(np.sum, self.masked_contact_seq, self.warn_par_mask)
 
     @cached_property
     def _get_par_safe_count(self):
-        return apply_mask(len, self.contact_seq, self.safe_par_mask)
+        return apply_mask(len, self.masked_contact_seq, self.safe_par_mask)
 
     @cached_property
     def _get_par_warn_count(self):
-        return apply_mask(len, self.contact_seq, self.warn_par_mask)
+        return apply_mask(len, self.masked_contact_seq, self.warn_par_mask)
 
     #-------------------------------------------------------------------
     # Implementation of required property getters
     #------------------------------------------------------------------- 
     @cached_property
     def _get_par_fa_frac(self):
-        return apply_mask(np.mean, self.contact_seq, self.safe_par_mask)
+        return apply_mask(np.mean, self.masked_contact_seq, self.safe_par_mask)
 
     @cached_property
     def _get_global_fa_frac(self):
         mask = self.masked_trial_log['type'] == 'safe'
-        return np.array(self.contact_seq)[mask].mean()
+        return np.array(self.masked_contact_seq)[mask].mean()
     
     @cached_property
     def _get_par_hit_frac(self):
-        return apply_mask(np.mean, self.contact_seq, self.warn_par_mask) 
+        return apply_mask(np.mean, self.masked_contact_seq, self.warn_par_mask) 
 
     def _get_warn_trial_count(self):
         return (self.masked_trial_log['type'] == 'warn').sum()
