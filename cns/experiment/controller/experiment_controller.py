@@ -13,21 +13,6 @@ from datetime import datetime, timedelta
 import logging
 log = logging.getLogger(__name__)
 
-def build_signal_cache(signal, *parameters):
-
-    def generate_signal(template, parameter):
-        signal = template.__class__()
-        errors = signal.copy_traits(template)
-        if errors:
-            raise BaseException('Unable to copy traits to new signal')
-        signal.set_variable(parameter)
-        return signal
-
-    cache = {}
-    for par in parameters:
-        cache[par] = generate_signal(signal, par)
-    return cache
-
 class ExperimentToolBar(ToolBar):
 
     size = 24, 24
@@ -93,13 +78,6 @@ class ExperimentToolBar(ToolBar):
 
     trait_view = View(group, kind='subpanel')
 
-    #@on_trait_change('+action')
-    #@on_trait_change('start, stop, pause, revert, apply, resume, remind')
-    #def process_action(self, trait, value):
-    #    log.debug('process_action %r %r', trait, value)
-    #    if self.traits_inited():
-    #        getattr(self.handler, trait)(self.info)
-
 class ExperimentController(Controller):
     """Primary controller for TDT System 3 hardware.  This class must be
     configured with a model that contains the appropriate parameters (e.g.
@@ -126,6 +104,8 @@ class ExperimentController(Controller):
         controller will go back to the paused state.
     Running
         The system is playing the sequence of safe and warn signals. 
+    Complete
+        The experiment is done.
     Disconnected
         Could not connect to the equipment.
 
@@ -156,7 +136,8 @@ class ExperimentController(Controller):
 
     toolbar = Instance(ExperimentToolBar, ())
     
-    state = Enum('halted', 'paused', 'running', 'manual',  'disconnected')
+    state = Enum('halted', 'paused', 'running', 'manual', 'disconnected',
+                 'complete')
 
     '''Number of experiments run before window is closed.'''
     runs = Int(0)
@@ -193,7 +174,6 @@ class ExperimentController(Controller):
             log.error(e)
             self.state = 'disconnected'
             error(info.ui.control, str(e))
-        log.debug("INIT MODEL UI %r", info.ui.view.close_result)
 
     def init_equipment(self, info):
         '''Attempts to connect with the hardware.  Called when the class is
@@ -251,7 +231,7 @@ class ExperimentController(Controller):
         '''Prevent user from closing window while an experiment is running since
         data is not saved to file until the stop button is pressed.
         '''
-        if self.state not in ('disconnected', 'halted'):
+        if self.state not in ('disconnected', 'halted', 'complete'):
             mesg = 'Please halt experiment before attempting to close window.'
             error(info.ui.control, mesg)
             return False
@@ -276,11 +256,9 @@ class ExperimentController(Controller):
             raise
 
     def stop(self, info=None):
-        log.debug('controller.stop()')
         self.stop_experiment(info)
-        log.debug("STOP PRE MODEL UI %r", info.ui.view.close_result)
         info.ui.view.close_result = True
-        log.debug("STOP POST MODEL UI %r", info.ui.view.close_result)
+        self.state = 'complete'
 
     ############################################################################
     # Stubs to implement

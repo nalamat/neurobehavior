@@ -421,10 +421,12 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
     contact_scores = Property(depends_on=DEP_CONTACT, store='array',
                               dtype=[('scores', 'f')])
     masked_contact_scores = Property(depends_on=DEP_M_CONTACT, store='array',
-                                     dtype=[('scores', 'bool')])
+                                     dtype=[('scores', 'f')])
 
-    contact_seq = Property(depends_on=DEP_CONTACT_SEQ, store='array')
-    masked_contact_seq = Property(depends_on=DEP_M_CONTACT_SEQ, store='array')
+    contact_seq = Property(depends_on=DEP_CONTACT_SEQ, store='array',
+                           dtype=[('scores', 'bool')])
+    masked_contact_seq = Property(depends_on=DEP_M_CONTACT_SEQ, store='array',
+                                  dtype=[('scores', 'bool')])
 
     # Parameter summary based on masked data
     pars = Property(depends_on='masked_trial_log')

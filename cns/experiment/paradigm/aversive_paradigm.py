@@ -1,3 +1,4 @@
+
 from cns import choice
 from cns import equipment
 from cns.traits.ui.api import ListAsStringEditor
@@ -6,8 +7,24 @@ from cns.experiment.paradigm.paradigm import Paradigm
 from cns.signal.type import Tone
 from enthought.traits.api import Button, on_trait_change, HasTraits, Any, Range, \
     CFloat, Property, Instance, Trait, Int, Dict, Float, List, Bool, Enum, \
-    DelegatesTo, Constant
-from enthought.traits.ui.api import View, Item, VGroup, Include, CheckListEditor
+    DelegatesTo, Constant, Tuple
+from enthought.traits.ui.api import View, Item, VGroup, Include, \
+        CheckListEditor, InstanceEditor, TableEditor, ListColumn
+
+def row_factory(*args, **kw):
+    return 0, 0
+
+sequence_table = TableEditor(
+        editable=True,
+        sortable=True,
+        sort_model=False,
+        #auto_add=True,
+        #row_factory=row_factory,
+        columns=[
+            ListColumn(index=0, editable=True, label='parameter'),
+            ListColumn(index=1, editable=True, label='duration')
+            ]
+        )
 
 class BaseAversiveParadigm(Paradigm):
     '''Defines an aversive paradigm, but not the signals that will be used.
@@ -17,21 +34,25 @@ class BaseAversiveParadigm(Paradigm):
     '''
 
     contact_method = Enum('touch', 'optical', store='attribute')
-    
     AVERSIVE = ['shock', 'info light', 'bright light', 'air puff']
     aversive_stimulus = List(editor=CheckListEditor(values=AVERSIVE, cols=2),
-                             store='attribute', log_change=True)
+                             store='attribute')
 
-    par_order = Trait('descending', choice.options,
-                      label='Parameter order',
-                      store='attribute', log_change=True)
-    pars = List(CFloat, [2000, 4000, 8000], minlen=1,
-                        label='Parameters',
-                        editor=ListAsStringEditor(),
-                        store='attribute')
-    par_remind = CFloat(1000,
-                        label='Remind parameter',
-                        store='attribute', log_change=True)
+    par_order = Trait('descending', choice.options, label='Parameter order',
+                      store='attribute')
+
+    #aversive_sequence = List(List(Float, Float), label='Parameters')
+    aversive_sequence = List
+
+    def _aversive_sequence_default(self):
+        return [[1, 0.15], [2, 0.32], [3, 0.44]]
+    #pars = List(CFloat, [2000, 4000, 8000], minlen=1,
+    #                    label='Parameters',
+    #                    editor=ListAsStringEditor())
+
+    par_remind = Float(1000, label='Remind parameter', store='attribute')
+
+    par_safe = Float(0, label='Safe parameter', store='attribute')
     lick_th = Range(0.0, 1.0, 0.75,
                     label='Contact threshold',
                     store='attribute', log_change=True)
@@ -46,10 +67,10 @@ class BaseAversiveParadigm(Paradigm):
     aversive_delay = Float(1, unit='s', store='attribute', 
                            label='Aversive delay (s)')
 
-    # Currently the shock duration cannot be controlled because it is hard
-    # wired into the shock controller/spout contact circuitry.
     aversive_duration = Float(0.3, unit='s', store='attribute',
                               label='Aversive duration (s)')
+
+    par_aversive = List(Tuple(Int, Int))
 
     min_safe = Int(2, store='attribute', label='Min safe trials')
     max_safe = Int(4, store='attribute', label='Max safe trials')
@@ -69,8 +90,21 @@ class BaseAversiveParadigm(Paradigm):
     #===========================================================================
     # The views available
     #===========================================================================
-    par_group = VGroup('par_remind', 'par_order', 'pars', 
-                       show_border=True, label='Parameters',)
+    test_view = View(
+            Item('aversive_sequence', editor=sequence_table, style='custom'),
+            resizable=True,
+            height=400,
+            width=400
+            )
+
+    par_group = VGroup(
+            'par_remind', 
+            'par_safe', 
+            'par_order', 
+            Item('aversive_sequence', editor=sequence_table),
+            show_border=True, 
+            label='Parameters')
+
     trial_group = VGroup(Item('min_safe', label='', invalid='err_num_trials'),
                          Item('max_safe', label='', invalid='err_num_trials'),)
 
@@ -100,21 +134,17 @@ class AversiveParadigm(BaseAversiveParadigm):
     Note that this will not work well with modulated tones!
     '''
 
-    signal_safe_selector = Instance(SignalSelector, {'allow_par': False},
-                                    label='Safe signal')
+    selector = Instance(SignalSelector, {'allow_par': True}, label='Signal')
+    signal = DelegatesTo('selector', store='child')
 
-    signal_safe = DelegatesTo('signal_safe_selector', 'signal', store='child')
-    signal_warn_selector = Instance(SignalSelector, (), label='Warn signal')
-    signal_warn = DelegatesTo('signal_warn_selector', 'signal', store='child')
+    signal_group = VGroup(Item('selector', style='custom', show_label=False,
+                               editor=InstanceEditor(view='popup_view')),
+                          show_border=True, label='Signal')
 
-    signal_group = VGroup(Item('signal_safe_selector', style='custom'),
-                          Item('signal_warn_selector', style='custom'))
+    err_signal = Property(Bool, depends_on='signal, signal.variable')
 
-    err_signal_warn = Property(Bool, 
-                               depends_on='signal_warn, signal_warn.variable')
-
-    def _get_err_signal_warn(self):
-        return self.signal_warn.variable is None
+    def _get_err_signal(self):
+        return self.signal.variable is None
 
 class AversiveFMParadigm(BaseAversiveParadigm):
     '''Aversive paradigm designed exclusively for FM tones.  Be sure to use with
@@ -131,4 +161,6 @@ class AversiveFMParadigm(BaseAversiveParadigm):
                           show_border=True, label='FM parameters')
 
 if __name__ == '__main__':
-    AversiveParadigm().configure_traits(view='edit_view')
+    #from enthought.etsconfig.api import ETSConfig
+    #ETSConfig.toolkit = 'qt4'
+    AversiveParadigm().configure_traits(view='test_view')

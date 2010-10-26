@@ -1,7 +1,8 @@
 from cns.experiment.paradigm.paradigm import Paradigm
 from cns.signal.type import Tone, Noise
 from cns.signal.signal_dialog import SignalSelector
-from enthought.traits.api import Instance, Float, DelegatesTo, Int, Float, Bool
+from enthought.traits.api import Instance, Float, DelegatesTo, Int, Float, \
+        Bool, Enum
 from enthought.traits.ui.api import View, spring, VGroup
 
 class PositiveParadigm(Paradigm):
@@ -39,11 +40,12 @@ class PositiveParadigm(Paradigm):
     poke_duration_lb = Float(0.1, unit='s', store='attribute')
     poke_duration_ub = Float(0.5, unit='s', store='attribute')
 
+    spout_sensor = Enum('touch', 'optical', store='attribute')
+
     TTL_fs = Float(500, unit='fs', store='attribute')
 
     traits_view = View(VGroup('go_signal_selector{}@', 
                               'nogo_signal_selector{}@',),
-                       #'go_probability{GO probability}',
                        'min_nogo',
                        'max_nogo',
                        'repeat_FA',
@@ -54,6 +56,7 @@ class PositiveParadigm(Paradigm):
                        'score_window_duration',
                        'reward_duration',
                        'timeout_duration',
+                       'spout_sensor',
                        'spout_smooth_duration',
                        'poke_duration_lb',
                        'poke_duration_ub',

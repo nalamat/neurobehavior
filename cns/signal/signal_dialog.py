@@ -65,8 +65,6 @@ class SignalSelector(HasTraits):
 
 SignalDialog = SignalSelector
 
-#popup_view = View('handler.edit_signal{}', handler=SignalEditHandler)
-
 if __name__ == '__main__':
     class Test(HasTraits):
         selector = Instance(SignalDialog, ())
@@ -75,11 +73,3 @@ if __name__ == '__main__':
 
     t = Test()
     t.configure_traits()
-
-
-
-    #sd = SignalDialog(signal=st.AMTone(), allow_par=False)
-    #sd.configure_traits(view='dialog_selector_view')
-    #sd.configure_traits()
-    #from cns.signal.type import Tone
-    #Tone().configure_traits(view=popup_view)

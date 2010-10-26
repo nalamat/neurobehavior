@@ -112,7 +112,7 @@ def demo_preset_sequence(backend='TDT'):
     silence = zeros(int((trial_duration-token_duration)*fs))
 
     # Generate the sequence of pips
-    for i in range(5):
+    for i in range(50):
         n_ramp = 2
         tone = cos2taper(Tone(duration=token_duration, fs=fs).signal, n_ramp)
         signal_sequence.append(tone)

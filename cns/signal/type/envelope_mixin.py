@@ -3,6 +3,8 @@ from enthought.traits.api import HasTraits, Property, CFloat, Range, Enum, \
 import logging
 log = logging.getLogger(__name__)
 
+from cns.signal.util import generate_ramp, generate_envelope
+
 import numpy as np
 
 class EnvelopeMixin(HasTraits):
@@ -42,7 +44,7 @@ class AMMixin(EnvelopeMixin):
             return 1
 
     def _get_phase_corr(self):
-        if self.phase_correction:
+        if self.phase_correction and self.env_depth != 0:
             z = 2/self.env_depth*self.power_corr-2/self.env_depth+1
             return np.arccos(z)
         else:

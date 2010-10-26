@@ -33,6 +33,7 @@ class PositiveController(ExperimentController):
                      'score_window_duration': 'circuit.score_dur_n', 
                      'reward_duration': 'circuit.reward_dur_n', 
                      'signal_offset_delay': 'circuit.sig_offset_del_n', 
+                     'spout_sensor': 'handler._apply_spout_sensor',
                      'spout_smooth_duration': 'circuit.spout_smooth_n', 
                      'timeout_duration': 'circuit.to_dur_n', 
                      'TTL_fs': 'circuit.TTL_nPer' }
@@ -103,8 +104,6 @@ class PositiveController(ExperimentController):
         #add_or_update_object(self.pump, self.model.exp_node, 'Pump')
         add_or_update_object(self.model.paradigm, self.model.exp_node, 'paradigm')
         add_or_update_object(self.model.data, self.model.exp_node, 'data')
-        #analyzed_node = get_or_append_node(self.model.data.store_node, 'Analyzed')
-        #add_or_update_object(self.model.analyzed, analyzed_node)
 
     #===========================================================================
     # Tasks driven by the slow and fast timers
@@ -132,43 +131,9 @@ class PositiveController(ExperimentController):
                    self.model.data.signal_TTL,
                    self.model.data.score_TTL,
                    self.model.data.reward_TTL,
-                   #self.model.data.trial_TTL,
                    self.model.data.response_TTL,
-                   #self.model.data.pump_TTL,
                    ]
         return int_to_TTL(len(targets), deinterleave(targets))
-
-    #@on_trait_change('fast_tick')
-    #def monitor_circuit(self):
-    #    self.pipeline.send(self.circuit.TTL.read().astype(np.int8))
-    #    self.model.data._generate_action_log()
-
-    #    # Process trial_end before trial_start to avoid potential race condition
-    #    # since trial_end algorithm depends on some variables processed by the
-    #    # trial_start block to determine what the "last" trial was.
-    #    if self.circuit.trial_end_idx.value > self.current_trial_end_idx:
-    #        self.current_trial_end_idx += 1
-
-    #        ts_start = self.circuit.trial_start_ts.value
-    #        ts_end = self.circuit.trial_end_ts.value
-    #        if self.current_trial == 1:
-    #            self.model.data.log_trial(ts_start, ts_end, 'GO')
-    #        else:
-    #            self.model.data.log_trial(ts_start, ts_end, 'NOGO')
-
-    #    if self.circuit.trial_start_idx.value > self.current_trial_start_idx:
-    #        self.current_trial_start_idx += 1
-    #        self.current_trial += 1
-
-    #        if self.current_trial == self.current_num_nogo + 2:
-    #            self.current_num_nogo = self.choice_num_nogo()
-    #            self.current_trial = 1
-    #        if self.current_trial == self.current_num_nogo + 1:
-    #            self.circuit.trigger(2)
-
-    #        self.current_poke_dur = self.choice_poke_dur()
-    #        self.circuit.poke_dur_n.set(self.current_poke_dur, 's')
-    #        self.circuit.trigger(1)
 
     @on_trait_change('fast_tick')
     def monitor_circuit(self):
@@ -189,8 +154,6 @@ class PositiveController(ExperimentController):
 
             if last_ttype == 'NOGO' and self.current_repeat_FA:
                 if self.model.data.trial_log[-1][3] == 'SPOUT':
-                #if self.model.data.trial_log[0][3] == 'SPOUT':
-                    # Gerbil false alarmed, add NOGO trial
                     log.debug("FA detected, adding a NOGO trial")
                     self.current_num_nogo += 1
 
@@ -251,6 +214,12 @@ class PositiveController(ExperimentController):
         signal = self.model.paradigm.nogo_signal
         self.circuit.nogo_buf.set(signal)
         self.backend.set_attenuation(signal.attenuation, 'PA5')
+
+    def _apply_spout_sensor(self, value):
+        if value == 'touch':
+            self.circuit.contact_method.value = 0
+        else:
+            self.circuit.contact_method.value = 1
 
     def log_event(self, ts, name, value):
         pass
