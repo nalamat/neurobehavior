@@ -1,28 +1,29 @@
 from enthought.pyface.api import error
-from cns.data.ui.cohort import CohortViewHandler
+from cns.data.ui.cohort import CohortView, CohortViewHandler, animal_editor
 from cns.data import persistence
 from cns.data.h5_utils import get_or_append_node
 import sys
 import tables
 from enthought.traits.api import Any, Trait, TraitError
+from enthought.traits.ui.api import View, Item
 
 import logging
 log = logging.getLogger(__name__)
 
+from .experiment.aversive_experiment import AversiveFMExperiment
+from .experiment.aversive_experiment import AversiveExperiment
+from .experiment.positive_experiment import PositiveExperiment
+
+
 class ExperimentLauncher(CohortViewHandler):
 
     last_paradigm = Trait(None, Any)
-    experiment = Any
 
     def init(self, info):
         if not self.load_file(info):
             sys.exit()
 
-    def object_dclicked_changed(self, info):
-        if info.initialized:
-            self.run_experiment(info)
-
-    def run_experiment(self, info):
+    def launch_experiment(self, info, selected, etype):
         '''
         Runs specified experiment type.  On successful completion of an
         experiment, marks the animal as processed and saves the last paradigm
@@ -30,7 +31,8 @@ class ExperimentLauncher(CohortViewHandler):
         paradigm will not be saved.
         '''
         try:
-            item = info.object.selected
+            #item = info.object.selected
+            item = selected
             if item.store_node._v_isopen:
                 animal_node = item.store_node
             else:
@@ -46,7 +48,7 @@ class ExperimentLauncher(CohortViewHandler):
                 log.debug('No prior paradigm found.  Creating new paradigm.')
                 paradigm = None
                 
-            model = self.experiment(store_node=store_node, animal=item)
+            model = etype(store_node=store_node, animal=item)
             
             try:
                 if paradigm is not None:
@@ -88,18 +90,17 @@ class ExperimentLauncher(CohortViewHandler):
             """
             error(info.ui.control, str(e) + '\n\n' + dedent(mesg))
 
-from .experiment.aversive_experiment import AversiveFMExperiment
-from .experiment.aversive_experiment import AversiveExperiment
-from .experiment.positive_experiment import PositiveExperiment
+    def launch_appetitive(self, info, selected):
+        self.launch_experiment(info, selected[0], PositiveExperiment)
 
-experiment_map = {'appetitive': PositiveExperiment,
-                  'aversive': AversiveExperiment,
-                  'aversiveFM': AversiveFMExperiment }
+    def launch_aversive_generic(self, info, selected):
+        self.launch_experiment(info, selected[0], AversiveExperiment)
 
-def load_experiment_launcher(etype):
-    from cns.data.ui.cohort import CohortView
-    handler = ExperimentLauncher(experiment=experiment_map[etype])
-    CohortView().configure_traits(view='detailed_view', handler=handler)
+    def launch_aversive_fm(self, info, selected):
+        self.launch_experiment(info, selected[0], AversiveFMExperiment)
+
+def load_experiment_launcher():
+    CohortView().configure_traits(view='detailed_view', handler=ExperimentLauncher())
 
 def test_experiment(etype):
     import tables

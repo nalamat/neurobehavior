@@ -5,18 +5,19 @@ Positive Behavior Paradigm
 Equipment configuration
 =======================
 
-====== ======== ======= ========= ======
-RX6 ID Bit Mask PP24 ID Direction Signal
-====== ======== ======= ========= ======
-0      1        1       OUT       Sync Trigger
-1      2        2       IN        Electrical contact 1 (spout)
-2      4        3       OUT       LED
-3      8        4       IN        Optical 1 (nose poke)
-4      16       5       OUT       
-5      32       6       IN        
-6      64       7       OUT       Pump trigger
-7      128      8       IN        
-====== ======== ======= ========= ======
+========= ======== ======= ========= ======
+RX6 ID    Bit Mask PP24 ID Direction Signal
+========= ======== ======= ========= ======
+Bit 0     1        A1      OUT       Sync Trigger
+Bit 1     2        A2      IN        Electrical contact 1 (spout)
+Bit 2     4        A3      OUT       LED
+Bit 3     8        A4      IN        Optical 1 (nose poke)
+Bit 4     16       A5      OUT       
+Bit 5     32       A6      IN        
+Bit 6     64       A7      OUT       Pump trigger
+Bit 7     128      A8      IN        
+Word 1.0  1        B8      OUT       
+========= ======== ======= ========= ======
 
 Experiment structure
 ====================

@@ -64,10 +64,6 @@ class Animal(HasTraits):
 
     def _get_name(self):
         return '%s %s' % (self.identifier.capitalize(), self.sex)
-
-    #def __cmp__(self, other):
-    #    return 
-    #    return cmp(self.name, other.name)
     
 class Cohort(HasTraits):
 
