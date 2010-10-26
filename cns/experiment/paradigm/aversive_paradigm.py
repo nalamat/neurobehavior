@@ -9,7 +9,15 @@ from enthought.traits.api import Button, on_trait_change, HasTraits, Any, Range,
     CFloat, Property, Instance, Trait, Int, Dict, Float, List, Bool, Enum, \
     DelegatesTo, Constant, Tuple
 from enthought.traits.ui.api import View, Item, VGroup, Include, \
-        CheckListEditor, InstanceEditor, TableEditor, ListColumn
+        CheckListEditor, InstanceEditor, TableEditor, ListColumn, \
+        ObjectColumn, TabularEditor
+
+from enthought.traits.ui.tabular_adapter import TabularAdapter
+
+
+class Foo(HasTraits):
+    x = Float(0)
+    y = Float(0)
 
 def row_factory(*args, **kw):
     return 0, 0
@@ -20,11 +28,23 @@ sequence_table = TableEditor(
         sort_model=False,
         #auto_add=True,
         #row_factory=row_factory,
+        show_toolbar=True,
         columns=[
             ListColumn(index=0, editable=True, label='parameter'),
             ListColumn(index=1, editable=True, label='duration')
+            #ObjectColumn(name='x'),
+            #ObjectColumn(name='y'),
             ]
         )
+
+class SequenceAdapter(TabularAdapter):
+
+    columns = ('parameter', 'duration')
+
+#sequence_table = TabularEditor(
+#        adapter=SequenceAdapter(),
+#        editable=True,
+#        )
 
 class BaseAversiveParadigm(Paradigm):
     '''Defines an aversive paradigm, but not the signals that will be used.
@@ -45,7 +65,7 @@ class BaseAversiveParadigm(Paradigm):
     aversive_sequence = List
 
     def _aversive_sequence_default(self):
-        return [[1, 0.15], [2, 0.32], [3, 0.44]]
+        return [[1.5, 0.15], [2, 0.32], [3, 0.44]]
     #pars = List(CFloat, [2000, 4000, 8000], minlen=1,
     #                    label='Parameters',
     #                    editor=ListAsStringEditor())
@@ -105,8 +125,10 @@ class BaseAversiveParadigm(Paradigm):
             show_border=True, 
             label='Parameters')
 
-    trial_group = VGroup(Item('min_safe', label='', invalid='err_num_trials'),
-                         Item('max_safe', label='', invalid='err_num_trials'),)
+    trial_group = VGroup(
+            Item('min_safe', label='', invalid='err_num_trials'),
+            Item('max_safe', label='', invalid='err_num_trials'),
+            )
 
     timing_group = VGroup(trial_group, 
                           'aversive_delay', 
