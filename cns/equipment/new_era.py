@@ -59,9 +59,9 @@ import os
 
 from enthought.etsconfig.etsconfig import ETSConfig
 from enthought.savage.traits.ui.svg_button import SVGButton
-from enthought.traits.api import CFloat, Constant, Instance, Bool, HasTraits, \
-        Any, Button
-from enthought.traits.ui.api import Controller, Item, HGroup, View
+from enthought.traits.api import Float, CFloat, Constant, Instance, Bool, HasTraits, \
+        Any, Button, Property, Trait
+from enthought.traits.ui.api import Controller, Item, HGroup, View, VGroup
 from cns.widgets import icons
 from enthought.pyface.timer.api import Timer
 from cns.equipment import EquipmentError
@@ -446,11 +446,11 @@ class PumpInterface(object):
         All commands are logged for debugging.
         '''
         self.ser.write(cmd + self.CR)
-        #log.debug('Sent %s to pump', cmd)
+        log.debug('Sent %s to pump', cmd)
         result = self.ser.readline(eol=self.ETX)
         if not result:
             raise PumpCommError('NR', cmd)
-        #log.debug('Pump returned raw response: %s' % result)
+        log.debug('Pump returned raw response: %s' % result)
         match = self._basic_response.match(result)
 
         if match.group('status') == 'A?':
@@ -649,30 +649,49 @@ class PumpController(Controller):
     def object_trigger_changed(self, info):
         self.iface.trigger = info.object.trigger
 
+SYRINGE_DATA = {
+        'B-D 10cc (plastic)': 14.43,
+        'B-D 20cc (plastic)': 19.05,
+        'B-D 30cc (plastic)': 21.59,
+        'B-D 60cc (plastic)': 26.59,
+        'Popper 20cc (glass)': 19.58,
+        }
+
 class Pump(HasTraits):
     '''Contains the pump settings.
     '''
-    rate = CFloat(0.3, label='Rate (mL/min)', store='attribute')
-    diameter = Constant(19.05, label='Syringe ID (mm)', store='attribute')
+    rate = CFloat(0.3, store='attribute')
     trigger = Constant('run_high', store='atribute')
 
-    #infused = CFloat(0)
-    #withdrawn = CFloat(0)
+    diameter = Property(depends_on='syringe')
+    syringe = Trait('B-D 60cc (plastic)', SYRINGE_DATA)
 
-    # \u0394 is the unicode character code for the Greek uppercase delta.
-    rate_incr = CFloat(0.025, label=u'\u0394 Rate (mL/min)', store='attribute')
+    def _get_diameter(self):
+        return self.syringe_
 
-    # Approximate volume of the tube connecting the pump to the lick spout
-    tube_volume = CFloat(4.0, label='Tube volume (mL)', store='attribute')
-    # Fastest (safe) rate at which we can fill the tube
-    fill_rate = CFloat(10.0, label='Tube fill rate (mL/min)', store='attribute')
+    rate_incr = Float(0.025, store='attribute')
 
-    traits_view = View(['handler.toolbar{}@', 'rate_incr', 'rate', '-'],
-                        handler=PumpController)
+    traits_view = View(
+            VGroup(
+                HGroup(
+                    Item('handler.toolbar', style='custom'),
+                    Item('syringe'),
+                    show_labels=False,
+                    ),
+                HGroup(
+                    Item('rate_incr', label=u'\u0394 Rate (mL/min)'),
+                    Item('rate', label='Rate (mL/min)'),
+                    ),
+                show_labels=False,
+                label='Pump Settings',
+                show_border=True,
+                ),
+            handler=PumpController)
 
 if __name__ == '__main__':
     try:
         pump = Pump()
         pump.configure_traits()
+        print pump.diameter
     except EquipmentError:
         print 'error'
