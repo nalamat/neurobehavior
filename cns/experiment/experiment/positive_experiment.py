@@ -2,9 +2,11 @@ from enthought.traits.api import HasTraits, Any, Instance, DelegatesTo, Int
 from enthought.traits.ui.api import View, Item, VGroup, HGroup, InstanceEditor,\
     VSplit, HSplit, TabularEditor, Group
 
-from cns.experiment.data.positive_data import PositiveData
-from cns.experiment.paradigm.positive_paradigm import PositiveParadigm
-from cns.experiment.controller.positive_controller import PositiveController
+from cns.experiment.data.positive_data import PositiveData, PositiveDataStage1
+from cns.experiment.paradigm.positive_paradigm import PositiveParadigm, \
+    PositiveParadigmStage1
+from cns.experiment.controller.positive_controller import PositiveController, \
+        PositiveControllerStage1
 
 from cns.widgets.views.channel_view import MultipleChannelView, \
         MultiChannelView, TTLChannelView
@@ -49,6 +51,50 @@ trial_log_table = TableEditor(
             TrialResponseColumn(index=3, label='response'),
             ]
         )
+
+class PositiveExperimentStage1(HasTraits):
+
+    animal = Any
+    store_node = Any
+    exp_node = Any
+
+    data = Instance(PositiveDataStage1)
+    paradigm = Instance(PositiveParadigmStage1, ())
+
+    contact_plot = Instance(TTLChannelView)
+
+    def _data_default(self):
+        return PositiveDataStage1(store_node=self.store_node)
+
+    def _data_changed(self):
+        view = TTLChannelView(
+                value_title='Contact Fraction',
+                value_min=0,
+                value_max=1,
+                interactive=False,
+                window=.5,
+                clean_data=True,)
+
+        lw = 4
+        view.add(self.data.spout_TTL, label='Spout Contact',
+                 decimate_mode='mean', color='black', line_width=lw)
+        view.add(self.data.override_TTL, label='Play Signal',
+                 decimate_mode='mean', color='red', line_width=lw)
+        view.add(self.data.pump_TTL, label='Water dispending',
+                 decimate_mode='mean', color='blue', line_width=lw)
+        self.contact_plot = view
+
+    traits_view = View(
+            HSplit(
+                VGroup(
+                    Item('handler.toolbar', style='custom'),
+                    Item('paradigm', style='custom'),
+                    ),
+                Item('contact_plot', style='custom', width=600, height=600),
+                ),
+            resizable=True,
+            close_result=False,
+            handler=PositiveControllerStage1)
 
 class PositiveExperiment(HasTraits):
 

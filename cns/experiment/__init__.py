@@ -1,3 +1,5 @@
+from enthought.etsconfig.api import ETSConfig
+ETSConfig.toolkit = 'qt4'
 from enthought.pyface.api import error
 from cns.data.ui.cohort import CohortView, CohortViewHandler, animal_editor
 from cns.data import persistence
@@ -13,7 +15,7 @@ log = logging.getLogger(__name__)
 from .experiment.aversive_experiment import AversiveFMExperiment
 from .experiment.aversive_experiment import AversiveExperiment
 from .experiment.positive_experiment import PositiveExperiment
-
+from .experiment.positive_experiment import PositiveExperimentStage1
 
 class ExperimentLauncher(CohortViewHandler):
 
@@ -105,7 +107,8 @@ def load_experiment_launcher():
 def test_experiment(etype):
     import tables
     test_file = tables.openFile('test.hd5', 'w')
-    experiment_map[etype](store_node=test_file.root).configure_traits()
+    #experiment_map[etype](store_node=test_file.root).configure_traits()
+    globals()[etype](store_node=test_file.root).configure_traits()
 
 if __name__ == '__main__':
     import sys

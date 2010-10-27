@@ -7,6 +7,7 @@ from cns.data.h5_utils import append_node, append_date_node, \
     get_or_append_node
 from cns.data.persistence import add_or_update_object
 from cns.experiment.data.positive_data import PositiveData
+from cns.experiment.data.positive_data import PositiveDataStage1
 from cns.experiment.paradigm.positive_paradigm import PositiveParadigm
 from datetime import timedelta, datetime
 from enthought.pyface.api import error
@@ -19,6 +20,56 @@ import time
 import numpy as np
 
 log = logging.getLogger(__name__)
+
+class PositiveControllerStage1(ExperimentController):
+
+    circuits = {'circuit': ('positive-behavior-stage1', 'RX6') }
+    circuit = Any
+    fast_tick = Event
+
+    parameter_map = {
+            'spout_sensor': 'handler._apply_spout_sensor',
+            'TTL_fs': 'circuit.TTL_nPer', }
+
+    def init_experiment(self, info):
+        super(PositiveControllerStage1, self).init_experiment(info)
+        exp_node = append_date_node(self.model.store_node,
+                pre='appetitive_stage1_date')
+        data_node = append_node(exp_node, 'data')
+        self.model.data = PositiveDataStage1(store_node=data_node)
+        self.model.exp_node = exp_node
+        self.circuit.TTL.initialize(src_type=np.int8, compression='decimated')
+        self.circuit.DAC1a.set(self.model.paradigm.signal)
+
+    def start_experiment(self, info):
+        self.circuit.start()
+        self.fast_timer = Timer(250, self.tick, 'fast')
+        self.state = 'running'
+
+    def stop_experiment(self, info):
+        #self.fast_timer.stop()
+        self.state = 'halted'
+
+    pipeline = Any
+
+    def _pipeline_default(self):
+        targets = [self.model.data.spout_TTL,
+                   self.model.data.override_TTL,
+                   self.model.data.pump_TTL, ]
+        return int_to_TTL(len(targets), deinterleave(targets))
+
+    @on_trait_change('fast_tick')
+    def monitor_circuit(self):
+        self.pipeline.send(self.circuit.TTL.read().astype(np.int8))
+
+    def _apply_spout_sensor(self, value):
+        if value == 'touch':
+            self.circuit.sensor.value = 0
+        else:
+            self.circuit.sensor.value = 2
+
+    def log_event(self, *args, **kw):
+        pass
 
 class PositiveController(ExperimentController):
     '''
@@ -219,7 +270,7 @@ class PositiveController(ExperimentController):
         if value == 'touch':
             self.circuit.contact_method.value = 0
         else:
-            self.circuit.contact_method.value = 1
+            self.circuit.contact_method.value = 2
 
     def log_event(self, ts, name, value):
         pass

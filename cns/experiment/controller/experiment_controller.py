@@ -5,7 +5,7 @@ from enthought.etsconfig.api import ETSConfig
 from enthought.pyface.api import error
 from enthought.savage.traits.ui.svg_button import SVGButton
 from enthought.traits.api import Enum, Int, Instance, Dict, on_trait_change, \
-    Property, Str, Button, Tuple
+    Property, Str, Button, Tuple, Any, Event
 from enthought.traits.ui.api import Controller, Handler, HGroup, Item, spring, \
     View
 from datetime import datetime, timedelta
@@ -150,6 +150,7 @@ class ExperimentController(Controller):
     >>> circuits = { 'circuit': ('positive-behavior-stage3', 'RX6') }
     """
     circuits = Dict(Str, Tuple(Str, Str))
+    backend = Any
 
     """Map of paradigm parameters with their corresponding circuit value (if
     applicable).  Value should be in the format circuit_name.tag_name where
@@ -160,6 +161,10 @@ class ExperimentController(Controller):
 
     start_time = Instance(datetime)
     time_elapsed = Property(Instance(timedelta), depends_on='slow_tick')
+
+    fast_timer = Any
+    slow_timer = Any
+    fast_tick = Event
 
     def init(self, info):
         '''Post-construction init.  Determines whether it is able to connect
