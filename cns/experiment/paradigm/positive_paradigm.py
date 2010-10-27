@@ -2,8 +2,28 @@ from cns.experiment.paradigm.paradigm import Paradigm
 from cns.signal.type import Tone, Noise
 from cns.signal.signal_dialog import SignalSelector
 from enthought.traits.api import Instance, Float, DelegatesTo, Int, Float, \
-        Bool, Enum
-from enthought.traits.ui.api import View, spring, VGroup
+        Bool, Enum, List
+from enthought.traits.ui.api import View, spring, VGroup, Item, InstanceEditor
+from cns.traits.ui.api import ListAsStringEditor
+
+class PositiveParadigmStage1(Paradigm):
+
+    selector = Instance(SignalSelector, {'allow_par': True})
+    pars = List(Float, [1], minlen=1, store='attribute')
+    signal = DelegatesTo('selector', store='child')
+    spout_sensor = Enum('touch', 'optical', store='attribute')
+    TTL_fs = Float(500, unit='fs', store='attribute')
+
+    traits_view = View(
+            'spout_sensor',
+            Item('pars', label='Parameters', editor=ListAsStringEditor()),
+            VGroup(
+                Item('selector', editor=InstanceEditor(view='popup_view'),
+                     style='custom', show_label=False),
+                #label='Signal',
+                #show_border=True,
+                ),
+            )
 
 class PositiveParadigm(Paradigm):
 
@@ -65,4 +85,4 @@ class PositiveParadigm(Paradigm):
                     )
 
 if __name__ == '__main__':
-    PositiveParadigm().configure_traits()
+    AppetitiveParadigmStage1().configure_traits()

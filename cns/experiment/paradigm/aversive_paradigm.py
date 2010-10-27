@@ -62,13 +62,13 @@ class BaseAversiveParadigm(Paradigm):
                       store='attribute')
 
     #aversive_sequence = List(List(Float, Float), label='Parameters')
-    aversive_sequence = List
+    #aversive_sequence = List
 
-    def _aversive_sequence_default(self):
-        return [[1.5, 0.15], [2, 0.32], [3, 0.44]]
-    #pars = List(CFloat, [2000, 4000, 8000], minlen=1,
-    #                    label='Parameters',
-    #                    editor=ListAsStringEditor())
+    #def _aversive_sequence_default(self):
+    #    return [[1.5, 0.15], [2, 0.32], [3, 0.44]]
+    pars = List(CFloat, [2000, 4000, 8000], minlen=1,
+                        label='Parameters',
+                        editor=ListAsStringEditor())
 
     par_remind = Float(1000, label='Remind parameter', store='attribute')
 
@@ -111,7 +111,7 @@ class BaseAversiveParadigm(Paradigm):
     # The views available
     #===========================================================================
     test_view = View(
-            Item('aversive_sequence', editor=sequence_table, style='custom'),
+            #Item('aversive_sequence', editor=sequence_table, style='custom'),
             resizable=True,
             height=400,
             width=400
@@ -121,7 +121,8 @@ class BaseAversiveParadigm(Paradigm):
             'par_remind', 
             'par_safe', 
             'par_order', 
-            Item('aversive_sequence', editor=sequence_table),
+            'pars',
+            #Item('aversive_sequence', editor=sequence_table),
             show_border=True, 
             label='Parameters')
 

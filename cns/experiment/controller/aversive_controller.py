@@ -84,6 +84,7 @@ class BaseAversiveController(ExperimentController):
 
         # Refresh experiment state
         self.current_par_remind = paradigm.par_remind
+        self.current_safe = paradigm.par_safe
         self.current_par = self.choice_par.next()
         self.current_num_safe = self.choice_num_safe.next()
         self.current_trial = 1
@@ -365,6 +366,11 @@ class AversiveFMController(BaseAversiveController):
 
     def _apply_signal_remind(self):
         self.circuit.depth.value = self.current_par_remind
+
+    def _apply_signal_safe(self):
+        print self.current_safe
+        if self.current_safe != 0:
+            raise ValueError, 'Safe parameter must be 0!'
 
     def _apply_attenuation(self, value):
         self.backend.set_attenuation(value, 'PA5')

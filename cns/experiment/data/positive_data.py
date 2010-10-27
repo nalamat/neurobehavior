@@ -17,6 +17,31 @@ def apply_mask(fun, seq, mask):
 
 LOG_DTYPE = [('timestamp', 'i'), ('name', 'S64'), ('value', 'S128'), ]
 
+class PositiveDataStage1(ExperimentData):
+
+    contact_fs = Float(500.0)
+
+    def _create_channel(self, name, dtype):
+        contact_node = get_or_append_node(self.store_node, 'contact')
+        return FileChannel(node=contact_node, fs=self.contact_fs,
+                           name=name, dtype=dtype)
+
+    override_TTL = Instance(FileChannel, 
+            store='channel', store_path='contact/override_TTL')
+    spout_TTL = Instance(FileChannel, 
+            store='channel', store_path='contact/spout_TTL')
+    pump_TTL = Instance(FileChannel, 
+            store='channel', store_path='contact/pump_TTL')
+
+    def _override_TTL_default(self):
+        return self._create_channel('override_TTL', np.bool)
+
+    def _spout_TTL_default(self):
+        return self._create_channel('spout_TTL', np.bool)
+
+    def _pump_TTL_default(self):
+        return self._create_channel('pump_TTL', np.bool)
+
 class PositiveData_0_1(ExperimentData):
 
     version = Float(0.0)

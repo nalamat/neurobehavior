@@ -446,11 +446,11 @@ class PumpInterface(object):
         All commands are logged for debugging.
         '''
         self.ser.write(cmd + self.CR)
-        log.debug('Sent %s to pump', cmd)
+        #log.debug('Sent %s to pump', cmd)
         result = self.ser.readline(eol=self.ETX)
         if not result:
             raise PumpCommError('NR', cmd)
-        log.debug('Pump returned raw response: %s' % result)
+        #log.debug('Pump returned raw response: %s' % result)
         match = self._basic_response.match(result)
 
         if match.group('status') == 'A?':
