@@ -1,0 +1,10 @@
+glob:.bzr
+glob:*.h5
+glob:*.pyc
+glob:*.asv
+glob:*.log
+glob:*.*~
+glob:*.swp
+glob:doc/_build/*
+glob:doc/*.idx
+glob:doc/*.aux
