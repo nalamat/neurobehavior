@@ -8,40 +8,97 @@ from numpy import inf, nan, pi, sin, cos, divide, random, linspace, ones
 ################################################################################
 def t(fs, duration):
     '''
+    Generate time vector for computing signal waveform.
+
+    Parameters
+    ----------
+    fs : number (Hz)
+        sampling frequency
+    duration : (s)
+        duration of vector
+
+    Returns
+    -------
+    array [fs**-1, 2*fs**-1 ... duration]
+
     Due to strange boundary effects occuring at zero in some of the block
     computations (particularly when we are normalizing an array of frequencies
-    in a tone block), we always start t at the *first* sample.
+    in a tone block), we always start at at the *first* sample.
     '''
     return linspace(fs**-1, duration, fs*duration)
 
 def convert(value, src_unit, req_unit):
+    '''
+    Convert value to desired unit.
 
-    def radians_to_degrees(radians):
-        return radians/(2*pi)*360.
+    Parameters
+    ----------
+    value : number
+        value to be converted
+    src_unit : string
+        unit of value
+    req_unit : string
+        unit to convert value to
+    
+    Right now this is a fairly "dumb" implementation that does not factor in the
+    possible need for using other paramters to cmplete the conversion.  However,
+    it's not clear to me this is a valid use case at the moment.  We will not
+    put any effort into implementing it.
 
-    def degrees_to_radians(degrees):
-        return 2*pi*degrees/360.
-
-    def Hz_to_period(Hz):
-        return Hz**-1
-
-    def period_to_Hz(period):
-        return period**-1
+    Examples
+    --------
+    >>> convert(2.5, 's', 'ms')
+    2500
+    >>> convert(1000, 'Hz', 'period')
+    0.001
+    >>> convert(convert(1000, 'Hz', 'period'), 's', 'ms')
+    1.0
+    '''
+    map = {
+        ('s', 'ms')             : lambda s: s*1e3,
+        ('s', 'us')             : lambda s: s*1e6,
+        ('ms', 's')             : lambda s: s*1e-3,
+        ('ms', 'us')            : lambda s: s*1e3,
+        ('us', 'ms')            : lambda s: s*1e-3,
+        ('us', 's')             : lambda s: s*1e-6,
+        ('radians', 'degrees')  : lambda radians: radians/(2.*pi)*360.,
+        ('degrees', 'radians')  : lambda degrees: 2.*pi*degrees/360.,
+        ('Hz', 'period')        : lambda Hz: Hz**-1,
+        ('period', 'Hz')        : lambda period: period**-1,
+    }
+    try:
+        return map[src_unit, req_unit](value)
+    except KeyError:
+        # Create a more informative error message than KeyError
+        raise ValueError('Conversion from %s to %s not supported', src_unit,
+                         req_unit)
 
 ################################################################################
 # Interface definitions
 ################################################################################
 class Parameter(object):
+    '''
+    Defines a block parameter
 
-    def __init__(self, lb=None, ub=None, warn_lb=None, warn_ub=None, units=None,
-                 label=None):
-        # TODO: units check seems a bit klunky
+    Properties
+    ----------
+    valid_bounds : tuple
+        Require that value be in the range [lower, upper)
+    warn_bounds : tuple
+        Warn if value falls outside the range [lower, upper)
+    units : string or list of strings
+        Valid units for the parameter, first in sequence is the default
+    '''
+    # TODO: Needs a bit mor ethinking through
+
+    def __init__(self, source, default, valid_bounds, warn_bounds, units=None):
         if type(units) == str:
             units = (units,)
         if units is not None:
             default_unit = units[0]
         else:
             default_unit = None
+
         self.__dict__.update(locals())
 
     def set(self, value, unit=None):
@@ -61,11 +118,39 @@ class Parameter(object):
         #return ones(len(t))*self.get(unit)
         return self.get(unit)
 
+    def validate(self, fs):
+        '''
+        Given the samping frequency, ensure that the parameter is valid.
+        '''
+        # TODO: we may need to consider fleshing out the context to include
+        # additional edge cases; however, I think fs is the only special case
+        # right now that we need.
+        context = {'fs': fs}
+        lb, ub = self.valid_bounds
+        if type(lb) == type(''):
+            lb = eval(lb, context)
+        if type(ub) == type(''):
+            ub = eval(ub, context)
+
+        raise NotImplementedException
+
+    def warn(self, fs):
+        raise NotImplementedException
+
 ################################################################################
 # Interface definitions
 ################################################################################
 class Block(object):
     # TODO: add validation and warning checks of parameters
+
+    def _get_parameters(self):
+        return [v for v in self.__dict__.values() if isinstance(v, Parameter)]
+
+    parameters = Property(_get_parameters)
+
+    def validate(self):
+        for p in self.parameters:
+
 
     def __init__(self, **kw):
         '''
@@ -164,7 +249,7 @@ class Experiment(Block):
         for i in range(set_reps):
             n = len(final)
             trial_triggers.extend([t+n for t in trial_triggers[:trial_reps]])
-            set_triggers.append(n)
+            set_triggers.append(n)inf
             final.extend(set)
             final.extend(int_set_waveform)
 
@@ -177,22 +262,23 @@ class Experiment(Block):
 ################################################################################
 class Tone(Carrier):
 
-    frequency = Parameter(0, 300, None, '0.5*fs**-1', 'Hz') 
-    amplitude = Parameter(0, 0.01, 5, 10, 'V')
-    phase     = Parameter(-inf, 0, 2*pi, inf, ('radians', 'degrees'))
+    frequency = Parameter(1000, (0, '0.5*fs**-1'), (300, None), 'Hz') 
+    amplitude = Parameter(1, (0, 10), (0.01, 5), 'V')
+    phase     = Parameter(0, (-inf, inf), (0, 2*pi), ('radians', 'degrees'))
+
+    warnings  = []
+    errors    = []
 
     def __call__(self, t, fs):
-        ''' To modulate frequency, we must transform the instantaneous frequency
-        into the instantaneous phase of the signal.  For a fixed-frequency tone,
-        the phase increases at a constant rate. Of note, the integral of an
-        array The instantaneous phase of a modulated waveform can be computed by
-        the integral.  We need to factor out the time domain as well.
-
-        TODO: Implement special case for phase modulation.  Amplitude modulation
-        should not require any adjustment.  
-        '''
+        # To modulate frequency, we must transform the instantaneous frequency
+        # into the instantaneous phase of the signal.  For a fixed-frequency tone,
+        # the phase increases at a constant rate. Of note, the integral of an
+        # array The instantaneous phase of a modulated waveform can be computed by
+        # the integral.  We need to factor out the time domain as well.
         frequency = self.frequency(t, fs, 'Hz').cumsum()*(fs**-1)/t
         amplitude = self.amplitude(t, fs, 'V')
+        # TODO: Implement special case for phase modulation.  Amplitude
+        # modulation should not require any adjustment.  
         phase     = self.phase(t, fs, 'radians')
         return amplitude*sin(2*pi*frequency*t+phase)
 
@@ -257,14 +343,32 @@ class Noise(Carrier):
 ################################################################################
 # Operation Blocks
 ################################################################################
+class Constant(Operation):
+    '''
+    Note that in general this block should be implied (i.e. we should not be
+    required to wire this block to each parameter to set their value.  However,
+    this is a block that can be placed on the flowchart if desired.  This is
+    useful for cases where we need to ensure two parameters are equal (by directly
+    linking this block to the parameters) or enforce a mathematical relationship
+    between several parameters (via an eval operation).
+    '''
+    value    = Parameter()
 
-import unittest
+    def __call__(self, t, fS):
+        return self.value.get(t, fs)
 
-class TestTone(unittest.TestCase):
+class Sinusoid(Operation):
+    pass
 
-    def setUp(self):
-        self.block = Tone(frequency=1e3, amplitude=1, phase=0)
+class Trapezoid(Operation):
+    pass
 
+class Triangle(Trapezoid):
+    pass
+
+################################################################################
+# Demo functions
+################################################################################
 def test_tone():
     fs = 1e3
     ts = t(fs, 10)

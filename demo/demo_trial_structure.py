@@ -4,7 +4,27 @@ import numpy as np
 from pylab import subplot, show, fill_between, title, plot, gcf, axvline, axis
 from scipy.signal import iirfilter, filtfilt
 
-fs = 50000 # samples per second
+def cos2ramp(n):
+    return np.sin(np.linspace(0, np.pi / 2., n)) ** 2
+
+def cosramp(n):
+    return np.sin(np.linspace(0, np.pi / 2., n))
+
+def linramp(n):
+    return np.arange(n, dtype='f') / n
+
+def generate_envelope(n, ramp_n):
+    '''
+    Generate envelope
+    '''
+    #ramp = generate_ramp(ramp_type, ramp_n)
+    ramp = cos2ramp(ramp_n)
+    return np.r_[ramp, np.ones(n-2*ramp_n), ramp[::-1]]
+
+def cos2taper(waveform, ramp_n):
+    return waveform * generate_envelope(len(waveform), ramp_n)
+
+fs = 1000 # samples per second
 
 def generate_waveform(waveform, trial_dur, trial_env_dur, int_trial_dur,
                       trial_reps, int_set_dur, set_reps):
@@ -99,17 +119,15 @@ def env(n, ramp):
 def sin_mod(t, offset, depth, frequency, phase):
     return depth*np.sin(2*np.pi*frequency*t+phase)+offset
 
-#def fm(t, amplitude, fc, depth, pc, fm, pm):
-#    return amplitude*np.sin(2*np.pi*fc*t+depth/fm*np.cos(2*np.pi*fm*t+pm)+pc)
+def fm(t, amplitude, fc, depth, pc, fm, pm):
+    return amplitude*np.sin(2*np.pi*fc*t+depth/fm*np.cos(2*np.pi*fm*t+pm)+pc)
 
-#def tone(t, amplitude, frequency, phase):
-#    try:
-#        frequency = frequency.cumsum()*(fs**-1)/t
-#    except:
-#        pass
-#    return amplitude*np.sin(2*np.pi*frequency*t+phase)
-
-def assert
+def tone(t, amplitude, frequency, phase):
+    try:
+        frequency = frequency.cumsum()*(fs**-1)/t
+    except:
+        pass
+    return amplitude*np.sin(2*np.pi*frequency*t+phase)
 
 def sin_mod_op(t, waveform, frequency, phase, depth):
     mod_wave = depth/2.*np.sin(2*np.pi*frequency*t+phase)+depth/2.
@@ -129,12 +147,6 @@ def cos2env(waveform, ramp_dur, env_dur):
 
 def add(*waveforms):
     return np.c_[waveforms].sum(axis=1)
-
-class Delay(Block):
-
-    def __init__(self, duration):
-
-    def duration(
 
 def delay(waveform, dur):
     n = dur*fs
