@@ -13,6 +13,17 @@ The code is structured into several folders:
         folder.  For example, if the CNS folder lives at
         /home/brad/neurobehavior/cns, then set PYTHONPATH to
         /home/brad/neurobehavior.
+
+        channel
+            TODO
+        equipment
+            Collection of hardware interface modules (including TDT DSP and
+            syringe pump)
+        experiment
+            Experiment paradigms, controllers and data storage/analysis
+        signal
+            Signal generation
+            
     app
         This contains short scripts that are designed to load the appropriate
         modules and launch GUI experiments.
@@ -172,7 +183,7 @@ However, one key difference is you often declare class properties in the
 definition of a "Traited" class and tack on metadata about these class
 properties.  This metadata is used by functions that generate the GUI for each
 class.  I also wrote some functions to take advantage of the metadata available
-for saving the class to a HDF5 file (see `cns.data.persistence` for more
+for saving the class to a HDF5 file (see :module:`cns.data.persistence` for more
 information).
 
 Be sure to work your way through some of the examples provided in the Traits

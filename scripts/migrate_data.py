@@ -7,8 +7,7 @@ function scans the file for data stored in RawAversiveData_v0_1 format and
 converts it to a format suitable for loading into RawAversiveData_v0_2
 structures.
 
-Repair functions must be run in a very specific order that's listed in the tuple
-below.
+Repair functions must be run in a very specific order defined by cleanup.
 '''
 
 import tables
@@ -34,7 +33,7 @@ def fix_node_class(node):
 def fix_node_time(node):
     '''
     Fix missing start_time, stop_time and duration attribute.  Depends on
-    new-style contact data.
+    new-style contact data, so be sure to run fix_node_contact first.
     '''
     from cns.data.h5_utils import extract_date_from_name
     from cns.data import persistence
@@ -43,8 +42,7 @@ def fix_node_time(node):
     if node._v_name.startswith('aversive_date_'):
         try: 
             node.Data._v_attrs.start_time
-        except:
-            start_time = extract_date_from_name(node, pre='aversive_date_')
+        except: start_time = extract_date_from_name(node, pre='aversive_date_')
             try:
                 fs = node.Data.contact.trial_running._v_attrs.fs
                 ts = node.Data.trial_log[-1][0]
@@ -121,6 +119,15 @@ def move_experiment_nodes(node):
                 child._f_move(newparent=newparent)
 
 def fix_node_names(node):
+    '''
+    Prior to the addition of the appetitive paradigm, all experiments were
+    stored in nodes named "date_*".  We are now changing this approach to label
+    the node as "aversive_date_*" or "appetitive_date_*".
+
+    Likewise, we are renaming AversiveData to Data and AversiveParadigm_0 to
+    Paradigm (since the experiment node now indicates the experiment type) 
+    '''
+
     import re 
 
     if re.match('^date(\d+)', node._v_name):
@@ -136,12 +143,20 @@ def fix_node_names(node):
         node._f_move(newname='Paradigm')
 
 def move_analyzed_nodes(node):
+    '''
+    I decided to change the structure of the experiment, so analyzed nodes need
+    to be under the data node (since there can be multiple analyses of the same
+    dataset.
+    '''
 
     if node._v_pathname.endswith('Data/AnalyzedAversiveData_0'):
         newparent = node._v_parent._v_pathname + '/Analyzed'
         node._f_move(newparent=newparent, createparents=True)
 
 def fix_node_attr_names(node):
+    '''
+    Renaming several node attributes so naming is more consistent.
+    '''
 
     if hasattr(node, '_v_children'):
         if 'trial_log' in node._v_children and len(node.trial_log.cols) == 3:
@@ -154,6 +169,14 @@ def fix_node_attr_names(node):
     if 'total_trials' in node._v_attrs:
         print 'Renaming total_trials'
         node._v_attrs._f_rename('total_trials', 'warn_trial_count')
+
+def fix_pump_rate(node):
+    '''
+    The syringe diameter was incorrectly set to 19.05 mm.  It should be set to 
+    '''
+    if node._v_name.startswith('aversive_date_'):
+        start_time = persistence.strptime(node.Data._v_attrs.start_time)
+        start_time =
 
 cleanup = (move_experiment_nodes,
            move_analyzed_nodes,
