@@ -184,32 +184,6 @@ class PumpInterface(object):
                             'W(?P<withdraw>[\.0-9]+)' + \
                             '(?P<units>[MLU]{2})')
 
-    class Map(object):
-        '''Helper class that allows us to do specify human-readable names and
-        the corresponding machine code.  When __getitem__ is called, it will
-        inspect both the human-readable name and machine code name until it
-        finds a match.  It returns the "partner" of that match (e.g. if it
-        matches the human-readable name, it will return the machine code that
-        corresponds to the human-readable name.
-
-        Note that __init__ and __getitem__ are special classmethods.  See Python
-        documentation for more information about these.
-        '''
-
-        def __init__(self, **kw):
-            self.map = kw
-
-        def __getitem__(self, item):
-            for a, b in self.map.items():
-                if a.upper() == item.upper(): return b
-                elif b.upper() == item.upper(): return a
-            raise KeyError, item
-
-    # These are unique one-way maps between the RS-232 command codes and a more
-    # human-readable code that we can use in our programs.
-    _direction = Map(infuse='INF', withdraw='WDR', reverse='REV')
-    _trg = Map(start='St', run_high='LE')
-
     # Startup sequence that ensures pump is always in an expected state.
     _connect_seq = [
             # Pump baudrate must match connection baudrate otherwise we won't be
@@ -277,7 +251,6 @@ class PumpInterface(object):
     def disconnect(self):
         for cmd in self._disconnect_seq:
             self.xmit(cmd)
-        #self.ser.close()
 
     def run(self, **kw):
         '''Sets the appropriate properties of the pump and starts running.  This
@@ -295,7 +268,6 @@ class PumpInterface(object):
             setattr(self, k, v)
         if self.cur_status not in 'IW':
             self.start()
-            #self.xmit('RUN')
 
     def run_if_TTL(self, **kw):
         '''In contrast to `run`, the state of the TTL is inspected.  If the TTL is
@@ -349,10 +321,21 @@ class PumpInterface(object):
     # to pump._set_trigger('start').
 
     def _set_trigger(self, trg):
-        self.xmit('TRG %s' % self._trg[trg])
+        if trg == 'start':
+            self.xmit('TRG St')
+        elif trg == 'run_high':
+            self.xmit('TRG LE')
+        else:
+            raise PumpCommError('', 'TRG')
 
     def _get_trigger(self):
-        return self._trg[self.xmit('TRG')]
+        trig = self.xmit('TRG')
+        if trig == 'St':
+            return 'start'
+        elif trig == 'LE':
+            return 'run_high'
+        else:
+            raise PumpCommError('', 'TRG')
 
     def _set_volume(self, volume):
         self.xmit('VOL %0.2f' % volume)
@@ -365,12 +348,22 @@ class PumpInterface(object):
 
     def _get_direction(self):
         dir = self.xmit('DIR')
-        if dir == 'INF': return 'infuse'
-        elif dir == 'WDR': return 'withdraw'
-        else: raise PumpCommError('', 'DIR')
+        if dir == 'INF': 
+            return 'infuse'
+        elif dir == 'WDR': 
+            return 'withdraw'
+        else: 
+            raise PumpCommError('', 'DIR')
 
     def _set_direction(self, direction):
-        return self.xmit('DIR %s' % self._direction[direction])
+        if direction == 'withdraw':
+            return self.xmit('DIR WDR')
+        elif direction == 'infuse':
+            return self.xmit('DIR INF')
+        elif direction == 'reverse':
+            return self.xmit('DIR REV')
+        else:
+            raise PumpCommError('', 'DIR')
 
     def _set_rate(self, rate):
         # Units are UM MM UH MH.  First character indicates ul or ml, second
@@ -472,134 +465,135 @@ class PumpInterface(object):
         self.cur_status = match.group('status')
         return match.group('data')
 
-class PumpToolBar(HasTraits):
-    '''Toolbar containing command buttons that allow us to control the pump via
-    a GUI.  Three basic commands are provided: increase rate, decrease rate, and
-    override the TTL input (so pump continuously infuses).  There are two
-    additional commands, intialize and shutdown, which essentially infuse or
-    withdraw, respectively, a fixed volume.  This would be used at the start or
-    end of an experiment to fill the tube or drain it.  However, we do not
-    include buttons for these on the toolbar to prevent the user from
-    accidentally clicking on them during an experiment!
-    '''
+#class PumpToolBar(HasTraits):
+#    '''
+#    Toolbar containing command buttons that allow us to control the pump via
+#    a GUI.  Three basic commands are provided: increase rate, decrease rate, and
+#    override the TTL input (so pump continuously infuses).  There are two
+#    additional commands, intialize and shutdown, which essentially infuse or
+#    withdraw, respectively, a fixed volume.  This would be used at the start or
+#    end of an experiment to fill the tube or drain it.  However, we do not
+#    include buttons for these on the toolbar to prevent the user from
+#    accidentally clicking on them during an experiment!
+#    '''
+#
+#    handler = Any
+#
+#    # There are two primary backends for the GUI system we are using: QT4 and
+#    # WxWidgets.  WxWidgets has an ugly SVG button renderer, so we use
+#    # text-based buttons when  using WxWidgets.  When QT4 is the active backend,
+#    # we can use some pretty-looking SVG buttons (that show the toggle state).
+#    if ETSConfig.toolkit == 'qt4':
+#        kw = dict(height=18, width=18)
+#        increase = SVGButton(filename=icons.up, **kw)
+#        decrease = SVGButton(filename=icons.down, **kw)
+#        override = SVGButton(filename=icons.right2, tooltip='override',
+#                             toggle=True, **kw)
+#        #initialize  = SVGButton(filename=icons.first, **kw)
+#        #shutdown    = SVGButton(filename=icons.last, **kw)
+#        item_kw = dict(show_label=False)
+#    else:
+#        increase = Button('+')
+#        decrease = Button('-')
+#        override = Button('O')
+#        initialize = Button('I')
+#        shutdown = Button('W')
+#        item_kw = dict(width= -24, height= -24, show_label=False)
+#
+#    group = HGroup(Item('increase', **item_kw),
+#                   Item('decrease', **item_kw),
+#                   Item('override', **item_kw),
+#                   '_',
+#                   )
+#
+#    traits_view = View(group)
+#
+#    def _increase_fired(self, event):
+#        self.handler.do_increase(self.handler.info)
+#
+#    def _decrease_fired(self, event):
+#        self.handler.do_decrease(self.handler.info)
+#
+#    def _override_fired(self, event):
+#        # TODO: we should probably consider adding some code to update the look
+#        # of the override button when it's in text mode so the user has some
+#        # visual feedback that the pump is in 'override' mode.
+#        self.handler.do_toggle_override(self.handler.info)
+#
+#    def _initialize_fired(self, event):
+#        self.handler.do_initialize(self.handler.info)
+#
+#    def _shutdown_fired(self, event):
+#        self.handler.do_shutdown(self.handler.info)
 
-    handler = Any
-
-    # There are two primary backends for the GUI system we are using: QT4 and
-    # WxWidgets.  WxWidgets has an ugly SVG button renderer, so we use
-    # text-based buttons when  using WxWidgets.  When QT4 is the active backend,
-    # we can use some pretty-looking SVG buttons (that show the toggle state).
-    if ETSConfig.toolkit == 'qt4':
-        kw = dict(height=18, width=18)
-        increase = SVGButton(filename=icons.up, **kw)
-        decrease = SVGButton(filename=icons.down, **kw)
-        override = SVGButton(filename=icons.right2, tooltip='override',
-                             toggle=True, **kw)
-        #initialize  = SVGButton(filename=icons.first, **kw)
-        #shutdown    = SVGButton(filename=icons.last, **kw)
-        item_kw = dict(show_label=False)
-    else:
-        increase = Button('+')
-        decrease = Button('-')
-        override = Button('O')
-        initialize = Button('I')
-        shutdown = Button('W')
-        item_kw = dict(width= -24, height= -24, show_label=False)
-
-    group = HGroup(Item('increase', **item_kw),
-                   Item('decrease', **item_kw),
-                   Item('override', **item_kw),
-                   '_',
-                   )
-
-    traits_view = View(group)
-
-    def _increase_fired(self, event):
-        self.handler.do_increase(self.handler.info)
-
-    def _decrease_fired(self, event):
-        self.handler.do_decrease(self.handler.info)
-
-    def _override_fired(self, event):
-        # TODO: we should probably consider adding some code to update the look
-        # of the override button when it's in text mode so the user has some
-        # visual feedback that the pump is in 'override' mode.
-        self.handler.do_toggle_override(self.handler.info)
-
-    def _initialize_fired(self, event):
-        self.handler.do_initialize(self.handler.info)
-
-    def _shutdown_fired(self, event):
-        self.handler.do_shutdown(self.handler.info)
-
-class PumpController(Controller):
-
-    toolbar = Instance(PumpToolBar, args=())
-    iface = Instance(PumpInterface, args=())
-    override = Bool(False)
-    #monitor = Bool(True)
-    model = Any
-
-    #timer = Instance(Timer)
-
-    def init(self, info):
-        #self.iface.connect()
-        # This is what we call "installing the handler".  Essentially we are
-        # giving the GUI toolbar a reference to the handler so it can
-        # communicate user actions to the handler as needed.
-        self.toolbar.handler = self
-        self.model = info.object
-        self.iface = PumpInterface()
-            
-        #if self.monitor:
-        #    #self.timer = Timer(250, self.tick)
-        #    pass
-
-    #def tick(self):
-    #    self.model.infused = self.iface.infused
-    #    self.model.withdrawn = self.iface.withdrawn
-
-    #####################################################################
-    # Logic for processing of user actions
-    #####################################################################
-    def do_fill_tube(self, info):
-        self.iface.reset_volume()
-        self.iface.run(rate=info.object.fill_rate,
-                       volume=info.object.tube_volume,
-                       trigger='start')
-
-        while self.iface.infused < info.object.tube_volume:
-            time.sleep(0.25)
-
-        self.iface.reset_volume()
-        self.iface.volume = 0
-
-    def do_empty_tube(self, info):
-        self.iface.reset_volume()
-        self.iface.run(rate= -info.object.fill_rate,
-                       volume=info.object.tube_volume,
-                       trigger='start')
-
-        while self.iface.withdrawn < info.object.tube_volume:
-            time.sleep(0.25)
-
-        self.iface.reset_volume()
-        self.iface.volume = 0
-        self.trigger = 'run_high'
-
-    def do_toggle_override(self, info):
-        if self.iface.trigger == 'run_high':
-            self.iface.run(trigger='start')
-            self.override = True
-        else:
-            self.iface.run_if_TTL(trigger='run_high')
-            self.override = False
-
-    def do_increase(self, info):
-        info.object.rate += info.object.rate_incr
-
-    def do_decrease(self, info):
-        info.object.rate -= info.object.rate_incr
+#class PumpController(Controller):
+#
+#    toolbar = Instance(PumpToolBar, args=())
+#    iface = Instance(PumpInterface, args=())
+#    override = Bool(False)
+#    #monitor = Bool(True)
+#    model = Any
+#
+#    #timer = Instance(Timer)
+#
+#    def init(self, info):
+#        #self.iface.connect()
+#        # This is what we call "installing the handler".  Essentially we are
+#        # giving the GUI toolbar a reference to the handler so it can
+#        # communicate user actions to the handler as needed.
+#        self.toolbar.handler = self
+#        self.model = info.object
+#        self.iface = PumpInterface()
+#            
+#        #if self.monitor:
+#        #    #self.timer = Timer(250, self.tick)
+#        #    pass
+#
+#    #def tick(self):
+#    #    self.model.infused = self.iface.infused
+#    #    self.model.withdrawn = self.iface.withdrawn
+#
+#    #####################################################################
+#    # Logic for processing of user actions
+#    #####################################################################
+#    #def do_fill_tube(self, info):
+#    #    self.iface.reset_volume()
+#    #    self.iface.run(rate=info.object.fill_rate,
+#    #                   volume=info.object.tube_volume,
+#    #                   trigger='start')
+#
+#    #    while self.iface.infused < info.object.tube_volume:
+#    #        time.sleep(0.25)
+#
+#    #    self.iface.reset_volume()
+#    #    self.iface.volume = 0
+#
+#    #def do_empty_tube(self, info):
+#    #    self.iface.reset_volume()
+#    #    self.iface.run(rate= -info.object.fill_rate,
+#    #                   volume=info.object.tube_volume,
+#    #                   trigger='start')
+#
+#    #    while self.iface.withdrawn < info.object.tube_volume:
+#    #        time.sleep(0.25)
+#
+#    #    self.iface.reset_volume()
+#    #    self.iface.volume = 0
+#    #    self.trigger = 'run_high'
+#
+#    def do_toggle_override(self, info):
+#        if self.iface.trigger == 'run_high':
+#            self.iface.run(trigger='start')
+#            self.override = True
+#        else:
+#            self.iface.run_if_TTL(trigger='run_high')
+#            self.override = False
+#
+#    def do_increase(self, info):
+#        info.object.rate += info.object.rate_incr
+#
+#    def do_decrease(self, info):
+#        info.object.rate -= info.object.rate_incr
 
     #####################################################################
     # How changes to the model are handled
@@ -612,63 +606,55 @@ class PumpController(Controller):
     # object_rate_changed being called.  object_rate_change then tells
     # PumpInterface to update the rate.
 
-    def object_rate_changed(self, info):
-        self.iface.rate = info.object.rate
-        info.object.rate = self.iface.rate
+    #def object_rate_changed(self, info):
+    #    self.iface.rate = info.object.rate
+    #    info.object.rate = self.iface.rate
 
-    def object_diameter_changed(self, info):
-        self.iface.diameter = info.object.diameter
+    #def object_diameter_changed(self, info):
+    #    self.iface.diameter = info.object.diameter
 
-    def object_trigger_changed(self, info):
-        self.iface.trigger = info.object.trigger
+    #def object_trigger_changed(self, info):
+    #    self.iface.trigger = info.object.trigger
 
-SYRINGE_DATA = {
-        'B-D 10cc (plastic)': 14.43,
-        'B-D 20cc (plastic)': 19.05,
-        'B-D 30cc (plastic)': 21.59,
-        'B-D 60cc (plastic)': 26.59,
-        'Popper 20cc (glass)': 19.58,
-        }
+#class Pump(HasTraits):
+#    '''Contains the pump settings.
+#    '''
+#    rate = CFloat(0.3, store='attribute')
+#    trigger = Constant('run_high', store='atribute')
+#
+#    diameter = Property(depends_on='syringe')
+#    syringe = Trait('B-D 60cc (plastic)', SYRINGE_DATA)
+#
+#    def _get_diameter(self):
+#        return self.syringe_
+#
+#    rate_incr = Float(0.025, store='attribute')
+#
+#    traits_view = View(
+#            VGroup(
+#                HGroup(
+#                    Item('handler.toolbar', style='custom'),
+#                    Item('syringe'),
+#                    show_labels=False,
+#                    ),
+#                HGroup(
+#                    Item('rate_incr', label=u'\u0394 Rate (mL/min)'),
+#                    Item('rate', label='Rate (mL/min)'),
+#                    ),
+#                show_labels=False,
+#                label='Pump Settings',
+#                show_border=True,
+#                ),
+#            handler=PumpController)
 
-class Pump(HasTraits):
-    '''Contains the pump settings.
-    '''
-    rate = CFloat(0.3, store='attribute')
-    trigger = Constant('run_high', store='atribute')
-
-    diameter = Property(depends_on='syringe')
-    syringe = Trait('B-D 60cc (plastic)', SYRINGE_DATA)
-
-    def _get_diameter(self):
-        return self.syringe_
-
-    rate_incr = Float(0.025, store='attribute')
-
-    traits_view = View(
-            VGroup(
-                HGroup(
-                    Item('handler.toolbar', style='custom'),
-                    Item('syringe'),
-                    show_labels=False,
-                    ),
-                HGroup(
-                    Item('rate_incr', label=u'\u0394 Rate (mL/min)'),
-                    Item('rate', label='Rate (mL/min)'),
-                    ),
-                show_labels=False,
-                label='Pump Settings',
-                show_border=True,
-                ),
-            handler=PumpController)
-
-def main():
-    pump = Pump()
-    pump.configure_traits()
-    print pump.diameter
-
-if __name__ == '__main__':
-    import sys, cProfile
-    cProfile.run('main()', 'profile.dmp')
-    import pstats
-    p = pstats.Stats('profile.dmp')
-    p.strip_dirs().sort_stats('cumulative').print_stats(50)
+#def main():
+#    pump = Pump()
+#    pump.configure_traits()
+#    print pump.diameter
+#
+#if __name__ == '__main__':
+#    import sys, cProfile
+#    cProfile.run('main()', 'profile.dmp')
+#    import pstats
+#    p = pstats.Stats('profile.dmp')
+#    p.strip_dirs().sort_stats('cumulative').print_stats(50)

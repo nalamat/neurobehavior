@@ -11,7 +11,6 @@ from cns.experiment.data.positive_data import PositiveDataStage1
 from cns.experiment.paradigm.positive_paradigm import PositiveParadigm
 from datetime import timedelta, datetime
 from enthought.pyface.api import error
-from enthought.pyface.timer.api import Timer
 from enthought.traits.api import Any, Instance, CInt, CFloat, Str, Float, \
     Property, HasTraits, Bool, on_trait_change, Dict, Button, Event, Int
 from enthought.traits.ui.api import HGroup, spring, Item, View
@@ -19,48 +18,64 @@ import logging
 import time
 import numpy as np
 
+from .pump_controller_mixin import PumpControllerMixin
+
 log = logging.getLogger(__name__)
 
-class PositiveControllerStage1(ExperimentController):
+class PositiveControllerStage1(ExperimentController, PumpControllerMixin):
 
     circuits = {'circuit': ('positive-behavior-stage1', 'RX6') }
     circuit = Any
-    fast_tick = Event
 
     parameter_map = {
             'spout_sensor': 'handler._apply_spout_sensor',
-            'TTL_fs': 'circuit.TTL_nPer', }
+            'TTL_fs': 'circuit.TTL_nPer', 
+            'syringe_diameter': 'handler._apply_syringe_diameter',
+            'pump_rate': 'handler._apply_pump_rate', }
+
+    pipeline = Any
 
     def init_experiment(self, info):
         super(PositiveControllerStage1, self).init_experiment(info)
         exp_node = append_date_node(self.model.store_node,
-                pre='appetitive_stage1_date')
+                                    pre='appetitive_stage1_date_')
         data_node = append_node(exp_node, 'data')
         self.model.data = PositiveDataStage1(store_node=data_node)
         self.model.exp_node = exp_node
-        self.circuit.TTL.initialize(src_type=np.int8, compression='decimated')
+        self.circuit.TTL.initialize(src_type=np.int8)
         self.circuit.DAC1a.set(self.model.paradigm.signal)
 
-    def start_experiment(self, info):
-        self.circuit.start()
-        self.fast_timer = Timer(250, self.tick, 'fast')
-        self.state = 'running'
-
-    def stop_experiment(self, info):
-        #self.fast_timer.stop()
-        self.state = 'halted'
-
-    pipeline = Any
-
-    def _pipeline_default(self):
+        #self.pump.diameter = self.model.paradigm.syringe_diameter
         targets = [self.model.data.spout_TTL,
                    self.model.data.override_TTL,
                    self.model.data.pump_TTL, ]
-        return int_to_TTL(len(targets), deinterleave(targets))
+        self.pipeline = int_to_TTL(len(targets), deinterleave(targets))
 
-    @on_trait_change('fast_tick')
-    def monitor_circuit(self):
-        self.pipeline.send(self.circuit.TTL.read().astype(np.int8))
+    def start_experiment(self, info):
+        self.model.data.start_time = datetime.now()
+        self.circuit.start()
+        self.circuit.trigger(1)
+        self.state = 'running'
+
+    def resume(self, info):
+        self.circuit.trigger(1)
+        self.state = 'running'
+
+    def pause(self, info):
+        self.circuit.trigger(2)
+        self.state = 'paused'
+
+    def stop_experiment(self, info):
+        self.circuit.stop()
+        self.state = 'halted'
+        self.model.data.stop_time = datetime.now()
+        #add_or_update_object(self.pump, self.model.exp_node, 'Pump')
+        add_or_update_object(self.model.paradigm, self.model.exp_node, 'paradigm')
+        add_or_update_object(self.model.data, self.model.exp_node, 'data')
+
+    def tick(self):
+        data = self.circuit.TTL.read().astype(np.int8)
+        self.pipeline.send(data)
 
     def _apply_spout_sensor(self, value):
         if value == 'touch':
@@ -71,9 +86,7 @@ class PositiveControllerStage1(ExperimentController):
     def log_event(self, *args, **kw):
         pass
 
-class PositiveController(ExperimentController):
-    '''
-    '''
+class PositiveController(ExperimentController, PumpControllerMixin):
 
     circuits = { 'circuit': ('positive-behavior-stage3', 'RX6') }
     circuit = Any
@@ -87,12 +100,11 @@ class PositiveController(ExperimentController):
                      'spout_sensor': 'handler._apply_spout_sensor',
                      'spout_smooth_duration': 'circuit.spout_smooth_n', 
                      'timeout_duration': 'circuit.to_dur_n', 
-                     'TTL_fs': 'circuit.TTL_nPer' }
+                     'TTL_fs': 'circuit.TTL_nPer',
+                     'syringe_diameter': 'handler._apply_syringe_diameter',
+                     'pump_rate': 'handler._apply_pump_rate', }
     backend = Any
     circuit = Any
-    pump = Any
-
-    fast_timer = Instance(Timer)
 
     # A coroutine pipeline that acquires contact data from the RX6 and sends it
     # to the TrialData object
@@ -102,11 +114,11 @@ class PositiveController(ExperimentController):
 
     status = Property(Str, depends_on='state, current_trial, current_num_nogo')
 
-    fast_tick = Event
-
     def init_equipment(self, info):
         super(PositiveController, self).init_equipment(info)
-        self.pump = equipment.pump().Pump()
+        #self.pump = equipment.pump().Pump()
+
+    current_loop = Int
 
     current_trial_start_idx = Int
     current_trial_end_idx = Int
@@ -129,7 +141,7 @@ class PositiveController(ExperimentController):
         self.model.data = PositiveData(store_node=data_node)
         self.model.exp_node = exp_node
         
-        self.circuit.TTL.initialize(src_type=np.int8, compression='decimated')
+        self.circuit.TTL.initialize(src_type=np.int8)
         self._apply_go_signal()
         self._apply_nogo_signal()
         self.circuit.signal_dur_n.value = self.circuit.go_buf_n.value
@@ -137,8 +149,18 @@ class PositiveController(ExperimentController):
         self.current_trial_start_idx = 0
         self.current_trial_end_idx = 0
 
+        targets = [
+                self.model.data.poke_TTL,
+                self.model.data.spout_TTL,
+                self.model.data.signal_TTL,
+                self.model.data.score_TTL,
+                self.model.data.reward_TTL,
+                self.model.data.response_TTL,
+                   ]
+        self.pipeline = int_to_TTL(len(targets), deinterleave(targets))
+
     def start_experiment(self, info):
-        self.fast_timer = Timer(250, self.tick, 'fast')
+        self.current_loop = 0
         self.model.data.start_time = datetime.now()
         self.state = 'running'
         self.circuit.start()
@@ -146,7 +168,7 @@ class PositiveController(ExperimentController):
 
     def stop_experiment(self, info=None):
         self.state = 'halted'
-        self.fast_timer.stop()
+        #self.fast_timer.stop()
         self.circuit.stop()
         self.pending_changes = {}
         self.old_values = {}
@@ -159,8 +181,7 @@ class PositiveController(ExperimentController):
     #===========================================================================
     # Tasks driven by the slow and fast timers
     #===========================================================================
-    #@on_trait_change('fast_tick')
-    #def task_update_pump(self):
+    #def monitor_pump(self):
     #    self.water_infused = self.pump.infused
 
     def _get_status(self):
@@ -176,19 +197,13 @@ class PositiveController(ExperimentController):
         else:
             return base + 'GO'
             
-    def _pipeline_default(self):
-        targets = [self.model.data.poke_TTL,
-                   self.model.data.spout_TTL,
-                   self.model.data.signal_TTL,
-                   self.model.data.score_TTL,
-                   self.model.data.reward_TTL,
-                   self.model.data.response_TTL,
-                   ]
-        return int_to_TTL(len(targets), deinterleave(targets))
-
-    @on_trait_change('fast_tick')
-    def monitor_circuit(self):
+    def tick(self):
+        self.current_loop += 1
         self.pipeline.send(self.circuit.TTL.read().astype(np.int8))
+
+        if (self.current_loop % 5) == 0:
+            self.water_infused = self.pump.infused
+            # update status here
 
         if self.circuit.trial_end_idx.value > self.current_trial_end_idx:
             # Trial is over.  Process new data and set up for next trial.

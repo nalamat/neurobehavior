@@ -5,9 +5,10 @@ from enthought.etsconfig.api import ETSConfig
 from enthought.pyface.api import error
 from enthought.savage.traits.ui.svg_button import SVGButton
 from enthought.traits.api import Enum, Int, Instance, Dict, on_trait_change, \
-    Property, Str, Button, Tuple, Any, Event
+    Property, Str, Button, Tuple, Any, Event, List
 from enthought.traits.ui.api import Controller, Handler, HGroup, Item, spring, \
     View
+from enthought.pyface.timer.api import Timer
 from datetime import datetime, timedelta
 
 import logging
@@ -139,8 +140,8 @@ class ExperimentController(Controller):
     state = Enum('halted', 'paused', 'running', 'manual', 'disconnected',
                  'complete')
 
-    '''Number of experiments run before window is closed.'''
-    runs = Int(0)
+    #'''Number of experiments run before window is closed.'''
+    #runs = Int(0)
 
     """Dictionary of circuits to be loaded.  Keys correspond to the name the
     DSPCircuit object will be bound to on the controller.  Value is a tuple of
@@ -162,9 +163,7 @@ class ExperimentController(Controller):
     start_time = Instance(datetime)
     time_elapsed = Property(Instance(timedelta), depends_on='slow_tick')
 
-    fast_timer = Any
-    slow_timer = Any
-    fast_tick = Event
+    timer = Instance('enthought.pyface.timer.api.Timer')
 
     def init(self, info):
         '''Post-construction init.  Determines whether it is able to connect
@@ -223,9 +222,6 @@ class ExperimentController(Controller):
                       ref_name, value, unit)
             getattr(circuit, ref_name).set(value, unit)
 
-    def tick(self, speed):
-        setattr(self, speed + '_tick', True)
-
     def _get_time_elapsed(self):
         if self.state is 'halted':
             return timedelta()
@@ -256,11 +252,17 @@ class ExperimentController(Controller):
         try:
             self.init_experiment(info)
             self.start_experiment(info)
+            #self.timer_tick = 0
+            self.timer = Timer(250, self.tick)
         except BaseException, e:
             error(self.info.ui.control, str(e))
             raise
 
     def stop(self, info=None):
+        try:
+            self.timer.Stop()
+        except AttributeError:
+            self.timer.stop()
         self.stop_experiment(info)
         info.ui.view.close_result = True
         self.state = 'complete'
@@ -304,10 +306,10 @@ class ExperimentController(Controller):
             ts = self.circuit.ts_n.value
         except:
             ts = -1
+        print self.pending_changes
         for key, value in self.pending_changes.items():
             log.debug("Apply: setting %s to %r", key, value)
             object, name = key
-
             try:
                 getattr(self, '_apply_'+name)(value)
                 self.log_event(ts, name, value)
@@ -315,10 +317,9 @@ class ExperimentController(Controller):
                 try:
                     ref = self.parameter_map[name]
                     self.autoconfigure_dsp_tag(name, ref, self.model.paradigm)
-                except TypeError:
+                except KeyError:
                     log.warn("Can't set %s to %r", name, value)
                     log.warn("Removing this from the stack")
-
             del self.pending_changes[(object, name)]
             del self.old_values[(object, name)]
 

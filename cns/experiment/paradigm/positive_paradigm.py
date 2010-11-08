@@ -3,10 +3,13 @@ from cns.signal.type import Tone, Noise
 from cns.signal.signal_dialog import SignalSelector
 from enthought.traits.api import Instance, Float, DelegatesTo, Int, Float, \
         Bool, Enum, List
-from enthought.traits.ui.api import View, spring, VGroup, Item, InstanceEditor
+from enthought.traits.ui.api import View, spring, VGroup, Item, \
+    InstanceEditor, Include
 from cns.traits.ui.api import ListAsStringEditor
 
-class PositiveParadigmStage1(Paradigm):
+from .pump_settings_mixin import PumpSettingsMixin
+
+class PositiveParadigmStage1(Paradigm, PumpSettingsMixin):
 
     selector = Instance(SignalSelector, {'allow_par': True})
     pars = List(Float, [1], minlen=1, store='attribute')
@@ -17,6 +20,7 @@ class PositiveParadigmStage1(Paradigm):
     traits_view = View(
             'spout_sensor',
             Item('pars', label='Parameters', editor=ListAsStringEditor()),
+            Include('simple_pump_settings'),
             VGroup(
                 Item('selector', editor=InstanceEditor(view='popup_view'),
                      style='custom', show_label=False),
@@ -25,7 +29,7 @@ class PositiveParadigmStage1(Paradigm):
                 ),
             )
 
-class PositiveParadigm(Paradigm):
+class PositiveParadigm(Paradigm, PumpSettingsMixin):
 
     go_signal_selector = Instance(SignalSelector, dict(signal=Noise(duration=3,
                                                                     attenuation=20), 
@@ -64,7 +68,8 @@ class PositiveParadigm(Paradigm):
 
     TTL_fs = Float(500, unit='fs', store='attribute')
 
-    traits_view = View(VGroup('go_signal_selector{}@', 
+    traits_view = View(Include('simple_pump_settings'),
+                       VGroup('go_signal_selector{}@', 
                               'nogo_signal_selector{}@',),
                        'min_nogo',
                        'max_nogo',
@@ -85,4 +90,4 @@ class PositiveParadigm(Paradigm):
                     )
 
 if __name__ == '__main__':
-    AppetitiveParadigmStage1().configure_traits()
+    PositiveParadigmStage1().configure_traits()
