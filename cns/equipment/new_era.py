@@ -136,7 +136,7 @@ class PumpUnitError(Exception):
 try:
     import serial
     connection_settings = dict(port=0, baudrate=19200, bytesize=8, parity='N',
-            stopbits=1, timeout=1, xonxoff=0, rtscts=0, writeTimeout=1,
+            stopbits=1, timeout=.05, xonxoff=0, rtscts=0, writeTimeout=1,
             dsrdtr=None, interCharTimeout=None)
     SERIAL = serial.Serial(**connection_settings)
 except serial.SerialException, e:
@@ -175,8 +175,8 @@ class PumpInterface(object):
 
     # Response is in the format <STX><address><status>[<data>]<ETX>
     _basic_response = re.compile(STX + '(?P<address>\d+)' + \
-                                     '(?P<status>[IWSPTUX]|A\?)' + \
-                                     '(?P<data>.*)' + ETX)
+                                       '(?P<status>[IWSPTUX]|A\?)' + \
+                                       '(?P<data>.*)' + ETX)
 
     # Response for queries about volume dispensed.  Returns separate numbers for
     # infuse and withdraw.  Format is I<float>W<float><units>
@@ -437,7 +437,21 @@ class PumpInterface(object):
     # RS232 functions
     #####################################################################
 
-    def _basic_xmit(self, cmd):
+    def readline(self):
+        # PySerial v2.5 no longer supports the eol parameter, so we manually
+        # read byte by byte until we reach the line-end character.  Timeout
+        # should be set to a very low value as well.  A support ticket has been
+        # filed.
+        # https://sourceforge.net/tracker/?func=detail&atid=446302&aid=3101783&group_id=46487 
+        result = []
+        while 1:
+            last = self.ser.read(1)
+            result.append(last)
+            if last == self.ETX or last == '':
+                break
+        return ''.join(result)
+
+    def xmit(self, cmd):
         '''Takes command and formats it for transmission to the pump.  Inspects
         resulting response packet to see if the pump is operating within
         expected parameters.  If not, an error is raised, otherwise the data is
@@ -446,59 +460,17 @@ class PumpInterface(object):
         All commands are logged for debugging.
         '''
         self.ser.write(cmd + self.CR)
-        #log.debug('Sent %s to pump', cmd)
-        result = self.ser.readline(eol=self.ETX)
-        if not result:
-            raise PumpCommError('NR', cmd)
-        #log.debug('Pump returned raw response: %s' % result)
-        match = self._basic_response.match(result)
+        result = self.readline()
 
+        if result == '':
+            raise PumpCommError('NR', cmd)
+        match = self._basic_response.match(result)
         if match.group('status') == 'A?':
             raise PumpHardwareError(match.group('data'), cmd)
         elif match.group('data').startswith('?'):
             raise PumpCommError(match.group('data')[1:], cmd)
-
         self.cur_status = match.group('status')
         return match.group('data')
-
-    # At one point we were considering adding a _safe_xmit mode, however I got
-    # tired of trying to get it to work so I gave up.  I'm leaving this as-is in
-    # case we ever decide to revisit the issue.  The safe mode code is below but
-    # commented out.
-    xmit = _basic_xmit
-
-    # TODO: safe mode code is not working.  This is just a placeholder if we
-    # ever decide to revisit this issue.  I'm not interested in debugging the
-    # issues pertaning to this right now.
-    #mode = Enum('basic', 'safe')
-    #safe_timeout = Int(150)
-
-    # If pump starts up in safe mode, we can disable it
-    #exit_safe = STX+'\x08SAF0\x55\x43'+ETX
-
-    # Response is in the format <STX><address><status>[<data>]<ETX>
-    #_safe_response = re.compile(STX+'(\d+)([IWSPTUX])(.*)'+ETX)
-
-    #def _xmit_safe(self, cmd):
-    #    # Format is <STX><length><command data><CRC 16><ETX>
-    #    # Length is remaining bytes in packet, including length byte
-    #    # CRC 16 is high byte, low byte of 16 bit CCITT CRC
-
-    #    # 4 includes two byte CRC, length byte, and ETX byte
-    #    length = len(cmd)+4
-    #    crc = util.crc_compute(cmd)
-    #    hi, lo = util.hi8(crc), util.lo8(crc)
-
-    #    self.ser.write(length)
-    #    self.ser.write(cmd)
-    #    self.ser.write(hi)
-    #    self.ser.write(lo)
-    #    self.ser.write(self.ETX)
-    #    log.debug('Sent %s %s %s %s to pump' % \
-    #            (hex(length), cmd, hex(hi), hex(lo)))
-
-    #    result = self.ser.readline(eol=self.ETX)
-    #    addr, status, resp = self._basic_response.match(result).groups()
 
 class PumpToolBar(HasTraits):
     '''Toolbar containing command buttons that allow us to control the pump via
@@ -565,10 +537,10 @@ class PumpController(Controller):
     toolbar = Instance(PumpToolBar, args=())
     iface = Instance(PumpInterface, args=())
     override = Bool(False)
-    monitor = Bool(True)
+    #monitor = Bool(True)
     model = Any
 
-    timer = Instance(Timer)
+    #timer = Instance(Timer)
 
     def init(self, info):
         #self.iface.connect()
@@ -579,12 +551,13 @@ class PumpController(Controller):
         self.model = info.object
         self.iface = PumpInterface()
             
-        if self.monitor:
-            self.timer = Timer(250, self.tick)
+        #if self.monitor:
+        #    #self.timer = Timer(250, self.tick)
+        #    pass
 
-    def tick(self):
-        self.model.infused = self.iface.infused
-        self.model.withdrawn = self.iface.withdrawn
+    #def tick(self):
+    #    self.model.infused = self.iface.infused
+    #    self.model.withdrawn = self.iface.withdrawn
 
     #####################################################################
     # Logic for processing of user actions
@@ -688,10 +661,14 @@ class Pump(HasTraits):
                 ),
             handler=PumpController)
 
+def main():
+    pump = Pump()
+    pump.configure_traits()
+    print pump.diameter
+
 if __name__ == '__main__':
-    try:
-        pump = Pump()
-        pump.configure_traits()
-        print pump.diameter
-    except EquipmentError:
-        print 'error'
+    import sys, cProfile
+    cProfile.run('main()', 'profile.dmp')
+    import pstats
+    p = pstats.Stats('profile.dmp')
+    p.strip_dirs().sort_stats('cumulative').print_stats(50)
