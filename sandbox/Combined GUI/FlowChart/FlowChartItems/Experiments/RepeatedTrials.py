@@ -27,7 +27,7 @@ class RepeatedTrials(Experiments.Experiment):
 		self.createParameterGUI(defaultAxes = {"xy":[(self.trialParameter, self.durationParameter)], "y":[self.parameters[2]]})
 	
 		self.currentlyRunningExperiment=False
-		self.dspManager = SimpleDSPInterface()
+		#self.dspManager = SimpleDSPInterface()
 		
 	def gainFocus(self):
 		if self.hasFocus: return

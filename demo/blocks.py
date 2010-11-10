@@ -2,6 +2,7 @@
 
 from scipy import signal
 from numpy import inf, nan, pi, sin, cos, divide, random, linspace, ones
+import numpy as np
 
 ################################################################################
 # Utility functions
@@ -41,9 +42,16 @@ def convert(value, src_unit, req_unit):
         unit to convert value to
     
     Right now this is a fairly "dumb" implementation that does not factor in the
-    possible need for using other paramters to cmplete the conversion.  However,
-    it's not clear to me this is a valid use case at the moment.  We will not
-    put any effort into implementing it.
+    possible need for using other paramters to complete the conversion.  One
+    possibility is that the amplitude parameter would need to know the frequency
+    of the tone before computing the appropriate conversion to dB SPL.  However,
+    it's not clear to me the best approach for handling these "complex"
+    conversions, or whether they are best handled elsewhere.
+
+    One use case that would be extremely useful is the ability to convert phase
+    to interaural time delay; however this process requires knowledge of the
+    *frequency* (plus the width of the gerbil's head).  This is not implemented
+    for now.
 
     Examples
     --------
@@ -70,8 +78,8 @@ def convert(value, src_unit, req_unit):
         return map[src_unit, req_unit](value)
     except KeyError:
         # Create a more informative error message than KeyError
-        raise ValueError('Conversion from %s to %s not supported', src_unit,
-                         req_unit)
+        raise ValueError('Conversion from %s to %s not supported', 
+                         src_unit, req_unit)
 
 ################################################################################
 # Interface definitions
@@ -82,105 +90,115 @@ class Parameter(object):
 
     Properties
     ----------
+    default : number
+        If no source is provided, default to this value
     valid_bounds : tuple
         Require that value be in the range [lower, upper)
     warn_bounds : tuple
         Warn if value falls outside the range [lower, upper)
-    units : string or list of strings
-        Valid units for the parameter, first in sequence is the default
+    unit : required unit of parameter
+
+    Never rely on the default value when creating paradigms for use in your
+    experiments!  I am very likely to change these values as I see fit.
+    Default values are primarily for debugging purposes.
     '''
-    # TODO: Needs a bit mor ethinking through
 
-    def __init__(self, source, default, valid_bounds, warn_bounds, units=None):
-        if type(units) == str:
-            units = (units,)
-        if units is not None:
-            default_unit = units[0]
-        else:
-            default_unit = None
-
+    def __init__(self, default=None, unit=None, valid_bounds=None,
+                 warn_bounds=None):
         self.__dict__.update(locals())
 
     def set(self, value, unit=None):
-        # TODO: is this a good time to check if this is a valid parameter?
-        self.value = value
         if unit is None:
-            self.unit = self.default_unit
+            unit = self.unit
+        if not isinstance(value, Modulation):
+            value = Constant(value, unit)
+        self.source = value
 
-    def get(self, unit):
-        # TODO: how do we factor in conversions that depend on other parameters?
-        if unit != self.unit:
-            return convert(self.value, self.unit, unit)
+    def get(self, t, fs, clip_value):
+        '''
+        Get value of parameter
+
+        Parameters
+        ----------
+        t : array-like
+            Time vector
+        fs : float
+            Sampling frequency
+        clip : boolean
+            Clip value to valid bounds before returning
+
+        Each block (e.g. :class:`Constant`) does not necessarily need t, fs or
+        unit for computing its value; however, this allows a simple way for
+        crucial context to propagate to the blocks that need it.
+        '''
+        try:
+            value = self.source.get(t, fs, self.unit)
+        except AttributeError:
+            value = self.default
+
+        if clip_value and self.valid_bounds is not None:
+            lb, ub = self._eval_bounds(self.valid_bounds, fs)
+            return clip(value, lb, ub)
         else:
-            return self.value
+            return value
 
-    def __call__(self, t, fs, unit=None):
-        #return ones(len(t))*self.get(unit)
-        return self.get(unit)
+    def is_valid(self, value, fs):
+        '''
+        Returns True if value is valid
+        '''
+        if self.valid_bounds is not None:
+            lb, ub = self._eval_bounds(self.valid_bounds, fs)
+            return lb <= value < ub
+        else:
+            return True
 
-    def validate(self, fs):
+    def is_reasonable(self, value, fs):
         '''
-        Given the samping frequency, ensure that the parameter is valid.
+        Returns True if value is reasonable
         '''
-        # TODO: we may need to consider fleshing out the context to include
-        # additional edge cases; however, I think fs is the only special case
-        # right now that we need.
-        context = {'fs': fs}
-        lb, ub = self.valid_bounds
+        if self.warn_bounds is not None:
+            lb, ub = self._eval_bounds(self.warn_bounds, fs)
+            return lb <= value < ub
+        else:
+            return True
+
+    def _eval_bounds(self, bounds, fs):
+        lb, ub = bounds
         if type(lb) == type(''):
             lb = eval(lb, context)
         if type(ub) == type(''):
             ub = eval(ub, context)
+        return lb, ub
 
-        raise NotImplementedException
-
-    def warn(self, fs):
-        raise NotImplementedException
+    def __repr__(self):
+        return repr(self.source)
 
 ################################################################################
 # Interface definitions
 ################################################################################
 class Block(object):
-    # TODO: add validation and warning checks of parameters
-
-    def _get_parameters(self):
-        return [v for v in self.__dict__.values() if isinstance(v, Parameter)]
-
-    parameters = Property(_get_parameters)
-
-    def validate(self):
-        for p in self.parameters:
-
 
     def __init__(self, **kw):
         '''
         Parameters must have been defined in advance
         '''
-        # TODO: is this a good way to handle setting the unit: e.g. a tuple
-        # (value, unit).  Overall the Paramter system seems a bit hackish, but I
-        # think it sets a good framework that we can rethink without changing
-        # too much.
         for k, v in kw.items():
             if type(v) == tuple:
-                getattr(self, k).set(v[0], unit=v[1])
-            elif isinstance(v, Block):
-                setattr(self, k, v)
+                c, unit = v
+                getattr(self, k).set(Constant(c, unit))
             else:
                 getattr(self, k).set(v)
 
-    def validate(self):
-        raise NotImplementedException
+    def _get_parameters(self):
+        return [v for v in self.__dict__.values() if isinstance(v, Parameter)]
+
+    parameters = property(_get_parameters)
 
 class Carrier(Block):
     '''
     Defines a fundamental signal
     '''
-
-    def realize(self, fs):
-        '''
-        Generate waveform
-        '''
-        raise NotImplementedException
+    pass
 
 class Operation(Block):
     '''
@@ -194,44 +212,31 @@ class Operation(Block):
         '''
         raise NotImplementedException
 
-    def apply(self, *waveforms):
-        '''
-        Perform operation
-        '''
-        raise NotImplementedException
-
 class Modulation(Block):
     '''
     Generate a waveform that is used as a parameter for another block
     '''
-    def realize(self, fs):
-        '''
-        Generate waveform
-        '''
-        raise NotImplementedException
+    pass
 
 class Experiment(Block):
 
     waveform        = Parameter()
-    trial_dur       = Parameter()
-    trial_env_dur   = Parameter()
-    int_trial_dur   = Parameter()
-    trial_reps      = Parameter()
-    int_set_dur     = Parameter()
-    set_reps        = Parameter()
+    trial_dur       = Parameter(1, 's', (0, inf), (0.01, 10))
+    trial_env_dur   = Parameter(1, 's', (0, inf), (0.01, 10))
+    int_trial_dur   = Parameter(0, 's', (0, inf), (0.01, 10))
+    int_set_dur     = Parameter(1, 's', (0, inf), (0, inf))
+    trial_reps      = Parameter(1, None, (1, inf), (1, 5))
+    set_reps        = Parameter(1, None, (1, inf), (1, inf))
 
-    def __call__(self, t, fs):
-        waveform        = self.waveform(t, fs)
-        trial_dur       = self.trial_dur(t, fs)
-        trial_env_dur   = self.trial_env_dur(t, fs)
-        int_trial_dur   = self.int_trial_dur(t, fs)
-        trial_reps      = self.trial_reps(t, fs)
-        int_set_dur     = self.int_set_dur(t, fs)
-        set_reps        = self.set_reps(t, fs)
+    def realize(self, fs):
+        waveform        = self.waveform.get(t, fs)
+        trial_dur       = self.trial_dur.get(t, fs)
+        trial_env_dur   = self.trial_env_dur.get(t, fs)
+        int_trial_dur   = self.int_trial_dur.get(t, fs)
+        trial_reps      = self.trial_reps.get(t, fs)
+        int_set_dur     = self.int_set_dur.get(t, fs)
+        set_reps        = self.set_reps.get(t, fs)
 
-        # Note that the waveform simply reflects the *envelope* of the trial
-        # waveform.  It does not represent the *actual* trial waveform itself.
-        # The trial waveform may be more nuanced than this.
         trial_waveform = cos2taper(waveform, trial_env_dur*fs)
         int_trial_waveform = np.zeros(int_trial_dur*fs)
         int_set_waveform = np.zeros(int_set_dur*fs)
@@ -239,107 +244,120 @@ class Experiment(Block):
         trial_triggers = []
         set_triggers = []
 
+        # Repeat the trials to form a single set waveform
         set = []
         for i in range(trial_reps):
             trial_triggers.append(len(set))
             set.extend(trial_waveform)
             set.extend(int_trial_waveform)
 
+        # Repeat the set waveform to form the final waveform
         final = []
         for i in range(set_reps):
             n = len(final)
             trial_triggers.extend([t+n for t in trial_triggers[:trial_reps]])
-            set_triggers.append(n)inf
+            set_triggers.append(n)
             final.extend(set)
             final.extend(int_set_waveform)
 
+        # Finalize the waveform
         waveform = np.array(final)
         t = np.arange(len(waveform))/fs
         return t, waveform, trial_triggers, set_triggers
+
+    def __repr__(self):
+        return "<Experiment>"
 
 ################################################################################
 # Carrier Blocks
 ################################################################################
 class Tone(Carrier):
 
-    frequency = Parameter(1000, (0, '0.5*fs**-1'), (300, None), 'Hz') 
-    amplitude = Parameter(1, (0, 10), (0.01, 5), 'V')
-    phase     = Parameter(0, (-inf, inf), (0, 2*pi), ('radians', 'degrees'))
+    frequency = Parameter(1000, 'Hz', (0, '0.5*fs**-1'), (300, inf))
+    amplitude = Parameter(1, 'V', (0, 10), (0.01, 5))
+    phase     = Parameter(0, 'radians', None, (0, 2*pi))
 
-    warnings  = []
-    errors    = []
-
-    def __call__(self, t, fs):
+    def get(self, t, fs):
         # To modulate frequency, we must transform the instantaneous frequency
-        # into the instantaneous phase of the signal.  For a fixed-frequency tone,
-        # the phase increases at a constant rate. Of note, the integral of an
-        # array The instantaneous phase of a modulated waveform can be computed by
-        # the integral.  We need to factor out the time domain as well.
-        frequency = self.frequency(t, fs, 'Hz').cumsum()*(fs**-1)/t
-        amplitude = self.amplitude(t, fs, 'V')
+        # into the instantaneous phase of the signal.  For a fixed-frequency
+        # tone, the phase increases at a constant rate.  We also factor out the
+        # time vector since it's put back in during the final step.
+        frequency = self.frequency.get(t, fs)
+        try:
+            frequency = frequency.cumsum()*(fs**-1)/t
+        except:
+            pass
+        amplitude = self.amplitude(t, fs)
+
         # TODO: Implement special case for phase modulation.  Amplitude
         # modulation should not require any adjustment.  
-        phase     = self.phase(t, fs, 'radians')
+        phase     = self.phase(t, fs)
         return amplitude*sin(2*pi*frequency*t+phase)
 
-class FM(Carrier):
+    def __repr__(self):
+        return "<Tone Carrier: {0}, {1}, {2}>".format(self.frequency,
+                                                      self.amplitude,
+                                                      self.phase)
 
-    warnings = [
-        ('(fc-fm)>0', '''Selected combination of {fc} and {fm} extends into the
-         negative frequency domain.  Modulation will be clipped to a minimum of
-         1 Hz.'''),
-        ('(fc+fm)<0.5*bandwidth)<500', '''The noise band extends into a frequency
-         region that may be outside the best range of the speaker.'''),
-        ] 
-
-    fc        = Parameter(0, 300, None, '0.5*fs**-1', 'Hz', 'Carrier frequency') 
-    fm        = Parameter(0, 0.1, 50, '0.5*fs**-1', 'Hz', 
-                          'Modulation frequency') 
-    pc        = Parameter(-inf, 0, 2*pi, inf, ('radians', 'degrees'),
-                          'Carrier phase')
-    pm        = Parameter(-inf, 0, 2*pi, inf, ('radians', 'degrees'), 
-                          'Modulator phase')
-    amplitude = Parameter(0, 0.01, 5, 10, 'V')
-
-    def __call__(self, t, fs):
-        fm        = self.fm(t, fs, 'Hz')
-        fc        = self.fc(t, fs, 'Hz')
-        amplitude = self.amplitude(t, fs, 'V')
-        phase     = self.phase(t, fs, 'radians')
-        return amplitude*sin(2*pi*fc*t+depth/fm*cos(2*pi*fm*t+pm)+pc)
-
-class Noise(Carrier):
-
-    warnings = [
-        ('(fc-0.5*bandwidth)>0', '''Selected combination of {fc} and {bandwidth}
-         extends into the negative frequency domain.  Lower bound of the noise
-         band will be clipped to zero.'''),
-        ('(fc-0.5*bandwidth)<500', '''The noise band extends into a frequency
-         region that may be outside the best range of the speaker.'''),
-        ('(fc+0.5*bandwidth)<(0.5*fs**-1', '''The noise band extends into a
-         frequency region that is greater than the Nyquist frequency.  The noise
-         band will be clipped to {0.5*fs**-1} Hz.'''),
-        ] 
-
-    fc        = Parameter(0, 300, None, '0.5*fs**-1', 'Hz', 'carrier frequency') 
-    bandwidth = Parameter(0, 1, None, '0.25*fs**-1', 'Hz')
-    seed      = Parameter()
-    amplitude = Parameter(0, 0.01, 5, 10, 'V')
-
-    def __call__(self, t, fs):
-        fc        = self.fc(t, fs, 'Hz')
-        bandwidth = self.bandwidth(t, fs, 'Hz')
-        seed      = self.seed(t, fs)
-        amplitude = self.amplitude(t, fs, 'V')
-
-        #random.seed(seed)
-        noise = random.uniform(low=-1, high=1, size=len(t))
-        fl = fc-bandwidth
-        fh = fc+bandwidth
-        Wn = divide([fl, fh], fs/2.)
-        b, a = signal.iirfilter(8, Wn)
-        return signal.filtfilt(b, a, amplitude*noise)
-
+#class FM(Carrier):
+#
+#    warnings = [
+#        ('(fc-fm)>0', '''Selected combination of {fc} and {fm} extends into the
+#         negative frequency domain.  Modulation will be clipped to a minimum of
+#         1 Hz.'''),
+#        ('(fc+fm)<0.5*bandwidth)<500', '''The noise band extends into a frequency
+#         region that may be outside the best range of the speaker.'''),
+#        ] 
+#
+#    fc        = Parameter(1000, (0, '0.5*fs**-1'), (300, None), 'Hz', 
+#                          'Carrier frequency') 
+#    fm        = Parameter(5, (0, '0.5*fs**-1'), 0.1, 50, , 'Hz', 
+#                          'Modulation frequency') 
+#    pc        = Parameter(-inf, 0, 2*pi, inf, ('radians', 'degrees'),
+#                          'Carrier phase')
+#    pm        = Parameter(-inf, 0, 2*pi, inf, ('radians', 'degrees'), 
+#                          'Modulator phase')
+#    amplitude = Parameter(0, 0.01, 5, 10, 'V')
+#
+#    def __call__(self, t, fs):
+#        fm        = self.fm(t, fs, 'Hz')
+#        fc        = self.fc(t, fs, 'Hz')
+#        amplitude = self.amplitude(t, fs, 'V')
+#        phase     = self.phase(t, fs, 'radians')
+#        return amplitude*sin(2*pi*fc*t+depth/fm*cos(2*pi*fm*t+pm)+pc)
+#
+#class Noise(Carrier):
+#
+#    warnings = [
+#        ('(fc-0.5*bandwidth)>0', '''Selected combination of {fc} and {bandwidth}
+#         extends into the negative frequency domain.  Lower bound of the noise
+#         band will be clipped to zero.'''),
+#        ('(fc-0.5*bandwidth)<500', '''The noise band extends into a frequency
+#         region that may be outside the best range of the speaker.'''),
+#        ('(fc+0.5*bandwidth)<(0.5*fs**-1', '''The noise band extends into a
+#         frequency region that is greater than the Nyquist frequency.  The noise
+#         band will be clipped to {0.5*fs**-1} Hz.'''),
+#        ] 
+#
+#    fc        = Parameter(0, 300, None, '0.5*fs**-1', 'Hz', 'carrier frequency') 
+#    bandwidth = Parameter(0, 1, None, '0.25*fs**-1', 'Hz')
+#    seed      = Parameter()
+#    amplitude = Parameter(0, 0.01, 5, 10, 'V')
+#
+#    def __call__(self, t, fs):
+#        fc        = self.fc(t, fs, 'Hz')
+#        bandwidth = self.bandwidth(t, fs, 'Hz')
+#        seed      = self.seed(t, fs)
+#        amplitude = self.amplitude(t, fs, 'V')
+#
+#        #random.seed(seed)
+#        noise = random.uniform(low=-1, high=1, size=len(t))
+#        fl = fc-bandwidth
+#        fh = fc+bandwidth
+#        Wn = divide([fl, fh], fs/2.)
+#        b, a = signal.iirfilter(8, Wn)
+#        return signal.filtfilt(b, a, amplitude*noise)
+#
 ################################################################################
 # Operation Blocks
 ################################################################################
@@ -348,14 +366,22 @@ class Constant(Operation):
     Note that in general this block should be implied (i.e. we should not be
     required to wire this block to each parameter to set their value.  However,
     this is a block that can be placed on the flowchart if desired.  This is
-    useful for cases where we need to ensure two parameters are equal (by directly
-    linking this block to the parameters) or enforce a mathematical relationship
-    between several parameters (via an eval operation).
+    useful for cases where we need to ensure two parameters are equal (by
+    directly linking this block to the parameters) or enforce a mathematical
+    relationship between several parameters (via an eval operation).
     '''
-    value    = Parameter()
 
-    def __call__(self, t, fS):
-        return self.value.get(t, fs)
+    def __init__(self, value, unit):
+        self.__dict__.update(locals())
+
+    def get(self, t, fs, unit):
+        if unit != self.unit:
+            return convert(self.value, self.unit, unit)
+        else:
+            return self.value
+
+    def __repr__(self):
+        return '<Constant: {0} {1}>'.format(self.value, self.unit)
 
 class Sinusoid(Operation):
     pass
@@ -376,7 +402,38 @@ def test_tone():
     signal = tone(ts, fs)
     from pylab import plot, show
     plot(ts, signal)
-    show()
+    show() 
+################################################################################
+# Demo Flowcharts
+################################################################################
+tone_pip = {
+    'trial_dur'     : 1,
+    'trial_env_dur' : 0.25,
+    'int_trial_dur' : 0,
+    'trial_reps'    : 1,
+    'int_set_dur'   : 1,
+    'set_reps'      : 1,
+    'waveform'      : (Tone, {
+                       'frequency'   : .25e3,
+                       'amplitude'   : 1,
+                       'phase'       : 0, 
+                       }),
+    }
+
+def prepare_experiment(parameters):
+
+    def parse_args(parameters):
+        result = {}
+        for par, value in parameters.items():
+            if type(value) == tuple and issubclass(value[0], Block):
+                klass, args = value
+                parsed = parse_args(args)
+                result[par] = klass(**parsed)
+            else:
+                result[par] = value
+        return result
+
+    return Experiment(**parse_args(parameters))
 
 def test_noise():
     waveform = Noise(fc=5000, bandwidth=1000, seed=1, amplitude=1)
@@ -389,4 +446,6 @@ def test_noise():
     #           int_set_dur=5, set_reps=2, waveform=)
 
 if __name__ == '__main__':
-    test_noise()
+    #test_noise()
+    exp = prepare_experiment(tone_pip)
+    print exp.waveform.source
