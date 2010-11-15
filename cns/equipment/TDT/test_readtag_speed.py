@@ -2,22 +2,9 @@ from cns import equipment
 from timeit import timeit
 import numpy as np
 import time
-import ctypes
 
-#circuit = equipment.dsp().load('test/data_reduction_RX6', 'RX6')
-circuit = equipment.dsp().load('test/data_reduction_RZ5', 'RZ5')
-test_data = np.empty(6250, dtype=np.float32)
-
-#circuit.mc.initialize(channels=4, use_vex=False)
-def readtag(n):
-    n = 10
-    data = np.ones(10, dtype=np.float32)
-    ref = data.ctypes.data_as(ctypes.POINTER(ctypes.c_int32))
-    print ref
-    print data
-    print circuit.dsp.ReadTag('buf', ref, 0, n)
-    print data
-    
+from cns import equipment
+circuit = equipment.dsp().load('test/data_reduction_RX6', 'RX6')
     
 def test_new_idea():
     #data = np.arange(12, dtype=np.int8)
@@ -99,5 +86,4 @@ if __name__ == '__main__':
     #readtag(10)
     check_returned_data()
     suite()
-    #test_new_idea()
     #run_comp_tests(4, 1)

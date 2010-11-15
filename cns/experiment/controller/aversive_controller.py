@@ -336,7 +336,6 @@ class AversiveController(BaseAversiveController):
     def init_experiment(self, info):
         self._apply_signal_warn()
         self.circuit.contact_buf.initialize(channels=4, sf=127, src_type=np.int8,
-                                            compression='decimated',
                                             fs=self.circuit.lick_nPer.get('fs'))
         super(AversiveController, self).init_experiment(info)
 
@@ -381,7 +380,6 @@ class AversiveFMController(BaseAversiveController):
         self.circuit.contact_buf.initialize(channels=4, 
                                             src_type=np.int8,
                                             sf=127,
-                                            compression='decimated',
                                             fs=self.circuit.lick_nPer.get('fs'))
         super(AversiveFMController, self).init_experiment(info)
 

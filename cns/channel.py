@@ -18,6 +18,9 @@ from enthought.traits.api import HasTraits, Property, Array, Int, Event, \
 import numpy as np
 import tables
 
+import logging
+log = logging.getLogger(__name__)
+
 class AbstractChannel(HasTraits):
     '''
     Base class for dealing with a continuous stream of data.  Facilitates
@@ -47,10 +50,6 @@ class AbstractChannel(HasTraits):
         '''
         return int((time-self.t0)*self.fs)
 
-    # Is this used???
-    #def get_indices(self, *args):
-    #    return [self.get_index(a) for a in args]
-
     def to_samples(self, time):
         return int(time*self.fs)
 
@@ -72,7 +71,13 @@ class AbstractChannel(HasTraits):
         t0_index = int(self.t0*self.fs)
         lb = max(0, start-t0_index+reference)
         ub = max(0, end-t0_index+reference)
-        return self.signal[lb:ub]
+        log.debug('Signal shape %r', self.signal.shape)
+        return self.signal[..., lb:ub]
+
+    def get_index(self, index, reference=0):
+        t0_index = int(self.t0*self.fs)
+        index = max(0, index-t0_index+reference)
+        return self.signal[..., index]
 
     def get_range(self, start, end, reference=None):
         '''
@@ -93,17 +98,20 @@ class AbstractChannel(HasTraits):
         actual trigger time.  Right now we can associate only a single set of
         triggers with a channel!
         '''
+        log.debug('Range (%.2f, %.2f)', lb, ub)
 
         if reference is not None:
             if len(self.trigger_indices):
                 ref_idx = self.trigger_indices[reference]
             else:
-                return self.signal[0:0], 0, 0
+                return self.signal[..., 0:0], 0, 0
         else:
             ref_idx = 0
         lb = max(0, self.to_index(start)+ref_idx)
         ub = max(0, self.to_index(end)+ref_idx)
-        signal = self.signal[lb:ub]
+        log.debug('Range index (%d, %d)', lb, ub)
+        log.debug('Signal size %r', self.signal.shape)
+        signal = self.signal[..., lb:ub]
         lb_time = lb/self.fs + self.t0 - ref_idx/self.fs
         ub_time = lb_time + len(signal)/self.fs
         return signal, lb_time, ub_time
@@ -128,9 +136,9 @@ class AbstractChannel(HasTraits):
         if len(self.signal) == 0:
             signal = np.array([])
         else:
-            signal = self.signal[lb:ub]
+            signal = self.signal[..., lb:ub]
         ub_time = ub/self.fs
-        lb_time = ub_time-len(signal)/self.fs
+        lb_time = ub_time-signal.shape[-1]/self.fs
         return signal, lb_time, ub_time
 
     def filter(self, filter):
@@ -212,21 +220,16 @@ class FileChannel(Channel):
     def _get_shape(self):
         return (0,)
 
-    def _create_buffer(self):
+    def _buffer_default(self):
         atom = tables.Atom.from_dtype(np.dtype(self.dtype))
         filters = tables.Filters(complevel=self.compression_level,
                                  complib=self.compression_type,
                                  fletcher32=self.use_checksum)
-
         buffer = append_node(self.node, self.name, 'EArray', atom, self.shape,
                              expectedrows=int(self.fs*self.expected_duration),
                              filters=filters)
-
         buffer.setAttr('fs', self.fs)
         return buffer
-
-    def _buffer_default(self):
-        return self._create_buffer()
 
     def _get_signal(self):
         return self.buffer
@@ -242,7 +245,9 @@ class RAMChannel(Channel):
     '''Buffers data in memory without saving it to disk.
 
     Uses a ringbuffer algorithm designed for efficient reads (writes are not as
-    efficient, but should still be fairly quick).
+    efficient, but should still be fairly quick).  The assumption is that this
+    is used for plotting data, and reads will be more common than writes (due to
+    panning, zooming and scaling).
 
     Parameters
     ==========
@@ -280,27 +285,28 @@ class RAMChannel(Channel):
         self.updated = True
 
     def _partial_write(self, data):
-        size = len(data)
+        size = data.shape[-1]
         if size > self.samples:
-            self.buffer = data[-self.samples:]
+            self.buffer = data[..., -self.samples:]
             self.dropped = size-self.samples
             self.offset = size-self.samples
             self._write = self._full_write
         elif self.partial_idx+size > self.samples:
             overflow = (self.partial_idx+size)-self.samples
             remainder = size-overflow
-            self.buffer[self.partial_idx:] = data[:remainder]
+            self.buffer[... ,self.partial_idx:] = data[..., :remainder]
             del self.partial_idx
             self._write = self._full_write
-            self._write(data[-overflow:])
+            self._write(data[..., -overflow:])
         else:
-            self.buffer[self.partial_idx:self.partial_idx+size] = data
+            self.buffer[..., self.partial_idx:self.partial_idx+size] = data
             self.partial_idx += size
 
     def _full_write(self, data):
-        size = len(data)
+        #size = len(data)
+        size = data.shape[-1]
         if size > self.samples:
-            self.buffer = data[-self.samples:]
+            self.buffer = data[..., -self.samples:]
             self.dropped += size-self.samples
             self.offset += size-self.samples
         else:
@@ -309,10 +315,10 @@ class RAMChannel(Channel):
             # discarded, we update offset.
             remainder = self.samples-size
             if remainder:
-                self.buffer[:remainder] = self.buffer[-remainder:]
+                self.buffer[..., :remainder] = self.buffer[..., -remainder:]
                 self.offset += size
             # Write new data to end of buffer
-            self.buffer[-size:] = data
+            self.buffer[..., -size:] = data
 
     _write = _partial_write
 
@@ -325,8 +331,6 @@ class BufferedChannel(Channel):
     @cached_property
     def _get_samples(self):
         return int(self.window * self.fs)
-
-    #signal = Property(Array(dtype='f'))
 
     def _buffer_default(self):
         return SoftwareRingBuffer(self.samples)
@@ -352,7 +356,7 @@ class StaticChannel(Channel):
 class MultiChannel(Channel):
 
     channels = Int(8)
-    names = List(Str)
+    #names = List(Str)
 
     def get_channel(self, channel):
         try:
@@ -380,12 +384,12 @@ class DerivedChannel(AbstractChannel):
 class RAMMultiChannel(RAMChannel, MultiChannel):
 
     def _buffer_default(self):
-        return np.empty((self.samples, self.channels))
+        return np.empty((self.channels, self.samples))
 
 class BufferedMultiChannel(BufferedChannel, MultiChannel):
 
     def _buffer_default(self):
-        return SoftwareRingBuffer((self.samples, self.channels))
+        return SoftwareRingBuffer((self.channels, self.samples))
 
 class FileMultiChannel(FileChannel, MultiChannel):
 
@@ -393,12 +397,12 @@ class FileMultiChannel(FileChannel, MultiChannel):
     name = 'FileMultiChannel'
 
     def _get_shape(self):
-        return (0, self.channels)
+        return (self.channels, 0)
 
-    def _create_buffer(self):
-        buffer = super(FileMultiChannel, self)._create_buffer()
+    def _buffer_default(self):
+        buffer = super(FileMultiChannel, self)._buffer_default()
         buffer.setAttr('channels', self.channels)
-        buffer.setAttr('names', self.names)
+        #buffer.setAttr('names', self.names)
         return buffer
 
 class SnippetChannel(Channel):

@@ -34,7 +34,6 @@ def available(old_idx, new_idx, buffer_size, multiple=1):
                         is currently acquiring a new snippet.  This results in
                         the read acquiring an incomplete snippet.
     '''
-
     if new_idx<old_idx:
         available = buffer_size-old_idx+new_idx
     else:
@@ -183,11 +182,10 @@ class RingBuffer(Buffer):
     def read(self, size=None):
         if size is None:
             size = self.available()
-        data = []
-        for o, l in self._wrap(size):
-            data.append(self._read(o, l))
+        data = np.concatenate([self._read(o, l) for o, l in self._wrap(size)],
+                axis=1)
         self.idx = o+l
-        return np.concatenate(data)
+        return data
 
     def write(self, data):
         if not len(data):
@@ -202,7 +200,6 @@ class RingBuffer(Buffer):
 
         num_written = 0
         for o, l in wrap(self.idx, size, len(self)):
-            #log.debug('Writing %d samples starting at %d from %r', l, o, self)
             if not self._write(o, data[num_written:num_written+l]):
                 raise SystemError, 'Problem with writing data to buffer'
             num_written += l
