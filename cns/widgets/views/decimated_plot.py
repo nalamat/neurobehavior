@@ -6,28 +6,34 @@ from enthought.traits.api import Float, Int, Instance, HasTraits, Trait, Bool, \
     Event, Str, Enum
 from enthought.traits.ui.api import View
 import numpy as np
+import unittest
 
 def decimate(data, screen_width, downsampling_cutoff=4, mode='extremes'):
-    data_width = len(data)
+    data_width = data.shape[-1]
     downsample = np.floor((data_width/screen_width)/4.)
     if downsample > downsampling_cutoff:
         return globals()['decimate_'+mode](data, downsample)
     else:
         return data
 
+def test_decimate_extremes(self):
+    data = [[ 0, 1, 0, 1, 2, 4, 2, 4, 2, 4, 6, 8, 6, 8 ]]
+
 def decimate_extremes(data, downsample):
-    offset = len(data) % downsample
+    last_dim = data.ndim
+    offset = data.shape[-1] % downsample
     # Force a copy to be made, which speeds up min()/max().  Apparently min/max
     # make a copy of a reshaped array before performing the operation, so we
     # force it now so the copy only occurs once.
     if data.ndim == 2:
-        shape = (-1, downsample, data.shape[-1])
+        #shape = (downsample, len(data), -1)
+        shape = (len(data), -1, downsample)
     else:
-        # If channels attribute is not set, it's a single channel.
+        #shape = (downsample, -1)
         shape = (-1, downsample)
-    data = data[offset:].reshape(shape).copy()
-    data_min = data.min(1)
-    data_max = data.max(1)
+    data = data[..., offset:].reshape(shape).copy()
+    data_min = data.min(last_dim)
+    data_max = data.max(last_dim)
     #return np.vstack[data_min, data_max], True
     #return np.column_stack((data_min, data_max)), True
     return data_min, data_max
@@ -94,10 +100,10 @@ class ChannelDataSource(HasTraits):
                 
         if channel is not None:
             if type(self._dec_cache) == type(()):
-                result = self._dec_cache[0][:,channel], self._dec_cache[1][:,channel]
+                result = self._dec_cache[0][channel], self._dec_cache[1][channel]
                 return result
             else:
-                return self._dec_cache[:, channel]
+                return self._dec_cache[channel]
         else:
             return self._dec_cache
         
@@ -172,7 +178,8 @@ class TimeSeries(BaseXYPlot):
             if self.ch_index is None:
                 self._cached_data = values
             else:
-                self._cached_data = values[:,self.ch_index]
+                #self._cached_data = values[:,self.ch_index]
+                self._cached_data = values[self.ch_index]
             self._cached_data_bounds = t_lb, t_ub
             self._cache_valid = True
             self._screen_cache_valid = False
@@ -249,7 +256,8 @@ class TTLTimeSeries(TimeSeries):
             if self.ch_index is None:
                 self._cached_data = values
             else:
-                self._cached_data = values[:,self.ch_index]
+                #self._cached_data = values[:,self.ch_index]
+                self._cached_data = values[self.ch_index]
             self._cached_data_bounds = t_lb, t_ub
             self._cache_valid = True
             self._screen_cache_valid = False
@@ -284,3 +292,54 @@ class SharedTimeSeries(TimeSeries):
             self._screen_cache_valid = True
             
         return [self._screen_index_cache, self._screen_value_cache]
+
+class TestDecimate(unittest.TestCase):
+
+    def setUp(self):
+        self.length = 100e3
+        self.channels = 16
+
+        t = np.arange(0, self.length, dtype='f')/self.length
+        uniform, ascending, sine = [], [], []
+        for i in range(self.channels):
+            uniform.append(np.ones(self.length)*i)
+            ascending.append(np.arange(self.length)+self.length)
+            sine.append(np.sin(2*np.pi*i*t))
+
+        self.uniform = np.c_[uniform]
+        self.ascending = np.c_[ascending]
+        self.sine = np.c_[sine]
+
+    def testDecimateExtremes(self):
+        decimate = 10
+        expected_length = self.length/decimate
+
+        t = np.arange(0, expected_length, dtype='f')/expected_length
+        uniform, lower_ascending, upper_ascending, sine = [], [], [], []
+        for i in range(self.channels):
+            uniform.append(np.ones(expected_length)*i)
+            lower_ascending.append(np.arange(0, self.length-1, decimate)+self.length)
+            upper_ascending.append(np.arange(decimate-1, self.length,
+                                             decimate)+self.length)
+            sine.append(np.sin(2*np.pi*i*t))
+        
+        expected_uniform = np.c_[uniform]
+        expected_lower_ascending = np.c_[lower_ascending]
+        expected_upper_ascending = np.c_[upper_ascending]
+        expected_sine = np.c_[sine]
+
+        actual_uniform = decimate_extremes(self.uniform, decimate)[0]
+        np.testing.assert_array_equal(actual_uniform, expected_uniform)
+
+        actual_lower, actual_upper = decimate_extremes(self.ascending, decimate)
+        np.testing.assert_array_equal(actual_lower, expected_lower_ascending)
+        np.testing.assert_array_equal(actual_upper, expected_upper_ascending)
+
+        actual_lower, actual_upper = decimate_extremes(self.sine, decimate)
+        mask = (expected_sine-actual_lower) >= 0
+        self.assertTrue(mask.all())
+        mask = (expected_sine-actual_upper) <= 0
+        self.assertTrue(mask.all())
+
+if __name__ == '__main__':
+    unittest.main()
