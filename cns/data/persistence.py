@@ -1,7 +1,7 @@
 import functools
 import tables
 import re
-from numpy import dtype, array
+from numpy import dtype, array, bool_
 from enthought.traits.api import Array, List, Dict
 from cns.channel import FileChannel, FileMultiChannel
 import datetime
@@ -330,6 +330,8 @@ def load_attribute(node, name, trait):
         value = strptime(value)
     elif isinstance(value, int):
         value = int(value)
+    elif isinstance(value, bool_):
+        value = bool(value)
     return value
 
 
