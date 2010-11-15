@@ -48,7 +48,7 @@ Post-trigger times
 """
 
 from __future__ import division
-from cns.buffer import available, BlockBuffer
+from cns.buffer import available, BlockBuffer, wrap
 from cns.util.math import nextpow2
 import logging
 import numpy as np
@@ -146,15 +146,15 @@ class DSPBuffer(BlockBuffer):
         self.dsp = dsp
         self.name = name
         self.name_len = name + '_n'
-        self.max_len = dsp.GetTagSize(name)
-        self.length = dsp.GetTagVal(self.name_len)
-        BlockBuffer.__init__(self, self.max_len, blocks=2)
+         
         self.initialize()
         self._bind_activex_functions()
+        BlockBuffer.__init__(self, self.max_length, blocks=2)
         
     def _bind_activex_functions(self):
-        '''Freezes the Name parameter of the ActiveX function.  Do not use these
-        unless absolutely necessary!  This is primarily for debugging purposes.
+        '''
+        Freezes the name parameter of the ActiveX function.  Do not use these
+        unless absolutely necessary!  This is for debugging purposes only.
         '''
         functions = ['ReadTagV', 'ReadTagVEX', 'WriteTagV', 'WriteTagVEX']
         for f in functions:
@@ -182,8 +182,8 @@ class DSPBuffer(BlockBuffer):
         ub = self.bounds()[1]
         return np.floor(ub/max_amplitude)
 
-    def initialize(self, src_type=np.float32, channels=1, read_mode='continuous', 
-                   multiple=1, compression=None, fs=None, sf=1):
+    def initialize(self, src_type=np.float32, channels=1,
+            read_mode='continuous', multiple=1, fs=None, sf=1, read_type='VEX'):
         """
         Configures class with appropriate information to interpret data acquired
         from the DSP buffer.
@@ -197,32 +197,62 @@ class DSPBuffer(BlockBuffer):
         else:
             raise ValueError, '%s read not supported' % read_mode
         
-        if self.compression not in [None, 'decimated', 'shuffled']:
-            mesg = "{0} is not a valid compression mode".format(self.compression)
-            raise ValueError, mesg
-        
-        #self.read_args = type_lookup[src_type], type_lookup[dest_type], 1
-        #self._read_f = self.dsp.ReadTagVEX
-            
+        self.read_args = type_lookup[src_type], type_lookup[src_type], channels
         self.c_factor = int(4/np.nbytes[src_type])
-        self.idx = self.dsp.GetTagVal(self.name_idx)
-        read_func = self._read_mode[(self.channels==1, self.compression)]
-        self._read = read_func.__get__(self, DSPBuffer)
 
-        buf_size = self.dsp.GetTagSize(self.name)
-        if buf_size % self.channels:
-            mesg = 'Buffer size, %d, is not a multiple of the channel number, %d'
-            mesg = mesg % (buf_size, self.channels)
-            raise ValueError(mesg)
-            
+        # 8 channels MCFloat2Int16 = compression factor of 2.  On every
+        # sample, 4 slots in the buffer are occupied.
+        # CompTo16 = compression factor of 2.  On every sample, 0.5 slots in
+        # the buffer are occupied.
+        self.n_slots = channels/self.c_factor
+
+        # Index at initialization
+        self.idx = self.dsp.GetTagVal(self.name_idx)/self.n_slots
+
+        self.max_slots = self.dsp.GetTagSize(self.name)
+        # GetTagType returns 0 if the tag does not exist.  Check to see if the
+        # tag exists, if so, get the buffer size (e.g. number of slots) from
+        # that tag, otherwise, default to GetTagSize.
+        if self.dsp.GetTagType(self.name_len) == 0:
+            self.resizable = False
+            self.slots = self.max_slots
+        else:
+            self.resizable = True
+            self.slots = self.dsp.GetTagVal(self.name_len)
+
+        if (self.slots % self.n_slots) != 0:
+            raise ValueError('Buffer size must be a multiple of %d',
+                             self.n_slots)
+
+        self.length = self.slots/self.n_slots
+        self.max_length = self.max_slots/self.n_slots
+
+        MC = False
+        SINGLE = True
+        
+        READ_MODES = { 
+                (SINGLE, None)            : self._simple_read,
+                (SINGLE, 'VEX')           : self._read_vex,
+                (SINGLE, 'decimated')     : self._c_read,
+                (MC,     'VEX')           : self._read_vex,
+                (MC,     None)            : self._mc_read,
+                (MC,     'shuffled')      : self._mc_c_read,
+                (MC,     'decimated')     : self._mc_dec_read,
+                }
+        self._read = READ_MODES[(channels==1, read_type)]
+
     def _set_length(self, length):
-        #buf_size = self.dsp.GetTagVal(self.name_len)
-        buf_size = self.dsp.GetTagSize(self.name)
-        if length > buf_size:
-            mesg = 'Cannot set size of buffer %s to %d.  Buffer size is %d.'
-            raise ValueError(mesg % (self.name, length, buf_size))
-        self.dsp.SetTagVal(self.name_len, length)
-        self.length = length
+        if not self.resizable:
+            raise AttributeError('Cannot resize buffer')
+        if length > self.max_length:
+            raise ValueError('Buffer size must be less than %d',
+                             self.max_length)
+        elif length % self.n_slots:
+            raise ValueError('Buffer size must be a multiple of %d',
+                             self.n_slots)
+        else:
+            self.dsp.SetTagVal(self.name_len, length/self.n_slots)
+            self.length = length
 
     def set(self, data):
         '''Assumes data is written starting at the first index of the buffer.'''
@@ -231,8 +261,6 @@ class DSPBuffer(BlockBuffer):
             data.fs = self.dsp.GetSFreq()
             self._set_length(len(data))
             self.dsp.WriteTagV(self.name, 0, data.signal)
-            #PA5.SetAtten(data.level)
-            #set_attenuation(data.level)
             log.debug('Set buffer %s with %d samples', self.name, len(data.signal))
         except AttributeError, e:
             self._set_length(len(data))
@@ -246,13 +274,6 @@ class DSPBuffer(BlockBuffer):
         except AttributeError:
             super(DSPBuffer, self).write(data)
 
-    def samples_processed(self):
-        curidx = self.dsp.GetTagVal(self.name_idx)
-        if curidx<self.idx:
-            return self.length-self.idx+curidx
-        else:
-            return curidx-self.idx
-
     def block_processed(self):
         """Indicates that the next block has been processed.  If this is
         primarily an input buffer, it means the block has data that is ready for
@@ -260,25 +281,36 @@ class DSPBuffer(BlockBuffer):
         in the block has been processed by the system (e.g.  played to the
         speaker) and can be overwritten safely using writeBlock.
         """
-        return self.samples_processed()>=self.block_size
+        return self.available()>=self.block_size
 
     def available(self):
-        # Very important!  We must read name_idx only once and store it locally as
-        # the DSP will continue to acquire data while we are doing our processing.
-        # We simply will grab the current data up to the point at which we read
-        # name_idx.
-        new_idx = self.dsp.GetTagVal(self.name_idx)
+        # Very important!  We must read name_idx only once and store it locally
+        # as the DSP will continue to acquire data while we are doing our
+        # processing.  We simply will grab the current data up to the point at
+        # which we read name_idx.
+        new_idx = self.dsp.GetTagVal(self.name_idx)/self.n_slots
+        #print new_idx, self.name_idx, self.dsp.GetTagVal(self.name_idx)
+        if (new_idx % 1) != 0:
+            raise ValueError("Attempt to read while write!")
         return available(self.idx, new_idx, self.length, self.multiple)
-    
+
+    def _read_vex(self, offset, length):
+        #log.debug("Attempting to read %s indices starting at %s from %s",
+                  #length, offset, self.name)
+        if length == 0:
+            return np.array([]).reshape((self.channels, -1))
+        else:
+            data = self.dsp.ReadTagVEX(self.name, offset, length, *self.read_args)
+            return np.true_divide(data, self.sf)
+
     def _simple_read(self, offset, length):
         # Available reports the number of samples ready to be read and
         # accounts for various edge cases.  See function documentation for
         # more detail.
         if length == 0:
-            return np.array([])
+            return np.array([]).reshape((self.channels, -1))
         else:
-            #data = self._read_f(self.name, offset, length, *self.read_args)[0]
-            data = self.ReadTagV(offset, length)
+            data = self.dsp.ReadTagV(self.name, offset, length)
             # The RZ5 and RX6 use float32 as the native datatype.  Numpy appears
             # to use float64 by default.
             return np.array(data, dtype=np.float32)
@@ -362,7 +394,7 @@ class DSPBuffer(BlockBuffer):
                 temp[j::c,i] = data[i*c+j::c*self.channels]
         data = temp
         return data
-
+        
     def _write(self, offset, data):
         return self.dsp.WriteTagV(self.name, offset, data)
         #return self.dsp.WriteTagVEX(self.name, offset, "I32", data)
@@ -395,16 +427,6 @@ class DSPBuffer(BlockBuffer):
     def channel_args(self):
         return { 'channels' : self.channels,
                  'fs'       : self.fs, }
-
-    MC = False
-    SINGLE = True
-    
-    _read_mode = { (SINGLE, None)        : _simple_read,
-                   (SINGLE, 'decimated') : _c_read,
-                   (MC, None)            : _mc_read,
-                   (MC, 'shuffled')      : _mc_c_read,
-                   (MC, 'decimated')     : _mc_dec_read,
-                  }
 
 class DSPTag(object):
     '''

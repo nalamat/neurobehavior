@@ -175,16 +175,16 @@ def deinterleave(targets):
         for i, target in enumerate(targets):
             if target is not None:
                 #target.send(item[:,i::n].ravel())
-                target.send(item[:,i].ravel())
+                target.send(item[i].ravel())
 
-@pipeline
-def deinterleave_2d(targets):
-    #n = len(targets)
-    while True:
-        item = np.array((yield))
-        for i, target in enumerate(targets):
-            if target is not None:
-                target.send(item[i])
+#@pipeline
+#def deinterleave_2d(targets):
+#    #n = len(targets)
+#    while True:
+#        item = np.array((yield))
+#        for i, target in enumerate(targets):
+#            if target is not None:
+#                target.send(item[i])
 
 @pipeline
 def divide(divisor, target):
