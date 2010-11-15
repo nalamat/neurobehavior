@@ -1,3 +1,4 @@
+from __future__ import division
 from enthought.traits.api import HasTraits, Property, CFloat, Range, Enum, \
         Bool, on_trait_change
 import logging
@@ -45,8 +46,9 @@ class AMMixin(EnvelopeMixin):
 
     def _get_phase_corr(self):
         if self.phase_correction and self.env_depth != 0:
-            z = 2/self.env_depth*self.power_corr-2/self.env_depth+1
-            return np.arccos(z)
+            depth = self.env_depth
+            z = 2/depth*self.power_corr-2/depth+1
+            return np.arccos(z) 
         else:
             return 0
     
@@ -54,9 +56,16 @@ class AMMixin(EnvelopeMixin):
         return self.env_fm ** -1
 
     def _get_envelope(self):
-        env = 0.5 * np.cos(self.t*2*np.pi*self.env_fm+self.phase_corr) + 0.5
-        env *= self.env_depth
-        env += 1 - self.env_depth
+        phi = self.phase_corr
+        phi += 2*(np.pi-phi)
+        #env = np.cos(self.t*2*np.pi*self.env_fm+self.phase_corr)
+        env = np.cos(self.t*2*np.pi*self.env_fm+phi)
+        #import pylab; pylab.plot(env); pylab.show()
+        env = 0.5*self.env_depth*env-0.5*self.env_depth+1
+        #print env
+        #print 'computng'
+        #env *= self.env_depth
+        #env += 1 - self.env_depth
         env *= 1/self.power_corr
         return env
 

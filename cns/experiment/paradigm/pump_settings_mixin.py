@@ -13,7 +13,7 @@ SYRINGE_DATA = {
 class PumpSettingsMixin(HasTraits):
 
     pump_rate = Float(0.5, store='attribute')
-    #pump_rate_delta = Float(0.025, store='attribute')
+    pump_rate_delta = Float(0.025, store='attribute')
     pump_syringe = Enum(SYRINGE_DEFAULT, sorted(SYRINGE_DATA.keys()),
                         store='attribute')
     syringe_diameter = Property(store='attribute', depends_on='pump_syringe')
@@ -39,7 +39,7 @@ class PumpSettingsMixin(HasTraits):
 
     simple_pump_settings = VGroup(
             Item('pump_rate', label=u'Rate (mL/min)'),
-            Item('pump_rate_delta', label=u'\u0394 Rate (mL/min)'),
+            #Item('pump_rate_delta', label=u'\u0394 Rate (mL/min)'),
             Item('pump_syringe', label='Syringe'),
             label='Pump Settings',
             show_border=True,

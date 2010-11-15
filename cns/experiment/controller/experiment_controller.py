@@ -19,38 +19,37 @@ class ExperimentToolBar(ToolBar):
     size = 24, 24
 
     if ETSConfig.toolkit == 'qt4':
-        kw = dict(height=size[0], width=size[1], action=True)
-        apply = SVGButton('Apply', filename=icons.apply,
-                          tooltip='Apply settings', **kw)
-        revert = SVGButton('Revert', filename=icons.undo,
-                          tooltip='Revert settings', **kw)
-        start = SVGButton('Run', filename=icons.start,
-                          tooltip='Begin experiment', **kw)
-        pause = SVGButton('Pause', filename=icons.pause,
-                          tooltip='Pause', **kw)
-        resume = SVGButton('Resume', filename=icons.resume,
-                          tooltip='Resume', **kw)
-        stop = SVGButton('Stop', filename=icons.stop,
-                          tooltip='stop', **kw)
-        remind = SVGButton('Remind', filename=icons.warn,
-                          tooltip='Remind', **kw)
+        kw      = dict(height=size[0], width=size[1], action=True)
+        apply   = SVGButton('Apply', filename=icons.apply,
+                            tooltip='Apply settings', **kw)
+        revert  = SVGButton('Revert', filename=icons.undo,
+                            tooltip='Revert settings', **kw)
+        start   = SVGButton('Run', filename=icons.start,
+                            tooltip='Begin experiment', **kw)
+        pause   = SVGButton('Pause', filename=icons.pause,
+                            tooltip='Pause', **kw)
+        resume  = SVGButton('Resume', filename=icons.resume,
+                            tooltip='Resume', **kw)
+        stop    = SVGButton('Stop', filename=icons.stop,
+                            tooltip='stop', **kw)
+        remind  = SVGButton('Remind', filename=icons.warn,
+                            tooltip='Remind', **kw)
         item_kw = dict(show_label=False)
-
     else:
         # The WX backend renderer for SVG buttons is ugly, so let's use text
         # buttons instead.  Eventually I'd like to unite these under ONE
         # backend.
-        apply = Button('A', action=True)
-        revert = Button('R', action=True)
-        start = Button('>>', action=True)
-        pause = Button('||', action=True)
-        resume = Button('>', action=True)
-        stop = Button('X', action=True)
-        remind = Button('!', action=True)
-
+        apply   = Button('A', action=True)
+        revert  = Button('R', action=True)
+        start   = Button('>>', action=True)
+        pause   = Button('||', action=True)
+        resume  = Button('>', action=True)
+        stop    = Button('X', action=True)
+        remind  = Button('!', action=True)
         item_kw = dict(show_label=False, height=-size[0], width=-size[1])
 
-    group = HGroup(Item('apply',
+    traits_view = View(
+            HGroup(Item('apply',
                         enabled_when="object.handler.pending_changes<>{}",
                         **item_kw),
                    Item('revert',
@@ -75,9 +74,11 @@ class ExperimentToolBar(ToolBar):
                         **item_kw),
                    spring,
                    springy=True,
-                   )
+                   ),
+            kind='subpanel',
+            )
 
-    trait_view = View(group, kind='subpanel')
+from pump_controller_mixin import PumpToolBar
 
 class ExperimentController(Controller):
     """Primary controller for TDT System 3 hardware.  This class must be
@@ -135,13 +136,11 @@ class ExperimentController(Controller):
     Typically handlers need to work closely with a DSP device.
     """
 
-    toolbar = Instance(ExperimentToolBar, ())
+    toolbar = Instance(ExperimentToolBar, (), toolbar=True)
+    pt = Instance(PumpToolBar, (), toolbar=True)
     
     state = Enum('halted', 'paused', 'running', 'manual', 'disconnected',
                  'complete')
-
-    #'''Number of experiments run before window is closed.'''
-    #runs = Int(0)
 
     """Dictionary of circuits to be loaded.  Keys correspond to the name the
     DSPCircuit object will be bound to on the controller.  Value is a tuple of
@@ -171,7 +170,9 @@ class ExperimentController(Controller):
         log.debug("Initializing equipment")
         try:
             self.model = info.object
-            self.toolbar.install(self, info)
+            for toolbar in self.trait_names(toolbar=True):
+                getattr(self, toolbar).install(self, info)
+                print getattr(self, toolbar)
             self.init_equipment(info)
             log.debug("Successfully initialized equipment")
         except equipment.EquipmentError, e:
@@ -243,7 +244,7 @@ class ExperimentController(Controller):
         '''
         Handles starting an experiment
 
-        Subclasses must implement `init_experiment` and `start_experiment`
+        Subclasses must implement `start_experiment`
         '''
         if not self.model.paradigm.is_valid():
             mesg = 'Please correct the following errors first:\n'
@@ -264,6 +265,10 @@ class ExperimentController(Controller):
         except AttributeError:
             self.timer.stop()
         self.stop_experiment(info)
+
+        self.pending_changes = {}
+        self.old_values = {}
+
         info.ui.view.close_result = True
         self.state = 'complete'
 

@@ -7,6 +7,7 @@ from .am_tone import AMTone
 from .ramped_tone import RampedTone
 from .ramped_noise import RampedNoise
 from .bandlimited_noise import BandlimitedNoise
+from .delayed_am_noise import DelayedAMNoise
 
 signal_types = {
         Silence     : 'silence',
@@ -18,4 +19,5 @@ signal_types = {
         RampedTone  : 'ramped tone',
         RampedNoise : 'ramped noise',
         BandlimitedNoise : 'band-limited noise',
+        DelayedAMNoise : 'delayed AM noise',
         }

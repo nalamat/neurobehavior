@@ -1,8 +1,9 @@
 from cns.experiment.paradigm.paradigm import Paradigm
+from cns import choice
 from cns.signal.type import Tone, Noise
 from cns.signal.signal_dialog import SignalSelector
 from enthought.traits.api import Instance, Float, DelegatesTo, Int, Float, \
-        Bool, Enum, List
+        CBool, Enum, List, Tuple, HasTraits, Trait
 from enthought.traits.ui.api import View, spring, VGroup, Item, \
     InstanceEditor, Include
 from cns.traits.ui.api import ListAsStringEditor
@@ -24,31 +25,54 @@ class PositiveParadigmStage1(Paradigm, PumpSettingsMixin):
             VGroup(
                 Item('selector', editor=InstanceEditor(view='popup_view'),
                      style='custom', show_label=False),
-                #label='Signal',
-                #show_border=True,
                 ),
             )
 
+from enthought.traits.ui.table_column import ObjectColumn
+from enthought.traits.ui.api import TableEditor, TextEditor
+
+class ParSetting(HasTraits):
+
+    parameter = Float(store='attribute')
+    reward_duration = Float(store='attribute')
+    reward_rate = Float(store='attribute')
+
+    def __cmp__(self, other):
+        return cmp(self.parameter, other.parameter)
+
+table_editor = TableEditor(
+        editable=True,
+        deletable=True,
+        show_toolbar=True,
+        row_factory=ParSetting,
+        columns=[
+            ObjectColumn(name='parameter', label='Par'),
+            ObjectColumn(name='reward_duration', label='Reward dur'),
+            ObjectColumn(name='reward_rate', label='Reward rate'),
+            ]
+        )
+
 class PositiveParadigm(Paradigm, PumpSettingsMixin):
 
-    go_signal_selector = Instance(SignalSelector, dict(signal=Noise(duration=3,
+    signal = Instance(Paradigm)
+
+    parameters = List(Instance(ParSetting), [], store='child')
+
+    parameter_order = Trait('shuffled set', choice.options, store='attribute')
+    nogo_parameter = Float
+    signal_selector = Instance(SignalSelector, dict(signal=Noise(duration=3,
                                                                     attenuation=20), 
-                                                       title='GO signal',
-                                                       allow_par=False))
+                                                       title='Signal',
+                                                       allow_par=True))
 
-    nogo_signal_selector = Instance(SignalSelector, dict(signal=Tone(duration=3,
-                                                                     attenuation=20,
-                                                                     frequency=1000), 
-                                                         title='NOGO signal',
-                                                         allow_par=False))
+    signal = DelegatesTo('signal_selector', 'signal', store='child')
 
-    go_signal = DelegatesTo('go_signal_selector', 'signal', store='child')
-    nogo_signal = DelegatesTo('nogo_signal_selector', 'signal', store='child')
-
-    #go_probability = Float(0.5, store='attribute')
     min_nogo = Int(0, label='Minimum NOGO', store='attribute')
     max_nogo = Int(3, label='Maximum NOGO', store='attribute')
-    repeat_FA = Bool(label='Repeat NOGO if FA?', store='attribute')
+
+    # Needs to be CBool because Pytables returns numpy.bool_ type which gets
+    # rejected by Bool trait
+    repeat_FA = CBool(label='Repeat NOGO if FA?', store='attribute')
 
     signal_offset_delay = Float(0.5, unit='s', store='attribute')
     intertrial_duration = Float(0.5, unit='s', store='attribute')
@@ -57,7 +81,7 @@ class PositiveParadigm(Paradigm, PumpSettingsMixin):
 
     score_window_duration = Float(3, unit='s', store='attribute')
     reward_duration = Float(0.5, unit='s', store='attribute')
-    spout_smooth_duration = Float(0.25, unit='s', store='attribute')
+    #spout_smooth_duration = Float(0.25, unit='s', store='attribute')
 
     timeout_duration = Float(5, unit='s', store='attribute')
 
@@ -68,26 +92,32 @@ class PositiveParadigm(Paradigm, PumpSettingsMixin):
 
     TTL_fs = Float(500, unit='fs', store='attribute')
 
-    traits_view = View(Include('simple_pump_settings'),
-                       VGroup('go_signal_selector{}@', 
-                              'nogo_signal_selector{}@',),
-                       'min_nogo',
-                       'max_nogo',
-                       'repeat_FA',
-                       'signal_offset_delay',
-                       'intertrial_duration',
-                       'response_window_delay',
-                       'response_window_duration',
-                       'score_window_duration',
-                       'reward_duration',
-                       'timeout_duration',
-                       'spout_sensor',
-                       'spout_smooth_duration',
-                       'poke_duration_lb',
-                       'poke_duration_ub',
-                       resizable=True,
-                       title='Positive paradigm editor',
-                    )
+    traits_view = View(
+            'pump_syringe',
+            VGroup('signal_selector{}@'),
+            Item('parameter_order'),
+            VGroup(
+                Item('parameters', editor=table_editor),
+                show_labels=False,
+                ),
+            Item('nogo_parameter', label='NOGO parameter'),
+            'min_nogo',
+            'max_nogo',
+            'repeat_FA',
+            'signal_offset_delay',
+            'intertrial_duration',
+            'response_window_delay',
+            'response_window_duration',
+            'score_window_duration',
+            'timeout_duration',
+            'spout_sensor',
+            #'spout_smooth_duration',
+            'poke_duration_lb',
+            'poke_duration_ub',
+            resizable=True,
+            title='Positive paradigm editor',
+            )
 
 if __name__ == '__main__':
-    PositiveParadigmStage1().configure_traits()
+    #PositiveParadigmStage1().configure_traits()
+    PositiveParadigm().configure_traits()

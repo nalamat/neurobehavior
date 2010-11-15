@@ -44,10 +44,16 @@ class ExperimentLauncher(CohortViewHandler):
                 animal_node = file.root
             
             store_node = get_or_append_node(animal_node, 'experiments')
+            paradigm_node = get_or_append_node(store_node, 'last_paradigm')
+            paradigm_name = etype.__name__
             try:
-                paradigm = persistence.load_object(store_node, 'last_paradigm')
-            except (tables.NoSuchNodeError, TraitError):
+                paradigm = persistence.load_object(paradigm_node, paradigm_name)
+            except tables.NoSuchNodeError:
                 log.debug('No prior paradigm found.  Creating new paradigm.')
+                paradigm = None
+            except TraitError, e:
+                log.debug('Prior paradigm found, but was unable to load.')
+                log.exception(e)
                 paradigm = None
                 
             model = etype(store_node=store_node, animal=item)
@@ -61,13 +67,12 @@ class ExperimentLauncher(CohortViewHandler):
                     log.debug('Using paradigm from previous animal.')
                     model.paradigm = self.last_paradigm
             except TraitError:
-                log.debug('Paradigm is not compatible with experiment')
-
+                log.debug('Prior paradigm is not compatible with experiment')
     
             ui = model.edit_traits(parent=info.ui.control, kind='livemodal')
             if ui.result:
-                persistence.add_or_update_object(model.paradigm, store_node,
-                                                 'last_paradigm')
+                persistence.add_or_update_object(model.paradigm, paradigm_node,
+                                                 paradigm_name)
                 item.processed = True
                 self.last_paradigm = model.paradigm
             
@@ -80,11 +85,11 @@ class ExperimentLauncher(CohortViewHandler):
         except SystemError, e:
             from textwrap import dedent
             mesg = """\
-            Could not launch experiment.  This likely means that you
-            forgot to turn on a piece of equipment.  Please check and ensure
-            that the RX6, RZ5 and PA5 are turned on.  If you still get this
-            error message, please try power-cycling the rack.  If this still
-            does not fix the error, power-cycle the computer as well.  
+            Could not launch experiment.  This likely means that you forgot to
+            turn on a piece of equipment.  Please check and ensure that the RX6,
+            RZ5 and PA5 are turned on.  If you still get this error message,
+            please try power-cycling the rack.  If this still does not fix the
+            error, power-cycle the computer as well.  
             
             Please remember that you need to give the equipment rack a minute to
             boot up once you turn it back on before attempting to launch an
@@ -101,6 +106,9 @@ class ExperimentLauncher(CohortViewHandler):
     def launch_aversive_fm(self, info, selected):
         self.launch_experiment(info, selected[0], AversiveFMExperiment)
 
+    def launch_appetitive_stage1(self, info, selected):
+        self.launch_experiment(info, selected[0], PositiveExperimentStage1)
+
 def load_experiment_launcher():
     CohortView().configure_traits(view='detailed_view', handler=ExperimentLauncher())
 
@@ -111,5 +119,9 @@ def test_experiment(etype):
     globals()[etype](store_node=test_file.root).configure_traits()
 
 if __name__ == '__main__':
-    import sys
-    test_experiment(sys.argv[1])
+    import sys, cProfile
+    cProfile.run('test_experiment("%s")' % sys.argv[1], 'profile.dmp')
+    import pstats
+    p = pstats.Stats('profile.dmp')
+    p.strip_dirs().sort_stats('cumulative').print_stats(50)
+    #test_experiment(sys.argv[1])

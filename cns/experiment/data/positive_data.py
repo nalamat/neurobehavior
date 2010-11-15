@@ -11,6 +11,14 @@ from cns.data.h5_utils import append_node, get_or_append_node
 from cns.pipeline import deinterleave, broadcast
 from scipy.stats import norm
 
+import logging
+log = logging.getLogger(__name__)
+
+# Score functions
+ts = lambda TTL: np.flatnonzero(TTL)
+edge_rising = lambda TTL: np.r_[0, np.diff(TTL.astype('i'))] == 1
+edge_falling = lambda TTL: np.r_[0, np.diff(TTL.astype('i'))] == -1
+
 def apply_mask(fun, seq, mask):
     seq = np.array(seq).ravel()
     return [fun(seq[m]) for m in mask]
@@ -101,11 +109,10 @@ class PositiveData_0_1(ExperimentData):
         return self._create_channel('reward_TTL', np.bool)
 
     TRIAL_DTYPE = [('ts_start', 'i'), ('ts_end', 'i'), ('type', 'S4'),
-                   ('response', 'S16')]
-    #ACTION_DTYPE = [('ts', 'i'), ('action', 'S16')]
+                   ('response', 'S16'), ('reaction_time', 'i')]
 
-    trial_log = List(Tuple(Int, Int, Str, Str), store='table', dtype=TRIAL_DTYPE)
-    #action_log = List(Tuple(Int, Str), store='table', dtype=ACTION_DTYPE)
+    trial_log = List(Tuple(Int, Int, Str, Str, Int), store='table',
+                     dtype=TRIAL_DTYPE)
 
     # Total GO trials presented
     num_go = Int(store='attribute')
@@ -129,19 +136,27 @@ class PositiveData_0_1(ExperimentData):
     response_hit_frac = Float(store='attribute')
 
     def log_trial(self, ts_start, ts_end, ttype):
+        log.debug('Logging trial %s (%d, %d)', ttype, ts_start, ts_end)
         if self.poke_TTL.get_range_index(ts_start, ts_end).all():
             response = 'NO_WITHDRAW'
         elif self.spout_TTL.get_range_index(ts_start, ts_end).any():
             response = 'SPOUT'
-        elif self.poke_TTL.get_range_index(ts_end, ts_end+1)[0] == 1:
+        elif self.poke_TTL.get_index(ts_end) == 1:
             response = 'POKE'
         else:
             response = 'NO_RESPONSE'
 
-        self.trial_log.append((ts_start, ts_end, ttype, response))
-        self.update_score()
+        #if response == 'SPOUT':
+        #    spout = self.spout_TTL.get_range_index(ts_start, ts_end)
+        #    rt = ts(edge_rising(spout))[0]
+        #elif response == 'POKE':
+        #    poke = self.poke_TTL.get_range_index(ts_start, ts_end)
+        #    rt = ts(edge_rising(poke))[0]
+        #else:
+        #    rt = -1
+        rt = -1
 
-    def update_score(self):
+        self.trial_log.append((ts_start, ts_end, ttype, response, rt))
         trial_log = np.array(self.trial_log)
 
         POKE = trial_log[:,3]=='POKE'
@@ -154,7 +169,6 @@ class PositiveData_0_1(ExperimentData):
         self.num_go_response = (GO&RESPONSE).sum()
         self.num_hit = (GO&SPOUT).sum()
 
-        #self.response_hit_frac = (GO&SPOUT).sum()/(GO&RESPONSE).sum()
         self.response_hit_frac = self.num_hit/self.num_go_response
         self.hit_frac = self.num_hit/self.num_go
 
@@ -165,57 +179,7 @@ class PositiveData_0_1(ExperimentData):
         self.response_fa_frac = self.num_fa/self.num_nogo_response
         self.fa_frac = self.num_fa/self.num_nogo
 
-    #def _score_trial(self, ts, type):
-    #    pass
-
-    #def _generate_action_log(self):
-    #    ts = lambda TTL: np.flatnonzero(TTL)
-    #    edge_rising = lambda TTL: np.r_[0, np.diff(TTL.astype('i'))] == 1
-    #    edge_falling = lambda TTL: np.r_[0, np.diff(TTL.astype('i'))] == -1
-
-    #    spout_TTL = self.spout_TTL.buffer[:]
-    #    poke_TTL = self.poke_TTL.buffer[:]
-    #    trial_TTL = self.trial_TTL.buffer[:]
-    #    score_TTL = self.score_TTL.buffer[:]
-    #    response_TTL = self.response_TTL.buffer[:]
-
-    #    # Spout contact when there's no trial
-    #    TTL = edge_rising(spout_TTL) & ~score_TTL
-    #    nontrial_spout_ts = ts(TTL).tolist()
-
-    #    # Poke-withdraw when there's no trial
-    #    TTL = edge_falling(poke_TTL) & ~response_TTL
-    #    nontrial_poke_wd_ts = ts(TTL).tolist()
-
-    #    # Repoke during response window
-    #    TTL = edge_rising(poke_TTL) & score_TTL
-    #    trial_poke_ts = ts(TTL).tolist()
-
-    #    # Spout contact during response window
-    #    TTL = edge_rising(spout_TTL) & score_TTL
-    #    trial_spout_ts = ts(TTL).tolist()
-
-    #    actions = ('nontrial_spout',
-    #               'nontrial_poke_wd',
-    #               'trial_poke',
-    #               'trial_spout'
-    #               )
-
-    #    self.action_log = []
-    #    for action in actions:
-    #        timestamps = locals()[action+'_ts']#[getattr(self, action+'_ts')
-    #        action = action.upper()
-    #        data = [(ts, action) for ts in timestamps]
-    #        self.action_log.extend(data)
-    #    self.action_log.sort(reverse=True)
-
 PositiveData = PositiveData_0_1
-
-class Test():
-
-    spout_TTL = ['00000000000000111100000000000111100000000000']
-    trial_TTL = ['00000000000000000000011111111111100000000000']
-    poke_TTL  = ['00000000000000000001111110000000000000000000']
 
 if __name__ == '__main__':
     pass
