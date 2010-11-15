@@ -19,6 +19,7 @@ oxygen_icons = {'start':        'actions/1rightarrow.svgz',
                 'up':           'actions/go-up.svgz',
                 'down':         'actions/go-down.svgz',
                 'right2':       'actions/2rightarrow.svgz',
+                'left2':        'actions/2leftarrow.svgz',
                 }
 
 for k, v in globals()[STYLE+'_icons'].items():

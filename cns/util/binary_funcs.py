@@ -38,9 +38,9 @@ def int_to_TTL(a, width):
     bitfield : array
         2D boolean array repesenting the bits in little-endian order
     
-    Example
+    Example (note the transpose -- didn't have time to flip around)
     =======
-    >>> int_to_TTL([4, 8, 5], width=6)
+    >>> int_to_TTL([4, 8, 5], width=6).T
     array([[False, False,  True, False, False, False],
            [False, False, False,  True, False, False],
            [ True, False,  True, False, False, False]], dtype=bool)
@@ -48,7 +48,7 @@ def int_to_TTL(a, width):
     a = np.array(a)
     bitarray = [(a>>bit) & 1 for bit in range(width)]
     #bitarray = map(lambda x: bin_array(x, width), a)
-    return np.array(bitarray, dtype=np.bool).T
+    return np.array(bitarray, dtype=np.bool)
 
 def bin_array(number, bits):
     '''Return binary representation of an integer as an integer array

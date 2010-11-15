@@ -47,6 +47,8 @@ animal_editor = TableEditor(
             ],
         menu=Menu(
             Action(name='Appetitive', action='launch_appetitive'),
+            Action(name='Appetitive (Stage 1)',
+                   action='launch_appetitive_stage1'),
             Action(name='Aversive (FM)', action='launch_aversive_fm'),
             Action(name='Aversive (generic)', action='launch_aversive_generic'),
             ),

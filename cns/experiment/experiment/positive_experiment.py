@@ -1,4 +1,7 @@
-from enthought.traits.api import HasTraits, Any, Instance, DelegatesTo, Int
+from __future__ import division
+import numpy as np
+from enthought.traits.api import HasTraits, Any, Instance, DelegatesTo, \
+        Int, Float, Property
 from enthought.traits.ui.api import View, Item, VGroup, HGroup, InstanceEditor,\
     VSplit, HSplit, TabularEditor, Group
 
@@ -32,7 +35,7 @@ class TrialTypeColumn(ListColumn):
 class TrialResponseColumn(ListColumn):
 
     def get_cell_color(self, object):
-        response = object[-1]
+        response = object[3]
         if response in ['NO_WITHDRAW', 'NO_RESPONSE']:
             return '#FFFFFF'
         elif response == 'SPOUT':
@@ -46,9 +49,10 @@ trial_log_table = TableEditor(
         sort_model=False,
         columns=[
             TrialTypeColumn(index=0, label='start'),
-            TrialTypeColumn(index=1, label='end'),
-            TrialTypeColumn(index=2, label='type'),
+            #TrialTypeColumn(index=1, label='end'),
+            #TrialTypeColumn(index=2, label='type'),
             TrialResponseColumn(index=3, label='response'),
+            TrialTypeColumn(index=4, label='reaction time'),
             ]
         )
 
@@ -88,9 +92,12 @@ class PositiveExperimentStage1(HasTraits):
             HSplit(
                 VGroup(
                     Item('handler.toolbar', style='custom'),
+                    Item('handler.pump_toolbar', style='custom'),
                     Item('paradigm', style='custom'),
+                    show_labels=False,
                     ),
-                Item('contact_plot', style='custom', width=600, height=600),
+                Item('contact_plot', style='custom', show_label=False,
+                     width=600, height=600),
                 ),
             resizable=True,
             close_result=False,
@@ -107,6 +114,16 @@ class PositiveExperiment(HasTraits):
     paradigm = Instance(PositiveParadigm, ())
 
     contact_plot = Instance(TTLChannelView)
+
+    trial_log_view = Property(depends_on='data.trial_log')
+
+    def _get_trial_log_view(self):
+        trial_log = np.array(self.data.trial_log, dtype=object)
+        if len(trial_log) > 0:
+            trial_log[:,4] /= self.data.contact_fs
+            return list(trial_log)
+        else:
+            return list(trial_log)
 
     def log_event(self, ts, name, value):
         pass
@@ -141,15 +158,20 @@ class PositiveExperiment(HasTraits):
     traits_view = View(
             HSplit(
                 VGroup(
+                    Item('handler.toolbar', style='custom'),
+                    Item('handler.pump_toolbar', style='custom'),
                     VGroup(
-                        'handler.toolbar@',
                         Item('handler.status', style='readonly'),
-                        Item('handler.current_poke_dur', 
-                             label='Poke duration (s)', style='readonly'),
-                        label='Experiment Status',
+                        Item('handler.water_infused', style='readonly'),
+                        VGroup(
+                            Item('handler.current_poke_dur', 
+                                 label='Poke duration (s)', style='readonly'),
+                            ),
+                        label='Status',
+                        show_border=True,
                         show_labels=False,
                     ),
-                    Item('handler.pump@', editor=InstanceEditor()),
+                    #Item('handler.pump@', editor=InstanceEditor()),
                     Item('paradigm@', editor=InstanceEditor(view='edit_view')),
                     show_labels=False,
                 ),
@@ -171,7 +193,8 @@ class PositiveExperiment(HasTraits):
                              label='HIT fraction (all)'),
                         style='readonly',
                     ),
-                    Item('object.data.trial_log', editor=trial_log_table),
+                    #Item('object.data.trial_log', editor=trial_log_table),
+                    Item('trial_log_view', editor=trial_log_table),
                     show_labels=False,
                 ),
                 Item('contact_plot', style='custom', width=600, height=600), 

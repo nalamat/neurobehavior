@@ -1,17 +1,20 @@
 from cns.channel import Channel, MultiChannel, SnippetChannel
-from cns.widgets.tools.zoom_tool import RLZoomTool
+#from cns.widgets.tools.zoom_tool import RLZoomTool
 from cns.widgets.views.decimated_plot import ChannelDataSource, TimeSeries, \
     SharedTimeSeries, TTLTimeSeries
 from enthought.chaco.api import ArrayPlotData, DataRange1D, PlotLabel, \
     LinePlot, LinearMapper, ArrayDataSource, PlotAxis, OverlayPlotContainer, \
     VPlotContainer, FilledLinePlot, BasePlotContainer, Plot
-from enthought.chaco.tools.api import PanTool, SimpleZoom
+from enthought.chaco.tools.api import PanTool, BetterSelectingZoom, ZoomTool
 from enthought.enable.api import ComponentEditor
 from enthought.enable.base_tool import KeySpec
 from enthought.traits.api import Instance, Str, CFloat, Bool, Dict, List, \
     on_trait_change, Int, DelegatesTo, HasTraits, Any, Button
 from enthought.traits.ui.api import View, Item, CheckListEditor, VGroup
 import numpy as np
+
+import logging
+log = logging.getLogger(__name__)
 
 class ChannelView(HasTraits):
 
@@ -87,14 +90,15 @@ class FFTView(ChannelView):
 
         pan = PanTool(component)
         component.tools.append(pan)
-        zoom = SimpleZoom(component,
-                          whieel_zoom_step=0.25,
-                          enter_zoom_key=KeySpec('z'),
-                          tool_mode='range',
-                          axis='index')
-        zoom = ConstrainedZoomTool(component,
-                                   wheel_zoom_step=0.25,
-                                   enter_zoom_key=KeySpec('z'))
+        #zoom = SimpleZoom(component,
+        #                  whieel_zoom_step=0.25,
+        #                  enter_zoom_key=KeySpec('z'),
+        #                  tool_mode='range',
+        #                  axis='index')
+        #zoom = ConstrainedZoomTool(component,
+        #                           wheel_zoom_step=0.25,
+        #  PanToenter_zoom_key=KeySpec('z'))
+        zoom = ZoomTool(component)
         component.overlays.append(zoom)
         return component
 
@@ -219,7 +223,7 @@ class MultipleChannelView(ChannelView):
 class MultiChannelView(ChannelView):
 
     channel = Instance(MultiChannel)
-    signal = Instance(Channel)
+    #signal = Instance(Channel)
     components = Dict(Int, Any, {})
     available = List(Int)
     ch_ds = Instance(ChannelDataSource, ())
@@ -267,21 +271,22 @@ class MultiChannelView(ChannelView):
                 stack_order='top_to_bottom',
                 )
         
-    def _signal_changed(self, new):
-        val_range = DataRange1D(low_setting=-1.5, high_setting=1.5)
-        val_map = LinearMapper(range=val_range)
-        plot = TimeSeries(channel=new, 
-                          index_mapper=self.idx_map,
-                          value_mapper=val_map,
-                          padding_left=75,
-                          reference='trigger',
-                          )
-        axis = PlotAxis(orientation='left', component=plot,
-                        small_haxis_style=True, title='Signal')
-        plot.overlays.append(axis)
-        self.component.insert(0, plot)
+    #def _signal_changed(self, new):
+    #    val_range = DataRange1D(low_setting=-1.5, high_setting=1.5)
+    #    val_map = LinearMapper(range=val_range)
+    #    plot = TimeSeries(channel=new, 
+    #                      index_mapper=self.idx_map,
+    #                      value_mapper=val_map,
+    #                      padding_left=75,
+    #                      reference='trigger',
+    #                      )
+    #    axis = PlotAxis(orientation='left', component=plot,
+    #                    small_haxis_style=True, title='Signal')
+    #    plot.overlays.append(axis)
+    #    self.component.insert(0, plot)
         
     def _channel_changed(self, new):
+        log.debug("CREATING CHNANEL PLOT")
         val_range = DataRange1D(low_setting=-3e-4, high_setting=3e-4)
         #val_range = DataRange1D(low_setting=-5, high_setting=5)
         self.available = [str(i+1) for i in range(new.channels)]
@@ -299,9 +304,10 @@ class MultiChannelView(ChannelView):
             axis = PlotAxis(orientation='left', component=plot,
                             small_haxis_style=True, title='%d' % (i+1))
             plot.overlays.append(axis)
-            zoom = RLZoomTool(component=plot)
+            #zoom = RLZoomTool(component=plot)
             plot.tools.append(PanTool(component=plot, constrain=True, constrain_direction="x"))
-            plot.overlays.append(zoom)
+            plot.overlays.append(BetterSelectingZoom(component=plot))
+            #plot.overlays.append(zoom)
             self.component.add(plot)
             self.components[i] = plot
             
@@ -309,6 +315,7 @@ class MultiChannelView(ChannelView):
                               title='Post Trigger Time (s)')
         self.visible = self.available
         self.set_visible()
+        log.debug("created CHANNEL PLOT")
 
     @on_trait_change('visible[]')
     def set_visible(self):

@@ -330,12 +330,12 @@ class PumpInterface(object):
 
     def _get_trigger(self):
         trig = self.xmit('TRG')
-        if trig == 'St':
+        if trig == 'ST':
             return 'start'
         elif trig == 'LE':
             return 'run_high'
         else:
-            raise PumpCommError('', 'TRG')
+            raise PumpCommError('', 'TRG ' + trig)
 
     def _set_volume(self, volume):
         self.xmit('VOL %0.2f' % volume)

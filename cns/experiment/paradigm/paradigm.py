@@ -20,3 +20,4 @@ class Paradigm(HasTraits):
                 messages.append(getattr(self, mesg_prop))
         if messages: return '\n'.join(messages)
         else: return 'No errors found'
+
