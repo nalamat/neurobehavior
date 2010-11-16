@@ -40,9 +40,6 @@ def decimate_extremes(data, downsample):
 
 def decimate_mean(data, downsample):
     offset = len(data) % downsample
-    # Force a copy to be made, which speeds up min()/max().
-    # Apparently min/max make a copy of a reshaped array before
-    # performing the operation, so we force it now so the copy only occurs once.
     if data.ndim == 2:
         shape = (-1, downsample, data.shape[-1])
     else:
