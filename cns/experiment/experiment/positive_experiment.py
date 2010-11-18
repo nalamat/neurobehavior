@@ -36,12 +36,17 @@ class TrialResponseColumn(ListColumn):
 
     def get_cell_color(self, object):
         response = object[3]
+        ttype = object[2]
+
         if response in ['NO_WITHDRAW', 'NO_RESPONSE']:
             return '#FFFFFF'
-        elif response == 'SPOUT':
-            return colors['light blue']
-        else:
-            return colors['gray']
+
+        map = {('GO', 'SPOUT')    : colors['light green'],
+             ('GO', 'POKE')     : colors['gray'],
+             ('NOGO', 'SPOUT')  : colors['gray'],
+             ('NOGO', 'POKE')   : colors['light red'],
+             }
+        return map[(ttype, response)]
 
 trial_log_table = TableEditor(
         editable=False,

@@ -242,6 +242,8 @@ class DSPBuffer(BlockBuffer):
         self._read = READ_MODES[(channels==1, read_type)]
 
     def _set_length(self, length):
+        if self.length == length:
+            return
         if not self.resizable:
             raise AttributeError('Cannot resize buffer')
         if length > self.max_length:
@@ -266,6 +268,9 @@ class DSPBuffer(BlockBuffer):
             self._set_length(len(data))
             self.dsp.WriteTagV(self.name, 0, data)
             log.debug('Set buffer %s with %d samples', self.name, len(data))
+
+    def get(self):
+        return self._read(0, self.length)
 
     def write(self, data):
         try:
@@ -625,8 +630,14 @@ def load_cof(iface, circuit_name):
                    os.getcwd(), ]
 
     success = False
+    # TODO: I believe you can also use some other extensions (*.rco).  Not
+    # really sure how these work.  May need to add them too.
+    if not circuit_name.endswith('.rcx'):
+        circuit_name += '.rcx'
+
     for dir in search_dirs:
-        circuit_path = os.path.join(dir, circuit_name+'.rcx')
+        circuit_path = os.path.join(dir, circuit_name)
+        log.debug('Checking %s', circuit_path)
         if os.path.exists(circuit_path):
             success = True
             break

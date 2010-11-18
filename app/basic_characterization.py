@@ -13,9 +13,9 @@ from cns.signal.signal_dialog import SignalDialog
 from cns.widgets.views.channel_view import MultiChannelView
 from enthought.pyface.timer.api import Timer
 from enthought.traits.api import Range, Float, HasTraits, Instance, DelegatesTo, \
-    Int, Any, on_trait_change, Enum, Trait, Tuple
+    Int, Any, on_trait_change, Enum, Trait, Tuple, List, Property, Str
 from enthought.traits.ui.api import View, VGroup, HGroup, Action, Controller, \
-Item
+Item, TupleEditor
 import numpy as np
 import tables
 
@@ -27,6 +27,46 @@ modes = {'raw': 0,
          'test sinusoid': 5,
          }
 
+
+from cns.traits.ui.api import ListAsStringEditor
+
+#CH_DIFF = [Range(0, 16, 4*int(i/4)+1) for i in range(16)]
+#CH_DIFF = [List(Int, []) for i in range(16)]
+CH_DIFF = [Str() for i in range(16)]
+#CH_DIFF_EDITORS = [ListAsStringEditor() for i in range(len(CH_DIFF))]
+CH_DIFF_LABELS = [str(i) for i in range(1, len(CH_DIFF)+1)]
+
+def to_list(string):
+    '''
+    Converts a string to a list of integers
+
+    >>> to_list('11')
+    [11]
+
+    >>> to_list('1-4')
+    [1, 2, 3, 4]
+
+    >>> to_list('1, 3-6')
+    [1, 3, 4, 5, 6]
+
+    >>> to_list('1, 3-4, 10')
+    [1, 3, 4, 10]
+
+    >>> to_list('1, 3 - 4, 10')
+    [1, 3, 4, 10]
+    '''
+    elements = [s.strip() for s in string.split(',')]
+    indices = []
+    for element in elements:
+        if '-' in element:
+            lb, ub = [int(e.strip()) for e in element.split('-')]
+            indices.extend(range(lb, ub+1))
+        elif element == '':
+            pass
+        else:
+            indices.append(int(element))
+    return indices
+
 class MedusaSettings(HasTraits):
 
     # IN settings
@@ -35,11 +75,21 @@ class MedusaSettings(HasTraits):
                         Tuple(Range(1, 16,  5), Float(50e3)),
                         Tuple(Range(1, 16,  9), Float(50e3)),
                         Tuple(Range(1, 16, 13), Float(50e3)))
-    ch_diff     = Tuple(Range(0, 16, 0),
-                        Range(0, 16, 0),
-                        Range(0, 16, 0),
-                        Range(0, 16, 0),
-                        )
+
+    diff        = Tuple(*CH_DIFF)
+    diff_matrix = Property
+
+    def _get_diff_matrix(self):
+        n_chan = len(self.diff)
+        map = np.zeros((n_chan, n_chan))
+        for ch, diff in enumerate(self.diff):
+            channels = to_list(diff)
+            if len(channels) != 0:
+                sf = -1.0/len(channels)
+                for d in channels:
+                    map[ch, d-1] = sf
+        print map.ravel()
+        return map.ravel()
 
     #attenuation = Range(0.0, 120.0, 20.0)
 
@@ -69,7 +119,8 @@ class MedusaSettings(HasTraits):
                     label='Monitor Channels',
                     show_border=True),
                 VGroup(
-                    Item('ch_diff', show_label=False),
+                    Item('diff', show_label=False,
+                         editor=TupleEditor(labels=CH_DIFF_LABELS)),
                     label='Differential Electrodes',
                     show_border=True),
 
@@ -121,6 +172,12 @@ class MedusaController(Controller):
             n = i+1 
             getattr(self.RZ5, 'ch_out_%d' % n).value = ch
             getattr(self.RZ5, 'ch_out_g_%d' % n).value = gain
+
+    @on_trait_change('settings.diff')
+    def update_ch_diff(self):
+        self.RZ5.diff_map.set(self.settings.diff_matrix)
+        print self.RZ5.diff_map.get()
+        #self.RZ5.diff_gain.value = self.settings.diff_gain
     
     #@on_trait_change('settings.ch_diff')
     #def update_ch_differential(self, new):
@@ -210,3 +267,6 @@ if __name__ == '__main__':
     #import pstats
     #p = pstats.Stats('profile.dmp')
     #p.strip_dirs().sort_stats('cumulative').print_stats(50)
+
+    #import doctest
+    #doctest.testmod()

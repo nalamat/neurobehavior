@@ -13,7 +13,10 @@ def generate_envelope(n, ramp_type, ramp_n):
     '''
     Generate envelope
     '''
-    ramp = generate_ramp(ramp_type, ramp_n)
+    if ramp_type != 'cosine squared':
+        raise ValueError, "not supported"
+    #ramp = generate_ramp(ramp_type, ramp_n)
+    ramp = cos2ramp(ramp_n)
     return np.r_[ramp, np.ones(n-2*ramp_n), ramp[::-1]]
 
 def cos2taper(waveform, ramp_n):
