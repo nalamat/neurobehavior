@@ -171,7 +171,7 @@ class PositiveController(ExperimentController, PumpControllerMixin):
         
         # Configure circuit
         self.circuit.TTL.initialize(src_type=np.int8)
-        self._init_apply_go_signal()
+        self._apply_go_signal()
         self._apply_nogo_signal()
         self.circuit.signal_dur_n.value = self.circuit.go_buf_n.value
         self.current_trial_start_idx = 0
@@ -302,7 +302,7 @@ class PositiveController(ExperimentController, PumpControllerMixin):
     _apply_parameter_order = _reset_current
     _apply_parameters = _reset_current
 
-    def _init_apply_go_signal(self):
+    def _apply_go_signal(self):
         signal = self.model.paradigm.signal
         current = self.current_parameter
         signal.set_variable(current.parameter)
@@ -311,20 +311,10 @@ class PositiveController(ExperimentController, PumpControllerMixin):
         self.pump.rate = current.reward_rate
         self.circuit.reward_dur_n.set(current.reward_duration, 's')
 
-    def _apply_go_signal(self):
-        current = self.current_parameter
-        self.pump.rate = current.reward_rate
-        self.circuit.reward_dur_n.set(current.reward_duration, 's')
-        return
-        current = self.current_parameter
-        self.pump.rate = current.reward_rate
-        self.circuit.reward_dur_n.set(current.reward_duration, 's')
-
     def _apply_nogo_signal(self):
         signal = self.model.paradigm.signal
         signal.set_variable(self.current_nogo_parameter)
         self.circuit.nogo_buf.set(signal)
-        #import pylab; pylab.plot(signal.signal); pylab.show();
         self.backend.set_attenuation(signal.attenuation, 'PA5')
 
     def _apply_spout_sensor(self, value):

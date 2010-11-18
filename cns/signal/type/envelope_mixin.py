@@ -4,7 +4,7 @@ from enthought.traits.api import HasTraits, Property, CFloat, Range, Enum, \
 import logging
 log = logging.getLogger(__name__)
 
-from cns.signal.util import generate_ramp, generate_envelope
+from cns.signal.util import generate_envelope
 
 import numpy as np
 
@@ -71,9 +71,9 @@ class AMMixin(EnvelopeMixin):
 
 class RampMixin(EnvelopeMixin):
 
-    ramp_type       = Enum('cosine squared', 'cosine', 'linear',
-                           label='Ramp type', unit=None,
-                           store='attribute')
+    #ramp_type       = Enum('cosine squared', 'cosine', 'linear',
+    #                       label='Ramp type', unit=None,
+    #                       store='attribute')
     ramp_time       = CFloat(0.5e-3, configurable=True,
                              label='Ramp time', unit='sec',
                              store='attribute')
@@ -96,13 +96,10 @@ class RampMixin(EnvelopeMixin):
             log.warn('Coercing ramp duration for %r to %r', self, max_ramp)
             self.set(trait_change_notify=False, ramp_duration=max_ramp)
 
-    def generate_ramp(self):
-        return generate_ramp(self.ramp_type, n)
-
     def _get_envelope(self):
         ramp_n = int(self.ramp_time * self.fs)
         env_n = int(self.ramp_duration * self.fs)
-        envelope = generate_envelope(env_n, self.ramp_type, ramp_n)
+        envelope = generate_envelope(env_n, 'cosine squared', ramp_n)
 
         if self.ramp_delay_ref == 'onset':
             pre_n = int(self.ramp_delay * self.fs)
