@@ -293,7 +293,7 @@ class ExperimentController(Controller):
     pending_changes = Dict({})
     old_values = Dict({})
 
-    @on_trait_change('model.paradigm.+', post_init=True)
+    @on_trait_change('model.paradigm.+, model.paradigm.parameters.+', post_init=True)
     def queue_change(self, object, name, old, new):
         if self.state <> 'halted':
             key = object, name

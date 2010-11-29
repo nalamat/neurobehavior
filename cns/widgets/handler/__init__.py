@@ -18,13 +18,8 @@ def filehandler_menu():
                     Action(name='Save as...', action='saveas_file',
                            enabled_when='_modified')]
 
-    #exit_actions = [Action(name='Exit', action='close',
-    #                       accelerator='Ctrl+W')]
-
     open_actions = ActionGroup(*open_actions)
     save_actions = ActionGroup(*save_actions)
-    #exit_actions = ActionGroup(*exit_actions)
-    #menu = Menu(open_actions, save_actions, exit_actions, name='&File')
     menu = Menu(open_actions, save_actions, name='&File')
     return menu
 

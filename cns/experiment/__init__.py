@@ -1,5 +1,3 @@
-from enthought.etsconfig.api import ETSConfig
-ETSConfig.toolkit = 'qt4'
 from enthought.pyface.api import error
 from cns.data.ui.cohort import CohortView, CohortViewHandler, animal_editor
 from cns.data import persistence
@@ -33,7 +31,6 @@ class ExperimentLauncher(CohortViewHandler):
         paradigm will not be saved.
         '''
         try:
-            #item = info.object.selected
             item = selected
             if item.store_node._v_isopen:
                 animal_node = item.store_node
@@ -115,7 +112,6 @@ def load_experiment_launcher():
 def test_experiment(etype):
     import tables
     test_file = tables.openFile('test.hd5', 'w')
-    #experiment_map[etype](store_node=test_file.root).configure_traits()
     globals()[etype](store_node=test_file.root).configure_traits()
 
 if __name__ == '__main__':
@@ -124,4 +120,3 @@ if __name__ == '__main__':
     import pstats
     p = pstats.Stats('profile.dmp')
     p.strip_dirs().sort_stats('cumulative').print_stats(50)
-    #test_experiment(sys.argv[1])
