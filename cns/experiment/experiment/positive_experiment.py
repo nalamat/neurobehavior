@@ -171,6 +171,13 @@ class PositiveExperiment(HasTraits):
                         VGroup(
                             Item('handler.current_poke_dur', 
                                  label='Poke duration (s)', style='readonly'),
+                            Item('handler.current_parameter', style='readonly'),
+                            #Item('handler.current_parameter.parameter',
+                            #     label='Current paramter', style='readonly'),
+                            #Item('handler.current_parameter.reward_rate',
+                            #     label='Reward rate (mL/m)', style='readonly'),
+                            #Item('handler.current_parameter.reward_duration',
+                            #     label='Current reward duration (s)', style='readonly'),
                             ),
                         label='Status',
                         show_border=True,

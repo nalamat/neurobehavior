@@ -97,8 +97,6 @@ class PositiveController(ExperimentController, PumpControllerMixin):
                      'score_window_duration': 'circuit.score_dur_n', 
                      'reward_duration': 'circuit.reward_dur_n', 
                      'signal_offset_delay': 'circuit.sig_offset_del_n', 
-                     'spout_sensor': 'handler._apply_spout_sensor',
-                     #'spout_smooth_duration': 'circuit.spout_smooth_n', 
                      'timeout_duration': 'circuit.to_dur_n', 
                      'TTL_fs': 'circuit.TTL_nPer',
                      'syringe_diameter': 'handler._apply_syringe_diameter',
@@ -121,6 +119,7 @@ class PositiveController(ExperimentController, PumpControllerMixin):
 
     current_trial = Int
     current_poke_dur = Float
+
     current_num_nogo = Int
     current_repeat_FA = Bool
     current_parameter = Any
@@ -141,7 +140,9 @@ class PositiveController(ExperimentController, PumpControllerMixin):
         self.choice_num_nogo = partial(np.random.randint, lb, ub+1)
 
         selector = self.model.paradigm.parameter_order_
-        self.choice_parameter = selector(self.model.paradigm.parameters)
+        import copy
+        sequence = copy.deepcopy(self.model.paradigm.parameters)
+        self.choice_parameter = selector(sequence)
 
         # Refresh experiment state
         self.current_trial = 1
@@ -246,7 +247,6 @@ class PositiveController(ExperimentController, PumpControllerMixin):
             # through due to downsampling.  Keep tryign until the data is
             # available.
             while True:
-                print "Stuck in this loop!"
                 try:
                     self.model.data.log_trial(ts_start, ts_end, last_ttype)
                     break
@@ -276,10 +276,10 @@ class PositiveController(ExperimentController, PumpControllerMixin):
                 self._apply_go_signal()
             else:
                 # Refresh NOGO (important for non-frozen noise)
-                #self._apply_nogo_signal()
+                self._apply_nogo_signal()
                 pass
 
-            self.current_parameter = self.choice_parameter.next()
+            #self.current_parameter = self.choice_parameter.next()
             self.current_trial_end_idx += 1
             self.current_poke_dur = self.choice_poke_dur()
             self.circuit.poke_dur_n.set(self.current_poke_dur, 's')
@@ -303,6 +303,7 @@ class PositiveController(ExperimentController, PumpControllerMixin):
     _apply_parameters = _reset_current
 
     def _apply_go_signal(self):
+        print self.current_parameter
         signal = self.model.paradigm.signal
         current = self.current_parameter
         signal.set_variable(current.parameter)
@@ -317,11 +318,9 @@ class PositiveController(ExperimentController, PumpControllerMixin):
         self.circuit.nogo_buf.set(signal)
         self.backend.set_attenuation(signal.attenuation, 'PA5')
 
-    def _apply_spout_sensor(self, value):
-        if value == 'touch':
-            self.circuit.contact_method.value = 0
-        else:
-            self.circuit.contact_method.value = 2
+    _apply_parameters_items = _reset_current
+    _apply_reward_rate = _reset_current
+    _apply_reward_duration = _reset_current
 
     def log_event(self, ts, name, value):
         pass

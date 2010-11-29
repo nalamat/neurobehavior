@@ -3,7 +3,7 @@ Created on Jun 9, 2010
 
 @author: admin_behavior
 '''
-from config import settings
+import settings
 
 from cns import equipment
 from cns.channel import FileMultiChannel, MultiChannel, RAMMultiChannel, \
@@ -91,7 +91,7 @@ class MedusaSettings(HasTraits):
         print map.ravel()
         return map.ravel()
 
-    #attenuation = Range(0.0, 120.0, 20.0)
+    attenuation = Range(0.0, 120.0, 20.0)
 
     #ch_out      = Range(1, 16, 1)
     #ch_out_gain = Float(50e3)
@@ -99,20 +99,20 @@ class MedusaSettings(HasTraits):
 
     #ch_diff     = Range(1, 16, 1)
 
-    #fc_low      = Float(3e3)
-    #fc_high     = Float(300)
+    fc_low      = Float(3e3)
+    fc_high     = Float(300)
 
     # OUT settings
-    #selector    = Instance(SignalDialog, {'allow_par': False})
-    #signal      = DelegatesTo('selector')
-    #trial_dur   = Float(5)
+    selector    = Instance(SignalDialog, {'allow_par': False})
+    signal      = DelegatesTo('selector')
+    trial_dur   = Float(5)
 
     # REPS
     #reps        = Int(-1)
 
     traits_view = View(
             VGroup(
-                #'attenuation{Attenuation (dB SPL)}',
+                'attenuation{Attenuation (dB SPL)}',
                 'mode',
                 VGroup(
                     Item('ch_out', show_label=False),
@@ -125,12 +125,11 @@ class MedusaSettings(HasTraits):
                     show_border=True),
 
                 #'ch_out_gain{Monitor channel gain}',
-                #'fc_low{Lowpass cutoff (Hz)}',
-                #'fc_high{Highpass cutoff (Hz)}',
-                #'trial_dur{Trial duration (s)}',
+                'fc_low{Lowpass cutoff (Hz)}',
+                'fc_high{Highpass cutoff (Hz)}',
+                'trial_dur{Trial duration (s)}',
                 #'reps{Repetitions (-1=infinite)}',
-                #'selector{}@')
-                ),
+                'selector{}@')
             )
 
 class MedusaController(Controller):

@@ -40,6 +40,11 @@ class ParSetting(HasTraits):
     def __cmp__(self, other):
         return cmp(self.parameter, other.parameter)
 
+    def __str__(self):
+        return "{0}, {1}s at {2}mL/m".format(self.parameter,
+                                             self.reward_duration,
+                                             self.reward_rate)
+
 table_editor = TableEditor(
         editable=True,
         deletable=True,

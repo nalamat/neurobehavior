@@ -131,6 +131,33 @@ NumpyDoc_
 .. _Sphinx: http://sphinx.pocoo.org/ 
 .. _NumpyDoc: http://pypi.python.org/pypi/numpydoc/
 
+Preparing the COM interface
+---------------------------
+Some hardware manufacturers (i.e. TDT) provide ActiveX (COM) libraries for their
+hardware.  You can use the win32com module to interface with these libraries.
+The easiest process is to use makey.  Open up a command prompt and type:
+
+>>> python -m win32com.client.makepy
+
+A popup window with all the COM libraries available will appear.  Select the
+library you want (i.e. TDevAccX) and click OK.  You'll get the following
+message:
+
+>>> python -m win32com.client.makepy
+Generating to c:\Python26\lib\site-packages\win32com\gen_py\831D8AF7-7E2B-426B-A430-18E670F56C12x0x10x9.py
+Building definitions from type library...
+Generating...
+Importing module
+
+Pay attention to the "Generating to" path.  Find the file described and copy it
+over to where you keep the rest of your Python modules (I store mine under
+cns.equipment.TDT.actxobjects).  When you need to use the library, just import
+the module you created!
+
+Note that you could skip this whole process if you are happy with "late-binding"
+automation (i.e. what Matlab uses); however, this is an inefficient process and
+I have not documented it (so you'd have to figure it out on your own).
+
 A few points for new Python programmers
 =======================================
 The best place to start learning Python is to download one of the distributions

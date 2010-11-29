@@ -1,7 +1,8 @@
 from os.path import dirname, join, abspath
 
 LIBRARY_ROOT = dirname(abspath(__file__))
-DATA_ROOT = abspath(join(LIBRARY_ROOT, '../../data'))
+#DATA_ROOT = abspath(join(LIBRARY_ROOT, '../../data'))
+DATA_ROOT = 'C:/experiments/data'
 CONFIG_ROOT = abspath(join(LIBRARY_ROOT, '../config'))
 
 PAR_WILDCARD    = 'Paradigm files (*.paradigm)|*.paradigm|'
