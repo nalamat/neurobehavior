@@ -114,8 +114,8 @@ class PositiveController(ExperimentController, PumpControllerMixin):
 
     current_loop = Int
 
-    current_trial_start_idx = Int
-    current_trial_end_idx = Int
+    #current_trial_start_ts = Int
+    current_trial_end_ts = Int
 
     current_trial = Int
     current_poke_dur = Float
@@ -175,8 +175,9 @@ class PositiveController(ExperimentController, PumpControllerMixin):
         self._apply_go_signal()
         self._apply_nogo_signal()
         self.circuit.signal_dur_n.value = self.circuit.go_buf_n.value
-        self.current_trial_start_idx = 0
-        self.current_trial_end_idx = 0
+        #self.current_trial_start_idx = 0
+        self.current_trial_end_ts = self.circuit.trial_end_ts.value
+        print 'TRIAL_TS_END', self.current_trial_end_ts
 
         targets = [
                 self.model.data.poke_TTL,
@@ -193,7 +194,9 @@ class PositiveController(ExperimentController, PumpControllerMixin):
         self.current_loop = 0
         self.model.data.start_time = datetime.now()
         self.circuit.start()
+        print self.circuit.trial_end_ts.value
         self.circuit.trigger(1)
+        print self.circuit.trial_end_ts.value
 
     def stop_experiment(self, info=None):
         self.state = 'halted'
@@ -220,14 +223,19 @@ class PositiveController(ExperimentController, PumpControllerMixin):
     ############################################################################
     def tick(self):
         self.current_loop += 1
+
+        # Don't be silly.  We don't need to query the pump on *every* tick (it's
+        # actually quite a slow operation).
         if (self.current_loop % 5) == 0:
             self.water_infused = self.pump.infused
             # update status here
 
-        if self.circuit.trial_end_idx.value > self.current_trial_end_idx:
+        print self.circuit.trial_end_ts.value
+        if self.circuit.trial_end_ts.value > self.current_trial_end_ts:
             # Trial is over.  Process new data and set up for next trial.
             ts_start = self.circuit.trial_start_ts.value
             ts_end = self.circuit.trial_end_ts.value
+            self.current_trial_end_ts = ts_end
 
             # Read the TTL data after we read ts_start and ts_end, but before we
             # score the data.  This ensures that we have the most up-to-date TTL
@@ -243,8 +251,8 @@ class PositiveController(ExperimentController, PumpControllerMixin):
             else:
                 last_ttype = 'NOGO'
 
-            # Sometimes it takes a msec for the requisite contact data to come
-            # through due to downsampling.  Keep tryign until the data is
+            # Sometimes it takes a ms for the requisite contact data to come
+            # through due to downsampling.  Keep trying until the data is
             # available.
             while True:
                 try:
@@ -272,15 +280,17 @@ class PositiveController(ExperimentController, PumpControllerMixin):
             # circuit accordingly.
             if self.current_trial == self.current_num_nogo + 1:
                 # Next trial should be a GO.  Prepare circuit.
-                self.circuit.trigger(2)
+                self.circuit.GO.value = 1
+                #self.circuit.trigger(2)
                 self._apply_go_signal()
             else:
                 # Refresh NOGO (important for non-frozen noise)
+                self.circuit.GO.value = 0
                 self._apply_nogo_signal()
                 pass
 
             #self.current_parameter = self.choice_parameter.next()
-            self.current_trial_end_idx += 1
+            #self.current_trial_end_idx += 1
             self.current_poke_dur = self.choice_poke_dur()
             self.circuit.poke_dur_n.set(self.current_poke_dur, 's')
             self.circuit.trigger(1)
