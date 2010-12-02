@@ -54,7 +54,7 @@ trial_log_table = TableEditor(
         sort_model=False,
         columns=[
             TrialTypeColumn(index=0, label='start'),
-            #TrialTypeColumn(index=1, label='end'),
+            TrialTypeColumn(index=1, label='end'),
             #TrialTypeColumn(index=2, label='type'),
             TrialResponseColumn(index=3, label='response'),
             TrialTypeColumn(index=4, label='reaction time'),
