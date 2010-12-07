@@ -175,9 +175,7 @@ class PositiveController(ExperimentController, PumpControllerMixin):
         self._apply_go_signal()
         self._apply_nogo_signal()
         self.circuit.signal_dur_n.value = self.circuit.go_buf_n.value
-        #self.current_trial_start_idx = 0
         self.current_trial_end_ts = self.circuit.trial_end_ts.value
-        print 'TRIAL_TS_END', self.current_trial_end_ts
 
         targets = [
                 self.model.data.poke_TTL,
@@ -194,9 +192,7 @@ class PositiveController(ExperimentController, PumpControllerMixin):
         self.current_loop = 0
         self.model.data.start_time = datetime.now()
         self.circuit.start()
-        print self.circuit.trial_end_ts.value
         self.circuit.trigger(1)
-        print self.circuit.trial_end_ts.value
 
     def stop_experiment(self, info=None):
         self.state = 'halted'

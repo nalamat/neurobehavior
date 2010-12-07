@@ -46,7 +46,9 @@ class SequenceAdapter(TabularAdapter):
 #        editable=True,
 #        )
 
-class BaseAversiveParadigm(Paradigm):
+from .pump_settings_mixin import PumpSettingsMixin
+
+class BaseAversiveParadigm(Paradigm, PumpSettingsMixin):
     '''Defines an aversive paradigm, but not the signals that will be used.
     This allows us to use either a generic circuit with two buffers for the
     warn/safe signal, or a circuit that is specialized for a specific kind of
