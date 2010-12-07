@@ -26,12 +26,14 @@ def generate_signal(template, parameter):
 
 log = logging.getLogger(__name__)
 
-class BaseAversiveController(ExperimentController):
+from .pump_controller_mixin import PumpControllerMixin
+
+class BaseAversiveController(ExperimentController, PumpControllerMixin):
 
     circuit = Any
     
     backend = Any
-    pump = Any
+    #pump = Any
 
     exp_node = Any
     data_node = Any
@@ -73,8 +75,7 @@ class BaseAversiveController(ExperimentController):
     status = Property(Str, depends_on='state, current_+')
     time_elapsed = Property(Str, depends_on='slow_tick', label='Time')
 
-    slow_tick = Event
-    fast_tick = Event
+    pipeline = Any
 
     def init_current(self, info=None):
         paradigm = self.model.paradigm
@@ -91,15 +92,8 @@ class BaseAversiveController(ExperimentController):
 
         self._apply_signal_safe()
 
-    def init_equipment(self, info):
-        log.debug('init_equipment')
-        super(BaseAversiveController, self).init_equipment(info)
-        self.pump = equipment.pump().Pump()
-
     def init_experiment(self, info):
-        log.debug('init_experiment')
         super(BaseAversiveController, self).init_experiment(info)
-
         self.model.exp_node = append_date_node(self.model.store_node,
                                                pre='aversive_date_')
         log.debug('Created experiment node for experiment at %r',
@@ -110,9 +104,13 @@ class BaseAversiveController(ExperimentController):
                                        store_node=self.model.data_node)
         self.init_current(info)
 
+        targets = [self.model.data.contact_digital,
+                   self.model.data.contact_digital_mean,
+                   self.model.data.trial_running, 
+                   self.model.data.contact_analog ]
+        self.pipeline = deinterleave(targets)
+
     def start_experiment(self, info):
-        self.fast_timer = Timer(250, self.tick, 'fast')
-        self.slow_timer = Timer(1000, self.tick, 'slow')
         self.pause()
         self.model.data.start_time = datetime.now()
         self.circuit.start()
@@ -137,14 +135,6 @@ class BaseAversiveController(ExperimentController):
 
     def stop_experiment(self, info=None):
         self.state = 'halted'
-
-        try:
-            self.slow_timer.stop()
-            self.fast_timer.stop()
-        except AttributeError:
-            self.slow_timer.Stop()
-            self.fast_timer.Stop()
-
         self.circuit.stop()
         self.pending_changes = {}
         self.old_values = {}
@@ -160,7 +150,7 @@ class BaseAversiveController(ExperimentController):
         self.model.data.edit_traits(parent=info.ui.control, view=view)
 
         # Save the data in our newly created node
-        add_or_update_object(self.pump, self.model.exp_node, 'Pump')
+        #add_or_update_object(self.pump, self.model.exp_node, 'Pump')
         add_or_update_object(self.model.paradigm, self.model.exp_node, 'Paradigm')
         add_or_update_object(self.model.data, self.model.exp_node, 'Data')
         analyzed_node = get_or_append_node(self.model.data.store_node, 'Analyzed')
@@ -169,18 +159,14 @@ class BaseAversiveController(ExperimentController):
     #===========================================================================
     # Tasks driven by the slow and fast timers
     #===========================================================================
-    @on_trait_change('slow_tick')
-    def task_update_pump(self):
-        infused = self.pump.infused
-        self.model.data.log_water(self.circuit.ts_n.value, infused)
-        self.water_infused = infused
-        
-    @on_trait_change('fast_tick')
-    def task_update_data(self):
-        self.model.data.contact_data.send(self.circuit.contact_buf.read())
+    #def task_update_pump(self):
+    #    infused = self.pump.infused
+    #    self.model.data.log_water(self.circuit.ts_n.value, infused)
+    #    self.water_infused = infused
 
-    @on_trait_change('fast_tick')
-    def task_monitor_circuit(self):
+    def tick(self):
+        self.pipeline.send(self.circuit.contact_buf.read())
+
         if self.circuit.idx.value > self.current_idx:
             self.current_idx += 1
             ts = self.circuit.lick_ts_trial_start_n.value
@@ -247,21 +233,6 @@ class BaseAversiveController(ExperimentController):
             status = 'PAUSED: next trial is %s' % status
         return status
 
-    @on_trait_change('pump.rate')
-    def log_pump(self, new):
-        if self.state <> 'halted':
-            self.model.data.log_event(self.circuit.ts_n.value, 'pump rate', new)
-
-    #count = CInt(0)
-
-    contact_pipe = Any
-
-    def _contact_pipe_default(self):
-        targets = [self.model.data.contact_digital,
-                   self.model.data.contact_digital_mean,
-                   self.model.data.trial_running, 
-                   self.model.data.contact_analog ]
-        return deinterleave(targets)
 
     ############################################################################
     # Code to apply parameter changes
@@ -300,6 +271,8 @@ class AversiveController(BaseAversiveController):
                      'aversive_stimulus': 'handler._apply_aversive_stimulus',
                      'aversive_delay': 'circuit.aversive_del_n',
                      'aversive_duration': 'circuit.aversive_dur_n',
+                     'syringe_diameter': 'handler._apply_syringe_diameter',
+                     'pump_rate': 'handler._apply_pump_rate', 
                      }
 
     @on_trait_change('fast_tick')
@@ -356,9 +329,9 @@ class AversiveFMController(BaseAversiveController):
                      'trial_duration': 'circuit.trial_dur_n',
                      }
 
-    @on_trait_change('fast_tick')
-    def task_update_data(self):
-        self.contact_pipe.send(self.circuit.contact_buf.read())
+    #@on_trait_change('fast_tick')
+    #def task_update_data(self):
+    #    self.contact_pipe.send(self.circuit.contact_buf.read())
 
     def _apply_signal_warn(self):
         self.circuit.depth.value = self.current_par
