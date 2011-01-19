@@ -21,7 +21,26 @@ import tables
 import logging
 log = logging.getLogger(__name__)
 
-class AbstractChannel(HasTraits):
+class Timeseries(HasTraits):
+
+    updated = Event
+    fs = Float
+    t0 = Float(0)
+
+    buffer = List([])
+    metadata = List([])
+
+    def send(self, timestamps):
+        #timestamps = np.array(timestamps)/self.fs
+        self.buffer.extend(timestamps.ravel())
+        self.updated = timestamps
+
+    def get_range(self, lb, ub):
+        timestamps = np.array(self.buffer)/self.fs 
+        mask = (timestamps>=lb)&(timestamps<ub)
+        return timestamps[mask]
+
+class Channel(HasTraits):
     '''
     Base class for dealing with a continuous stream of data.  Facilitates
     extracting a segment of the waveform (for analysis or plotting)
@@ -35,18 +54,23 @@ class AbstractChannel(HasTraits):
         may discard old data (e.g.  :class:`RAMChannel`), so we need to factor
         in the time offset when attempting to extract a given segment of the
         waveform for analysis.  
-
-    trigger_indices
-        Indices of triggers relative to the start of acquisition.  Eventually I
-        want to split this out of the class and simply provide the value to
-        :func:`get_range` that way we can select which trigger we want to
-        reference the data to.
     '''
 
+    fs = Float                          # Sampling frequency
+    t0 = Float(0)                       # Time of first sample (typically zero)
+
+    updated = Event
+
+    signal = Property
+
+    def _get_signal(self):
+        raise NotImplementedError, 'Use a subclass of Channel'
+
     def to_index(self, time):
-        '''Convert time to the corresponding index in the waveform.  Note that
-        the index may be negative if the time is less than t0.  Since Numpy
-        allows negative indices, be sure to check the value.
+        '''
+        Convert time to the corresponding index in the waveform.  Note that the
+        index may be negative if the time is less than t0.  Since Numpy allows
+        negative indices, be sure to check the value.
         '''
         return int((time-self.t0)*self.fs)
 
@@ -71,7 +95,6 @@ class AbstractChannel(HasTraits):
         t0_index = int(self.t0*self.fs)
         lb = max(0, start-t0_index+reference)
         ub = max(0, end-t0_index+reference)
-        log.debug('Signal shape %r', self.signal.shape)
         return self.signal[..., lb:ub]
 
     def get_index(self, index, reference=0):
@@ -89,32 +112,41 @@ class AbstractChannel(HasTraits):
             Start time.
         end : float, sec
             End time.
-        reference : int, optional
-            Trigger index to reference to.  If None, start is referenced to
-            start of data acquisition.  If -1, start is referenced to the time
-            of the most recent trigger.
-
-        Note: Eventually reference will be deprecated in favor of passing the
-        actual trigger time.  Right now we can associate only a single set of
-        triggers with a channel!
+        reference : float, optional
+            Set to -1 to get the most recent range
         '''
-        log.debug('Range (%.2f, %.2f)', lb, ub)
+        # Return an empty array of the appropriate dimensionality (whether it's
+        # single or multichannel)
+        if start == end:
+            return self.signal[..., 0:0]
+
+        # Otherwise, ensure that start time is greater than end 
+        if start > end:
+            raise ValueError("Start time must be < end time")
 
         if reference is not None:
-            if len(self.trigger_indices):
-                ref_idx = self.trigger_indices[reference]
+            if reference == -1:
+                return self.get_recent_range(start, end)
             else:
-                return self.signal[..., 0:0], 0, 0
+                ref_idx = self.to_index(reference)
         else:
             ref_idx = 0
-        lb = max(0, self.to_index(start)+ref_idx)
-        ub = max(0, self.to_index(end)+ref_idx)
-        log.debug('Range index (%d, %d)', lb, ub)
-        log.debug('Signal size %r', self.signal.shape)
-        signal = self.signal[..., lb:ub]
-        lb_time = lb/self.fs + self.t0 - ref_idx/self.fs
-        ub_time = lb_time + len(signal)/self.fs
-        return signal, lb_time, ub_time
+
+        # Due to the two checks at the beginning of this function, we do not
+        # need to worry about start == inf and end == -inf
+        if start == -np.inf:
+            lb = self.t0
+        else:
+            lb = max(0, self.to_index(start)+ref_idx)
+        if end == np.inf:
+            ub = self.get_size()
+        else:
+            ub = max(0, self.to_index(end)+ref_idx)
+
+        return self.signal[..., lb:ub]
+        #lb_time = lb/self.fs + self.t0 - ref_idx/self.fs
+        #ub_time = lb_time + len(signal)/self.fs
+        #return signal, lb_time, ub_time
 
     def get_recent_range(self, start, end=0):
         '''
@@ -128,7 +160,6 @@ class AbstractChannel(HasTraits):
         end
             End time
         '''
-        
         lb = min(-1, int(start*self.fs))
         ub = min(-1, int(end*self.fs))
         # This check is necessary to avoid raising an error in the HDF5
@@ -141,22 +172,19 @@ class AbstractChannel(HasTraits):
         lb_time = ub_time-signal.shape[-1]/self.fs
         return signal, lb_time, ub_time
 
+    def get_size(self):
+        return self.signal.shape[-1]
+
+    def get_bounds(self):
+        '''
+        Returns valid range of times as a tuple (lb, ub)
+        '''
+        return self.t0, self.t0 + self.signal.shape[-1]/self.fs
+
     def filter(self, filter):
         raise NotImplementedException
         '''Takes b,a parameters for filter'''
         self.signal = filtfilt(self.signal, **filter)
-
-class Channel(AbstractChannel):
-
-    fs = Float                          # Sampling frequency
-    t0 = Float(0)                       # Time of first sample (typically zero)
-    trigger_indices = List([])
-
-    updated = Event
-    signal = Property
-
-    def _get_signal(self):
-        raise NotImplementedError, 'Use a subclass of Channel'
 
 class FileChannel(Channel):
     '''
@@ -235,7 +263,9 @@ class FileChannel(Channel):
         return self.buffer
 
     def send(self, data):
-        self.buffer.append(data)
+        if data.ndim != 1 and data.shape[0] != 1:
+            raise ValueError, "First dimension must be 1"
+        self.buffer.append(data.ravel())
         self.updated = True
 
     def write(self, data):
@@ -322,76 +352,28 @@ class RAMChannel(Channel):
 
     _write = _partial_write
 
-class BufferedChannel(Channel):
-
-    window = Float(10)
-    samples = Property(Int, depends_on='window, fs')
-    buffer = Instance(SoftwareRingBuffer)
-
-    @cached_property
-    def _get_samples(self):
-        return int(self.window * self.fs)
-
-    def _buffer_default(self):
-        return SoftwareRingBuffer(self.samples)
-
-    def _get_signal(self):
-        return self.buffer.data
-
-    def send(self, data):
-        if len(data):
-            self.buffer.write(data)
-            self.updated = True
-
-class StaticChannel(Channel):
-
-    _signal = Array(dtype='f')
-
-    def _get_signal(self):
-        return self._signal
-
-    def _set_signal(self, signal):
-        self._signal = signal
-
 class MultiChannel(Channel):
 
     channels = Int(8)
-    #names = List(Str)
-
-    def get_channel(self, channel):
-        try:
-            idx = self.names.index(channel)
-        except ValueError:
-            idx = channel
-        #channel = DerivedChannel(parent=self, idx=idx)
-        #channel.sync_trait('fs', self)
-        #channel.sync_trait('t0', self)
-        #channel.sync_trait('updated', self)
-        #channel.sync_trait('trigger_indices', self)
-        #return channel
-        return DerivedChannel(parent=self, idx=idx)
-
-class DerivedChannel(AbstractChannel):
-    '''This is a hack, but I'm not sure the best way around this.'''
-
-    parent = Instance(MultiChannel)
-    _ = DelegatesTo('parent')
-    signal = Property
 
     def _get_signal(self):
-        return self.parent.signal[:,self.idx]
+        return self.buffer
+
+    def send(self, data):
+        self.buffer.append(data)
+        self.updated = True
 
 class RAMMultiChannel(RAMChannel, MultiChannel):
 
     def _buffer_default(self):
         return np.empty((self.channels, self.samples))
 
-class BufferedMultiChannel(BufferedChannel, MultiChannel):
+#class BufferedMultiChannel(BufferedChannel, MultiChannel):
+#
+#    def _buffer_default(self):
+#        return SoftwareRingBuffer((self.channels, self.samples))
 
-    def _buffer_default(self):
-        return SoftwareRingBuffer((self.channels, self.samples))
-
-class FileMultiChannel(FileChannel, MultiChannel):
+class FileMultiChannel(MultiChannel, FileChannel):
 
     channels = Int(8)
     name = 'FileMultiChannel'
@@ -402,7 +384,6 @@ class FileMultiChannel(FileChannel, MultiChannel):
     def _buffer_default(self):
         buffer = super(FileMultiChannel, self)._buffer_default()
         buffer.setAttr('channels', self.channels)
-        #buffer.setAttr('names', self.names)
         return buffer
 
 class SnippetChannel(Channel):

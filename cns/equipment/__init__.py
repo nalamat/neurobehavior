@@ -1,16 +1,3 @@
-def dsp(dsp='TDT'):
-    '''Load drivers for specified DSP backend and return module that implements
-    the `cns.equipment.backend` API.  See :module:`cns.equipment.TDT` for more
-    information regarding the API.
-    '''
-    return __import__(dsp, globals=globals(), level=1)
-
-def pump(pump='new_era'):
-    '''Load drivers for specified pump and return module that implements the
-    `cns.equipment.pump` API.
-    '''
-    return __import__(pump, globals=globals(), level=1)
-
 class EquipmentError(BaseException):
 
     def __init__(self, device, mesg):

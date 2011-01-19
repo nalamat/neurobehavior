@@ -53,14 +53,13 @@ class ChannelDataSource(HasTraits):
     # however, I find that we don't really need a lot of the required methods
     # that it stubs out.
     
-    channel = Instance(Channel)
-    
-    _data_cache_valid = Bool(False)
-    _dec_cache_valid = Bool(False)
+    channel             = Instance(Channel)
+    _data_cache_valid   = Bool(False)
+    _dec_cache_valid    = Bool(False)
     downsampling_cutoff = Int(4)
-    data_changed = Event
-    decimate_mode = Str('extremes')
-    reference = Enum('last_sample', 'trigger')
+    data_changed        = Event
+    decimate_mode       = Str('extremes')
+    reference           = Enum('last_sample', 'trigger')
     
     def get_bounds(self):
         return self._data_cache_bounds
@@ -114,7 +113,7 @@ class ChannelDataSource(HasTraits):
             old.on_trait_change(self._data_changed, "updated", remove=True)
         if new is not None:
             new.on_trait_change(self._data_changed, "updated", dispatch="new")
-    
+
 class TimeSeries(BaseXYPlot):
     '''
     Often our neurophysiology data involves sampling at up to 200kHz.  If we
