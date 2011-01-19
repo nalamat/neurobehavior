@@ -104,80 +104,44 @@ Backends
 DSP backend
 -----------
 
-Right now only one DSP backend (TDT) is supported.  A backend module deals with
-the hardware and driver-specific implementation details.  For example, to read
-from a buffer on a TDT DSP device without using the backend:
+To read from a buffer on a TDT DSP via the COM interface:
 
->>> from cns.equipment.TDT.actxobjects import RX6
+>>> from tdt.actxobjects import RX6
 >>> RX6.ConnectRX6('GB', 1)
 >>> RX6.ClearCOF()
->>> RX6.LoadCOF('aversive-behavior.rcx')
+>>> RX6.LoadCOF('basic-characterization.rcx')
 >>> RX6.Start()
 >>> last_read_index = 0
 >>> while True:
-...     next_index = RX6.GetTagVal('contact_buf_idx')
+...     next_index = RX6.GetTagVal('neural_i')
 ...     if next_index > last_read_index:
 ...         length = next_index - last_read_index
-...         data = RX6.ReadTagV('contact_buf', last_read_index, length)
+...         data = RX6.ReadTagV('neural', last_read_index, length)
 ...     elif next_index < last_read_index:
-...         length_a = RX6.GetTagSize('contact_buf') - last_read_index
-...         data_a = RX6.ReadTagV('contact_buf', last_read_index, length_a)
-...         data_b = RX6.ReadTagV('contact_buf', 0, next_index)
+...         length_a = RX6.GetTagSize('neural') - last_read_index
+...         data_a = RX6.ReadTagV('neural', last_read_index, length_a)
+...         data_b = RX6.ReadTagV('neural', 0, next_index)
 ...         data = np.concatenate(data_a, data_b)
 ...     last_read_index = next_index
 ...     if some_condition_met:
 ...         break
 >>> # do something with the data
 
-Phew!  That was a lot of boilerplate code just to load a circuit, run it, and
-continously read any new data in the contact buffer.  You have to continuously
-track the last index you read, check to see if the buffer has wrapped around to
-the beginning, and acquire the data.  Wouldn't it be easier to just write:
+This is a lot of boilerplate code just to load the microcode into the hardware
+and initialize it.  In addition, just reading data from the buffer requires you
+to continuously track the last index you read and check to see if the buffer has
+wrapped around to the beginning.
 
->>> from cns import equipment
->>> circuit = equipment.dsp('TDT').load('aversive-behavior')
->>> circuit.start()
+>>> from tdt import DSPCircuit
+>>> circuit = DSPCircuit('basic-characterization', 'RX6')
+>>> buffer = circuit.get_buffer('neural')
 >>> while True:
-...     data = circuit.contact_buf.next()
+...     data = buffer.next()
 ...     if some_condition_met:
 ...         break
 >>> # do something with the data
 
-This is precisely how the backend works.  All the hardware-specific
-implementation details of how to access the DSP variables (e.g.
-contact_buf_idx), determine the buffer size, and read data from the buffer are
-handled by :func:`DSPBuffer.read` in the TDT module.  It gets even better.  Let's say
-you decide you want to go with National Instruments instead.  Hopefully at some
-point, someone has written a backend module for National Instruments (presumably
-it would live in the NI module).  In this module there would be a
-:func:`DSPBuffer.read` method that knows how to deal with the NI DSP. The only change
-you would need to make to your code is to tell it to load the NI module rather
-than the TDT module.  
-
-The call to :func:`equipment.dsp()` will load the appropriate backend driver depending
-on what's available.  Since each backend driver is expected to follow a set API,
-your code should not need to worry about backend-specific implementation details
-as long as you restrict yourself to the API.
-
-.. note:: The mechanism for specifying the backend has not really been fleshed
-    out (since we only have one supported backend).  Right now you have to
-    specify it in the `equipment.dsp` method (it currently defaults to the only
-    suported backend, TDT).  However, we could conceivably have a settings file
-    for the program that a user can edit to specify the backend, or use an
-    environment variable.  Once we need to start supporting additional backends
-    (e.g. National Instruments or Neurolarynx), we will have to put some thought
-    into the mechanism for loading multiple backends.
-
-Each backend should, at the minimum, support initializing the DSP and
-controller, load a specified circuit and allow the program to read/write to
-buffers, get/set tag values and send TTLs.
-
-First, let's load and initialze our backend:
-
->>> from cns import equipment
->>> dsp = equipment.dsp()
->>> circuit = dsp.load('circuit-name', 'device-name')
->>> circuit.run()
+To write data to a buffer on the hardware:
 
 Lets say the circuit has the buffers microphone and speaker as well as the
 tags record_duration_n and record_delay_n.  Note that both tag names end in
@@ -200,13 +164,14 @@ a 25 ms delay.  Remember that record_delay_n and record_duration_n both require
 the number of samples.  Since number of samples depends on the sampling
 frequency of the DSP, we would have to compute this:
 
->>> circuit.record_delay_n.value = int(25e-3*circuit.fs)
->>> circuit.record_duration.value = int(500e-3*circuit.fs)
+>>> circuit.set_tag('record_delay_n', int(25e-3*circuit.fs))
+>>> circuit.set_tag('record_duration', int(500e-3*circuit.fs))
 
-Alternatively, we can use a convenience method:
+Alternatively, we can use a convenience method that handles the unit conversion
+for us (n is number of samples):
 
->>> circuit.record_delay_n.set(25, src_unit='ms')
->>> circuit.record_duration_n.set(500, src_unit='ms')
+>>> circuit.cset_tag('record_delay_n', 25, src_unit='ms', dest_unit='n')
+>>> circuit.cset_tag('record_duration_n', 500, src_unit='ms', dest_unit='n')
 
 Both approaches are fine; however, we recommend that you use the
 :func:`DSPTag.set` method rather than computing the value yourself.  This makes

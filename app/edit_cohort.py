@@ -1,4 +1,4 @@
-from config import settings
+import settings
 from cns.data.ui.cohort import CohortView
 
 if __name__ == '__main__':

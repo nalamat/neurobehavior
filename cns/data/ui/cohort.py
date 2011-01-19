@@ -50,7 +50,7 @@ animal_editor = TableEditor(
             Action(name='Appetitive (Stage 1)',
                    action='launch_appetitive_stage1'),
             Action(name='Aversive (FM)', action='launch_aversive_fm'),
-            Action(name='Aversive (generic)', action='launch_aversive_generic'),
+            Action(name='Aversive (AM Noise)', action='launch_aversive_am_noise'),
             ),
         )
 

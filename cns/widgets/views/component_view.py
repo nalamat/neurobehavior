@@ -127,8 +127,8 @@ class BarChartOverlay(ComponentView):
     def trait_view(self, parent=None):
         return self.template.trait_view(parent)
 
-    def add_legend(self):
-        leg_data = dict([(c.label, c.component) for c in self.components])
-        legend = Legend(plots=leg_data, component=self.component,
-                        border_visible=False)
-        self.component.underlays.append(legend)
+    #def add_legend(self):
+    #    leg_data = dict([(c.label, c.component) for c in self.components])
+    #    legend = Legend(plots=leg_data, component=self.component,
+    #                    border_visible=False)
+    #    self.component.underlays.append(legend)

@@ -64,6 +64,9 @@ def rand_source(count, size, sleep):
 ################################################################################
 # PIPELINES
 ################################################################################
+def deinterleave_bits(targets):
+    return int_to_TTL(len(targets), deinterleave(targets))
+
 @pipeline
 def int_to_TTL(bit_depth, target):
     '''
@@ -169,22 +172,11 @@ def broadcast(targets):
 
 @pipeline
 def deinterleave(targets):
-    #n = len(targets)
     while True:
         item = np.array((yield))
         for i, target in enumerate(targets):
             if target is not None:
-                #target.send(item[:,i::n].ravel())
                 target.send(item[i].ravel())
-
-#@pipeline
-#def deinterleave_2d(targets):
-#    #n = len(targets)
-#    while True:
-#        item = np.array((yield))
-#        for i, target in enumerate(targets):
-#            if target is not None:
-#                target.send(item[i])
 
 @pipeline
 def divide(divisor, target):
@@ -201,6 +193,13 @@ def threshold(threshold, fill, target):
     while True:
         data = (yield)
         data[data<threshold] = fill
+        target.send(data)
+
+@pipeline
+def diff(map, target):
+    while True:
+        data = (yield)
+        data[1] -= data[2]
         target.send(data)
 
 ################################################################################

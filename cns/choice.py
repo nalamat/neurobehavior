@@ -45,13 +45,19 @@ def descending(sequence):
         for i in reversed(ordered_indices):
             yield sequence[i]
 
-def pseudorandom(sequence):
+def pseudorandom(sequence, seed=None):
     '''
     Returns a randomly selected element from the sequence.
     '''
-    from numpy.random import randint
+    # We need to create a stand-alone generator that cannot be affected by other
+    # parts of the code that may require random data (e.g. noise).
+    from numpy.random import RandomState
+    state = RandomState()
+    state.seed(seed)
+
+    n = len(sequence)
     while True:
-        i = randint(0, len(sequence))
+        i = state.randint(0, n)
         yield sequence[i]
 
 def exact_order(sequence):
@@ -76,6 +82,8 @@ def shuffled_set(sequence):
     the sequence.  Once the sequence is exhausted, repopulate list with the
     original sequence. 
     '''
+    if len(sequence) == 0:
+        raise ValueError, "Cannot use an empty sequence"
     from numpy.random import shuffle
     while True:
         indices = range(len(sequence))

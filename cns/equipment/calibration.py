@@ -12,13 +12,14 @@ from enthought.traits.ui.api import View, Item, VGroup
 
 class Standard(HasTraits):
 
-    manufacturer = Str
-    ID = Any('')
+    name = Str
     frequency = Float(units='Hz')
     level = Float(units='dB SPL')
 
+    def __init__(self, name
+
     def __str__(self):
-        return '{manufacturer} {ID} ({level} dB SPL @ {frequency} Hz)'.format(**self.__dict__)
+        return '{name} ({level} dB SPL @ {frequency} Hz)'.format(**self.__dict__)
 
 class Microphone(HasTraits):
 

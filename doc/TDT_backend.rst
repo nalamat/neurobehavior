@@ -45,14 +45,17 @@ seconds to upload the entire waveform.
 Additional supplies needed
 --------------------------
 
+Breakout BNC female cable
+    501-1030-ND from DigiKey_
+
 Cree XR-E (DigiKey_) - 2
     DigKey has a fairly large selection of emitters.  To narrow down the
     selection, restrict your search to those currently in-stock with a minimum
     order quantity of 1.  You want one that can take at least 700 mA.  They come
     in various colors (we use soft/warm white).
 Optical sensor
-    Infrared LED, OPV380 (DigiKey_)
-    Photodiode, PNZ335-ND (DigiKey_)
+    365-1085-ND (Optek OP950) 935 nm side photodiode
+    160-1063-ND (Lite-On LTE-302) 940 nm IR emitter
 Air puff
     Pipe adapter 1/8" NPT x 1/4" ID (Cole-Parmer Part #A2-4NP)
     PVC braided tubing 1/4" ID x 7/16" OD x 3/32" wall (Nalgene Part #8005-0070)

@@ -2,73 +2,15 @@
 Overview
 ========
 
-This file contains several key classes that work together:
+>>> pump = PumpInterface()
+>>> pump.rate = 0.5
+>>> pump.diameter = 18.5
 
-    PumpInterface
-        Handles communication with the pump hardware (e.g. changing rate,
-        querying volume dispensed, determining whether there's an error).  This
-        is the abstraction layer.
-    PumpController
-        Contains logic for responding to user interaction (e.g.  what should
-        happen when the "override" button is pressed?).  This should be able to
-        work with any abstraction layer.
-    pump_view
-        What information should the GUI have and how should it look?
-    Pump
-        The settings for the pump.
-    PumpError
-        A generic pump error.
-
-If all you care about is controlling the pump via the python shell interface or
-via your program, `PumpInterface` is the only class you need.  You can simply
-load it:
-
->>> from cns import equipment
->>> pump_backend = equipment.pump()
->>> pump = pump_backend.PumpInterface()
-
-Generating a GUI
-================
-
-However, if you want help presenting a GUI that allows the user to interact with
-the pump, then the other three classes come into play.  You might be wondering
-how the `PumpController` differs from the `PumpInterface`.  While we could
-certainly combine these two classes into a single, monolithic class, I view
-these classes as serving two very different functions.  The `PumpInterface`
-class is hardware-specific.  That is, it knows how to communicate with the pump
-itself.  The `PumpController` is hardware-independent.  You simply tell the
-`PumpController` which interface to use (right now this defaults to the New Era
-pump interface).  The `PumpController` monitors the pump (via the PumpInterface)
-and tells the PumpInterface what to do in response to changes in the GUI.
-
-By splitting out functionality like this, we can swap in a different class if we
-want the behavior to be different.  For example, we can use a different
-`pump_view` class to change how the GUI looks.  If we don't like how the current
-"handler/controller" (which determines what commands to send to the pump
-interface based on user input), we can write a different handler.  Finally, a
-new PumpInterface can be written if we ever use a pump from a different
-manufacturer.
-
-pump_view <-> PumpController <-> Pump
-                                 PumpInterface
 '''
 
 import re
-import time
-import os
-
-from enthought.etsconfig.etsconfig import ETSConfig
-from enthought.savage.traits.ui.svg_button import SVGButton
-from enthought.traits.api import Float, CFloat, Constant, Instance, Bool, HasTraits, \
-        Any, Button, Property, Trait
-from enthought.traits.ui.api import Controller, Item, HGroup, View, VGroup
-from cns.widgets import icons
-from enthought.pyface.timer.api import Timer
-from cns.equipment import EquipmentError
-
 import logging
 log = logging.getLogger(__name__)
-
 
 #####################################################################
 # Custom-defined pump error messages
@@ -77,7 +19,7 @@ log = logging.getLogger(__name__)
 # exceptions so that we can provide messages and information specific to
 # problems with the pump hardware.
 
-class PumpError(EquipmentError):
+class PumpError(BaseException):
 
     def __init__(self, code, cmd=''):
         self.code = code
@@ -117,8 +59,8 @@ class PumpHardwareError(PumpError):
             'O'     : 'Pumping program phase out of range',
             }
 
-    _todo = 'Pump has reported an error.  Please check to ensure pump motor ' + \
-            'is not over-extended and power-cycle the pump.'
+    _todo = 'Pump has reported an error.  Please check to ensure pump ' + \
+            'motor is not over-extended and power-cycle the pump.'
 
 class PumpUnitError(Exception):
     # This is a custom error I added that is not part of the pump interface
@@ -140,7 +82,6 @@ try:
             dsrdtr=None, interCharTimeout=None)
     SERIAL = serial.Serial(**connection_settings)
 except serial.SerialException, e:
-    #raise PumpCommError('SER', 'serial.Serial')
     pass
 
 class PumpInterface(object):
@@ -464,197 +405,3 @@ class PumpInterface(object):
             raise PumpCommError(match.group('data')[1:], cmd)
         self.cur_status = match.group('status')
         return match.group('data')
-
-#class PumpToolBar(HasTraits):
-#    '''
-#    Toolbar containing command buttons that allow us to control the pump via
-#    a GUI.  Three basic commands are provided: increase rate, decrease rate, and
-#    override the TTL input (so pump continuously infuses).  There are two
-#    additional commands, intialize and shutdown, which essentially infuse or
-#    withdraw, respectively, a fixed volume.  This would be used at the start or
-#    end of an experiment to fill the tube or drain it.  However, we do not
-#    include buttons for these on the toolbar to prevent the user from
-#    accidentally clicking on them during an experiment!
-#    '''
-#
-#    handler = Any
-#
-#    # There are two primary backends for the GUI system we are using: QT4 and
-#    # WxWidgets.  WxWidgets has an ugly SVG button renderer, so we use
-#    # text-based buttons when  using WxWidgets.  When QT4 is the active backend,
-#    # we can use some pretty-looking SVG buttons (that show the toggle state).
-#    if ETSConfig.toolkit == 'qt4':
-#        kw = dict(height=18, width=18)
-#        increase = SVGButton(filename=icons.up, **kw)
-#        decrease = SVGButton(filename=icons.down, **kw)
-#        override = SVGButton(filename=icons.right2, tooltip='override',
-#                             toggle=True, **kw)
-#        #initialize  = SVGButton(filename=icons.first, **kw)
-#        #shutdown    = SVGButton(filename=icons.last, **kw)
-#        item_kw = dict(show_label=False)
-#    else:
-#        increase = Button('+')
-#        decrease = Button('-')
-#        override = Button('O')
-#        initialize = Button('I')
-#        shutdown = Button('W')
-#        item_kw = dict(width= -24, height= -24, show_label=False)
-#
-#    group = HGroup(Item('increase', **item_kw),
-#                   Item('decrease', **item_kw),
-#                   Item('override', **item_kw),
-#                   '_',
-#                   )
-#
-#    traits_view = View(group)
-#
-#    def _increase_fired(self, event):
-#        self.handler.do_increase(self.handler.info)
-#
-#    def _decrease_fired(self, event):
-#        self.handler.do_decrease(self.handler.info)
-#
-#    def _override_fired(self, event):
-#        # TODO: we should probably consider adding some code to update the look
-#        # of the override button when it's in text mode so the user has some
-#        # visual feedback that the pump is in 'override' mode.
-#        self.handler.do_toggle_override(self.handler.info)
-#
-#    def _initialize_fired(self, event):
-#        self.handler.do_initialize(self.handler.info)
-#
-#    def _shutdown_fired(self, event):
-#        self.handler.do_shutdown(self.handler.info)
-
-#class PumpController(Controller):
-#
-#    toolbar = Instance(PumpToolBar, args=())
-#    iface = Instance(PumpInterface, args=())
-#    override = Bool(False)
-#    #monitor = Bool(True)
-#    model = Any
-#
-#    #timer = Instance(Timer)
-#
-#    def init(self, info):
-#        #self.iface.connect()
-#        # This is what we call "installing the handler".  Essentially we are
-#        # giving the GUI toolbar a reference to the handler so it can
-#        # communicate user actions to the handler as needed.
-#        self.toolbar.handler = self
-#        self.model = info.object
-#        self.iface = PumpInterface()
-#            
-#        #if self.monitor:
-#        #    #self.timer = Timer(250, self.tick)
-#        #    pass
-#
-#    #def tick(self):
-#    #    self.model.infused = self.iface.infused
-#    #    self.model.withdrawn = self.iface.withdrawn
-#
-#    #####################################################################
-#    # Logic for processing of user actions
-#    #####################################################################
-#    #def do_fill_tube(self, info):
-#    #    self.iface.reset_volume()
-#    #    self.iface.run(rate=info.object.fill_rate,
-#    #                   volume=info.object.tube_volume,
-#    #                   trigger='start')
-#
-#    #    while self.iface.infused < info.object.tube_volume:
-#    #        time.sleep(0.25)
-#
-#    #    self.iface.reset_volume()
-#    #    self.iface.volume = 0
-#
-#    #def do_empty_tube(self, info):
-#    #    self.iface.reset_volume()
-#    #    self.iface.run(rate= -info.object.fill_rate,
-#    #                   volume=info.object.tube_volume,
-#    #                   trigger='start')
-#
-#    #    while self.iface.withdrawn < info.object.tube_volume:
-#    #        time.sleep(0.25)
-#
-#    #    self.iface.reset_volume()
-#    #    self.iface.volume = 0
-#    #    self.trigger = 'run_high'
-#
-#    def do_toggle_override(self, info):
-#        if self.iface.trigger == 'run_high':
-#            self.iface.run(trigger='start')
-#            self.override = True
-#        else:
-#            self.iface.run_if_TTL(trigger='run_high')
-#            self.override = False
-#
-#    def do_increase(self, info):
-#        info.object.rate += info.object.rate_incr
-#
-#    def do_decrease(self, info):
-#        info.object.rate -= info.object.rate_incr
-
-    #####################################################################
-    # How changes to the model are handled
-    #####################################################################
-    # If there are any changes to the model, either via the program or via user
-    # interaction, we need to ensure that the pump settings are updated
-    # properly.  These commands listen for changes and apply the necessary
-    # changes to the pump.  For example, calling pump.do_increase() causes the
-    # rate property of the model to change.  This change results in
-    # object_rate_changed being called.  object_rate_change then tells
-    # PumpInterface to update the rate.
-
-    #def object_rate_changed(self, info):
-    #    self.iface.rate = info.object.rate
-    #    info.object.rate = self.iface.rate
-
-    #def object_diameter_changed(self, info):
-    #    self.iface.diameter = info.object.diameter
-
-    #def object_trigger_changed(self, info):
-    #    self.iface.trigger = info.object.trigger
-
-#class Pump(HasTraits):
-#    '''Contains the pump settings.
-#    '''
-#    rate = CFloat(0.3, store='attribute')
-#    trigger = Constant('run_high', store='atribute')
-#
-#    diameter = Property(depends_on='syringe')
-#    syringe = Trait('B-D 60cc (plastic)', SYRINGE_DATA)
-#
-#    def _get_diameter(self):
-#        return self.syringe_
-#
-#    rate_incr = Float(0.025, store='attribute')
-#
-#    traits_view = View(
-#            VGroup(
-#                HGroup(
-#                    Item('handler.toolbar', style='custom'),
-#                    Item('syringe'),
-#                    show_labels=False,
-#                    ),
-#                HGroup(
-#                    Item('rate_incr', label=u'\u0394 Rate (mL/min)'),
-#                    Item('rate', label='Rate (mL/min)'),
-#                    ),
-#                show_labels=False,
-#                label='Pump Settings',
-#                show_border=True,
-#                ),
-#            handler=PumpController)
-
-#def main():
-#    pump = Pump()
-#    pump.configure_traits()
-#    print pump.diameter
-#
-#if __name__ == '__main__':
-#    import sys, cProfile
-#    cProfile.run('main()', 'profile.dmp')
-#    import pstats
-#    p = pstats.Stats('profile.dmp')
-#    p.strip_dirs().sort_stats('cumulative').print_stats(50)
