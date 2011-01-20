@@ -88,6 +88,7 @@ class AbstractAversiveController(AbstractExperimentController,
         self.set_aversive_duration(self.model.paradigm.aversive_duration)
         self.set_contact_threshold(self.model.paradigm.lick_th)
         self.set_trial_duration(self.model.paradigm.trial_duration)
+        self.set_attenuation(self.model.paradigm.attenuation)
 
         # Ensure that sampling frequencies are stored properly
         self.model.data.contact_digital.fs = self.buffer_TTL.fs
@@ -296,6 +297,9 @@ class AbstractAversiveController(AbstractExperimentController,
         # the warn signal.  Since the safe signal is continuously being updated,
         # we don't need to update that.
         self.update_warn()
+
+    def set_attenuation(self, value):
+        self.iface_behavior.set_tag('att_A', value)
 
     def update_remind(self):
         raise NotImplementedError

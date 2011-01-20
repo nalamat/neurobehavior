@@ -37,6 +37,12 @@ class PositiveStage1Controller(AbstractExperimentController,
                    self.model.data.signal_TTL,
                    self.model.data.free_run_TTL ]
 
+        self.model.data.spout_TTL.fs = self.buffer_TTL.fs
+        self.model.data.override_TTL.fs = self.buffer_TTL.fs
+        self.model.data.pump_TTL.fs = self.buffer_TTL.fs
+        self.model.data.signal_TTL.fs = self.buffer_TTL.fs
+        self.model.data.free_run_TTL.fs = self.buffer_TTL.fs
+
         self.pipeline_TTL = deinterleave_bits(targets)
 
         #self.model.data.start_time = datetime.now()
