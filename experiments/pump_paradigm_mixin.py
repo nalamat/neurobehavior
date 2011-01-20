@@ -10,6 +10,7 @@ class PumpParadigmMixin(HasTraits):
             'B-D 30cc (plastic)': 21.59,
             'B-D 60cc (plastic)': 26.59,
             'Popper 20cc (glass)': 19.58,
+            'B-D 10cc (glass)': 14.20,
             }
 
     pump_rate = Float(0.5, store='attribute', 
