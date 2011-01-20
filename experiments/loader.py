@@ -113,7 +113,7 @@ class ExperimentLauncher(CohortViewHandler):
         self.launch_experiment(info, selected[0], AversiveFMExperiment)
 
     def launch_appetitive_stage1(self, info, selected):
-        self.launch_experiment(info, selected[0], PositiveExperimentStage1)
+        self.launch_experiment(info, selected[0], PositiveStage1Experiment)
 
 def load_experiment_launcher():
     CohortView().configure_traits(view='detailed_view', handler=ExperimentLauncher())

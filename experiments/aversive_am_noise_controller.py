@@ -28,9 +28,6 @@ class AversiveAMNoiseController(AbstractAversiveController):
         duration = self.current_trial_duration
         return self.current_signal.realize(fs, duration)
 
-    def set_attenuation(self, value):
-        self.iface_behavior.set_tag('att_A', value)
-
     def update_remind(self):
         waveform = self._compute_signal(self.current_remind.parameter)
         self.buffer_trial.set(waveform)
@@ -40,7 +37,6 @@ class AversiveAMNoiseController(AbstractAversiveController):
         self.buffer_trial.set(waveform)
 
     def update_safe(self):
-        self.set_attenuation(self.current_attenuation)
         if self.buffer_int.written == 0:
             # We have not yet initialized the buffer with data.  Let's fill it
             # all up in one shot.
