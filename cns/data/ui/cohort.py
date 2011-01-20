@@ -32,6 +32,8 @@ class AnimalColumn(ObjectColumn):
         else:
             return '#FFFFFF'
 
+# This probably should be moved to experiments/loader.py since it is used by the
+# controller defined there.  The controller is called ExperimentLaucher.
 animal_editor = TableEditor(
         sortable=True,
         selected='selected',
@@ -46,11 +48,22 @@ animal_editor = TableEditor(
             AnimalColumn(name='identifier'),
             ],
         menu=Menu(
+            # This is a list of the different "actions" one can call for each of the
+            # animals in the cohort file.  The action is a function defined on the
+            # handler.  All of these actions are currently tied to functions that
+            # launch the appropriate experiment.
+
+            # name is the string that should be displayed in the context menu (i.e.
+            # the right-click pop-up menu).  action is the function on the
+            # controller/handler that should be called when that particular menu item
+            # is selected.  
             Action(name='Appetitive', action='launch_appetitive'),
             Action(name='Appetitive (Stage 1)',
                    action='launch_appetitive_stage1'),
             Action(name='Aversive (FM)', action='launch_aversive_fm'),
             Action(name='Aversive (AM Noise)', action='launch_aversive_am_noise'),
+            Action(name='Aversive (Noise Masking)',
+                   action='launch_aversive_noise_masking'),
             ),
         )
 

@@ -13,7 +13,7 @@ from enthought.traits.ui.api import View, Item
 import logging
 log = logging.getLogger(__name__)
 
-# Load the experiments
+# Import the experiments
 from positive_stage1_experiment import PositiveStage1Experiment
 from positive_experiment import PositiveExperiment
 from aversive_fm_experiment import AversiveFMExperiment
@@ -104,6 +104,14 @@ class ExperimentLauncher(CohortViewHandler):
             """
             error(info.ui.control, str(e) + '\n\n' + dedent(mesg))
 
+    # Functions to launch the different experiments from the context menu.  The options
+    # for the context menu are defined in cns.data.ui.cohort (in the animal_editor).  That
+    # really should be moved to this file since where it currently is located is not
+    # obvious.
+
+    # When the context menu item is selected, it calls the function specified by "action" with
+    # two arguments, info (a handle to the current window) and the selected item.
+    
     def launch_appetitive(self, info, selected):
         self.launch_experiment(info, selected[0], PositiveExperiment)
 
@@ -115,6 +123,9 @@ class ExperimentLauncher(CohortViewHandler):
 
     def launch_appetitive_stage1(self, info, selected):
         self.launch_experiment(info, selected[0], PositiveStage1Experiment)
+
+    def launch_aversive_noise_masking(self, info, selected):
+        self.launch_experiment(info, selected[0], AversiveNoiseMaskingExperiment)
 
 def load_experiment_launcher():
     CohortView().configure_traits(view='detailed_view', handler=ExperimentLauncher())
