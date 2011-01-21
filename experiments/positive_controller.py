@@ -187,6 +187,7 @@ class PositiveController(AbstractExperimentController, PumpControllerMixin):
                 # GO was just presented.  Set up for next block of trials.
                 self.current_num_nogo = self.choice_num_nogo()
                 self.current_setting_go = self.choice_parameter.next()
+                self.current_poke_dur = self.choice_poke_dur()
                 self.current_trial = 1
             else:
                 self.current_trial += 1
