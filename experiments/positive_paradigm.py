@@ -78,6 +78,7 @@ class PositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
     response_window_duration = Float(3, unit='s', store='attribute')
     reward_duration = Float(0.5, unit='s', store='attribute')
 
+    timeout_trigger  = Enum('FA only', 'Anytime')
     timeout_duration = Float(5, unit='s', store='attribute')
 
     poke_duration_lb = Float(0.1, unit='s', store='attribute')
@@ -113,6 +114,7 @@ class PositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
                         'reaction_window_delay',
                         'reaction_window_duration',
                         'response_window_duration',
+                        'timeout_trigger',
                         'timeout_duration',
                         'poke_duration_lb',
                         'poke_duration_ub',
