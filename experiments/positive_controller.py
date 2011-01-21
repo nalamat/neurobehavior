@@ -57,6 +57,8 @@ class PositiveController(AbstractExperimentController, PumpControllerMixin):
 
     def start_experiment(self, info):
         # Load interface for the experiment
+        self.init_pump()
+
         self.iface_behavior = DSPCircuit('components/positive-behavior', 'RZ6')
         self.buffer_signal = self.iface_behavior.get_buffer('speaker')
         self.buffer_TTL = self.iface_behavior.get_buffer('TTL', src_type=np.int8,
@@ -84,6 +86,7 @@ class PositiveController(AbstractExperimentController, PumpControllerMixin):
         self.set_signal_offset_delay(paradigm.signal_offset_delay)
         self.set_timeout_duration(paradigm.timeout_duration)
         self.set_attenuation(paradigm.attenuation)
+        self.set_timeout_trigger(paradigm.timeout_trigger)
 
         # Set up storage nodes
         exp_node = append_date_node(self.model.store_node,
@@ -263,6 +266,10 @@ class PositiveController(AbstractExperimentController, PumpControllerMixin):
 
     def set_attenuation(self, value):
         self.iface_behavior.set_tag('att_A', value)
+
+    def set_timeout_trigger(self, value):
+        flag = 0 if value == 'FA only' else 1
+        self.iface_behavior.set_tag('to_type', flag)
 
     def trigger_next(self):
         signal = self.model.paradigm.signal
