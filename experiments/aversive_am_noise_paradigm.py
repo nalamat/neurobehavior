@@ -8,10 +8,10 @@ class AversiveAMNoiseParadigm(AbstractAversiveParadigm):
     '''
 
     modulation_frequency = Float(5, store='attribute')
-    attenuation = Range(0, 120, 20, store='attribute')
+    attenuation = Range(0.0, 120.0, 20, store='attribute')
 
     signal_group = VGroup(
-            Item('attenuation', label='Attenuation (dB)'),
+            Item('attenuation', label='Attenuation (dB)', style='text'),
             Item('modulation_frequency', label='Modulation frequency (Hz)'),
             show_border=True, label='Signal',
             )

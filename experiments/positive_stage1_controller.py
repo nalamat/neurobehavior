@@ -43,6 +43,8 @@ class PositiveStage1Controller(AbstractExperimentController,
         self.model.data.signal_TTL.fs = self.buffer_TTL.fs
         self.model.data.free_run_TTL.fs = self.buffer_TTL.fs
 
+        self.set_attenuation(self.model.paradigm.attenuation)
+
         self.pipeline_TTL = deinterleave_bits(targets)
 
         #self.model.data.start_time = datetime.now()
@@ -97,3 +99,6 @@ class PositiveStage1Controller(AbstractExperimentController,
         if self.state == 'paused':
             return "Experimenter controlled"
         return "Subject controlled"
+
+    def set_attenuation(self, value):
+        self.iface_behavior.set_tag('att_A', value)

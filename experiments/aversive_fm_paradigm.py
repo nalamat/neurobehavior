@@ -10,11 +10,10 @@ class AversiveFMParadigm(AbstractAversiveParadigm):
 
     carrier_frequency = Float(4000, store='attribute')
     modulation_frequency = Float(5, store='attribute')
-    attenuation = Range(0, 120, 40, store='attribute')
+    attenuation = Range(0.0, 120.0, 40, store='attribute')
 
     signal_group = VGroup(
             Item('carrier_frequency', label='Carrier frequency (Hz)'),
             Item('modulation_frequency', label='Modulation frequency (Hz)'),
-            Item('attenuation', label='Attenuation (dB)'),
+            Item('attenuation', label='Attenuation (dB)', style='text'),
             show_border=True, label='FM parameters')
-
