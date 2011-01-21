@@ -121,6 +121,8 @@ def load_experiment_launcher():
 def test_experiment(etype):
     import tables
     test_file = tables.openFile('test.hd5', 'w')
+    if not etype.endswith('Experiment'):
+        etype += 'Experiment'
     experiment_class = globals()[etype]
     experiment = experiment_class(store_node=test_file.root)
     experiment.configure_traits()
