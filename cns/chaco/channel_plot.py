@@ -21,7 +21,6 @@ class ChannelPlot(BaseXYPlot):
     data_changed            = Event
     _data_cache_valid       = Bool(False)
     _screen_cache_valid     = Bool(False)
-    #mode                    = Enum('scrolling', 'sweep')
 
     def __init__(self, **kwargs):
         super(ChannelPlot, self).__init__(**kwargs)
@@ -93,7 +92,6 @@ class ChannelPlot(BaseXYPlot):
             idx, val = points
             if len(idx) == 0:
                 return
-
             gc.save_state()
             gc.set_antialias(True)
             gc.clip_to_rect(self.x, self.y, self.width, self.height)
