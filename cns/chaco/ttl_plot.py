@@ -21,8 +21,9 @@ class TTLPlot(ChannelPlot):
             starts = dv == 1
             ends = dv == -1
 
-            # Ensure that we have an end (if the TTL ends in a high, then we
-            # just "stick" an end on).
+            # Ensure that we have an end for plotting purposes (if the TTL ends
+            # in a high, then we just "stick" an end on and it will appear as
+            # the leading edge of the TTL).
             if val_pts[-1] == 1:
                 ends[-1] = True
 
