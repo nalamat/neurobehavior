@@ -124,8 +124,10 @@ class PositiveExperiment(HasTraits):
         axis = PlotAxis(component=plot, title="Time (s)",
                         orientation="top", ticks_visible=True)
         plot.underlays.append(axis)
+        tick_formatter = lambda s: "{0}:{1:02}".format(*divmod(int(s), 60))
         axis = PlotAxis(component=plot, orientation="bottom",
-                ticks_visible=True)
+                title="Time(min:sec)",
+                tick_label_formatter=tick_formatter)
         plot.underlays.append(axis)
 
         container.add(plot)

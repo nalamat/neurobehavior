@@ -84,12 +84,6 @@ class AbstractAversiveExperiment(AbstractExperiment):
         container.add(plot)
 
         # Add axes and grids to the first plot
-        axis = PlotAxis(component=plot, title="Time (s)",
-                        orientation="top", ticks_visible=True)
-        plot.overlays.append(axis)
-        axis = PlotAxis(component=plot, orientation="bottom",
-                ticks_visible=True)
-        plot.overlays.append(axis)
         grid = PlotGrid(mapper=plot.index_mapper, component=plot,
                 orientation='vertical', line_color='lightgray',
                 line_style='dot', grid_interval=0.25)
@@ -98,6 +92,14 @@ class AbstractAversiveExperiment(AbstractExperiment):
                 orientation='vertical', line_color='lightgray',
                 line_style='solid', grid_interval=1)
         plot.underlays.append(grid)
+        axis = PlotAxis(component=plot, title="Time (s)",
+                        orientation="top", ticks_visible=True)
+        plot.overlays.append(axis)
+        tick_formatter = lambda s: "{0}:{1:02}".format(*divmod(int(s), 60))
+        axis = PlotAxis(component=plot, orientation="bottom",
+                title="Time(min:sec)",
+                tick_label_formatter=tick_formatter)
+        plot.underlays.append(axis)
 
         self.experiment_plot = container
 
