@@ -77,8 +77,9 @@ class PositiveStage1Experiment(AbstractExperiment):
         axis = PlotAxis(component=plot, title="Time (s)",
                         orientation="top", ticks_visible=True)
         plot.underlays.append(axis)
-        axis = PlotAxis(component=plot, title="Time (s)",
-                        orientation="bottom", ticks_visible=True)
+        tick_formatter = lambda s: "{0}:{1:02}".format(*divmod(int(s), 60))
+        axis = PlotAxis(component=plot, title="Time (min:sec)",
+                tick_label_formatter=tick_formatter, orientation="bottom")
         plot.underlays.append(axis)
 
         self.contact_plot = container
