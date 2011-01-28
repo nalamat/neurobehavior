@@ -219,14 +219,18 @@ class AbstractExperimentController(Controller):
         except AttributeError:
             self.timer_fast.stop()
             self.timer_slow.stop()
-        self.stop_experiment(info)
-        self.model.stop_time = datetime.now()
 
-        self.pending_changes = {}
-        self.old_values = {}
+        try:
+            self.stop_experiment(info)
+            self.model.stop_time = datetime.now()
 
-        info.ui.view.close_result = True
-        self.state = 'complete'
+            self.pending_changes = {}
+            self.old_values = {}
+
+            info.ui.view.close_result = True
+            self.state = 'complete'
+        except BaseException, e:
+            error(self.info.ui.control, str(e))
 
     ############################################################################
     # Apply/Revert code
@@ -246,7 +250,12 @@ class AbstractExperimentController(Controller):
         # makes a change to one of these values and hits the Apply button,
         # init_current will be called and this code will make a new local copy
         # of the updated values.
-        for name in paradigm.trait_names():
+        
+        # My persistence code (in cns.persistence) adds some metadata to objects
+        # it recovers from the HDF5 file.  trait_names would return this
+        # metadata as well, which we don't want.  class_trait_names only returns
+        # traits defined on the actual object.
+        for name in paradigm.class_trait_names():
             if name not in ('trait_modified', 'trait_added'):
                 value = deepcopy(getattr(paradigm, name))
                 setattr(self, 'current_' + name, value)
