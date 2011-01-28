@@ -60,17 +60,13 @@ class PositiveController(AbstractExperimentController, PumpControllerMixin):
         self.init_pump()
 
         self.iface_behavior = DSPCircuit('components/positive-behavior', 'RZ6')
-        self.buffer_signal = self.iface_behavior.get_buffer('speaker')
-        self.buffer_TTL = self.iface_behavior.get_buffer('TTL', src_type=np.int8,
-                dest_type=np.int8, block_size=24)
+        self.buffer_signal = self.iface_behavior.get_buffer('speaker', 'w')
+        self.buffer_TTL = self.iface_behavior.get_buffer('TTL', 'r',
+                src_type=np.int8, dest_type=np.int8, block_size=24)
 
-        #self.buffer_trial_start_TS = self.iface_behavior.get_buffer('trial/',
-                #src_type=np.int32, block_size=1)
-        #self.buffer_trial_end_TS = self.iface_behavior.get_buffer('trial\\',
-                #src_type=np.int32, block_size=1)
-        self.buffer_to_start_TS = self.iface_behavior.get_buffer('TO/',
+        self.buffer_to_start_TS = self.iface_behavior.get_buffer('TO/', 'r',
                 src_type=np.int32, block_size=1)
-        self.buffer_to_end_TS = self.iface_behavior.get_buffer('TO\\',
+        self.buffer_to_end_TS = self.iface_behavior.get_buffer('TO\\', 'r',
                 src_type=np.int32, block_size=1)
 
         paradigm = self.model.paradigm
@@ -144,16 +140,13 @@ class PositiveController(AbstractExperimentController, PumpControllerMixin):
     # Master controller
     ############################################################################
     def tick_slow(self):
-        log.debug("TICK SLOW")
         ts = self.get_ts()
         seconds = int(ts/self.iface_behavior.fs)
         self.monitor_pump()
         self.model.data.timeout_start_timestamp.send(self.buffer_to_start_TS.read())
         self.model.data.timeout_end_timestamp.send(self.buffer_to_end_TS.read())
-        log.debug("COMPLETE")
 
     def tick_fast(self):
-        log.debug('TICK')
         ts_end = self.get_trial_end_ts()
         self.pipeline_contact.send(self.buffer_TTL.read())
         if ts_end > self.current_trial_end_ts:
@@ -199,7 +192,6 @@ class PositiveController(AbstractExperimentController, PumpControllerMixin):
                       self.current_num_nogo)
 
             self.trigger_next()
-            log.debug("returned to loop")
 
     ############################################################################
     # Code to apply parameter changes.  This is backend-specific.  If you want
@@ -211,7 +203,6 @@ class PositiveController(AbstractExperimentController, PumpControllerMixin):
     def queue_parameter_change(self, object, name, old, new):
         self.queue_change(self.model.paradigm, 'parameters',
                 self.current_parameters, self.model.paradigm.parameters)
-
 
     set_poke_duration_lb         = AbstractExperimentController.reset_current
     set_poke_duration_ub         = AbstractExperimentController.reset_current
@@ -289,6 +280,4 @@ class PositiveController(AbstractExperimentController, PumpControllerMixin):
         self.set_poke_duration(self.current_poke_dur)
         self.set_reward_duration(self.current_setting_go.reward_duration)
         self.iface_pump.rate = self.current_setting_go.reward_rate
-        log.debug("Uploaded signal with par %f", par)
         self.iface_behavior.trigger(1)
-        log.debug("Trigger sent")
