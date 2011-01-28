@@ -3,6 +3,7 @@ from enthought.traits.api import Property, Str
 from tdt import DSPCircuit
 from cns.pipeline import deinterleave_bits
 from cns.data.h5_utils import append_date_node, append_node
+from cns.data.persistence import add_or_update_object
 
 from abstract_experiment_controller import AbstractExperimentController
 from pump_controller_mixin import PumpControllerMixin
@@ -17,9 +18,9 @@ class PositiveStage1Controller(AbstractExperimentController,
         self.init_pump(info)
 
         self.iface_behavior = DSPCircuit('components/positive-behavior-stage1', 'RZ6')
-        self.buffer_signal = self.iface_behavior.get_buffer('signal')
-        self.buffer_TTL = self.iface_behavior.get_buffer('TTL', block_size=24,
-                src_type='int8', dest_type='int8')
+        self.buffer_signal = self.iface_behavior.get_buffer('signal', 'w')
+        self.buffer_TTL = self.iface_behavior.get_buffer('TTL', 'r',
+                block_size=24, src_type='int8', dest_type='int8')
 
         # Set up data files
         exp_node = append_date_node(self.model.store_node,
@@ -62,7 +63,7 @@ class PositiveStage1Controller(AbstractExperimentController,
     def stop_experiment(self, info):
         self.iface_behavior.stop()
         self.state = 'halted'
-        self.model.data.stop_time = datetime.now()
+        #self.model.data.stop_time = datetime.now()
         add_or_update_object(self.model.paradigm, self.model.exp_node, 'paradigm')
         add_or_update_object(self.model.data, self.model.exp_node, 'data')
 
@@ -77,7 +78,7 @@ class PositiveStage1Controller(AbstractExperimentController,
     def init_signal(self):
         signal = self.model.paradigm.signal
         fs = self.iface_behavior.fs
-        offset = self.buffer_signal.written
+        offset = self.buffer_signal.total_samples_written
         waveform = signal.block.realize(fs, 1.0, 0)
         self.buffer_signal.set(waveform)
 
@@ -86,7 +87,7 @@ class PositiveStage1Controller(AbstractExperimentController,
         if pending:
             signal = self.model.paradigm.signal
             fs = self.iface_behavior.fs
-            offset = self.buffer_signal.written
+            offset = self.buffer_signal.total_samples_written
             waveform = signal.block.realize(fs, pending, offset)
             self.buffer_signal.write(waveform)
 

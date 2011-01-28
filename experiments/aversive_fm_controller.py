@@ -10,9 +10,9 @@ class AversiveFMController(AbstractAversiveController):
         # little (i.e. it needs to use different microcode and the microcode
         # does not contain int and trial buffers).
         self.iface_behavior = DSPCircuit('components/aversive-behavior-FM', 'RZ6')
-        self.buffer_TTL = self.iface_behavior.get_buffer('TTL',
+        self.buffer_TTL = self.iface_behavior.get_buffer('TTL', 'r',
                 src_type='int8', dest_type='int8', block_size=24)
-        self.buffer_contact = self.iface_behavior.get_buffer('contact',
+        self.buffer_contact = self.iface_behavior.get_buffer('contact', 'r',
                 src_type='int8', dest_type='float32', block_size=24)
 
         self.set_carrier_frequency(self.model.paradigm.carrier_frequency)

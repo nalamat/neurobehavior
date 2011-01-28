@@ -37,7 +37,7 @@ class AversiveAMNoiseController(AbstractAversiveController):
         self.buffer_trial.set(waveform)
 
     def update_safe(self):
-        if self.buffer_int.written == 0:
+        if self.buffer_int.total_samples_written == 0:
             # We have not yet initialized the buffer with data.  Let's fill it
             # all up in one shot.
             self.current_signal.token.depth = self.current_safe.parameter
