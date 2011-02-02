@@ -9,7 +9,6 @@ from cns.data.h5_utils import append_date_node, append_node
 from cns import choice
 from cns.data.persistence import add_or_update_object
 from positive_data import PositiveData
-from positive_paradigm import PositiveParadigm
 
 import numpy as np
 
@@ -17,7 +16,8 @@ import numpy as np
 import logging
 log = logging.getLogger(__name__)
 
-class PositiveController(AbstractExperimentController, PumpControllerMixin):
+class AbstractPositiveController(AbstractExperimentController,
+                                 PumpControllerMixin):
 
     water_infused = Float(0)
     status = Property(Str, depends_on='state, current_trial, current_num_nogo')
@@ -49,9 +49,9 @@ class PositiveController(AbstractExperimentController, PumpControllerMixin):
 
         # Make copies of the parameters that can be changed during the
         # experiment.
-        self.current_repeat_FA = self.model.paradigm.repeat_FA
-        self.current_nogo_parameter = self.model.paradigm.nogo_parameter
-        self.current_trial_dur = self.model.paradigm.trial_duration
+        #self.current_repeat_FA = self.model.paradigm.repeat_FA
+        #self.current_nogo_parameter = self.model.paradigm.nogo_parameter
+        #self.current_trial_dur = self.model.paradigm.trial_duration
 
         log.debug("Initialized current settings")
 
@@ -71,6 +71,7 @@ class PositiveController(AbstractExperimentController, PumpControllerMixin):
 
         paradigm = self.model.paradigm
 
+        self.copy_paradigm(paradigm)
         self.init_current(info)
 
         # Configure the RPvds circuit
@@ -81,7 +82,7 @@ class PositiveController(AbstractExperimentController, PumpControllerMixin):
         self.set_reward_duration(paradigm.reward_duration)
         self.set_signal_offset_delay(paradigm.signal_offset_delay)
         self.set_timeout_duration(paradigm.timeout_duration)
-        self.set_attenuation(paradigm.attenuation)
+        #self.set_attenuation(paradigm.attenuation)
         self.set_timeout_trigger(paradigm.timeout_trigger)
         self.set_timeout_grace_period(paradigm.timeout_grace_period)
 
@@ -89,7 +90,7 @@ class PositiveController(AbstractExperimentController, PumpControllerMixin):
         exp_node = append_date_node(self.model.store_node,
                                     pre='appetitive_date_')
         data_node = append_node(exp_node, 'data')
-        self.model.data = PositiveData(store_node=data_node)
+        #self.model.data = PositiveData(store_node=data_node)
 
         self.model.data.trial_start_timestamp.fs = self.buffer_TTL.fs
         self.model.data.trial_end_timestamp.fs = self.buffer_TTL.fs
@@ -147,6 +148,10 @@ class PositiveController(AbstractExperimentController, PumpControllerMixin):
         self.model.data.timeout_start_timestamp.send(self.buffer_to_start_TS.read())
         self.model.data.timeout_end_timestamp.send(self.buffer_to_end_TS.read())
 
+    def log_trial(self, ts_start, ts_end, last_ttype):
+        parameter = self.current_setting_go.parameter
+        self.model.data.log_trial(ts_start, ts_end, last_ttype, parameter)
+
     def tick_fast(self):
         ts_end = self.get_trial_end_ts()
         self.pipeline_contact.send(self.buffer_TTL.read())
@@ -166,9 +171,8 @@ class PositiveController(AbstractExperimentController, PumpControllerMixin):
                 last_ttype = 'GO'
             else:
                 last_ttype = 'NOGO'
-            parameter = self.current_setting_go.parameter
 
-            self.model.data.log_trial(ts_start, ts_end, last_ttype, parameter)
+            self.log_trial(ts_start, ts_end, last_ttype)
 
             # Increment num_nogo
             if last_ttype == 'NOGO' and self.current_repeat_FA:
@@ -267,21 +271,4 @@ class PositiveController(AbstractExperimentController, PumpControllerMixin):
         self.iface_behavior.cset_tag('to_safe_n', value, 's', 'n')
 
     def trigger_next(self):
-        signal = self.model.paradigm.signal
-
-        if self.current_trial == self.current_num_nogo + 1:
-            par = self.current_setting_go.parameter
-            self.iface_behavior.set_tag('go?', 1)
-        else:
-            par = self.current_nogo_parameter
-            self.iface_behavior.set_tag('go?', 0)
-
-        signal.block.set_parameter(signal.variable, par)
-        waveform = signal.block.realize(self.iface_behavior.fs,
-                                        self.current_trial_dur)
-        self.buffer_signal.set(waveform)
-        self.iface_behavior.set_tag('signal_dur_n', len(waveform))
-        self.set_poke_duration(self.current_poke_dur)
-        self.set_reward_duration(self.current_setting_go.reward_duration)
-        self.iface_pump.rate = self.current_setting_go.reward_rate
-        self.iface_behavior.trigger(1)
+        raise NotImplementedError

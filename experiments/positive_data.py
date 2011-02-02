@@ -147,7 +147,6 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin):
             
         data = parameter, ts_start, ts_end, ttype, response, reaction_time
         self.trial_log.append(data)
-        log.debug("Finished analyzing trial")
 
     ts_seq = Property(Array('i'), depends_on='trial_log')
     par_seq = Property(Array('f'), depends_on='trial_log')

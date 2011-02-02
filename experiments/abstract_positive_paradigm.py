@@ -19,9 +19,6 @@ class TrialSetting(HasTraits):
     reward_duration = Float(0.5, store='attribute')
     reward_rate     = Float(0.3, store='attribute')
 
-    def _anytrait_changed(self, name, new):
-        print "CHANGE", name, new
-
     def __cmp__(self, other):
         return cmp(self.parameter, other.parameter)
 
@@ -42,18 +39,9 @@ table_editor = TableEditor(
             ]
         )
 
-class PositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
+class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
 
     parameters = List(Instance(TrialSetting), [], store='child')
-
-    signal = Enum(signal_options.keys())
-    signal_group = VGroup(
-            Item('signal', editor=EnumEditor(values=signal_options)),
-            Item('signal', editor=InstanceEditor(), style='custom'),
-            show_labels=False, show_border=True, label='Signal',
-            )
-
-    attenuation = Range(0, 120, 30, store='attribute')
 
     def _parameters_default(self):
         return [TrialSetting()]
@@ -63,8 +51,6 @@ class PositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
 
     min_nogo = Int(0, label='Minimum NOGO', store='attribute')
     max_nogo = Int(0, label='Maximum NOGO', store='attribute')
-
-    trial_duration = Float(1, unit='s', store='attribute')
 
     # Needs to be CBool because Pytables returns numpy.bool_ type which gets
     # rejected by Bool trait
@@ -85,29 +71,21 @@ class PositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
     poke_duration_lb = Float(0.1, unit='s', store='attribute')
     poke_duration_ub = Float(0.5, unit='s', store='attribute')
 
+    parameter_view = VGroup(
+            Item('nogo_parameter'),
+            VGroup(Item('parameter_order', label='Order')),
+            Item('parameters', editor=table_editor,
+                 show_label=False),
+            label='Trial Sequence',
+            show_border=True,
+            )
+
     traits_view = View(
             VGroup(
-                VGroup(
-                    Item('nogo_parameter'),
-                    VGroup(Item('parameter_order', label='Order')),
-                    Item('parameters', editor=table_editor,
-                         show_label=False),
-                    label='Trial Sequence',
-                    show_border=True,
-                    ),
+                Include('parameter_view'),
                 Tabbed(
+                    Include('signal_group'),
                     VGroup(
-                        Item('attenuation'),
-                        Item('trial_duration'),
-                        Item('signal', label='Signal types',
-                             editor=EnumEditor(values=signal_options)),
-                        Item('signal', editor=InstanceEditor(), style='custom',
-                             show_label=False),
-                        show_border=True, 
-                        label='Signal',
-                        ),
-                    VGroup(
-                        Item('nogo_parameter', label='NOGO parameter'),
                         'min_nogo',
                         'max_nogo',
                         'repeat_FA',

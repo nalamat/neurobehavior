@@ -16,7 +16,8 @@ log = logging.getLogger(__name__)
 
 # Import the experiments
 from positive_stage1_experiment import PositiveStage1Experiment
-from positive_experiment import PositiveExperiment
+from positive_am_noise_experiment import PositiveAMNoiseExperiment
+from positive_dt_experiment import PositiveDTExperiment
 from aversive_fm_experiment import AversiveFMExperiment
 from aversive_am_noise_experiment import AversiveAMNoiseExperiment
 from aversive_noise_masking_experiment import AversiveNoiseMaskingExperiment

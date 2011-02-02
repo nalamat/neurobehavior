@@ -9,8 +9,8 @@ from enthought.traits.ui.api import View, Item, VGroup, HGroup, InstanceEditor,\
 from enthought.enable.api import Component, ComponentEditor
 
 from positive_data import PositiveData
-from positive_paradigm import PositiveParadigm
-from positive_controller import PositiveController
+from abstract_positive_paradigm import AbstractPositiveParadigm
+from abstract_positive_controller import AbstractPositiveController
 
 from enthought.chaco.api import DataRange1D, LinearMapper, PlotAxis, PlotGrid, \
         OverlayPlotContainer
@@ -68,15 +68,14 @@ trial_log_table = TableEditor(
             ]
         )
 
-class PositiveExperiment(HasTraits):
+class AbstractPositiveExperiment(HasTraits):
 
-    # The store node should be a reference to an animal
-    animal = Any
-    store_node = Any
-    exp_node = Any
+    animal      = Any
+    store_node  = Any
+    exp_node    = Any
 
     data = Instance(PositiveData)
-    paradigm = Instance(PositiveParadigm, ())
+    paradigm = Instance(AbstractPositiveParadigm, ())
 
     trial_log_view = Property(depends_on='data.trial_log')
 
@@ -274,54 +273,53 @@ class PositiveExperiment(HasTraits):
     def _data_default(self):
         return PositiveData(store_node=self.store_node)
 
-    traits_view = View(
-            HSplit(
+    traits_group = HSplit(
+            VGroup(
+                Item('handler.toolbar', style='custom'),
                 VGroup(
-                    Item('handler.toolbar', style='custom'),
-                    VGroup(
-                        Item('handler.status', style='readonly'),
-                        Item('handler.current_poke_dur', 
-                             label='Poke duration (s)', style='readonly'),
-                        Item('handler.current_setting_go', style='readonly',
-                             label='Current GO'),
-                        label='Experiment',
-                        show_border=True,
-                    ),
-                    VGroup(
-                        Item('handler.pump_toolbar', style='custom',
-                             show_label=False), 
-                        Item('handler.current_volume_dispensed', 
-                             label='Dispensed (mL)', style='readonly'),
-                        Item('object.paradigm.pump_rate'),
-                        Item('object.paradigm.pump_syringe'),
-                        Item('object.paradigm.pump_syringe_diameter', 
-                             label='Diameter (mm)', style='readonly'),
-                        label='Pump Status',
-                        show_border=True,
-                        ),
-                    Item('paradigm@', editor=InstanceEditor(view='edit_view')),
-                    show_labels=False,
+                    Item('handler.status', style='readonly'),
+                    Item('handler.current_poke_dur', 
+                         label='Poke duration (s)', style='readonly'),
+                    Item('handler.current_setting_go', style='readonly',
+                         label='Current GO'),
+                    label='Experiment',
+                    show_border=True,
                 ),
                 VGroup(
-                    Item('experiment_plot', editor=ComponentEditor(),
-                        show_label=False, width=600, height=200),
-                    HGroup(
-                        Item('par_count_plot', editor=ComponentEditor(),
-                            show_label=False, width=150, height=150),
-                        Item('par_score_plot', editor=ComponentEditor(),
-                            show_label=False, width=150, height=150),
-                        Item('par_dprime_plot', editor=ComponentEditor(),
-                            show_label=False, width=150, height=150)
-                        ),
+                    Item('handler.pump_toolbar', style='custom',
+                         show_label=False), 
+                    Item('handler.current_volume_dispensed', 
+                         label='Dispensed (mL)', style='readonly'),
+                    Item('object.paradigm.pump_rate'),
+                    Item('object.paradigm.pump_syringe'),
+                    Item('object.paradigm.pump_syringe_diameter', 
+                         label='Diameter (mm)', style='readonly'),
+                    label='Pump Status',
+                    show_border=True,
                     ),
-                VGroup(
-                    Item('object.data.trial_log', editor=trial_log_table),
-                    show_labels=False,
-                    ),
+                Item('paradigm@', editor=InstanceEditor(view='edit_view')),
                 show_labels=False,
             ),
-            resizable=True,
-            kind='live',
-            id='cns.experiment.positive_experiment',
-            close_result=False,
-            handler=PositiveController)
+            VGroup(
+                Item('experiment_plot', editor=ComponentEditor(),
+                    show_label=False, width=600, height=200),
+                HGroup(
+                    Item('par_count_plot', editor=ComponentEditor(),
+                        show_label=False, width=150, height=150),
+                    Item('par_score_plot', editor=ComponentEditor(),
+                        show_label=False, width=150, height=150),
+                    Item('par_dprime_plot', editor=ComponentEditor(),
+                        show_label=False, width=150, height=150)
+                    ),
+                ),
+            VGroup(
+                Item('object.data.trial_log', editor=trial_log_table),
+                show_labels=False,
+                ),
+            show_labels=False,
+        )
+    
+    traits_view = View(Include('traits_group'),
+                       resizable=True,
+                       kind='live',
+                       handler=AbstractPositiveController)
