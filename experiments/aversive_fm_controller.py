@@ -22,9 +22,13 @@ class AversiveFMController(AbstractAversiveController):
     # work with the specific circuit we constructed
     def update_remind(self):
         self.iface_behavior.set_tag('depth', self.current_remind.parameter)
+        #self.iface_behavior.cset_tag('aversive_dur_n',
+        #        self.current_remind.aversive_duration, 's', 'n')
 
     def update_warn(self):
         self.iface_behavior.set_tag('depth', self.current_warn.parameter)
+        #self.iface_behavior.cset_tag('aversive_dur_n',
+        #        self.current_warn.aversive_duration, 's', 'n')
 
     def update_safe(self):
         pass
