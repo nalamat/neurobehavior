@@ -132,8 +132,16 @@ def load_experiment_launcher():
     CohortView().configure_traits(view='detailed_view', handler=ExperimentLauncher())
 
 def test_experiment(etype):
+    # Since we are testing our experiment paradigm, we need to provide a
+    # temporary HDF5 file (i.e. a "dummy" cohort file) that the experiment can
+    # save its data to.
     import tables
     test_file = tables.openFile('test.hd5', 'w')
+    from cns import TEMP_ROOT
+    from os.path import join
+    file_name = join(TEMP_ROOT, 'test.hd5')
+    test_file = tables.openFile(file_name, 'w')
+
     if not etype.endswith('Experiment'):
         etype += 'Experiment'
     experiment_class = globals()[etype]
@@ -141,10 +149,13 @@ def test_experiment(etype):
     experiment.configure_traits()
 
 def profile_experiment(etype):
+    from cns import TEMP_ROOT
+    from os.path import join
     import cProfile
-    cProfile.run('test_experiment("%s")' % etype, 'profile.dmp')
+    profile_data_file = join(TEMP_ROOT, 'profile.dmp')
+    cProfile.run('test_experiment("%s")' % etype, profile_data_file)
     import pstats
-    p = pstats.Stats('profile.dmp')
+    p = pstats.Stats(profile_data_file)
     p.strip_dirs().sort_stats('cumulative').print_stats(50)
 
 if __name__ == '__main__':
