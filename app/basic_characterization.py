@@ -1,3 +1,5 @@
+#from enthought.etsconfig.api import ETSConfig
+#ETSConfig.toolkit = 'qt4'
 '''
 Created on Jun 9, 2010
 
@@ -5,27 +7,50 @@ Created on Jun 9, 2010
 '''
 import settings
 
-from tdt import DSPProcess
+from scipy.signal import filtfilt
+#from tdt import DSPProcess
+from tdt import DSPCircuit as DSPProcess
 
 from cns.channel import FileMultiChannel, MultiChannel, RAMMultiChannel, \
     RAMChannel, Channel
 from cns.data.h5_utils import append_date_node
-from cns.widgets.views.channel_view import MultiChannelView
 from enthought.pyface.timer.api import Timer
 from enthought.traits.api import Range, Float, HasTraits, Instance, DelegatesTo, \
-    Int, Any, on_trait_change, Enum, Trait, Tuple, List, Property, Str
+    Int, Any, on_trait_change, Enum, Trait, Tuple, List, Property, Str, \
+    cached_property, Bool
 from enthought.traits.ui.api import View, VGroup, HGroup, Action, Controller, \
 Item, TupleEditor
 import numpy as np
 import tables
 
+from cns.pipeline import lfilter
 from cns.traits.ui.api import ListAsStringEditor
 
-#CH_DIFF = [Range(0, 16, 4*int(i/4)+1) for i in range(16)]
-#CH_DIFF = [List(Int, []) for i in range(16)]
-CH_DIFF = [Str() for i in range(16)]
-#CH_DIFF_EDITORS = [ListAsStringEditor() for i in range(len(CH_DIFF))]
-CH_DIFF_LABELS = [str(i) for i in range(1, len(CH_DIFF)+1)]
+class ChannelSetting(HasTraits):
+
+    number          = Int
+    differential    = Str
+    visible         = Bool(True)
+
+    view = View(
+            HGroup(
+                Item('number', style='readonly'),
+                Item('visible'),
+                Item('differential'),
+                show_labels=False,
+                ),
+            )
+
+from enthought.traits.ui.api import TableEditor, ObjectColumn
+from enthought.traits.ui.extras.checkbox_column import CheckboxColumn
+
+table_editor = TableEditor(
+        columns=[
+            CheckboxColumn(name='visible', width=20),
+            ObjectColumn(name='number'),
+            ObjectColumn(name='differential'),
+            ]
+        )
 
 def to_list(string):
     '''
@@ -58,6 +83,8 @@ def to_list(string):
             indices.append(int(element))
     return indices
 
+from enthought.enable.api import ComponentEditor
+
 class MedusaSettings(HasTraits):
 
     # IN settings
@@ -66,25 +93,37 @@ class MedusaSettings(HasTraits):
                         Tuple(Range(1, 16,  9), Float(50e3)),
                         Tuple(Range(1, 16, 13), Float(50e3)))
 
-    diff        = Tuple(*CH_DIFF)
-    diff_matrix = Property
+    channels    = List(Instance(ChannelSetting))
 
+    def _channels_default(self):
+        return [ChannelSetting(number=i) for i in range(16)]
+
+    #diff        = Tuple(*CH_DIFF)
+    diff_matrix = Property(depends_on='channels.differential')
+
+    @cached_property
     def _get_diff_matrix(self):
-        n_chan = len(self.diff)
+        n_chan = len(self.channels)
         map = np.zeros((n_chan, n_chan))
-        for ch, diff in enumerate(self.diff):
-            channels = to_list(diff)
+        for channel in self.channels:
+            channels = to_list(channel.differential)
             if len(channels) != 0:
                 sf = -1.0/len(channels)
                 for d in channels:
-                    map[ch, d-1] = sf
-        print map.ravel()
-        return map.ravel()
+                    map[channel.number, d-1] = sf
+        return map
 
     attenuation = Range(0.0, 120.0, 20.0)
-    fc_low      = Float(3e3)
+    fc_low      = Float(10e3)
     fc_high     = Float(300)
     trial_dur   = Float(5)
+    filt_coeffs = Property(depends_on='fc_low, fc_high')
+
+    @cached_property
+    def _get_filt_coeffs(self):
+        from scipy import signal
+        Wn = self.fc_high/25e3, self.fc_low/25e3
+        return signal.butter(4, Wn, 'band')
 
     traits_view = View(
             HGroup(
@@ -94,24 +133,29 @@ class MedusaSettings(HasTraits):
                         label='Monitor Channels',
                         show_border=True),
                     VGroup(
-                        Item('diff', show_label=False,
-                             editor=TupleEditor(labels=CH_DIFF_LABELS)),
-                        label='Differential Electrodes',
-                        show_border=True),
+                        Item('channels', editor=table_editor, show_label=False),
+                        label='Channel configuration', show_border=True
+                        ),
                     'fc_low{Lowpass cutoff (Hz)}',
                     'fc_high{Highpass cutoff (Hz)}',
                     'trial_dur{Trial duration (s)}',
                     ),
-                Item('handler.raw_view', style='custom'),
+                Item('handler.raw_view', editor=ComponentEditor(),
+                    show_label=False, width=800, height=600),
                 ),
             resizable=True,
             )
+
+from enthought.chaco.api import OverlayPlotContainer, LinearMapper, \
+        DataRange1D, PlotAxis, PlotGrid
+from cns.chaco.extremes_channel_plot import ExtremesChannelPlot
+from cns.chaco.channel_data_range import ChannelDataRange
 
 class MedusaController(Controller):
     
     raw_data    = Instance(MultiChannel)
     processed_data = Instance(MultiChannel)
-    raw_view    = Instance(MultiChannelView)
+    raw_view    = Instance(OverlayPlotContainer)
     file = Any
     
     def _file_default(self):
@@ -119,7 +163,7 @@ class MedusaController(Controller):
 
     def _raw_data_default(self):
         return FileMultiChannel(channels=16, fs=self.iface_physiology.fs,
-                node=self.file.root, name='raw_data')
+                node=self.file.root, name='raw_data', compression_level=0)
 
     def _processed_data_default(self):
         return FileMultiChannel(channels=16, fs=self.iface_physiology.fs,
@@ -132,34 +176,64 @@ class MedusaController(Controller):
     settings    = Instance(MedusaSettings, args=())
 
     iface_physiology = Any
-    buffer_raw = Any
-    buffer_processed = Any
-    pipeline_raw = Any
-    pipeline_processed = Any
+    buffer_raw          = Any
+    buffer_processed    = Any
+    pipeline_raw        = Any
+    pipeline_processed  = Any
 
     def _pipeline_processed_default(self):
         return self.processed_data
 
     def _pipeline_raw_default(self):
-        from cns.pipeline import diff
-        return diff([], self.raw_data)
+        return self.raw_data
 
     def _iface_physiology_default(self):
         circuit = DSPProcess('components/physiology', 'RZ5')
-        self.buffer_raw = circuit.get_buffer('raw', channels=16) 
-        self.buffer_processed = circuit.get_buffer('processed', channels=16) 
+        self.buffer_raw = circuit.get_buffer('craw', 'r', src_type='int16',
+                dest_type='float32', channels=16) 
+        #self.buffer_processed = circuit.get_buffer('processed', 'r', channels=16) 
         circuit.start()
         return circuit
 
     def _raw_view_default(self):
-        return MultiChannelView(channel=self.raw_data, visual_aids=False)
+        container = OverlayPlotContainer(bgcolor='white', fill_padding=True,
+                padding=50)
+
+        index_range = ChannelDataRange(sources=[self.raw_data], range=10,
+                interval=1)
+        index_mapper = LinearMapper(range=index_range)
+        value_range = DataRange1D(low_setting=-1.3e-3, high_setting=3.3e-3)
+        value_mapper = LinearMapper(range=value_range)
+        plot = ExtremesChannelPlot(channel=self.raw_data,
+                index_mapper=index_mapper, value_mapper=value_mapper)
+        grid = PlotGrid(mapper=plot.index_mapper, component=plot,
+                orientation='vertical', line_color='lightgray',
+                line_style='dot', grid_interval=0.25)
+        plot.underlays.append(grid)
+        grid = PlotGrid(mapper=plot.index_mapper, component=plot,
+                orientation='vertical', line_color='lightgray',
+                line_style='solid', grid_interval=1)
+        plot.underlays.append(grid)
+        axis = PlotAxis(component=plot, title="Time (s)", orientation="top")
+        plot.underlays.append(axis)
+        axis = PlotAxis(component=plot, title="Time (s)", orientation="bottom")
+        plot.underlays.append(axis)
+        #axis = PlotAxis(component=plot, orientation="left")
+        #plot.underlays.append(axis)
+        #axis = PlotAxis(component=plot, orientation="right")
+        #plot.underlays.append(axis)
+        container.add(plot)
+        return container
 
     def init(self, info):
         self.timer = Timer(100, self.tick)
+        self.model = info.object
 
     def tick(self):
-        self.pipeline_raw.send(self.buffer_raw.read())
-        self.pipeline_processed.send(self.buffer_processed.read())
+        data = self.buffer_raw.read()
+        if not len(data) == 0:
+            self.pipeline_raw.send(data)
+        #data += np.dot(data.T, self.model.diff_matrix).T
 
     def set_attenuation(self, value):
         self.iface_RZ6.set_tag('sig_atten', value)
@@ -179,7 +253,7 @@ if __name__ == '__main__':
     cProfile.run('test_medusa()', 'profile.dmp')
     import pstats
     p = pstats.Stats('profile.dmp')
-    p.strip_dirs().sort_stats('cumulative').print_stats(50)
+    p.sort_stats('cumulative').print_stats(50)
 
     #import doctest
     #doctest.testmod()
