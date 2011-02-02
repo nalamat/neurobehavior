@@ -1,5 +1,5 @@
 from enthought.traits.api import Trait, Instance, Range, Float, Property, \
-        Bool, List, Int, Str
+        Bool, List, Int, Str, Tuple
 from enthought.traits.ui.api import VGroup, Item, HGroup, View, Include
 
 from cns import choice
@@ -17,11 +17,11 @@ class AbstractAversiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
 
     # Trait defines a drop-down selector if you provide it with a list of
     # options
-    order = Trait('descending', choice.options, store='attribute')
+    order         = Trait('descending', choice.options, store='attribute')
     warn_sequence = List(Instance(TrialShockSetting), minlen=1,
-            editor=table_editor, store='node')
-    remind = Instance(TrialShockSetting, (), store='node')
-    safe = Instance(TrialShockSetting, (), store='node')
+                         editor=table_editor, store='child')
+    remind        = Instance(TrialShockSetting, (), store='child')
+    safe          = Instance(TrialShockSetting, (), store='child')
 
     def _warn_sequence_default(self):
         return [TrialShockSetting()]

@@ -1,4 +1,4 @@
-from enthought.traits.api import Any, Property, Str
+from enthought.traits.api import Any, Property, Str, on_trait_change
 
 from tdt import DSPCircuit
 from cns.pipeline import deinterleave_bits
@@ -219,13 +219,14 @@ class AbstractAversiveController(AbstractExperimentController,
         if self.state == 'halted':
             return 'System is halted'
         if self.state == 'manual':
-            return 'PAUSED: presenting reminder (%r)' % self.current_par
+            return 'PAUSED: presenting reminder (%s)' % self.current_remind
 
         if self.current_trial > self.current_num_safe:
-            status = 'WARNING (%r)' % self.current_par
+            status = 'WARNING (%s)' % self.current_warn
         else:
-            mesg = 'SAFE %d of %d (%r)'
-            status = mesg % (self.current_trial, self.current_num_safe, self.current_par)
+            mesg = 'SAFE %d of %d (%s)'
+            status = mesg % (self.current_trial, self.current_num_safe,
+                             self.current_warn)
         if self.state == 'paused':
             status = 'PAUSED: next trial is %s' % status
         return status
@@ -308,3 +309,22 @@ class AbstractAversiveController(AbstractExperimentController,
 
     def update_safe(self):
         raise NotImplementedError
+
+    set_warn_sequence   = AbstractExperimentController.reset_current
+    set_remind          = AbstractExperimentController.reset_current
+    set_safe            = AbstractExperimentController.reset_current
+
+    @on_trait_change(' model.paradigm.warn_sequence')
+    def queue_warn_sequence_change(self, object, name, old, new):
+        self.queue_change(self.model.paradigm, 'warn_sequence',
+                self.current_warn_sequence, self.model.paradigm.warn_sequence)
+
+    @on_trait_change('model.paradigm.remind.+')
+    def queue_remind_change(self, object, name, old, new):
+        self.queue_change(self.model.paradigm, 'remind',
+                self.current_remind, self.model.paradigm.remind)
+
+    @on_trait_change('model.paradigm.safe.+')
+    def queue_safe_change(self, object, name, old, new):
+        self.queue_change(self.model.paradigm, 'safe',
+                self.current_safe, self.model.paradigm.safe)
