@@ -1,7 +1,7 @@
 from neurogen.blocks import load_dict
 from neurogen.trait_interface import block_view_factory
 
-am_noise = (
+am_noise = load_dict((
         'Output', {
                 'token': (
                     'SAM', {
@@ -20,9 +20,9 @@ am_noise = (
                         'label'          : 'Sinusoidal Modulator',
                         }),
             #'label'     : 'Waveform',
-            })
+            }))
 
-ramped_am_noise = (
+ramped_am_noise = load_dict((
         'Output', {
             'token': (
                 'Cos2Envelope', {
@@ -44,9 +44,9 @@ ramped_am_noise = (
                             }),
                         }),
             #'label'     : 'Waveform',
-            })
+            }))
 
-tone = (
+ramped_tone = load_dict((
         'Output', {
             'token': (
                 'Cos2Envelope', {
@@ -62,20 +62,17 @@ tone = (
                     }),
             'label'     : 'Waveform',
             }
-        )
+        ))
 
-ramped_am_noise_signal = load_dict(ramped_am_noise)
-am_noise_signal = load_dict(am_noise)
-tone_signal = load_dict(tone)
-
-sig = block_view_factory(am_noise_signal)()
-sig.variable = 'SAM_2__depth'
-
-sig2 = block_view_factory(ramped_am_noise_signal)()
-sig2.variable = 'SAM_1__depth'
+am_noise = block_view_factory(am_noise)()
+am_noise.variable = 'SAM_1__depth'
+ramped_am_noise = block_view_factory(ramped_am_noise)()
+ramped_am_noise.variable = 'SAM_2__depth'
+ramped_tone = block_view_factory(ramped_tone)()
+ramped_tone.variable = 'Cos2Envelope_2__duration'
 
 signal_options = {
-        sig2  : 'Ramped AM Noise',
-        sig   : 'AM Noise',
-        block_view_factory(tone_signal)()       : 'Ramped Tone'
+        ramped_tone     : 'Ramped Tone',
+        ramped_am_noise : 'Ramped AM Noise',
+        am_noise        : 'AM Noise',
         }
