@@ -173,6 +173,22 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin):
     pars = Property(List(Int), depends_on='trial_log')
     go_trial_count = Property(Int, store='attribute', depends_on='trial_log')
 
+    DTYPE = [('par', 'f'), 
+             ('nogo_count', 'i'),
+             ('go_count', 'i'),
+             ('fa_count', 'i'),
+             ('hit_count', 'i'),
+             ('hit_frac', 'f'),
+             ('fa_frac', 'f'),
+             ('d', 'f'),
+             ]
+    par_info = Property(store='table', dtype=DTYPE)
+
+    def _get_par_info(self):
+        return zip(self.pars, self.par_nogo_count, self.par_go_count,
+                self.par_fa_count, self.par_hit_count, self.par_fa_frac,
+                self.par_hit_frac, self.par_dprime)
+
     @cached_property
     def _get_ts_seq(self):
         return [t[1] for t in self.trial_log]
