@@ -11,8 +11,8 @@ class AbstractExperiment(HasTraits):
 
     animal      = Any
     store_node  = Any
-    data        = Instance(AbstractExperimentData)
-    paradigm    = Instance(AbstractExperimentParadigm)
+    data        = Instance(AbstractExperimentData, store='node')
+    paradigm    = Instance(AbstractExperimentParadigm, store='node')
 
     start_time  = Instance(datetime, store='attribute')
     stop_time   = Instance(datetime, store='attribute')

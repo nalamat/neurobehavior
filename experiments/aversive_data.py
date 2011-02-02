@@ -143,20 +143,20 @@ class RawAversiveData_v0_2(AbstractExperimentData):
     comment = Str('', store='attribute')
     exit_status = Enum('complete', 'partial', 'aborted', store='attribute')
 
-    date = Property
-    start_time = Instance(datetime, store='attribute')
-    stop_time = Instance(datetime, store='attribute')
-    duration = Property(store='attribute')
+    #date = Property
+    #start_time = Instance(datetime, store='attribute')
+    #stop_time = Instance(datetime, store='attribute')
+    #duration = Property(store='attribute')
     water_infused = Property
     
-    def _get_date(self):
-        return self.start_time.date()
+    #def _get_date(self):
+    #    return self.start_time.date()
 
-    def _get_duration(self):
-        if self.stop_time is None:
-            return datetime.now()-self.start_time
-        else:
-            return self.stop_time-self.start_time
+    #def _get_duration(self):
+    #    if self.stop_time is None:
+    #        return datetime.now()-self.start_time
+    #    else:
+    #        return self.stop_time-self.start_time
 
     def _get_water_infused(self):
         try:
@@ -404,15 +404,14 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
     DEP_M_CONTACT = ['masked_trial_log', 'contact_dur', 'contact_offset']
     DEP_CONTACT_SEQ = ['contact_scores', 'contact_fraction']
     DEP_M_CONTACT_SEQ = ['masked_contact_scores', 'contact_fraction']
-    contact_scores = Property(depends_on=DEP_CONTACT, store='array',
-                              dtype=[('scores', 'f')])
+    contact_scores = Property(depends_on=DEP_CONTACT, store='array', dtype='f')
     masked_contact_scores = Property(depends_on=DEP_M_CONTACT, store='array',
-                                     dtype=[('scores', 'f')])
+                                     dtype='f')
 
     contact_seq = Property(depends_on=DEP_CONTACT_SEQ, store='array',
-                           dtype=[('scores', 'bool')])
+                           dtype='bool')
     masked_contact_seq = Property(depends_on=DEP_M_CONTACT_SEQ, store='array',
-                                  dtype=[('scores', 'bool')])
+                                  dtype='bool')
 
     # Parameter summary based on masked data
     pars = Property(depends_on='masked_trial_log')
