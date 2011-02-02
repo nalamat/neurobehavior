@@ -59,7 +59,7 @@ class PositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
         return [TrialSetting()]
 
     parameter_order = Trait('shuffled set', choice.options, store='attribute')
-    nogo_parameter  = Float
+    nogo_parameter  = Float(store='attribute')
 
     min_nogo = Int(0, label='Minimum NOGO', store='attribute')
     max_nogo = Int(0, label='Maximum NOGO', store='attribute')
@@ -78,8 +78,9 @@ class PositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
     response_window_duration = Float(3, unit='s', store='attribute')
     reward_duration = Float(0.5, unit='s', store='attribute')
 
-    timeout_trigger  = Enum('FA only', 'Anytime')
+    timeout_trigger  = Enum('FA only', 'Anytime', store='attribute')
     timeout_duration = Float(5, unit='s', store='attribute')
+    timeout_grace_period = Float(2.5, unit='s', store='attribute')
 
     poke_duration_lb = Float(0.1, unit='s', store='attribute')
     poke_duration_ub = Float(0.5, unit='s', store='attribute')
@@ -87,6 +88,7 @@ class PositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
     traits_view = View(
             VGroup(
                 VGroup(
+                    Item('nogo_parameter'),
                     VGroup(Item('parameter_order', label='Order')),
                     Item('parameters', editor=table_editor,
                          show_label=False),
@@ -116,6 +118,7 @@ class PositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
                         'response_window_duration',
                         'timeout_trigger',
                         'timeout_duration',
+                        'timeout_safe_period',
                         'poke_duration_lb',
                         'poke_duration_ub',
                         label='Trial Settings',

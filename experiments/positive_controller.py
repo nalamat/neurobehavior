@@ -53,7 +53,7 @@ class PositiveController(AbstractExperimentController, PumpControllerMixin):
         self.current_nogo_parameter = self.model.paradigm.nogo_parameter
         self.current_trial_dur = self.model.paradigm.trial_duration
 
-        log.debug("Initialized current settigns")
+        log.debug("Initialized current settings")
 
     def start_experiment(self, info):
         # Load interface for the experiment
@@ -83,6 +83,7 @@ class PositiveController(AbstractExperimentController, PumpControllerMixin):
         self.set_timeout_duration(paradigm.timeout_duration)
         self.set_attenuation(paradigm.attenuation)
         self.set_timeout_trigger(paradigm.timeout_trigger)
+        self.set_timeout_grace_period(paradigm.timeout_grace_period)
 
         # Set up storage nodes
         exp_node = append_date_node(self.model.store_node,
@@ -240,9 +241,6 @@ class PositiveController(AbstractExperimentController, PumpControllerMixin):
     def set_signal_offset_delay(self, value):
         self.iface_behavior.cset_tag('sig_offset_del_n', value, 's', 'n')
 
-    def set_timeout_duration(self, value):
-        self.iface_behavior.cset_tag('to_dur_n', value, 's', 'n')
-
     def set_poke_duration(self, value):
         self.iface_behavior.cset_tag('poke_dur_n', value, 's', 'n')
 
@@ -261,6 +259,12 @@ class PositiveController(AbstractExperimentController, PumpControllerMixin):
     def set_timeout_trigger(self, value):
         flag = 0 if value == 'FA only' else 1
         self.iface_behavior.set_tag('to_type', flag)
+
+    def set_timeout_duration(self, value):
+        self.iface_behavior.cset_tag('to_dur_n', value, 's', 'n')
+
+    def set_timeout_grace_period(self, value):
+        self.iface_behavior.cset_tag('to_safe_n', value, 's', 'n')
 
     def trigger_next(self):
         signal = self.model.paradigm.signal
