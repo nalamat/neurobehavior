@@ -7,6 +7,7 @@ from cns.data import persistence
 from cns.data.h5_utils import get_or_append_node
 import sys
 import tables
+from os.path import join
 from enthought.traits.api import Any, Trait, TraitError
 from enthought.traits.ui.api import View, Item
 
