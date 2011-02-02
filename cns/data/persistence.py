@@ -10,8 +10,11 @@ import logging
 log = logging.getLogger(__name__)
 
 def next_id(element, name=''):
-    try: next_id = element._f_getAttr(name+'_NEXT_ID')
-    except: next_id = 0
+    try: 
+        next_id = element._f_getAttr(name+'_NEXT_ID')
+    except: 
+        next_id = 0
+    log.debug("Storing next ID for %s in %s", name, element)
     element._f_setAttr(name+'_NEXT_ID', next_id + 1)
     return next_id
 
@@ -45,39 +48,41 @@ def store_attribute(node, object, name, trait):
         value = 'None'
     if value.__class__ in date_classes:
         # The HDF5 datetime datatype requires seconds since the Unix epoch
-        # (POSIX time_t).  We just convert the datetime to a string and
-        # store it that way instead.  It avoids cross-platform
-        # inconsistencies with the POSIX timestamps.
+        # (POSIX time_t).  We just convert the datetime to a string and store it
+        # that way instead.  It avoids cross-platform inconsistencies with the
+        # POSIX timestamps.
         value = strftime(value)
     node._f_setAttr(name, value)
 
 def store_array(node, object, name, trait):
     value = getattr(object, name)
-    try: getattr(node, name)._f_remove()
-    except tables.NoSuchNodeError: pass
+    try: 
+        getattr(node, name)._f_remove()
+    except tables.NoSuchNodeError: 
+        pass
+
     if len(value)==0:
         # Create a blank array
-        atom = tables.atom.Atom.from_dtype(value.dtype)
+        atom = tables.atom.Atom.from_dtype(dtype(trait.dtype))
         node._v_file.createEArray(node._v_pathname, name, atom, (0,))
     else:
         node._v_file.createArray(node._v_pathname, name, value)
 
 def store_table(node, object, name, trait):
     # Create copy of value since we may need to convert the datetime series.
-    value = array(getattr(object, name))
-    trait = object.trait(name)
+    value = getattr(object, name)
+    value = sanitize_datetimes(value, trait)
     # When datteime support is added to Numpy, we can delete the following
     # line and uncomment the line after
-    value = sanitize_datetimes(value, trait)
     #value = array(value, dtype=get_np_dtype(trait))
     #value = array(value, dtype=get_hdf5_dtype(trait))
     value = array(value, dtype=trait.dtype)
 
     try:
-        # Table already exists.  We delete the data in the table and
-        # re-add it.  This is not really efficient, but the current use
-        # case for this type of table will only have up to 100 rows so
-        # we should not see much of a performance hit.
+        # Table already exists.  We delete the data in the table and re-add it.
+        # This is not really efficient, but the current use case for this type
+        # of table will only have up to 100 rows so we should not see much of a
+        # performance hit.
         table = getattr(node, name)
         table.truncate(0)
         table.append(value)
@@ -95,8 +100,10 @@ def store_child(node, object, name, trait):
     if hasattr(value, '__iter__'): # This is a list of items
         #children.append(group_node)
         group_children = []
-        for v in value:
-            child = add_or_update_object(v, group_node)
+        for i, v in enumerate(value):
+            log.debug("Adding or updating %s", v)
+            name = v.__class__.__name__ + '_' + str(i)
+            child = add_or_update_object(v, group_node, name)
             group_children.append(child)
         # We need to think about whether we should be deleting records.
         # Maybe just add a deleted attribute so we know not to load the
@@ -107,7 +114,16 @@ def store_child(node, object, name, trait):
     else: # nope, it's not a list, just a single object
         add_or_update_object(value, node, name)
 
-def add_or_update_object(object, node, name=None):
+def update_object(object):
+    '''
+    Updates record for object loaded from HDF5 file.
+    '''
+
+    if not hasattr(object, 'UNIQUE_ID'):
+        raise IOError, "Object does not have an existing entry in file"
+    object_node = object.store_node
+
+def add_object(object, node, name=None):
     '''
     Persists Python object to a node in a HDF5 file.
 
@@ -122,22 +138,41 @@ def add_or_update_object(object, node, name=None):
     node
         HDF5 node to save object data to
     name
-        Name of object node that serves as the root of the object data.  The
-        object node will be appended to node.  If None, then the node will be
-        used as the root for the object data.
+        Name of object node that serves as the root of the object data.  If
+        None, then the node will be used as the root for the object data.
 
     Right now this function only works with subclasses of `HasTraits` since it
     requires some metadata to be set for each trait that is being saved.
     '''
 
+    # Autogenerate name
+    if name is None:
+        base_name = object.__class__.__name__
+        log.debug("Creating unique ID for %r", object)
+        setattr(object, 'UNIQUE_ID', next_id(node, base_name))
+        name = base_name + '_' + str(object.UNIQUE_ID)
+
+    # Get or create object node
+    try:
+        object_node = getattr(node, object_name)
+    except tables.NoSuchNodeError:
+        object_node = h5_file.createGroup(h5_path, object_name)
+        # A bit redundant since the name of the node also contains the ID
+        try: 
+            object_node._f_setAttr('UNIQUE_ID', object.UNIQUE_ID)
+        except: 
+            pass
+
+    persist_object(object, node)
+
+def add_or_update_object(object, node, name=None):
     h5_file = node._v_file
     h5_path = node._v_pathname
     base_name = object.__class__.__name__
 
     if name is None:
-    #if as_child:
-        # Check to see if object has been assigned a unique ID
         if not hasattr(object, 'UNIQUE_ID'):
+            log.debug("Creating unique ID for %r", object)
             setattr(object, 'UNIQUE_ID', next_id(node, base_name))
         object_name = base_name + '_' + str(object.UNIQUE_ID)
     else:
@@ -152,8 +187,10 @@ def add_or_update_object(object, node, name=None):
     except tables.NoSuchNodeError:
         object_node = h5_file.createGroup(h5_path, object_name)
         # A bit redundant since the name of the node also contains the ID
-        try: object_node._f_setAttr('UNIQUE_ID', object.UNIQUE_ID)
-        except: pass
+        try: 
+            object_node._f_setAttr('UNIQUE_ID', object.UNIQUE_ID)
+        except: 
+            pass
 
     # Info that allows us to recreate the object later
     object_node._f_setAttr('module', object.__class__.__module__)
@@ -161,9 +198,9 @@ def add_or_update_object(object, node, name=None):
     #else: # We are supposed to use this node!
         #object_node = node
 
-    # Now we add the metadata for the object
-    # TODO: add support for deleted metadata.  Right now this is unsupported
-    # because we don't need this use case.
+    # Now we add the metadata for the object TODO: add support for deleted
+    # metadata.  Right now this is unsupported because we don't need this use
+    # case.
     store_map = (('attribute', store_attribute),
                  ('array', store_array),
                  ('table', store_table),
@@ -252,6 +289,7 @@ def switch_datetime_fmt(table, trait, parser):
         try:
             dtype = trait.dtype
         except AttributeError:
+            raise DeprecationWarning, "Use dtype metadata now"
             dtype = get_np_dtype(trait)
 
         table = [tuple(row) for row in table]
@@ -272,7 +310,7 @@ def switch_datetime_fmt(table, trait, parser):
 
 sanitize_datetimes = functools.partial(switch_datetime_fmt, parser=strftime_arr)
 unsanitize_datetimes = functools.partial(switch_datetime_fmt,
-                                         parser=strptime_arr)
+        parser=strptime_arr)
 
 def append_metadata(object, source):
     from os.path import abspath
