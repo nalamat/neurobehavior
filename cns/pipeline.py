@@ -64,6 +64,22 @@ def rand_source(count, size, sleep):
 ################################################################################
 # PIPELINES
 ################################################################################
+@pipeline
+def lfilter(b, a, target):
+    from scipy.signal import lfilter
+    margin = len(b)
+    n = margin*2
+
+    buffer = (yield)
+    while True:
+        if buffer.shape[-1] > n:
+            filtered_buffer = lfilter(b, a, buffer)
+            target.send(filtered_buffer[..., margin:-margin])
+            buffer = buffer[..., -margin:]
+        data  = (yield)
+        print "LFILTER", buffer.shape, data.shape
+        buffer = np.c_[buffer, (yield)]
+
 def deinterleave_bits(targets):
     return int_to_TTL(len(targets), deinterleave(targets))
 
