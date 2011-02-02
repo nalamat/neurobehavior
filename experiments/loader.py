@@ -77,8 +77,9 @@ class ExperimentLauncher(CohortViewHandler):
     
             ui = model.edit_traits(parent=info.ui.control, kind='livemodal')
             if ui.result:
+                #persistence.delete_object(paradigm_node, paradigm_name)
                 persistence.add_or_update_object(model.paradigm, paradigm_node,
-                                                 paradigm_name)
+                        paradigm_name)
                 item.processed = True
                 self.last_paradigm = model.paradigm
             
