@@ -11,12 +11,21 @@ class AbstractExperiment(HasTraits):
 
     animal      = Any
     store_node  = Any
+    exp_node    = Any
+    data_node   = Any
+
     data        = Instance(AbstractExperimentData, store='node')
     paradigm    = Instance(AbstractExperimentParadigm, store='node')
 
     start_time  = Instance(datetime, store='attribute')
     stop_time   = Instance(datetime, store='attribute')
     duration    = Property(store='attribute')
+
+    def _exp_node_default(self):
+        return append_date_node(self.store_node)
+
+    def _data_node_default(self):
+        return append_node(self.exp_node, 'data')
 
     def _get_date(self):
         return self.start_time.date()

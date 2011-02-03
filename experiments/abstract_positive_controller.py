@@ -47,12 +47,6 @@ class AbstractPositiveController(AbstractExperimentController,
         self.current_poke_dur = self.choice_poke_dur()
         self.set_poke_duration(self.current_poke_dur)
 
-        # Make copies of the parameters that can be changed during the
-        # experiment.
-        #self.current_repeat_FA = self.model.paradigm.repeat_FA
-        #self.current_nogo_parameter = self.model.paradigm.nogo_parameter
-        #self.current_trial_dur = self.model.paradigm.trial_duration
-
         log.debug("Initialized current settings")
 
     def start_experiment(self, info):
@@ -85,12 +79,6 @@ class AbstractPositiveController(AbstractExperimentController,
         #self.set_attenuation(paradigm.attenuation)
         self.set_timeout_trigger(paradigm.timeout_trigger)
         self.set_timeout_grace_period(paradigm.timeout_grace_period)
-
-        # Set up storage nodes
-        exp_node = append_date_node(self.model.store_node,
-                                    pre='appetitive_date_')
-        data_node = append_node(exp_node, 'data')
-        #self.model.data = PositiveData(store_node=data_node)
 
         self.model.data.trial_start_timestamp.fs = self.buffer_TTL.fs
         self.model.data.trial_end_timestamp.fs = self.buffer_TTL.fs

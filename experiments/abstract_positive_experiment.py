@@ -8,6 +8,7 @@ from enthought.traits.ui.api import View, Item, VGroup, HGroup, InstanceEditor,\
 
 from enthought.enable.api import Component, ComponentEditor
 
+from abstract_experiment import AbstractExperiment
 from positive_data import PositiveData
 from abstract_positive_paradigm import AbstractPositiveParadigm
 from abstract_positive_controller import AbstractPositiveController
@@ -68,16 +69,15 @@ trial_log_table = TableEditor(
             ]
         )
 
-class AbstractPositiveExperiment(HasTraits):
-
-    animal      = Any
-    store_node  = Any
-    exp_node    = Any
+class AbstractPositiveExperiment(AbstractExperiment):
 
     data = Instance(PositiveData)
     paradigm = Instance(AbstractPositiveParadigm, ())
 
     trial_log_view = Property(depends_on='data.trial_log')
+
+    def _data_default(self):
+        return PositiveData(store_node=self.data_node)
 
     def _get_trial_log_view(self):
         trial_log = np.array(self.data.trial_log, dtype=object)
@@ -93,8 +93,8 @@ class AbstractPositiveExperiment(HasTraits):
     experiment_plot = Any
     experiment_plot_index_range = Instance(ChannelDataRange, ())
 
-    par_count_plot = Instance(Component)
-    par_score_plot = Instance(Component)
+    par_count_plot  = Instance(Component)
+    par_score_plot  = Instance(Component)
     par_dprime_plot = Instance(Component)
     
     def _data_changed(self):
