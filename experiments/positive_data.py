@@ -148,12 +148,12 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin):
         data = parameter, ts_start, ts_end, ttype, response, reaction_time
         self.trial_log.append(data)
 
-    ts_seq = Property(Array('i'), depends_on='trial_log')
-    par_seq = Property(Array('f'), depends_on='trial_log')
-    ttype_seq = Property(Array('S'), depends_on='trial_log')
-    resp_seq = Property(Array('S'), depends_on='trial_log')
+    ts_seq       = Property(Array('i'), depends_on='trial_log')
+    par_seq      = Property(Array('f'), depends_on='trial_log')
+    ttype_seq    = Property(Array('S'), depends_on='trial_log')
+    resp_seq     = Property(Array('S'), depends_on='trial_log')
 
-    go_indices = Property(Array('i'), depends_on='ttype_seq')
+    go_indices   = Property(Array('i'), depends_on='ttype_seq')
     nogo_indices = Property(Array('i'), depends_on='ttype_seq')
 
     par_go_mask = Property(List(Array('b')), depends_on='trial_log')
@@ -168,6 +168,8 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin):
 
     par_hit_frac = Property(List(Float), depends_on='trial_log')
     par_fa_frac = Property(List(Float), depends_on='trial_log')
+    
+    global_fa_frac = Property(Float, depends_on='trial_log')
 
     pars = Property(List(Int), depends_on='trial_log')
     go_trial_count = Property(Int, store='attribute', depends_on='trial_log')
@@ -273,6 +275,17 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin):
     @cached_property
     def _get_par_fa_frac(self):
         return np.true_divide(self.par_fa_count, self.par_nogo_count)
+
+    @cached_property
+    def _get_global_fa_frac(self):
+        nogo_count = np.len(self.nogo_indices)
+        nogo_resp = np.take(self.resp_seq, self.nogo_indices)
+        # fa_mask is a boolean array where 1 indicates the subject went to the
+        # spout.  We can simply compute the sum of this array to determien how
+        # many times the subject went to the spout (e.g. "false alarmed")
+        fa_mask = nogo_resp == 'spout'
+        fa_count = np.sum(fa_mask)
+        return float(fa_count)/float(nogo_count)
 
     @cached_property
     def _get_go_trial_count(self):

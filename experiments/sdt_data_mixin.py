@@ -24,4 +24,9 @@ class SDTDataMixin(HasTraits):
 
     @cached_property
     def _get_par_dprime(self):
-        return self.par_z_hit-self.par_z_fa
+        return self.par_z_hit-self.z_fa
+
+    @cached_property
+    def _get_z_fa(self):
+        global_fa_frac = clip(self.global_fa_frac, self.clip, 1-self.clip)
+        return norm.ppf(global_fa_frac)
