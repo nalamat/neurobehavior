@@ -22,6 +22,40 @@ from aversive_fm_experiment import AversiveFMExperiment
 from aversive_am_noise_experiment import AversiveAMNoiseExperiment
 from aversive_noise_masking_experiment import AversiveNoiseMaskingExperiment
 
+from cns.data.ui.cohort import CohortEditor, CohortView, CohortViewHandler
+
+from enthought.traits.ui.menu import Menu, Action
+
+cohort_editor = CohortEditor(menu=Menu(
+    # This is a list of the different "actions" one can call for each of the
+    # animals in the cohort file.  The action is a function defined on the
+    # handler.  All of these actions are currently tied to functions that launch
+    # the appropriate experiment.  Name is the string that should be displayed
+    # in the context menu (i.e.  the right-click pop-up menu).  action is the
+    # function on the controller/handler that should be called when that
+    # particular menu item is selected.  
+    Action(name='Appetitive', action='launch_appetitive'),
+    Action(name='Appetitive (Stage 1)', action='launch_appetitive_stage1'),
+    Action(name='Aversive (FM)', action='launch_aversive_fm'),
+    Action(name='Aversive (AM Noise)', action='launch_aversive_am_noise'),
+    Action(name='Aversive (Noise Masking)',
+           action='launch_aversive_noise_masking'),
+    ))
+
+class ExperimentCohortView(CohortView):
+
+    traits_view = View(
+        VGroup(
+            Group(Item('object.cohort.description', style='readonly')),
+            Item('object.cohort.animals', editor=cohort_editor,
+                 show_label=False, style='readonly'),
+        ),
+        title='Cohort',
+        height=400,
+        width=600,
+        resizable=True,
+    )
+
 class ExperimentLauncher(CohortViewHandler):
 
     last_paradigm = Trait(None, Any)
@@ -37,6 +71,7 @@ class ExperimentLauncher(CohortViewHandler):
         used.  If the experiment is launched but not run, changes to the
         paradigm will not be saved.
         '''
+
         try:
             item = selected
             if item.store_node._v_isopen:
@@ -106,13 +141,14 @@ class ExperimentLauncher(CohortViewHandler):
             """
             error(info.ui.control, str(e) + '\n\n' + dedent(mesg))
 
-    # Functions to launch the different experiments from the context menu.  The options
-    # for the context menu are defined in cns.data.ui.cohort (in the animal_editor).  That
-    # really should be moved to this file since where it currently is located is not
-    # obvious.
+    # Functions to launch the different experiments from the context menu.  The
+    # options for the context menu are defined in cns.data.ui.cohort (in the
+    # animal_editor).  That really should be moved to this file since where it
+    # currently is located is not obvious.
 
-    # When the context menu item is selected, it calls the function specified by "action" with
-    # two arguments, info (a handle to the current window) and the selected item.
+    # When the context menu item is selected, it calls the function specified by
+    # "action" with two arguments, info (a handle to the current window) and the
+    # selected item.
     
     def launch_appetitive(self, info, selected):
         self.launch_experiment(info, selected[0], PositiveExperiment)
