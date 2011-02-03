@@ -1,14 +1,20 @@
+import os
 from os.path import dirname, join, abspath
 
-LIBRARY_ROOT = dirname(abspath(__file__)) # not sure if this is still used
-DATA_ROOT = 'C:/experiments/data'   # where data files should be stored
-LOG_ROOT = 'C:/experiments/logs'    # where log files should be st ored
-TEMP_ROOT = 'C:/experiments/temp'   # location for temporary files
-COHORT_PATH = DATA_ROOT # i.e. store the cohort data files here
+BASE_DIRECTORIES = {
+        'REGINA'    : 'E:/',
+        'PC'        : 'C:/EXPERIMENTS',
+        'SEMPLE'    : None,
+        'ROSEN'     : None,
+        }
 
-# not used (was toying with the idea of saving a paradigm)
-PAR_WILDCARD    = 'Paradigm files (*.paradigm)|*.paradigm|'
-# extension for cohort files
+BASE_DIRECTORY = BASE_DIRECTORIES[os.getenv('COMPUTERNAME')]
+LOG_ROOT    = join(BASE_DIRECTORY, 'logs') # where log files should be stored
+TEMP_ROOT   = join(BASE_DIRECTORY, 'temp') # location for temporary files
+DATA_ROOT   = join(BASE_DIRECTORY, 'data') # location for data files
+COHORT_PATH = DATA_ROOT                    # location for cohort files
+
+# extension to use for cohort files
 COHORT_WILDCARD = 'Cohort files (*.cohort.hd5)|*.cohort.hd5|'
 
 if __name__ == '__main__':
