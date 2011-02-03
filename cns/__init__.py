@@ -3,7 +3,7 @@ from os.path import dirname, join, abspath
 
 BASE_DIRECTORIES = {
         'REGINA'    : 'E:/',
-        'PC'        : 'C:/EXPERIMENTS',
+        'DFNKWCH1'  : 'C:/EXPERIMENTS',
         'SEMPLE'    : None,
         'ROSEN'     : None,
         }
