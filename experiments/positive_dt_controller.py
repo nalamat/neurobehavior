@@ -9,8 +9,8 @@ class PositiveDTController(AbstractPositiveController):
     def log_trial(self, ts_start, ts_end, last_ttype):
         parameter = self.current_setting_go.parameter
         attenuation = self.current_setting_go.attenuation
-        self.model.data.log_trial(ts_start, ts_end, last_ttype, parameter,
-                attenuation)
+        self.model.data.log_trial(ts_start, ts_end, last_ttype, 
+                (parameter, attenuation))
 
     def _compute_signal(self, duration):
         carrier = blocks.BroadbandNoise(seed=-1)
