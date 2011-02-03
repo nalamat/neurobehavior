@@ -68,26 +68,26 @@ class CohortEditor(TableEditor):
 #    def get_width(self, object, trait, column):
 #        return self.widths[column]
 
-detailed_cohort_table = TabularEditor(adapter=AnimalAdapter(), 
-                                      editable=False)
+#detailed_cohort_table = TabularEditor(adapter=AnimalAdapter(), 
+#                                      editable=False)
 
-class SimpleAnimalAdapter(TabularAdapter):
-    
-    columns = [('animal', 'animal')]
-    
-    animal_text = Property
-    
-    def _get_animal_text(self):
-        try:
-            attributes = (self.item.identifier.capitalize(), 
-                          self.item.parents,
-                          self.item.birth.strftime('%x'))
-            return '%s\t(Litter %s born %s)' % attributes
-        except:
-            return 'Unknown'
-        
-    def _get_bg_color(self):
-        return sex_colormap[self.item.sex]
+#class SimpleAnimalAdapter(TabularAdapter):
+#    
+#    columns = [('animal', 'animal')]
+#    
+#    animal_text = Property
+#    
+#    def _get_animal_text(self):
+#        try:
+#            attributes = (self.item.identifier.capitalize(), 
+#                          self.item.parents,
+#                          self.item.birth.strftime('%x'))
+#            return '%s\t(Litter %s born %s)' % attributes
+#        except:
+#            return 'Unknown'
+#        
+#    def _get_bg_color(self):
+#        return sex_colormap[self.item.sex]
     
 class CohortViewHandler(FileHandler):
 
