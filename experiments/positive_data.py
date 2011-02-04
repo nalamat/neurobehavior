@@ -174,16 +174,17 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin):
     pars = Property(List(Int), depends_on='trial_log')
     go_trial_count = Property(Int, store='attribute', depends_on='trial_log')
 
-    DTYPE = [('par', 'f'), 
-             ('nogo_count', 'i'),
-             ('go_count', 'i'),
-             ('fa_count', 'i'),
-             ('hit_count', 'i'),
-             ('hit_frac', 'f'),
-             ('fa_frac', 'f'),
-             ('d', 'f'),
-             ]
-    par_info = Property(store='table', dtype=DTYPE)
+    PAR_INFO_DTYPE = [
+            ('par', 'f'), 
+            ('nogo_count', 'i'),
+            ('go_count', 'i'),
+            ('fa_count', 'i'),
+            ('hit_count', 'i'),
+            ('hit_frac', 'f'),
+            ('fa_frac', 'f'),
+            ('d', 'f'),
+            ]
+    par_info = Property(store='table', dtype=PAR_INFO_DTYPE)
 
     def _get_par_info(self):
         return zip(self.pars, self.par_nogo_count, self.par_go_count,
@@ -222,9 +223,14 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin):
         return self._get_indices('NOGO')
 
     def _get_par_mask(self, sequence, value):
-        log.debug("Getting par mask")
-        mask = np.array(sequence) == value
-        return [np.equal(self.par_seq, par) & mask for par in self.pars]
+        value_mask = np.array(sequence) == value
+        result = []
+        for par in self.pars:
+            par_mask = np.equal(self.par_seq, par)
+            if par_mask.ndim != 1:
+                par_mask = par_mask.all(axis=-1)
+            result.append(par_mask & value_mask)
+        return result
 
     @cached_property
     def _get_par_nogo_mask(self):
@@ -266,7 +272,18 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin):
     def _get_pars(self):
         # We only want to return pars for complete trials (e.g. ones for which a
         # go was presented).
-        return np.unique(np.take(self.par_seq, self.go_indices, axis=0))
+        seq = np.take(self.par_seq, self.go_indices, axis=0)
+
+        try:
+            # This should work for "complex" parameters where we are varying the
+            # signal across more than one dimension.
+            unique = set([tuple(i) for i in seq])
+            return list(unique)
+        except:
+            # If we are varying across only a single dimension, this will take
+            # precedence.
+            return np.unique(seq)
+        #return np.unique(np.take(self.par_seq, self.go_indices, axis=0))
 
     @cached_property
     def _get_par_hit_frac(self):
@@ -278,13 +295,18 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin):
 
     @cached_property
     def _get_global_fa_frac(self):
-        nogo_count = np.len(self.nogo_indices)
+        nogo_count = len(self.nogo_indices)
+
+        if nogo_count == 0:
+            return np.nan
+
         nogo_resp = np.take(self.resp_seq, self.nogo_indices)
         # fa_mask is a boolean array where 1 indicates the subject went to the
         # spout.  We can simply compute the sum of this array to determien how
         # many times the subject went to the spout (e.g. "false alarmed")
         fa_mask = nogo_resp == 'spout'
         fa_count = np.sum(fa_mask)
+
         return float(fa_count)/float(nogo_count)
 
     @cached_property

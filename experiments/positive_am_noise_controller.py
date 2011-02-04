@@ -31,7 +31,5 @@ class PositiveAMNoiseController(AbstractPositiveController):
         self.iface_behavior.set_tag('signal_dur_n', len(waveform))
 
         self.set_poke_duration(self.current_poke_dur)
-        self.set_reward_duration(self.current_setting_go.reward_duration)
-        self.iface_pump.rate = self.current_setting_go.reward_rate
 
         self.iface_behavior.trigger(1)

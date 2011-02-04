@@ -26,20 +26,20 @@ class PositiveDTController(AbstractPositiveController):
         if self.current_trial == self.current_num_nogo + 1:
             par = self.current_setting_go.parameter
             self.iface_behavior.set_tag('go?', 1)
+            waveform = self._compute_signal(par)
+            self.buffer_signal.set(waveform)
+            self.set_attenuation(self.current_setting_go.attenuation)
+            self.iface_behavior.set_tag('signal_dur_n', len(waveform))
         else:
-            par = self.current_nogo_parameter
             self.iface_behavior.set_tag('go?', 0)
+            self.set_attenuation(120)
+            self.buffer_signal.clear()
+            # If set to 0, then the signal will play "forever".  Need to look
+            # into how to fix this in the rcx file.
+            self.iface_behavior.set_tag('signal_dur_n', 1)
 
-        # Prepare next signal
-        waveform = self._compute_signal(par)
-        self.buffer_signal.set(waveform)
-        self.set_attenuation(self.current_setting_go.attenuation)
-        self.iface_behavior.set_tag('signal_dur_n', len(waveform))
-
-        # Prepare next reward
+        # Update settings
         self.set_poke_duration(self.current_poke_dur)
-        self.set_reward_duration(self.current_setting_go.reward_duration)
-        self.iface_pump.rate = self.current_setting_go.reward_rate
 
         # Commence next trial
         self.iface_behavior.trigger(1)

@@ -11,8 +11,8 @@ class PositiveDTExperiment(AbstractPositiveExperiment):
 
     paradigm = Instance(PositiveDTParadigm, ())
 
-    def _data_default(self):
-        return PositiveDTData(store_node=self.data_node)
+    def _data_node_changed(self, new):
+        self.data = PositiveDTData(store_node=new)
 
     traits_view = View(Include('traits_group'),
                        resizable=True,

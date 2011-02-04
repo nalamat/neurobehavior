@@ -5,7 +5,6 @@ from tdt import DSPCircuit
 from pump_controller_mixin import PumpControllerMixin
 from abstract_experiment_controller import AbstractExperimentController
 from cns.pipeline import deinterleave_bits
-from cns.data.h5_utils import append_date_node, append_node
 from cns import choice
 from cns.data.persistence import add_or_update_object
 from positive_data import PositiveData
@@ -73,12 +72,13 @@ class AbstractPositiveController(AbstractExperimentController,
         self.set_reaction_window_delay(paradigm.reaction_window_delay)
         self.set_reaction_window_duration(paradigm.reaction_window_duration)
         self.set_response_window_duration(paradigm.response_window_duration)
-        self.set_reward_duration(paradigm.reward_duration)
         self.set_signal_offset_delay(paradigm.signal_offset_delay)
         self.set_timeout_duration(paradigm.timeout_duration)
-        #self.set_attenuation(paradigm.attenuation)
         self.set_timeout_trigger(paradigm.timeout_trigger)
         self.set_timeout_grace_period(paradigm.timeout_grace_period)
+
+        self.set_reward_duration(paradigm.reward_duration)
+        self.set_pump_rate(paradigm.pump_rate)
 
         self.model.data.trial_start_timestamp.fs = self.buffer_TTL.fs
         self.model.data.trial_end_timestamp.fs = self.buffer_TTL.fs
@@ -91,7 +91,7 @@ class AbstractPositiveController(AbstractExperimentController,
         self.model.data.response_TTL.fs = self.buffer_TTL.fs
         self.model.data.reward_TTL.fs = self.buffer_TTL.fs
 
-        self.model.exp_node = exp_node
+        #self.model.exp_node = exp_node
 
         targets = [self.model.data.poke_TTL, self.model.data.spout_TTL,
                    self.model.data.reaction_TTL, self.model.data.signal_TTL,
@@ -111,6 +111,7 @@ class AbstractPositiveController(AbstractExperimentController,
         self.state = 'halted'
         self.iface_behavior.trigger('A', 'low')
         self.iface_behavior.stop()
+
         add_or_update_object(self.model.paradigm, self.model.exp_node, 'paradigm')
         add_or_update_object(self.model.data, self.model.exp_node, 'data')
 

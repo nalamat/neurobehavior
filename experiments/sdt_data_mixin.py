@@ -8,6 +8,7 @@ class SDTDataMixin(HasTraits):
     # Clip FA/HIT rate if < clip or > 1-clip (prevents unusually high z-scores)
     clip        = Float(0.05, store='attribute')
 
+    z_fa        = Property(Float,       depends_on='global_fa_frac')
     par_z_fa    = Property(List(Float), depends_on='par_fa_frac')
     par_z_hit   = Property(List(Float), depends_on='par_hit_frac')
     par_dprime  = Property(List(Float), depends_on='par_z_hit, par_z_fa')
