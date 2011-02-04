@@ -35,7 +35,10 @@ cohort_editor = CohortEditor(menu=Menu(
     # in the context menu (i.e.  the right-click pop-up menu).  action is the
     # function on the controller/handler that should be called when that
     # particular menu item is selected.  
-    Action(name='Appetitive', action='launch_appetitive'),
+    Action(name='Appetitive (temporal integration)',
+           action='launch_appetitive_dt'),
+    Action(name='Appetitive (AM noise)',
+           action='launch_appetitive_am_noise'),
     Action(name='Appetitive (Stage 1)', action='launch_appetitive_stage1'),
     Action(name='Aversive (FM)', action='launch_aversive_fm'),
     Action(name='Aversive (AM Noise)', action='launch_aversive_am_noise'),
@@ -150,9 +153,12 @@ class ExperimentLauncher(CohortViewHandler):
     # When the context menu item is selected, it calls the function specified by
     # "action" with two arguments, info (a handle to the current window) and the
     # selected item.
+
+    def launch_appetitive_am_noise(self, info, selected):
+        self.launch_experiment(info, selected[0], PositiveAMNoiseExperiment)
     
-    def launch_appetitive(self, info, selected):
-        self.launch_experiment(info, selected[0], PositiveExperiment)
+    def launch_appetitive_dt(self, info, selected):
+        self.launch_experiment(info, selected[0], PositiveDTExperiment)
 
     def launch_aversive_am_noise(self, info, selected):
         self.launch_experiment(info, selected[0], AversiveAMNoiseExperiment)
@@ -167,7 +173,7 @@ class ExperimentLauncher(CohortViewHandler):
         self.launch_experiment(info, selected[0], AversiveNoiseMaskingExperiment)
 
 def load_experiment_launcher():
-    CohortView().configure_traits(view='detailed_view', handler=ExperimentLauncher())
+    ExperimentCohortView().configure_traits(handler=ExperimentLauncher())
 
 def test_experiment(etype):
     # Since we are testing our experiment paradigm, we need to provide a
