@@ -37,15 +37,13 @@ class AbstractAversiveController(AbstractExperimentController,
 
         self.shadow_paradigm(paradigm)
 
+        # choice_setting and choice_num_safe are generators (i.e. functions that
+        # remember their state in between calls).  Thus, they are a great way
+        # for tracking what the next parameter and number of safes should be.
         self.choice_setting = choice.get(self.current_order,
                                          self.current_warn_sequence)
         trials = range(self.current_min_safe, self.current_max_safe+1)
         self.choice_num_safe = choice.get('pseudorandom', trials)
-
-        # choice_par and choice_num_safe are generators (i.e. functions that
-        # remember their state in between calls).  Thus, they are a great way
-        # for tracking what the next parameter and number of safes should be.
-        #self.choice_par = choice.get(paradigm.par_order, paradigm.pars[:])
 
         self.current_warn = self.choice_setting.next()
         self.current_num_safe = self.choice_num_safe.next()
@@ -70,14 +68,6 @@ class AbstractAversiveController(AbstractExperimentController,
         self.init_paradigm(info.paradigm)
 
         # Set up the data node
-        self.model.exp_node = append_date_node(self.model.store_node,
-                pre='aversive_date_')
-        log.debug('Created experiment node for experiment at %r',
-                self.model.exp_node)
-        self.model.data_node = append_node(self.model.exp_node, 'Data')
-        log.debug('Created data node for experiment at %r', self.model.data_node)
-        self.model.data = AversiveData(store_node=self.model.data_node)
-
         self.init_current(info)
 
         # Ensure that sampling frequencies are stored properly

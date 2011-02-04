@@ -24,7 +24,8 @@ class AbstractExperiment(HasTraits):
     duration    = Property(store='attribute')
 
     def _store_node_changed(self, new):
-        self.exp_node = append_date_node(new)
+        pre = self.__class__.__name__ + '_'
+        self.exp_node = append_date_node(new, pre=pre)
         self.data_node = append_node(self.exp_node, 'data')
 
     def __init__(self, **kwargs):

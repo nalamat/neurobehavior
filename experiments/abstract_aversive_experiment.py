@@ -21,8 +21,11 @@ from abstract_aversive_controller import AbstractAversiveController
 
 class AbstractAversiveExperiment(AbstractExperiment):
 
-    data = Instance(AversiveData, ())
+    data = Instance(AversiveData)
     analyzed = Instance(AnalyzedAversiveData)
+
+    def _data_default(self):
+        return PositiveData(store_node=self.data_node)
 
     # AversiveFMParadigm and AversiveParadigm are subclasses of
     # BaseAversiveParadigm, so you can put it here too.  However, you cannot put
@@ -39,7 +42,6 @@ class AbstractAversiveExperiment(AbstractExperiment):
 
     def _data_changed(self):
         self.analyzed = AnalyzedAversiveData(data=self.data)
-        #self.analyzed_view = AnalyzedAversiveDataView(analyzed=self.analyzed)
         self._update_experiment_plot()
         self._update_score_chart()
         self._update_plots()
