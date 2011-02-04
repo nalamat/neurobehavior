@@ -239,54 +239,28 @@ class AbstractExperimentController(Controller):
     pending_changes = Dict({})
     old_values = Dict({})
 
-    def copy_paradigm(self, paradigm):
-        # Create a "shadow copy" of the paradigm that is used by the controller.
-        # This is important because changes to the view are immediately
-        # registered on the "model" itself, but should not affect the controller
-        # until "apply" is pressed.
-        #
-        # Refresh experiment state.  Paradigm attributes can get updated
-        # by the user via the GUI so we need to ensure that we store a local
-        # copy of the values we need during experiment control.  If the user
-        # makes a change to one of these values and hits the Apply button,
-        # init_current will be called and this code will make a new local copy
-        # of the updated values.
-        
-        # My persistence code (in cns.persistence) adds some metadata to objects
-        # it recovers from the HDF5 file.  trait_names would return this
-        # metadata as well, which we don't want.  class_trait_names only returns
-        # traits defined on the actual object.
-        for name in paradigm.class_trait_names():
-            if name not in ('trait_modified', 'trait_added'):
-                value = deepcopy(getattr(paradigm, name))
-                setattr(self, 'current_' + name, value)
+    def init_paradigm(self, paradigm):
+        '''
+        Configuring the equipment based on initial values in the paradigm.  If
+        the trait has the metadata flag, 'init', set to True, then the
+        corresponding setter (set_trait_name) will be called with the initial
+        value of the trait.
+        '''
+        for trait_name in paradigm.class_trait_names(init=True):
+            value = getattr(paradigm, trait_name)
+            getattr(self, 'set_' + trait_name)(value)
 
-    #def remove_listeners(self, old):
-    #    for name in old.trait_names():
-    #        if name not in ('trait_modified', 'trait_added'):
-    #            old.on_trait_change(self.queue_change, name, remove=True)
-    #            value = getattr(old, name)
-    #            if isinstance(value, object):
-    #                self.remove_listeners(value)
-
-    #def add_listeners(self, new):
-    #    for name in new.trait_names():
-    #        if name not in ('trait_modified', 'trait_added'):
-    #            print new, name
-    #            new.on_trait_change(self.queue_change, name)
-    #            value = getattr(new, name)
-    #            if isinstance(value, HasTraits):
-    #                self.add_listeners(value)
-
-        #if name == 'model':
-        #    if old is not None:
-        #        old = old.paradigm
-        #    if new is not None:
-        #        new = new.paradigm
-        #if old is not None:
-        #    self.remove_listeners(old)
-        #if new is not None:
-        #    self.add_listeners(new)
+    def shadow_paradigm(self, paradigm):
+        '''
+        Copy the current value of traits required by the controller for
+        computations performed in the event loop, thus preventing changes to the
+        paradigm from affecting the experiment until the "apply" button is
+        pressed.  To indicate that a copy of the variable should be made, set
+        the 'shadow' metadata attribute to True.
+        '''
+        for trait_name in paradigm.class_trait_names(shadow=True):
+            value = deepcopy(getattr(paradigm, trait_name))
+            setattr(self, 'current_' + trait_name, value)
 
     @on_trait_change('model.paradigm.+')
     def queue_change(self, object, name, old, new):

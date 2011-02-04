@@ -33,12 +33,9 @@ class AbstractAversiveController(AbstractExperimentController,
     '''
 
     def init_current(self, info=None):
-        # instance of aversive_paradigm.AversiveParadigm
         paradigm = self.model.paradigm 
 
-        # Copy all paradigm parameters over to the controller as attributes
-        # called current_<parameter name>
-        self.copy_paradigm(paradigm)
+        self.shadow_paradigm(paradigm)
 
         self.choice_setting = choice.get(self.current_order,
                                          self.current_warn_sequence)
@@ -70,6 +67,7 @@ class AbstractAversiveController(AbstractExperimentController,
     def start_experiment(self, info):
         self.init_equipment()
         self.init_pump(info)
+        self.init_paradigm(info.paradigm)
 
         # Set up the data node
         self.model.exp_node = append_date_node(self.model.store_node,
@@ -81,14 +79,6 @@ class AbstractAversiveController(AbstractExperimentController,
         self.model.data = AversiveData(store_node=self.model.data_node)
 
         self.init_current(info)
-
-        # Be sure that all relevant circuit parameters are set properly before
-        # we start the experiment! 
-        self.set_aversive_delay(self.model.paradigm.aversive_delay)
-        self.set_aversive_duration(self.model.paradigm.aversive_duration)
-        self.set_contact_threshold(self.model.paradigm.lick_th)
-        self.set_trial_duration(self.model.paradigm.trial_duration)
-        self.set_attenuation(self.model.paradigm.attenuation)
 
         # Ensure that sampling frequencies are stored properly
         self.model.data.contact_digital.fs = self.buffer_TTL.fs
@@ -265,9 +255,12 @@ class AbstractAversiveController(AbstractExperimentController,
     # Use a function called set_<parameter_name>.  This function will be called
     # when you change that parameter via the GUI and then click on the Apply
     # button.  These functions define how the change to the parameter should be
-    # handled.  Variable names come from the attribute in the paradigm (i.e. if a variable
-    # is called "par_seq_foo in the AversiveParadigm class, you would define a
-    # funciton called "set_par_seq_foo".
+    # handled.  Variable names come from the attribute in the paradigm (i.e. if
+    # a variable is called "par_seq_foo in the AversiveParadigm class, you would
+    # define a function called "set_par_seq_foo".
+
+    def set_prevent_disarm(self, value):
+        self.iface_behavior.set_tag('no_disarm', value)
 
     def set_aversive_delay(self, value):
         self.iface_behavior.cset_tag('aversive_del_n', value, 's', 'n')
@@ -275,7 +268,7 @@ class AbstractAversiveController(AbstractExperimentController,
     def set_aversive_duration(self, value):
         self.iface_behavior.cset_tag('aversive_dur_n', value, 's', 'n')
 
-    def set_contact_threshold(self, value):
+    def set_lick_th(self, value):
         self.iface_behavior.set_tag('lick_th', value)
 
     def set_pause_state(self, value):

@@ -17,24 +17,27 @@ class AbstractAversiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
 
     # Trait defines a drop-down selector if you provide it with a list of
     # options
-    order         = Trait('descending', choice.options, store='attribute')
+    order         = Trait('descending', choice.options, store='attribute',
+                          shadow=True)
     warn_sequence = List(Instance(TrialShockSetting), minlen=1,
-                         editor=table_editor, store='child')
-    remind        = Instance(TrialShockSetting, (), store='child')
-    safe          = Instance(TrialShockSetting, (), store='child')
+                         editor=table_editor, store='child', shadow=True)
+    remind        = Instance(TrialShockSetting, (), store='child', shadow=True)
+    safe          = Instance(TrialShockSetting, (), store='child', shadow=True)
 
     def _warn_sequence_default(self):
         return [TrialShockSetting()]
 
+    prevent_disarm = Bool(True, store='attribute', init=True)
+
     # By default, Range provides a slider as the GUI widget.  Note that you can
     # override the default widget if desired.
-    lick_th = Range(0.0, 1.0, 0.75, store='attribute')
-    aversive_delay = Float(1, store='attribute')
-    aversive_duration = Float(0.3, store='attribute')
+    lick_th = Range(0.0, 1.0, 0.75, store='attribute', init=True)
+    aversive_delay = Float(1, store='attribute', init=True)
+    aversive_duration = Float(0.3, store='attribute', init=True)
 
-    min_safe = Int(2, store='attribute', apply='reset')
-    max_safe = Int(4, store='attribute', apply='reset')
-    trial_duration = Float(1.0, store='attribute')
+    min_safe = Int(2, store='attribute', apply='reset', shadow=True)
+    max_safe = Int(4, store='attribute', apply='reset', shadow=True)
+    trial_duration = Float(1.0, store='attribute', init=True)
 
     #===========================================================================
     # Error checks
@@ -71,6 +74,8 @@ class AbstractAversiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
             )
 
     timing_group = VGroup(trial_group, 
+                          Item('prevent_disarm',
+                               label='Prevent disarming of stimulus?'),
                           Item('aversive_delay', 
                                label='Aversive stimulus delay (s)'),
                           Item('aversive_duration',
