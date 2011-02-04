@@ -15,6 +15,6 @@ class PositiveAMNoiseParadigm(AbstractPositiveParadigm):
             Item('duration', label='Signal duration (s)'),
             Item('rise_fall_time', label='Rise/fall time (s)'),
             Item('fm', label='Modulation frequency (Hz)'),
-            label='AM noise settings',
+            label='Signal',
             show_border=True,
             )

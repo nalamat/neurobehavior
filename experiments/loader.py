@@ -8,8 +8,9 @@ from cns.data.h5_utils import get_or_append_node
 import sys
 import tables
 from os.path import join
+
 from enthought.traits.api import Any, Trait, TraitError
-from enthought.traits.ui.api import View, Item
+from enthought.traits.ui.api import View, Item, VGroup, Group
 
 import logging
 log = logging.getLogger(__name__)
@@ -173,10 +174,8 @@ def test_experiment(etype):
     # temporary HDF5 file (i.e. a "dummy" cohort file) that the experiment can
     # save its data to.
     import tables
-    test_file = tables.openFile('test.hd5', 'w')
     from cns import TEMP_ROOT
-    from os.path import join
-    file_name = join(TEMP_ROOT, 'test.hd5')
+    file_name = join(TEMP_ROOT, 'test.h5')
     test_file = tables.openFile(file_name, 'w')
 
     if not etype.endswith('Experiment'):
@@ -187,7 +186,6 @@ def test_experiment(etype):
 
 def profile_experiment(etype):
     from cns import TEMP_ROOT
-    from os.path import join
     import cProfile
     profile_data_file = join(TEMP_ROOT, 'profile.dmp')
     cProfile.run('test_experiment("%s")' % etype, profile_data_file)

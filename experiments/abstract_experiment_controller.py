@@ -209,8 +209,8 @@ class AbstractExperimentController(Controller):
             self.timer_fast = Timer(100, self.tick_fast)
             self.timer_slow = Timer(500, self.tick_slow)
         except BaseException, e:
+            log.exception(e)
             error(self.info.ui.control, str(e))
-            raise
 
     def stop(self, info=None):
         try:
@@ -230,6 +230,7 @@ class AbstractExperimentController(Controller):
             info.ui.view.close_result = True
             self.state = 'complete'
         except BaseException, e:
+            log.exception(e)
             error(self.info.ui.control, str(e))
 
     ############################################################################

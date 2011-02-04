@@ -2,7 +2,8 @@ from abstract_experiment_paradigm import AbstractExperimentParadigm
 
 from cns import choice
 from enthought.traits.api import Instance, Float, DelegatesTo, Int, Float, \
-        CBool, Enum, List, Tuple, HasTraits, Trait, on_trait_change, Range
+        CBool, Enum, List, Tuple, HasTraits, Trait, on_trait_change, Range, \
+        Property
 from enthought.traits.ui.api import View, spring, VGroup, Item, \
     InstanceEditor, Include, EnumEditor, Tabbed
 from cns.traits.ui.api import ListAsStringEditor
@@ -16,15 +17,12 @@ from enthought.traits.ui.api import TableEditor, TextEditor
 class TrialSetting(HasTraits):
 
     parameter       = Float(1.0, store='attribute')
-    reward_duration = Float(0.5, store='attribute')
-    reward_rate     = Float(0.3, store='attribute')
 
     def __cmp__(self, other):
         return cmp(self.parameter, other.parameter)
 
     def __str__(self):
-        return "{0}, {1}s at {2}mL/min".format(self.parameter,
-                self.reward_duration, self.reward_rate)
+        return "{0}".format(self.parameter)
 
 table_editor = TableEditor(
         editable=True,
@@ -33,9 +31,6 @@ table_editor = TableEditor(
         row_factory=TrialSetting,
         columns=[
             ObjectColumn(name='parameter', label='Parameter', width=75),
-            ObjectColumn(name='reward_duration', label='Reward duration',
-                width=75),
-            ObjectColumn(name='reward_rate', label='Reward rate', width=75),
             ]
         )
 
@@ -48,6 +43,16 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
 
     parameter_order = Trait('shuffled set', choice.options, store='attribute')
     nogo_parameter  = Float(store='attribute')
+
+    reward_duration = Float(1.0, label='Reward duration (s)', store='attribute')
+    pump_rate = Float(1.0, label='Reward rate (mL/min)', store='attribute')
+
+    reward_volume = Property(Float, depends_on='reward_duration, pump_rate',
+                             label='Reward volume (ul)')
+
+    def _get_reward_volume(self):
+        # Rate is in ml/min, compute mls dispensed then return as ul
+        return 1e3 * self.pump_rate * self.reward_duration/60.0
 
     min_nogo = Int(0, label='Minimum NOGO', store='attribute')
     max_nogo = Int(0, label='Maximum NOGO', store='attribute')
@@ -89,6 +94,9 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
                         'min_nogo',
                         'max_nogo',
                         'repeat_FA',
+                        label='Trial',
+                        ),
+                    VGroup(
                         'signal_offset_delay',
                         'intertrial_duration',
                         'reaction_window_delay',
@@ -99,9 +107,14 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
                         'timeout_safe_period',
                         'poke_duration_lb',
                         'poke_duration_ub',
-                        label='Trial Settings',
-                        show_border=True,
+                        label='Timing',
                         ),
+                    VGroup(
+                        'reward_duration',
+                        'pump_rate',
+                        Item('reward_volume', style='readonly'),
+                        label='Reward',
+                        )
                     ),
                 ),
             resizable=False,

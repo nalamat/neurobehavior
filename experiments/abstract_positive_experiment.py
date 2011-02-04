@@ -290,7 +290,6 @@ class AbstractPositiveExperiment(AbstractExperiment):
                          show_label=False), 
                     Item('handler.current_volume_dispensed', 
                          label='Dispensed (mL)', style='readonly'),
-                    Item('object.paradigm.pump_rate'),
                     Item('object.paradigm.pump_syringe'),
                     Item('object.paradigm.pump_syringe_diameter', 
                          label='Diameter (mm)', style='readonly'),
