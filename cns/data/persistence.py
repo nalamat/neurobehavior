@@ -19,8 +19,8 @@ def next_id(element, name=''):
     return next_id
 
 def get_np_dtype(trait):
-    types = ['object' if t.startswith('date') else t for t in trait.col_types]
-    return dtype(zip(trait.col_names, types))
+    #types = ['object' if t.startswith('date') else t for t in trait.col_types]
+    return dtype(zip(trait.col_names, trait.col_types))
 
 def get_traits(object, filter_readonly=False, filter_events=True, **metadata):
     '''Convenience function to filter out readonly traits.  This is useful for
@@ -71,11 +71,6 @@ def store_array(node, object, name, trait):
 def store_table(node, object, name, trait):
     # Create copy of value since we may need to convert the datetime series.
     value = getattr(object, name)
-    value = sanitize_datetimes(value, trait)
-    # When datteime support is added to Numpy, we can delete the following
-    # line and uncomment the line after
-    #value = array(value, dtype=get_np_dtype(trait))
-    #value = array(value, dtype=get_hdf5_dtype(trait))
     value = array(value, dtype=trait.dtype)
 
     try:
@@ -208,9 +203,9 @@ def add_or_update_object(object, node, name=None):
                 )
 
     for mode, store in store_map:
-        log.debug('Storing %s data', mode)
+        log.debug('Storing %s data', mode.upper())
         for name, trait in object.class_traits(store=mode).items():
-            log.debug('Storing %s', name)
+            log.debug('Storing %s %s', mode, name)
             store(object_node, object, name, trait)
 
     append_metadata(object, object_node)
@@ -295,10 +290,10 @@ def switch_datetime_fmt(table, trait, parser):
         table = [tuple(row) for row in table]
         table = array(table, dtype=dtype)
 
-        for cname, ctype in dtype:
-            if ctype.startswith('datetime'):
-                res = ctype[-2]
-                table[cname] = parser(table[cname], res)
+        #for cname, ctype in dtype:
+        #    if ctype.startswith('datetime'):
+        #        res = ctype[-2]
+        #        table[cname] = parser(table[cname], res)
 
         # This is an ugly hack required by Numpy v1.3.  Once datetime support is
         # included in Numpy (possibly v1.5) much of the work can be delegated to
@@ -334,7 +329,7 @@ class PersistenceReadError(BaseException):
         return self.mesg % (self.file, self.path)
 
 def load_table(node, name, trait):
-    return unsanitize_datetimes(getattr(node, name)[:], trait)
+    return getattr(node, name)[:]
 
 def load_child(node, name, trait):
     value = getattr(node, name)
