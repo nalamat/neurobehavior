@@ -317,12 +317,18 @@ class PumpInterface(object):
         # on the keypad or power-cycle the pump that the pump reverts to the old
         # rate.
 
-        # NOTE: RAT C does not work with the older pump.
-        if rate < 0: self.direction = 'withdraw'
-        else: self.direction = 'infuse'
-        #self.stop()
-        self.xmit('RAT C %.3f' % abs(rate))
-        #self.start()
+        if rate < 0: 
+            self.direction = 'withdraw'
+        else: 
+            self.direction = 'infuse'
+
+        try:
+            self.xmit('RAT C %.3f' % abs(rate))
+        except:
+            # Our oldest pump does not support the RAT C command
+            #self.stop()
+            self.xmit('RAT %.3f' % abs(rate))
+            #self.start()
 
     def _get_rate(self):
         rate = self.xmit('RAT')
