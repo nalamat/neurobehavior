@@ -40,9 +40,9 @@ class AbstractAversiveController(AbstractExperimentController,
         # choice_setting and choice_num_safe are generators (i.e. functions that
         # remember their state in between calls).  Thus, they are a great way
         # for tracking what the next parameter and number of safes should be.
-        self.choice_setting = choice.get(self.current_order,
-                                         self.current_warn_sequence)
-        trials = range(self.current_min_safe, self.current_max_safe+1)
+        self.choice_setting = choice.get(paradigm.order,
+                                         paradigm.warn_sequence)
+        trials = range(paradigm.min_safe, paradigm.max_safe+1)
         self.choice_num_safe = choice.get('pseudorandom', trials)
 
         self.current_warn = self.choice_setting.next()
@@ -236,7 +236,6 @@ class AbstractAversiveController(AbstractExperimentController,
     # applied.  This should only be used when you need to change the trial
     # sequence (i.e. number of safes, order of parameters, parameter sequence,
     # etc).
-    set_remind           = AbstractExperimentController.reset_current
     set_safe             = AbstractExperimentController.reset_current
     set_order            = AbstractExperimentController.reset_current
     set_max_safe         = AbstractExperimentController.reset_current
@@ -248,6 +247,9 @@ class AbstractAversiveController(AbstractExperimentController,
     # handled.  Variable names come from the attribute in the paradigm (i.e. if
     # a variable is called "par_seq_foo in the AversiveParadigm class, you would
     # define a function called "set_par_seq_foo".
+
+    def set_remind(self, value):
+        self.current_remind = value
 
     def set_prevent_disarm(self, value):
         self.iface_behavior.set_tag('no_disarm', value)
