@@ -44,8 +44,10 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
     parameter_order = Trait('shuffled set', choice.options, store='attribute')
     nogo_parameter  = Float(store='attribute')
 
-    reward_duration = Float(1.0, label='Reward duration (s)', store='attribute')
-    pump_rate = Float(1.0, label='Reward rate (mL/min)', store='attribute')
+    reward_duration = Float(1.0, label='Reward duration (s)', store='attribute',
+                            init=True)
+    pump_rate = Float(1.0, label='Reward rate (mL/min)', store='attribute',
+                      init=True)
 
     reward_volume = Property(Float, depends_on='reward_duration, pump_rate',
                              label='Reward volume (ul)')
@@ -61,20 +63,21 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
     # rejected by Bool trait
     repeat_FA = CBool(label='Repeat NOGO if FA?', store='attribute')
 
-    signal_offset_delay = Float(0.5, unit='s', store='attribute')
-    intertrial_duration = Float(0.5, unit='s', store='attribute')
-    reaction_window_delay = Float(0, unit='s', store='attribute')
-    reaction_window_duration = Float(1.5, unit='s', store='attribute')
+    signal_offset_delay = Float(0.5, unit='s', store='attribute', init=True)
+    intertrial_duration = Float(0.5, unit='s', store='attribute', init=True)
+    reaction_window_delay = Float(0, unit='s', store='attribute', init=True)
+    reaction_window_duration = Float(1.5, unit='s', store='attribute',
+                                     init=True)
 
-    response_window_duration = Float(3, unit='s', store='attribute')
-    reward_duration = Float(0.5, unit='s', store='attribute')
+    response_window_duration = Float(3, unit='s', store='attribute', init=True)
+    reward_duration = Float(0.5, unit='s', store='attribute', init=True)
 
-    timeout_trigger  = Enum('FA only', 'Anytime', store='attribute')
-    timeout_duration = Float(5, unit='s', store='attribute')
-    timeout_grace_period = Float(2.5, unit='s', store='attribute')
+    timeout_trigger  = Enum('FA only', 'Anytime', store='attribute', init=True)
+    timeout_duration = Float(5, unit='s', store='attribute', init=True)
+    timeout_grace_period = Float(2.5, unit='s', store='attribute', init=True)
 
-    poke_duration_lb = Float(0.1, unit='s', store='attribute')
-    poke_duration_ub = Float(0.5, unit='s', store='attribute')
+    poke_duration_lb = Float(0.1, unit='s', store='attribute', init=True)
+    poke_duration_ub = Float(0.5, unit='s', store='attribute', init=True)
 
     parameter_view = VGroup(
             Item('nogo_parameter'),
@@ -104,9 +107,9 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
                         'response_window_duration',
                         'timeout_trigger',
                         'timeout_duration',
-                        'timeout_safe_period',
-                        'poke_duration_lb',
-                        'poke_duration_ub',
+                        'timeout_grace_period',
+                        Item('poke_duration_lb', label='Min poke duration (s)'),
+                        Item('poke_duration_ub', label='Max poke duration (s)'),
                         label='Timing',
                         ),
                     VGroup(

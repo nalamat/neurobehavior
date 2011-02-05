@@ -6,18 +6,31 @@ log = logging.getLogger(__name__)
 
 class PositiveDTController(AbstractPositiveController):
 
+    carrier     = Any
+    envelope    = Any
+    output      = Any
+
     def log_trial(self, ts_start, ts_end, last_ttype):
         parameter = self.current_setting_go.parameter
         attenuation = self.current_setting_go.attenuation
         self.model.data.log_trial(ts_start, ts_end, last_ttype, 
-                (parameter, attenuation))
+                                  (parameter, attenuation))
+
+    def _carrier_default(self):
+        return blocks.BroadbandNoise(seed=-1)
+
+    def _envelope_default(self):
+        return blocks.Cos2Envelope(token=self.carrier)
+
+    def _output_default(self):
+        return blocks.Output(token=self.envelope)
 
     def _compute_signal(self, duration):
-        carrier = blocks.BroadbandNoise(seed=-1)
-        envelope = blocks.Cos2Envelope(rise_time=self.current_rise_fall_time,
-                                       duration=duration, token=carrier)
-        output = blocks.Output(token=envelope)
+        self.envelope.duration = duration
         return output.realize(self.iface_behavior.fs, duration)
+
+    def set_rise_fall_time(self, value):
+        self.envelope.rise_time = value
 
     def set_attenuation(self, value):
         self.iface_behavior.set_tag('att_A', value)

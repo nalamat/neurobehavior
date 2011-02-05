@@ -22,11 +22,6 @@ class AbstractPositiveController(AbstractExperimentController,
     status = Property(Str, depends_on='state, current_trial, current_num_nogo')
 
     def init_current(self, info=None):
-        # Update random selector for poke duration using new bounds
-        lb = self.model.paradigm.poke_duration_lb
-        ub = self.model.paradigm.poke_duration_ub
-        self.choice_poke_dur = partial(np.random.uniform, lb, ub)
-
         # Update random selector for trial number
         lb = self.model.paradigm.min_nogo
         ub = self.model.paradigm.max_nogo
@@ -43,8 +38,6 @@ class AbstractPositiveController(AbstractExperimentController,
         self.current_trial = 1
         self.current_setting_go = self.choice_parameter.next()
         self.current_num_nogo = self.choice_num_nogo()
-        self.current_poke_dur = self.choice_poke_dur()
-        self.set_poke_duration(self.current_poke_dur)
 
         log.debug("Initialized current settings")
 
@@ -64,21 +57,8 @@ class AbstractPositiveController(AbstractExperimentController,
 
         paradigm = self.model.paradigm
 
-        self.copy_paradigm(paradigm)
+        self.init_paradigm(paradigm)
         self.init_current(info)
-
-        # Configure the RPvds circuit
-        self.set_intertrial_duration(paradigm.intertrial_duration)
-        self.set_reaction_window_delay(paradigm.reaction_window_delay)
-        self.set_reaction_window_duration(paradigm.reaction_window_duration)
-        self.set_response_window_duration(paradigm.response_window_duration)
-        self.set_signal_offset_delay(paradigm.signal_offset_delay)
-        self.set_timeout_duration(paradigm.timeout_duration)
-        self.set_timeout_trigger(paradigm.timeout_trigger)
-        self.set_timeout_grace_period(paradigm.timeout_grace_period)
-
-        self.set_reward_duration(paradigm.reward_duration)
-        self.set_pump_rate(paradigm.pump_rate)
 
         self.model.data.trial_start_timestamp.fs = self.buffer_TTL.fs
         self.model.data.trial_end_timestamp.fs = self.buffer_TTL.fs
@@ -198,17 +178,24 @@ class AbstractPositiveController(AbstractExperimentController,
         self.queue_change(self.model.paradigm, 'parameters',
                 self.current_parameters, self.model.paradigm.parameters)
 
-    set_poke_duration_lb         = AbstractExperimentController.reset_current
-    set_poke_duration_ub         = AbstractExperimentController.reset_current
     set_min_nogo                 = AbstractExperimentController.reset_current
     set_max_nogo                 = AbstractExperimentController.reset_current
-    set_repeat_FA                = AbstractExperimentController.reset_current
     set_parameter_order          = AbstractExperimentController.reset_current
     set_parameters               = AbstractExperimentController.reset_current
     set_parameters_items         = AbstractExperimentController.reset_current
 
-    set_reward_rate              = AbstractExperimentController.reset_current
-    set_reward_duration          = AbstractExperimentController.reset_current
+    def set_poke_duration_lb(self, value):
+        self.current_poke_duration_lb = value
+        self.reset_poke_duration()
+
+    def set_poke_duration_ub(self, value):
+        self.current_poke_duration_ub = value
+        self.reset_poke_duration()
+
+    def reset_poke_duration(self):
+        self.choice_poke_dur = partial(np.random.uniform, lb, ub)
+        self.current_poke_dur = self.choice_poke_dur()
+        self.set_poke_duration(self.current_poke_dur)
 
     def set_repeat_FA(self, value):
         self.current_repeat_FA = value
