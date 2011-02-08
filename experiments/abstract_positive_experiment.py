@@ -57,6 +57,16 @@ class TrialResponseColumn(ListColumn):
         ttype = object[3]
         return self.MAP[(ttype, response)]
 
+    def get_value(self, object):
+        value = object[self.index]
+        if type(value) in (list, tuple):
+            # Default Python formatting for a tuple or list is a bit ugly, so
+            # let's handle it ourselves.
+            print "FOUND"
+            return ", ".join([str(e) for e in value])
+        else:
+            return str(value)
+
 trial_log_table = TableEditor(
         editable=False,
         sort_model=False,
