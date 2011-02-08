@@ -25,7 +25,7 @@ class AbstractAversiveExperiment(AbstractExperiment):
     analyzed = Instance(AnalyzedAversiveData)
 
     def _data_default(self):
-        return PositiveData(store_node=self.data_node)
+        return AversiveData(store_node=self.data_node)
 
     # AversiveFMParadigm and AversiveParadigm are subclasses of
     # BaseAversiveParadigm, so you can put it here too.  However, you cannot put

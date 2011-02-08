@@ -1,3 +1,4 @@
+from enthought.traits.api import Instance
 from abstract_positive_controller import AbstractPositiveController
 import neurogen.block_definitions as blocks
 
@@ -6,9 +7,9 @@ log = logging.getLogger(__name__)
 
 class PositiveDTController(AbstractPositiveController):
 
-    carrier     = Any
-    envelope    = Any
-    output      = Any
+    carrier     = Instance(blocks.Block)
+    envelope    = Instance(blocks.Block)
+    output      = Instance(blocks.Block)
 
     def log_trial(self, ts_start, ts_end, last_ttype):
         parameter = self.current_setting_go.parameter
@@ -27,7 +28,7 @@ class PositiveDTController(AbstractPositiveController):
 
     def _compute_signal(self, duration):
         self.envelope.duration = duration
-        return output.realize(self.iface_behavior.fs, duration)
+        return self.output.realize(self.iface_behavior.fs, duration)
 
     def set_rise_fall_time(self, value):
         self.envelope.rise_time = value

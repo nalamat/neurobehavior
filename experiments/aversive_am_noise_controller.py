@@ -22,7 +22,7 @@ class AversiveAMNoiseController(AbstractAversiveController):
                           equalize_phase=True)
 
     def _output_default(self):
-        return blocks.Output(token=self.envelope)
+        return blocks.Output(token=self.modulator)
 
     def set_modulation_frequency(self, value):
         self.modulator.frequency = value
@@ -65,3 +65,6 @@ class AversiveAMNoiseController(AbstractAversiveController):
             if pending > 0:
                 waveform = self.buffer_safe.send(pending)
                 self.buffer_int.write(waveform)
+
+    def set_modulation_frequency(self, value):
+        self.current_modulation_frequency = value

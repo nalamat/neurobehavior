@@ -35,7 +35,7 @@ class AbstractAversiveController(AbstractExperimentController,
     def init_current(self, info=None):
         paradigm = self.model.paradigm 
 
-        self.shadow_paradigm(paradigm)
+        #self.shadow_paradigm(paradigm)
 
         # choice_setting and choice_num_safe are generators (i.e. functions that
         # remember their state in between calls).  Thus, they are a great way
@@ -65,10 +65,9 @@ class AbstractAversiveController(AbstractExperimentController,
     def start_experiment(self, info):
         self.init_equipment()
         self.init_pump(info)
-        self.init_paradigm(info.paradigm)
 
-        # Set up the data node
-        self.init_current(info)
+        self.init_current(info.paradigm)
+        self.init_paradigm(info.paradigm)
 
         # Ensure that sampling frequencies are stored properly
         self.model.data.contact_digital.fs = self.buffer_TTL.fs
