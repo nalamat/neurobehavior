@@ -56,8 +56,8 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
         # Rate is in ml/min, compute mls dispensed then return as ul
         return 1e3 * self.pump_rate * self.reward_duration/60.0
 
-    min_nogo = Int(0, label='Minimum NOGO', store='attribute')
-    max_nogo = Int(0, label='Maximum NOGO', store='attribute')
+    min_nogo = Int(0, label='Minimum NOGO', store='attribute', init=True)
+    max_nogo = Int(0, label='Maximum NOGO', store='attribute', init=True)
 
     # Needs to be CBool because Pytables returns numpy.bool_ type which gets
     # rejected by Bool trait

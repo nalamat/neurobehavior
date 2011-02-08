@@ -29,22 +29,6 @@ class PositiveAMNoiseController(AbstractPositiveController):
         return self.output.realize(self.iface_behavior.fs,
                                    self.current_duration)
 
-    def trigger_next(self):
-        if self.current_trial == self.current_num_nogo + 1:
-            par = self.current_setting_go.parameter
-            self.iface_behavior.set_tag('go?', 1)
-        else:
-            par = self.current_nogo_parameter
-            self.iface_behavior.set_tag('go?', 0)
-
-        # Prepare next signal
-        waveform = self._compute_signal(par)
-        self.buffer_signal.set(waveform)
-        self.set_attenuation(self.current_attenuation)
-        self.iface_behavior.set_tag('signal_dur_n', len(waveform))
-        self.set_poke_duration(self.current_poke_dur)
-        self.iface_behavior.trigger(1)
-
     def set_rise_fall_time(self, value):
         self.envelope.rise_time = value
 
@@ -57,3 +41,18 @@ class PositiveAMNoiseController(AbstractPositiveController):
 
     def set_nogo_parameter(self, value):
         self.current_nogo_parameter = value
+
+    def trigger_next(self):
+        if self.current_trial == self.current_num_nogo + 1:
+            par = self.current_setting_go.parameter
+            self.iface_behavior.set_tag('go?', 1)
+        else:
+            par = self.current_nogo_parameter
+            self.iface_behavior.set_tag('go?', 0)
+
+        # Prepare next signal
+        waveform = self._compute_signal(par)
+        self.buffer_signal.set(waveform)
+        self.iface_behavior.set_tag('signal_dur_n', len(waveform))
+        self.set_poke_duration(self.current_poke_dur)
+        self.iface_behavior.trigger(1)

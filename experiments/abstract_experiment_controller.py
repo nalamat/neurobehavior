@@ -5,7 +5,7 @@ from enthought.pyface.api import error
 from enthought.pyface.timer.api import Timer
 from enthought.etsconfig.api import ETSConfig
 from enthought.traits.api import Any, Instance, Enum, Dict, on_trait_change, \
-        HasTraits
+        HasTraits, List
 from enthought.traits.ui.api import Controller, View, HGroup, Item, spring
 from enthought.savage.traits.ui.svg_button import SVGButton
 
@@ -51,8 +51,6 @@ class ExperimentToolBar(ToolBar):
         stop    = Button('X', action=True)
         remind  = Button('!', action=True)
         item_kw = dict(show_label=False, height=-size[0], width=-size[1])
-
-    buttons = ['apply', 'revert', 'start', 'remind', 'pause', 'resume', 'stop']
 
     traits_view = View(
             HGroup(Item('apply',
@@ -236,6 +234,7 @@ class AbstractExperimentController(Controller):
     ############################################################################
     # Apply/Revert code
     ############################################################################
+    deferred_changes = List
     pending_changes = Dict({})
     old_values = Dict({})
 

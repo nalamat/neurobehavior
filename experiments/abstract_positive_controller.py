@@ -1,9 +1,11 @@
 from functools import partial
 
-from enthought.traits.api import Str, Property, Float, on_trait_change
+from enthought.traits.api import Str, Property, Float, on_trait_change, Instance
+from enthought.traits.ui.api import View, Item, HGroup, spring
 from tdt import DSPCircuit
 from pump_controller_mixin import PumpControllerMixin
 from abstract_experiment_controller import AbstractExperimentController
+from abstract_experiment_controller import ExperimentToolBar
 from cns.pipeline import deinterleave_bits
 from cns import choice
 from cns.data.persistence import add_or_update_object
@@ -15,8 +17,33 @@ import numpy as np
 import logging
 log = logging.getLogger(__name__)
 
+class PositiveExperimentToolBar(ExperimentToolBar):
+    
+    traits_view = View(
+            HGroup(Item('apply',
+                        enabled_when="object.handler.pending_changes<>{}"),
+                   Item('revert',
+                        enabled_when="object.handler.pending_changes<>{}",),
+                   Item('start',
+                        enabled_when="object.handler.state=='halted'",),
+                   '_',
+                   Item('remind',
+                        enabled_when="object.handler.state=='running'",),
+                   Item('stop',
+                        enabled_when="object.handler.state in " +\
+                                     "['running', 'paused', 'manual']",),
+                   spring,
+                   springy=True,
+                   show_labels=False,
+                   ),
+            kind='subpanel',
+            )
+
 class AbstractPositiveController(AbstractExperimentController,
                                  PumpControllerMixin):
+
+    # Override default implementation of toolbar used by AbstractExperiment
+    toolbar = Instance(PositiveExperimentToolBar, (), toolbar=True)
 
     water_infused = Float(0)
     status = Property(Str, depends_on='state, current_trial, current_num_nogo')
@@ -25,7 +52,6 @@ class AbstractPositiveController(AbstractExperimentController,
         # Update random selector for trial number
         lb = self.model.paradigm.min_nogo
         ub = self.model.paradigm.max_nogo
-        self.choice_num_nogo = partial(np.random.randint, lb, ub+1)
 
         # Deepcopy because we need to ensure that it does not update while we
         # are making changes
@@ -37,7 +63,6 @@ class AbstractPositiveController(AbstractExperimentController,
         # Refresh experiment state
         self.current_trial = 1
         self.current_setting_go = self.choice_parameter.next()
-        self.current_num_nogo = self.choice_num_nogo()
 
         log.debug("Initialized current settings")
 
@@ -106,7 +131,35 @@ class AbstractPositiveController(AbstractExperimentController,
                     self.current_num_nogo)
         else:
             return 'GO'
-            
+
+    def acquire_trial_lock(self):
+        # Pause circuit and see if trial is running.  If trial is already
+        # running, it's too late and a lock cannot be acquired.  If trial is not
+        # running, changes can be made.  A lock is returned (note this is not
+        # thread-safe).
+        log.debug("Setting pause state to True")
+        self.set_pause_state(True)
+        if self.get_trial_running():
+            log.debug("Trial is running, let's try later")
+            self.set_pause_state(False) 
+            return False
+        else:
+            return True
+
+    def release_trial_lock(self):
+        log.debug("Releasing trial lock")
+        self.set_pause_state(False)
+
+    def remind(self, info=None):
+        if self.acquire_trial_lock():
+            self.current_trial = 1
+            self.current_num_nogo = 0
+            self.trigger_next()
+            self.current_go_requested = False
+            self.release_trial_lock()
+        else:
+            self.current_go_requested = True
+
     ############################################################################
     # Master controller
     ############################################################################
@@ -129,11 +182,6 @@ class AbstractPositiveController(AbstractExperimentController,
             self.current_trial_end_ts = ts_end
             ts_start = self.get_trial_start_ts()
 
-            # Read the TTL data after we read ts_start and ts_end, but before we
-            # score the data.  This ensures that we have the most up-to-date TTL
-            # data for the scoring.
-            #self.pipeline.send(self.project.behavior.TTL.read().astype(np.int8))
-
             # In this context, current_trial reflects the trial that just
             # occured
             if self.current_trial == self.current_num_nogo + 1:
@@ -145,7 +193,6 @@ class AbstractPositiveController(AbstractExperimentController,
 
             # Increment num_nogo
             if last_ttype == 'NOGO' and self.current_repeat_FA:
-                #if self.model.data.trial_log[-1][3] == 'spout':
                 if self.model.data.resp_seq[-1] == 'spout':
                     log.debug("FA detected, adding a NOGO trial")
                     self.current_num_nogo += 1
@@ -161,6 +208,9 @@ class AbstractPositiveController(AbstractExperimentController,
                 self.current_trial = 1
             else:
                 self.current_trial += 1
+
+            if self.current_go_requested:
+                self.remind()
 
             log.debug('Next trial: %d, NOGO count: %d', self.current_trial,
                       self.current_num_nogo)
@@ -178,8 +228,6 @@ class AbstractPositiveController(AbstractExperimentController,
         self.queue_change(self.model.paradigm, 'parameters',
                 self.current_parameters, self.model.paradigm.parameters)
 
-    set_min_nogo                 = AbstractExperimentController.reset_current
-    set_max_nogo                 = AbstractExperimentController.reset_current
     set_parameter_order          = AbstractExperimentController.reset_current
     set_parameters               = AbstractExperimentController.reset_current
     set_parameters_items         = AbstractExperimentController.reset_current
@@ -193,9 +241,34 @@ class AbstractPositiveController(AbstractExperimentController,
         self.reset_poke_duration()
 
     def reset_poke_duration(self):
-        self.choice_poke_dur = partial(np.random.uniform, lb, ub)
-        self.current_poke_dur = self.choice_poke_dur()
-        self.set_poke_duration(self.current_poke_dur)
+        lb = self.current_poke_duration_lb
+        ub = self.current_poke_duration_ub
+
+        # Ensure that poke_duration is only reset after both lb and ub are set
+        if lb is not None and ub is not None:
+            self.choice_poke_dur = partial(np.random.uniform, lb, ub)
+            self.current_poke_dur = self.choice_poke_dur()
+            self.set_poke_duration(self.current_poke_dur)
+
+    def set_min_nogo(self, value):
+        self.current_min_nogo = value
+        self.reset_nogo()
+
+    def set_max_nogo(self, value):
+        self.current_max_nogo = value
+        self.reset_nogo()
+
+    def reset_nogo(self):
+        lb = self.current_min_nogo
+        ub = self.current_max_nogo
+
+        # Ensure that NOGO count is only reset after both lb and ub are set
+        if lb is not None and ub is not None:
+            self.choice_num_nogo = partial(np.random.randint, lb, ub+1)
+            # Don't update NOGO count unless this is the first time it has been
+            # called
+            if self.current_num_nogo is None:
+                self.current_num_nogo = self.choice_num_nogo()
 
     def set_repeat_FA(self, value):
         self.current_repeat_FA = value
@@ -246,5 +319,11 @@ class AbstractPositiveController(AbstractExperimentController,
     def set_timeout_grace_period(self, value):
         self.iface_behavior.cset_tag('to_safe_n', value, 's', 'n')
 
+    def get_trial_running(self):
+        return self.iface_behavior.get_tag('trial_running')
+
     def trigger_next(self):
         raise NotImplementedError
+
+    def set_pause_state(self, value):
+        self.iface_behavior.set_tag('pause_state', value)
