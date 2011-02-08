@@ -173,6 +173,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin):
 
     pars = Property(List(Int), depends_on='trial_log')
     go_trial_count = Property(Int, store='attribute', depends_on='trial_log')
+    nogo_trial_count = Property(Int, store='attribute', depends_on='trial_log')
 
     PAR_INFO_DTYPE = [
             ('par', 'f'), 
@@ -278,12 +279,9 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin):
             # This should work for "complex" parameters where we are varying the
             # signal across more than one dimension.
             unique = set([tuple(i) for i in seq])
-            return list(unique)
         except:
-            # If we are varying across only a single dimension, this will take
-            # precedence.
-            return np.unique(seq)
-        #return np.unique(np.take(self.par_seq, self.go_indices, axis=0))
+            unique = set(seq)
+        return sorted(unique)
 
     @cached_property
     def _get_par_hit_frac(self):
@@ -312,6 +310,10 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin):
     @cached_property
     def _get_go_trial_count(self):
         return len(self.go_indices)
+
+    @cached_property
+    def _get_nogo_trial_count(self):
+        return len(self.nogo_indices)
 
 PositiveData = PositiveData_0_1
 
