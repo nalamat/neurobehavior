@@ -173,6 +173,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin):
 
     pars = Property(List(Int), depends_on='trial_log')
     go_trial_count = Property(Int, store='attribute', depends_on='trial_log')
+    nogo_trial_count = Property(Int, store='attribute', depends_on='trial_log')
 
     PAR_INFO_DTYPE = [
             ('par', 'f'), 
@@ -309,6 +310,10 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin):
     @cached_property
     def _get_go_trial_count(self):
         return len(self.go_indices)
+
+    @cached_property
+    def _get_nogo_trial_count(self):
+        return len(self.nogo_indices)
 
 PositiveData = PositiveData_0_1
 

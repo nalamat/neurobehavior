@@ -312,6 +312,17 @@ class AbstractPositiveExperiment(AbstractExperiment):
                     ),
                 ),
             VGroup(
+                VGroup(
+                    Item('object.data.go_trial_count',
+                         label='Number of GO trials'),
+                    Item('object.data.nogo_trial_count',
+                         label='Number of NOGO trials'),
+                    Item('object.data.global_fa_frac',
+                         label='Global FA fraction'),
+                    label='Experiment summary',
+                    show_border=True,
+                    style='readonly',
+                    ),
                 Item('object.data.trial_log', editor=trial_log_table),
                 show_labels=False,
                 ),
