@@ -381,13 +381,15 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
         spout during the check period based on `contact_fraction`.
     '''
 
-    #data = Instance(RawAversiveData_v0_2, ())
     data = Instance(RawAversiveData, ())
 
-    # Analysis parameters
+    # Mask parameters
+    mask_mode = Enum('none', 'exclude', 'include', store='attribute')
     exclude_first = Int(0, store='attribute')
     exclude_last = Int(0, store='attribute')
+    include_last = Int(0, store='atribute')
 
+    # Analysis parameters
     contact_offset = Float(0.9, store='attribute')
     contact_dur = Float(0.1, store='attribute')
     contact_fraction = Range(0.0, 1.0, 0.5, store='attribute')
@@ -397,7 +399,7 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
 
     # Masked data
     trial_log = Property(depends_on='data.trial_log')
-    masked_trial_log = Property(depends_on='data.trial_log, exclude+')
+    masked_trial_log = Property(depends_on='data.trial_log, mask_mode, exclude+, include+')
 
     # Basic analysis of masked data
     DEP_CONTACT = ['trial_log', 'contact_dur', 'contact_offset']
@@ -440,11 +442,26 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
         Convert `data.trial_log` to record array and mask unwanted trials
         '''
         log = np.array(self.data.trial_log, dtype=TRIAL_DTYPE)
-        if self.exclude_last != 0:
-            # x[0:-0] returns empty array
-            return log[self.exclude_first:-self.exclude_last]
+        if len(log) == 0:
+            return log
+
+        warn_indices = np.flatnonzero(log['type'] == 'warn')
+
+        if self.mask_mode == 'exclude':
+            lb = warn_indices[exclude_first]
+            if self.exclude_last != 0:
+                ub = warn_indices[-self.exclude_last]
+            else:
+                ub = warn_indices[-1]
+            return log[lb:ub]
+        elif self.mask_mode == 'include':
+            if len(warn_indices) < self.include_last:
+                return log
+            else:
+                index = warn_indices[-self.include_last]
+                return log[index:]
         else:
-            return log[self.exclude_first:]
+            return log
 
     safe_par_mask = Property(depends_on='masked_trial_log')
     warn_par_mask = Property(depends_on='masked_trial_log')

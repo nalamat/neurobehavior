@@ -147,6 +147,7 @@ class AbstractAversiveController(AbstractExperimentController,
         self.state = 'halted'
         self.iface_behavior.stop()
 
+        self.model.analyzed.mask_mode = 'none'
         # Save the data in our newly created node
         #add_or_update_object(self.pump, self.model.exp_node, 'Pump')
         add_or_update_object(self.model.paradigm, self.model.exp_node, 'Paradigm')

@@ -35,7 +35,7 @@ class AbstractExperiment(HasTraits):
 
     def _get_duration(self):
         if self.stop_time is None and self.start_time is None:
-            return timedelta()
+            return datetime.timedelta()
         elif self.stop_time is None:
             return datetime.now()-self.start_time
         else:

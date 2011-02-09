@@ -1,7 +1,7 @@
 from numpy import clip
 
 from enthought.traits.api import Any, Instance
-from enthought.traits.ui.api import View, Item, VGroup, HGroup, HSplit
+from enthought.traits.ui.api import View, Item, VGroup, HGroup, HSplit, Tabbed
 from enthought.enable.api import Component, ComponentEditor
 from enthought.chaco.api import DataRange1D, LinearMapper, PlotLabel, \
         VPlotContainer, PlotAxis, PlotGrid, add_default_grids, \
@@ -22,7 +22,7 @@ from abstract_aversive_controller import AbstractAversiveController
 class AbstractAversiveExperiment(AbstractExperiment):
 
     data = Instance(AversiveData, ())
-    analyzed = Instance(AnalyzedAversiveData)
+    analyzed = Instance(AnalyzedAversiveData, ())
 
     # AversiveFMParadigm and AversiveParadigm are subclasses of
     # BaseAversiveParadigm, so you can put it here too.  However, you cannot put
@@ -261,7 +261,15 @@ class AbstractAversiveExperiment(AbstractExperiment):
                     show_border=True,
                     ),
                 # Include the GUI from the paradigm
-                Item('paradigm', style='custom'), 
+                Tabbed(
+                   Item('paradigm', style='custom', show_label=False), 
+                   VGroup(
+                       Item('object.analyzed.mask_mode'),
+                       Item('object.analyzed.include_last'), 
+                       Item('object.analyzed.exclude_first'),
+                       Item('object.analyzed.exclude_last'),
+                       ),
+                   ),
                 show_labels=False,
                 ),
             VGroup(
