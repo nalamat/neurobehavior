@@ -188,6 +188,11 @@ class PumpInterface(object):
             # of concern so we reraise them.
             if e.code != 'R':
                 raise
+        except NameError:
+            # Raised when it cannot find the global name 'SERIAL' (which
+            # typically indicates a problem connecting to COM1).  Let's
+            # translate this to a human-understandable error.
+            raise PumpCommError('SER')
 
     def disconnect(self):
         for cmd in self._disconnect_seq:
