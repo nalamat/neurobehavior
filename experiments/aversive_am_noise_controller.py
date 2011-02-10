@@ -9,24 +9,30 @@ log = logging.getLogger(__name__)
 
 class AversiveAMNoiseController(AbstractAversiveController):
 
-    current_signal = Any
+    carrier     = Any
+    modulator   = Any
+    output      = Any
 
-    def _current_signal_default(self):
-        signal = blocks.SAM(
-                token=blocks.BroadbandNoise(seed=-1),
-                fm=self.current_modulation_frequency, 
-                equalize_power=True,
-                equalize_phase=True,
-                depth=0)
-        return blocks.SimpleWaveform(token=signal)
+    def _carrier_default(self):
+        return blocks.BroadbandNoise(seed=-1)
+
+    def _modulator_default(self):
+        return blocks.SAM(token=self.carrier,
+                          equalize_power=True,
+                          equalize_phase=True)
+
+    def _output_default(self):
+        return blocks.Output(token=self.modulator)
+
+    def set_modulation_frequency(self, value):
+        self.modulator.frequency = value
 
     def _compute_signal(self, depth):
         direction = 'positive' if randint(0, 2) else 'negative'
-        self.current_signal.token.depth = depth
-        self.current_signal.token.equalize_direction = direction
+        self.modulator.depth = depth
+        self.modulator.equalize_direction = direction
         fs = self.iface_behavior.fs
-        duration = self.current_trial_duration
-        return self.current_signal.realize(fs, duration)
+        return self.output.realize(fs, self.current_trial_duration)
 
     def update_remind(self):
         waveform = self._compute_signal(self.current_remind.parameter)
@@ -40,14 +46,14 @@ class AversiveAMNoiseController(AbstractAversiveController):
         if self.buffer_int.total_samples_written == 0:
             # We have not yet initialized the buffer with data.  Let's fill it
             # all up in one shot.
-            self.current_signal.token.depth = self.current_safe.parameter
+            self.modulator.depth = self.current_safe.parameter
 
             # Let's freeze our safe signal and turn it into a generator.  This
             # will allow us to grab the next set of samples from the signal
             # without having to worry about tracking requisite things like
             # offset.
             fs = self.iface_behavior.fs
-            self.buffer_safe = self.current_signal.freeze(fs)
+            self.buffer_safe = self.output.freeze(fs)
             samples = int(fs*self.current_trial_duration)
             waveform = self.buffer_safe.send(samples)
             self.buffer_int.set(waveform)
@@ -59,3 +65,6 @@ class AversiveAMNoiseController(AbstractAversiveController):
             if pending > 0:
                 waveform = self.buffer_safe.send(pending)
                 self.buffer_int.write(waveform)
+
+    def set_modulation_frequency(self, value):
+        self.current_modulation_frequency = value

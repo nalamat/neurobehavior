@@ -1,6 +1,6 @@
 from numpy import clip
 
-from enthought.traits.api import Any, Instance
+from enthought.traits.api import Instance, on_trait_change
 from enthought.traits.ui.api import View, Item, VGroup, HGroup, HSplit, Tabbed
 from enthought.enable.api import Component, ComponentEditor
 from enthought.chaco.api import DataRange1D, LinearMapper, PlotLabel, \
@@ -19,27 +19,25 @@ from abstract_experiment import AbstractExperiment
 from abstract_aversive_paradigm import AbstractAversiveParadigm
 from abstract_aversive_controller import AbstractAversiveController
 
+import logging
+log = logging.getLogger(__name__)
+
 class AbstractAversiveExperiment(AbstractExperiment):
 
-    data = Instance(AversiveData, ())
-    analyzed = Instance(AnalyzedAversiveData, ())
+    data                = Instance(AversiveData)
+    analyzed            = Instance(AnalyzedAversiveData)
+    paradigm            = Instance(AbstractAversiveParadigm, ())
 
-    # AversiveFMParadigm and AversiveParadigm are subclasses of
-    # BaseAversiveParadigm, so you can put it here too.  However, you cannot put
-    # PositiveParadigm here.
-    paradigm = Instance(AbstractAversiveParadigm, ())
+    experiment_plot     = Instance(Component)
+    par_score_chart     = Instance(Component)
+    score_chart         = Instance(Component)
+    par_count_chart     = Instance(Component)
+    par_dprime_chart    = Instance(Component)
 
-    # Define view elements here
-    experiment_plot = Any
-
-    par_score_chart = Any
-    score_chart = Instance(Component)
-    par_count_chart = Instance(Component)
-    par_dprime_chart = Instance(Component)
-
-    def _data_changed(self):
+    def _data_node_changed(self, new):
+        log.debug("Data node changed")
+        self.data = AversiveData(store_node=new)
         self.analyzed = AnalyzedAversiveData(data=self.data)
-        #self.analyzed_view = AnalyzedAversiveDataView(analyzed=self.analyzed)
         self._update_experiment_plot()
         self._update_score_chart()
         self._update_plots()
@@ -198,15 +196,14 @@ class AbstractAversiveExperiment(AbstractExperiment):
         plot.underlays.append(PlotAxis(plot, orientation='left'))
         self.par_count_chart = plot
 
-        # FA and HIT
+        # par score chart
         bounds = lambda low, high, margin, tight: (low-0.8, high+0.8)
         index_range = DataRange1D(bounds_func=bounds)
         index_mapper = LinearMapper(range=index_range)
         value_range = DataRange1D(low_setting=0, high_setting=1)
         value_mapper = LinearMapper(range=value_range)
 
-        self.par_score_chart = OverlayPlotContainer(bgcolor='white',
-                fill_padding=True)
+        chart = OverlayPlotContainer(bgcolor='white', fill_padding=True)
 
         plot = DynamicBarPlot(source=self.analyzed, label_trait='pars',
                 value_trait='par_hit_frac', bgcolor='white', padding=50,
@@ -226,7 +223,7 @@ class AbstractAversiveExperiment(AbstractExperiment):
                 orientation='horizontal', line_color='lightgray',
                 line_style='dot', grid_interval=0.2)
         plot.underlays.append(grid)
-        self.par_score_chart.add(plot)
+        chart.add(plot)
 
         plot = DynamicBarPlot(source=self.analyzed, label_trait='pars',
                 value_trait='par_fa_frac', bgcolor='white', padding=50,
@@ -234,8 +231,8 @@ class AbstractAversiveExperiment(AbstractExperiment):
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 index_offset=0.2, alpha=0.5)
         index_range.add(plot.index)
-
-        self.par_score_chart.add(plot)
+        chart.add(plot)
+        self.par_score_chart = chart
 
     traits_group = HSplit(
             VGroup(

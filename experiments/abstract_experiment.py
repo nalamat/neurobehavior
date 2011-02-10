@@ -9,6 +9,9 @@ from abstract_experiment_controller import AbstractExperimentController
 from abstract_experiment_data import AbstractExperimentData
 from abstract_experiment_paradigm import AbstractExperimentParadigm
 
+import logging
+log = logging.getLogger(__name__)
+
 class AbstractExperiment(HasTraits):
 
     animal      = Any
@@ -24,11 +27,10 @@ class AbstractExperiment(HasTraits):
     duration    = Property(store='attribute')
 
     def _store_node_changed(self, new):
-        self.exp_node = append_date_node(new)
+        log.debug("Store node change detected")
+        pre = self.__class__.__name__ + '_'
+        self.exp_node = append_date_node(new, pre=pre)
         self.data_node = append_node(self.exp_node, 'data')
-
-    def __init__(self, **kwargs):
-        super(AbstractExperiment, self).__init__(**kwargs)
 
     def _get_date(self):
         return self.start_time.date()

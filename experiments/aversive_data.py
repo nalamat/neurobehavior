@@ -402,11 +402,12 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
     masked_trial_log = Property(depends_on='data.trial_log, mask_mode, exclude+, include+')
 
     # Basic analysis of masked data
-    DEP_CONTACT = ['trial_log', 'contact_dur', 'contact_offset']
+    DEP_CONTACT = ['data.trial_log', 'contact_dur', 'contact_offset']
     DEP_M_CONTACT = ['masked_trial_log', 'contact_dur', 'contact_offset']
     DEP_CONTACT_SEQ = ['contact_scores', 'contact_fraction']
     DEP_M_CONTACT_SEQ = ['masked_contact_scores', 'contact_fraction']
     contact_scores = Property(depends_on=DEP_CONTACT, store='array', dtype='f')
+
     masked_contact_scores = Property(depends_on=DEP_M_CONTACT, store='array',
                                      dtype='f')
 
