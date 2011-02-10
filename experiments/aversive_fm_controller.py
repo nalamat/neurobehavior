@@ -15,20 +15,13 @@ class AversiveFMController(AbstractAversiveController):
         self.buffer_contact = self.iface_behavior.get_buffer('contact', 'r',
                 src_type='int8', dest_type='float32', block_size=24)
 
-        self.set_carrier_frequency(self.model.paradigm.carrier_frequency)
-        self.set_modulation_frequency(self.model.paradigm.modulation_frequency)
-
     # We are overriding the three signal update methods (remind, warn, safe) to
     # work with the specific circuit we constructed
     def update_remind(self):
         self.iface_behavior.set_tag('depth', self.current_remind.parameter)
-        #self.iface_behavior.cset_tag('aversive_dur_n',
-        #        self.current_remind.aversive_duration, 's', 'n')
 
     def update_warn(self):
         self.iface_behavior.set_tag('depth', self.current_warn.parameter)
-        #self.iface_behavior.cset_tag('aversive_dur_n',
-        #        self.current_warn.aversive_duration, 's', 'n')
 
     def update_safe(self):
         pass

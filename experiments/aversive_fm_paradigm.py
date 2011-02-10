@@ -8,9 +8,9 @@ class AversiveFMParadigm(AbstractAversiveParadigm):
     the appropriate DSP circuit.
     '''
 
-    carrier_frequency = Float(4000, store='attribute')
-    modulation_frequency = Float(5, store='attribute')
-    attenuation = Range(0.0, 120.0, 40, store='attribute')
+    carrier_frequency = Float(4000, store='attribute', init=True)
+    modulation_frequency = Float(5, store='attribute', init=True)
+    attenuation = Range(0.0, 120.0, 40, store='attribute', init=True)
 
     signal_group = VGroup(
             Item('carrier_frequency', label='Carrier frequency (Hz)'),

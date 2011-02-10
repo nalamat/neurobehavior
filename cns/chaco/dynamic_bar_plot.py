@@ -20,7 +20,15 @@ class DynamicBarplotAxis(LabelAxis):
 
     def _update_labels(self):
         labels = getattr(self.source, self.label_trait)
-        self.labels = [str(l) for l in labels]
+        text = []
+        for l in labels:
+            if type(l) in (list, tuple):
+                label = ', '.join([str(e) for e in l])
+            else:
+                label = str(l)
+            text.append(label)
+
+        self.labels = text
         self.positions = np.arange(len(labels))
         self.invalidate_and_redraw()
 
