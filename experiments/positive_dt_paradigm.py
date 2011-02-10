@@ -29,7 +29,7 @@ table_editor = TableEditor(
 
 class PositiveDTParadigm(AbstractPositiveParadigm):
 
-    parameters = List(Instance(TrialSetting), [], store='child')
+    parameters = List(Instance(TrialSetting), [], store='child', init=True)
     rise_fall_time = Float(0.0025, store='attribute', init=True)
 
     parameter_view = VGroup(

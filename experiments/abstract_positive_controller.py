@@ -10,6 +10,7 @@ from cns.pipeline import deinterleave_bits
 from cns import choice
 from cns.data.persistence import add_or_update_object
 from positive_data import PositiveData
+from copy import deepcopy
 
 import numpy as np
 
@@ -48,28 +49,12 @@ class AbstractPositiveController(AbstractExperimentController,
     water_infused = Float(0)
     status = Property(Str, depends_on='state, current_trial, current_num_nogo')
 
-    def init_current(self, info=None):
-        # Update random selector for trial number
-        lb = self.model.paradigm.min_nogo
-        ub = self.model.paradigm.max_nogo
-
-        # Deepcopy because we need to ensure that it does not update while we
-        # are making changes
-        selector = self.model.paradigm.parameter_order_
-        import copy
-        sequence = copy.deepcopy(self.model.paradigm.parameters)
-        self.choice_parameter = selector(sequence)
-
-        # Refresh experiment state
-        self.current_trial = 1
-        self.current_setting_go = self.choice_parameter.next()
-
-        log.debug("Initialized current settings")
-
     def start_experiment(self, info):
         # Load interface for the experiment
+        log.debug("start_experiment")
         self.init_pump()
 
+        log.debug("initializing circuit")
         self.iface_behavior = DSPCircuit('components/positive-behavior', 'RZ6')
         self.buffer_signal = self.iface_behavior.get_buffer('speaker', 'w')
         self.buffer_TTL = self.iface_behavior.get_buffer('TTL', 'r',
@@ -80,11 +65,10 @@ class AbstractPositiveController(AbstractExperimentController,
         self.buffer_to_end_TS = self.iface_behavior.get_buffer('TO\\', 'r',
                 src_type=np.int32, block_size=1)
 
-        paradigm = self.model.paradigm
+        log.debug("initializing paradigm")
+        self.init_paradigm(self.model.paradigm)
 
-        self.init_paradigm(paradigm)
-        self.init_current(info)
-
+        log.debug("updating data")
         self.model.data.trial_start_timestamp.fs = self.buffer_TTL.fs
         self.model.data.trial_end_timestamp.fs = self.buffer_TTL.fs
         self.model.data.timeout_start_timestamp.fs = self.buffer_TTL.fs
@@ -98,6 +82,7 @@ class AbstractPositiveController(AbstractExperimentController,
 
         #self.model.exp_node = exp_node
 
+        log.debug("creating pipeline")
         targets = [self.model.data.poke_TTL, self.model.data.spout_TTL,
                    self.model.data.reaction_TTL, self.model.data.signal_TTL,
                    self.model.data.response_TTL, self.model.data.reward_TTL, ]
@@ -107,6 +92,7 @@ class AbstractPositiveController(AbstractExperimentController,
         # Configure circuit
         self.current_trial_end_ts = self.get_trial_end_ts()
 
+        log.debug("starting")
         self.state = 'running'
         self.iface_behavior.start()
         self.iface_behavior.trigger('A', 'high')
@@ -228,9 +214,22 @@ class AbstractPositiveController(AbstractExperimentController,
         self.queue_change(self.model.paradigm, 'parameters',
                 self.current_parameters, self.model.paradigm.parameters)
 
-    set_parameter_order          = AbstractExperimentController.reset_current
-    set_parameters               = AbstractExperimentController.reset_current
-    set_parameters_items         = AbstractExperimentController.reset_current
+    def set_parameters(self, value):
+        self.current_parameters = deepcopy(value)
+        self.reset_sequence()
+
+    def set_parameter_order(self, value):
+        self.current_order = self.model.paradigm.parameter_order_
+        self.reset_sequence()
+
+    def reset_sequence(self):
+        order = self.current_order
+        parameters = self.current_parameters
+        if order is not None and parameters is not None:
+            self.choice_parameter = order(parameters)
+            # Refresh experiment state
+            self.current_trial = 1
+            self.current_setting_go = self.choice_parameter.next()
 
     def set_poke_duration_lb(self, value):
         self.current_poke_duration_lb = value
@@ -266,7 +265,7 @@ class AbstractPositiveController(AbstractExperimentController,
         if lb is not None and ub is not None:
             self.choice_num_nogo = partial(np.random.randint, lb, ub+1)
             # Don't update NOGO count unless this is the first time it has been
-            # called
+            # called.
             if self.current_num_nogo is None:
                 self.current_num_nogo = self.choice_num_nogo()
 

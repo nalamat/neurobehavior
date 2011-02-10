@@ -86,8 +86,8 @@ class AbstractPositiveExperiment(AbstractExperiment):
 
     trial_log_view = Property(depends_on='data.trial_log')
 
-    def _data_default(self):
-        return PositiveData(store_node=self.data_node)
+    def _data_node_changed(self, new):
+        self.data = PositiveData(store_node=new)
 
     def _get_trial_log_view(self):
         trial_log = np.array(self.data.trial_log, dtype=object)
@@ -97,19 +97,14 @@ class AbstractPositiveExperiment(AbstractExperiment):
         else:
             return list(trial_log)
 
-    def log_event(self, ts, name, value):
-        pass
-
-    experiment_plot = Any
-    experiment_plot_index_range = Instance(ChannelDataRange, ())
-
+    experiment_plot = Instance(Component)
     par_count_plot  = Instance(Component)
     par_score_plot  = Instance(Component)
     par_dprime_plot = Instance(Component)
     
     def _data_changed(self):
         plots = {}
-        index_range = self.experiment_plot_index_range
+        index_range = ChannelDataRange()
         index_range.sources = [self.data.spout_TTL]
         index_mapper = LinearMapper(range=index_range)
 
@@ -279,9 +274,6 @@ class AbstractPositiveExperiment(AbstractExperiment):
         plot.underlays.append(axis)
         plot.underlays.append(PlotAxis(plot, orientation='left'))
         self.par_dprime_plot = plot
-
-    def _data_default(self):
-        return PositiveData(store_node=self.store_node)
 
     traits_group = HSplit(
             VGroup(

@@ -5,7 +5,7 @@ from enthought.pyface.api import error
 from enthought.pyface.timer.api import Timer
 from enthought.etsconfig.api import ETSConfig
 from enthought.traits.api import Any, Instance, Enum, Dict, on_trait_change, \
-        HasTraits, List
+        HasTraits, List, Button
 from enthought.traits.ui.api import Controller, View, HGroup, Item, spring
 from enthought.savage.traits.ui.svg_button import SVGButton
 
@@ -248,18 +248,6 @@ class AbstractExperimentController(Controller):
         for trait_name in paradigm.class_trait_names(init=True):
             value = getattr(paradigm, trait_name)
             getattr(self, 'set_' + trait_name)(value)
-
-    def shadow_paradigm(self, paradigm):
-        '''
-        Copy the current value of traits required by the controller for
-        computations performed in the event loop, thus preventing changes to the
-        paradigm from affecting the experiment until the "apply" button is
-        pressed.  To indicate that a copy of the variable should be made, set
-        the 'shadow' metadata attribute to True.
-        '''
-        for trait_name in paradigm.class_trait_names(shadow=True):
-            value = deepcopy(getattr(paradigm, trait_name))
-            setattr(self, 'current_' + trait_name, value)
 
     @on_trait_change('model.paradigm.+')
     def queue_change(self, object, name, old, new):

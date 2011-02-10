@@ -1,6 +1,7 @@
 from enthought.traits.api import Trait, Instance, Range, Float, Property, \
         Bool, List, Int, Str, Tuple
-from enthought.traits.ui.api import VGroup, Item, HGroup, View, Include
+from enthought.traits.ui.api import VGroup, Item, HGroup, View, Include, \
+        Tabbed
 
 from cns import choice
 
@@ -18,11 +19,11 @@ class AbstractAversiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
     # Trait defines a drop-down selector if you provide it with a list of
     # options
     order         = Trait('descending', choice.options, store='attribute',
-                          shadow=True)
+                          init=True)
     warn_sequence = List(Instance(TrialShockSetting), minlen=1,
-                         editor=table_editor, store='child', shadow=True)
-    remind        = Instance(TrialShockSetting, (), store='child', shadow=True)
-    safe          = Instance(TrialShockSetting, (), store='child', shadow=True)
+                         store='child', init=True)
+    remind        = Instance(TrialShockSetting, (), store='child', init=True)
+    safe          = Instance(TrialShockSetting, (), store='child', init=True)
 
     def _warn_sequence_default(self):
         return [TrialShockSetting()]
@@ -35,8 +36,8 @@ class AbstractAversiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
     aversive_delay = Float(1, store='attribute', init=True)
     aversive_duration = Float(0.3, store='attribute', init=True)
 
-    min_safe = Int(2, store='attribute', apply='reset', shadow=True)
-    max_safe = Int(4, store='attribute', apply='reset', shadow=True)
+    min_safe = Int(2, store='attribute', init=True)
+    max_safe = Int(4, store='attribute', init=True)
     trial_duration = Float(1.0, store='attribute', init=True)
 
     #===========================================================================
@@ -60,8 +61,12 @@ class AbstractAversiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
             Item('safe', style='custom', label='Safe'),
             VGroup(
                 Item('order', label='Order'),
-                HGroup(Item('warn_sequence', show_label=False)),
-                show_border=True, label='Warn'),
+                HGroup(
+                    Item('warn_sequence', show_label=False, editor=table_editor)
+                    ),
+                show_border=True, 
+                label='Warn'
+                ),
             show_border=True, 
             label='Signal Parameters')
 
@@ -73,21 +78,24 @@ class AbstractAversiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
             Item('trial_duration', label='Trial duration (s)'),
             )
 
-    timing_group = VGroup(trial_group, 
-                          Item('prevent_disarm',
-                               label='Prevent disarming of stimulus?'),
-                          Item('aversive_delay', 
-                               label='Aversive stimulus delay (s)'),
-                          Item('aversive_duration',
-                               label='Aversive stimulus duration (s)'),
-                          Item('lick_th', label='Contact threshold'),
-                          show_border=True, label='Trial settings')
+    timing_group = VGroup(
+            trial_group, 
+            Item('prevent_disarm',
+                 label='Prevent disarming of stimulus?'),
+            Item('aversive_delay', 
+                 label='Aversive stimulus delay (s)'),
+            Item('aversive_duration',
+                 label='Aversive stimulus duration (s)'),
+            Item('lick_th', label='Contact threshold'),
+            show_border=True, 
+            label='Trial settings',
+            )
 
     traits_view = View(
-            VGroup(
+            Tabbed(
                 par_group, 
                 timing_group, 
-                # Include the view defined in 'signal_group' in subclasses
-                Include('signal_group')),
+                Include('signal_group'),
+                ),
             resizable=True,
             title='Aversive Paradigm editor')
