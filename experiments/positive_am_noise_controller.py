@@ -15,7 +15,8 @@ class PositiveAMNoiseController(AbstractPositiveController):
         return blocks.BroadbandNoise(seed=-1)
 
     def _modulator_default(self):
-        return blocks.SAM(token=self.carrier, equalize_power=True,
+        return blocks.SAM(token=self.carrier, 
+                          equalize_power=True,
                           equalize_phase=False)
 
     def _envelope_default(self):

@@ -186,8 +186,11 @@ def test_experiment(etype):
 
     if not etype.endswith('Experiment'):
         etype += 'Experiment'
+    log.debug("Looking for experiment %s", etype)
     experiment_class = globals()[etype]
+    log.debug("Setting up experiment %s", etype)
     experiment = experiment_class(store_node=test_file.root)
+    log.debug("Initializing GUI for %s", etype)
     experiment.configure_traits()
 
 def profile_experiment(etype):

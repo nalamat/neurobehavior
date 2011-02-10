@@ -25,7 +25,7 @@ class DynamicBarplotAxis(LabelAxis):
             if type(l) in (list, tuple):
                 label = ', '.join([str(e) for e in l])
             else:
-                label = str(e)
+                label = str(l)
             text.append(label)
 
         self.labels = text

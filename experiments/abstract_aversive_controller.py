@@ -1,11 +1,13 @@
 from enthought.traits.api import Any, Property, Str, on_trait_change
 
+import numpy as np
 from tdt import DSPCircuit
 from cns.pipeline import deinterleave_bits
 from cns.data.h5_utils import append_node, append_date_node, \
     get_or_append_node
 from cns.data.persistence import add_or_update_object
 from cns import choice
+from functools import partial
 
 from abstract_experiment_controller import AbstractExperimentController
 from pump_controller_mixin import PumpControllerMixin
@@ -18,9 +20,6 @@ class AbstractAversiveController(AbstractExperimentController,
         PumpControllerMixin):
     # Derive from PumpControllerMixin since the code used to control the pump is
     # same regardless of whether it's positive or aversive paradigm.
-
-    exp_node = Any
-    data_node = Any
 
     status = Property(Str, depends_on='state, current_+')
 
@@ -35,18 +34,12 @@ class AbstractAversiveController(AbstractExperimentController,
     def init_current(self, info=None):
         paradigm = self.model.paradigm 
 
-        #self.shadow_paradigm(paradigm)
-
-        # choice_setting and choice_num_safe are generators (i.e. functions that
-        # remember their state in between calls).  Thus, they are a great way
-        # for tracking what the next parameter and number of safes should be.
-        self.choice_setting = choice.get(paradigm.order,
+        # choice_setting is a generator (i.e. functions that remember their
+        # state in between calls).  Thus, they are a great way for tracking what
+        # the next parameter and number of safes should be.
+        self.choice_setting = choice.get(self.current_order,
                                          paradigm.warn_sequence)
-        trials = range(paradigm.min_safe, paradigm.max_safe+1)
-        self.choice_num_safe = choice.get('pseudorandom', trials)
-
         self.current_warn = self.choice_setting.next()
-        self.current_num_safe = self.choice_num_safe.next()
         self.current_trial = 1
 
     def init_equipment(self):
@@ -65,9 +58,8 @@ class AbstractAversiveController(AbstractExperimentController,
     def start_experiment(self, info):
         self.init_equipment()
         self.init_pump(info)
-
-        self.init_current(info.paradigm)
-        self.init_paradigm(info.paradigm)
+        self.init_paradigm(self.model.paradigm)
+        self.init_current(self.model.paradigm)
 
         # Ensure that sampling frequencies are stored properly
         self.model.data.contact_digital.fs = self.buffer_TTL.fs
@@ -94,16 +86,21 @@ class AbstractAversiveController(AbstractExperimentController,
         self.update_safe()
         self.update_warn()
 
-        # We monitor current_trial_end_ts to determine when a trial is over.
-        # Let's grab the current value of trial_end_ts
-        self.current_trial_ts = self.get_trial_end_ts()
         # We want to start the circuit in the paused state (i.e. playing the
         # intertrial signal but not presenting trials)
         self.pause()
         # Now we start the circuit
         self.iface_behavior.start()
-        # The circuit requires a "high" zBUS trigger A to enable data collection
-        self.iface_behavior.trigger('A', 'high')
+
+        # We monitor current_trial_end_ts to determine when a trial is over.
+        # Let's grab the current value of trial_end_ts before we do anything
+        # else.  If we grab it before starting the circuit, then it may not
+        # reflect any spurious triggers that cause trial_end_ts to advance
+        # during initialization (this is very common when you have EdgeDetect
+        # set to "falling edge" for detecting when a trial is over).  This is a
+        # known bug and the easiest way to work around it is to let the circuit
+        # initialize and "settle" before grabbing the relevant values.
+        self.current_trial_ts = self.get_trial_end_ts()
 
     def remind(self, info=None):
         self.state = 'manual'
@@ -168,7 +165,8 @@ class AbstractAversiveController(AbstractExperimentController,
                     log.debug('processing warning trial')
                     par = self.current_warn.parameter
                     self.model.data.log_trial(ts, par, -1, 'warn')
-                    self.current_num_safe = self.choice_num_safe.next()
+                    print self.choice_num_safe
+                    self.current_num_safe = self.choice_num_safe()
                     self.current_warn = self.choice_setting.next()
 
                     # If there are 3 safes, current trial will be 1, 2, 3, 4
@@ -231,21 +229,32 @@ class AbstractAversiveController(AbstractExperimentController,
     def log_event(self, ts, name, value):
         self.model.data.log_event(ts, name, value)
 
-    # Tells controller to reset current trial settings once all changes are
-    # applied.  This should only be used when you need to change the trial
-    # sequence (i.e. number of safes, order of parameters, parameter sequence,
-    # etc).
-    set_safe             = AbstractExperimentController.reset_current
-    set_order            = AbstractExperimentController.reset_current
-    set_max_safe         = AbstractExperimentController.reset_current
-    set_min_safe         = AbstractExperimentController.reset_current
-
     # Use a function called set_<parameter_name>.  This function will be called
     # when you change that parameter via the GUI and then click on the Apply
     # button.  These functions define how the change to the parameter should be
     # handled.  Variable names come from the attribute in the paradigm (i.e. if
     # a variable is called "par_seq_foo in the AversiveParadigm class, you would
     # define a function called "set_par_seq_foo".
+
+    def set_order(self, value):
+        self.current_order = value
+
+    def set_min_safe(self, value):
+        self.current_min_safe = value
+        self.reset_safes()
+
+    def set_max_safe(self, value):
+        self.current_max_safe = value
+
+    def reset_safes(self):
+        lb = self.current_min_safe
+        ub = self.current_max_safe
+        if lb is not None and ub is not None:
+            self.choice_num_safe = partial(np.random.randint, lb, ub+1)
+            self.current_num_safe = self.choice_num_safe()
+
+    def set_safe(self, value):
+        self.current_safe = value
 
     def set_remind(self, value):
         self.current_remind = value
@@ -280,7 +289,9 @@ class AbstractAversiveController(AbstractExperimentController,
         # Now that we've changed trial duration, we need to be sure to update
         # the warn signal.  Since the safe signal is continuously being updated,
         # we don't need to update that.
-        self.update_warn()
+
+        if self.current_warn is not None:
+            self.update_warn()
 
     def set_attenuation(self, value):
         self.iface_behavior.set_tag('att_A', value)
@@ -295,8 +306,6 @@ class AbstractAversiveController(AbstractExperimentController,
         raise NotImplementedError
 
     set_warn_sequence   = AbstractExperimentController.reset_current
-    set_remind          = AbstractExperimentController.reset_current
-    set_safe            = AbstractExperimentController.reset_current
 
     @on_trait_change(' model.paradigm.warn_sequence')
     def queue_warn_sequence_change(self, object, name, old, new):
