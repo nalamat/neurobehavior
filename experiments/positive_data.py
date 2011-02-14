@@ -14,6 +14,8 @@ from cns.pipeline import deinterleave, broadcast
 from cns.channel import Timeseries
 
 
+from enthought.chaco.api import AbstractPlotData
+
 import logging
 log = logging.getLogger(__name__)
 
@@ -28,7 +30,13 @@ def apply_mask(fun, seq, mask):
 
 LOG_DTYPE = [('timestamp', 'i'), ('name', 'S64'), ('value', 'S128'), ]
 
-class PositiveData_0_1(AbstractExperimentData, SDTDataMixin):
+class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
+
+    def get_data(self, name):
+        print 'getting', name
+        data = getattr(self, name)
+        print data
+        return data
 
     version = Float(0.0)
     latest_version = 0.1
@@ -314,6 +322,11 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin):
     @cached_property
     def _get_nogo_trial_count(self):
         return len(self.nogo_indices)
+
+    @on_trait_change('go_trial_count')
+    def fire_data_changed(self):
+        print 'data changed'
+        self.data_changed = {'changed': ['pars', 'par_go_count']}
 
 PositiveData = PositiveData_0_1
 

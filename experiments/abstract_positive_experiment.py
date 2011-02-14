@@ -102,6 +102,10 @@ class AbstractPositiveExperiment(AbstractExperiment):
     par_dprime_plot = Instance(Component)
     
     def _data_changed(self):
+        self._generate_experiment_plot()
+        self._generate_summary_plots()
+
+    def _generate_experiment_plot(self):
         plots = {}
         index_range = ChannelDataRange()
         index_range.sources = [self.data.spout_TTL]
@@ -134,6 +138,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
         plot.underlays.append(axis)
 
         container.add(plot)
+
         plots["Spout Contact"] = plot
 
         plot = TTLPlot(channel=self.data.poke_TTL, reference=0,
@@ -194,6 +199,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
 
         self.experiment_plot = container
 
+    def _generate_summary_plots(self):
         bounds = lambda low, high, margin, tight: (low-0.5, high+0.5)
         index_range = DataRange1D(bounds_func=bounds)
         index_mapper = LinearMapper(range=index_range)
@@ -274,63 +280,70 @@ class AbstractPositiveExperiment(AbstractExperiment):
         plot.underlays.append(PlotAxis(plot, orientation='left'))
         self.par_dprime_plot = plot
 
+
+    status_group = VGroup(
+            Item('handler.status', style='readonly'),
+            Item('handler.current_poke_dur', 
+                 label='Poke duration (s)', style='readonly'),
+            Item('handler.current_setting_go', style='readonly',
+                 label='Current GO'),
+            label='Experiment',
+            show_border=True,
+            )
+
+    plots_group = VGroup(
+            Item('experiment_plot', editor=ComponentEditor(),
+                show_label=False, width=600, height=200),
+            HGroup(
+                Item('par_count_plot', editor=ComponentEditor(),
+                    show_label=False, width=150, height=150),
+                Item('par_score_plot', editor=ComponentEditor(),
+                    show_label=False, width=150, height=150),
+                Item('par_dprime_plot', editor=ComponentEditor(),
+                    show_label=False, width=150, height=150)
+                ),
+            )
+
+    experiment_group = VGroup(
+            VGroup(
+                Item('object.data.go_trial_count',
+                     label='Number of GO trials'),
+                Item('object.data.nogo_trial_count',
+                     label='Number of NOGO trials'),
+                Item('object.data.global_fa_frac',
+                     label='Global FA fraction'),
+                label='Experiment summary',
+                show_border=True,
+                style='readonly',
+                ),
+            Item('object.data.trial_log', editor=trial_log_table),
+            show_labels=False,
+            )
+
     traits_group = HSplit(
             VGroup(
                 Item('handler.toolbar', style='custom'),
-                VGroup(
-                    Item('handler.status', style='readonly'),
-                    Item('handler.current_poke_dur', 
-                         label='Poke duration (s)', style='readonly'),
-                    Item('handler.current_setting_go', style='readonly',
-                         label='Current GO'),
-                    label='Experiment',
-                    show_border=True,
-                ),
-                VGroup(
-                    Item('handler.pump_toolbar', style='custom',
-                         show_label=False), 
-                    Item('handler.current_volume_dispensed', 
-                         label='Dispensed (mL)', style='readonly'),
-                    Item('object.paradigm.pump_syringe'),
-                    Item('object.paradigm.pump_syringe_diameter', 
-                         label='Diameter (mm)', style='readonly'),
-                    label='Pump Status',
-                    show_border=True,
-                    ),
-                Item('paradigm@', editor=InstanceEditor(view='edit_view')),
+                Include('status_group'),
+                Item('paradigm', style='custom', editor=InstanceEditor()),
                 show_labels=False,
             ),
-            VGroup(
-                Item('experiment_plot', editor=ComponentEditor(),
-                    show_label=False, width=600, height=200),
-                HGroup(
-                    Item('par_count_plot', editor=ComponentEditor(),
-                        show_label=False, width=150, height=150),
-                    Item('par_score_plot', editor=ComponentEditor(),
-                        show_label=False, width=150, height=150),
-                    Item('par_dprime_plot', editor=ComponentEditor(),
-                        show_label=False, width=150, height=150)
-                    ),
-                ),
-            VGroup(
-                VGroup(
-                    Item('object.data.go_trial_count',
-                         label='Number of GO trials'),
-                    Item('object.data.nogo_trial_count',
-                         label='Number of NOGO trials'),
-                    Item('object.data.global_fa_frac',
-                         label='Global FA fraction'),
-                    label='Experiment summary',
-                    show_border=True,
-                    style='readonly',
-                    ),
-                Item('object.data.trial_log', editor=trial_log_table),
-                show_labels=False,
-                ),
+            Include('plots_group'),
+            Include('experiment_group'),
             show_labels=False,
         )
     
-    traits_view = View(Include('traits_group'),
-                       resizable=True,
-                       kind='live',
-                       handler=AbstractPositiveController)
+    traits_view = View(
+            HSplit(
+                VGroup(
+                    Item('handler.toolbar', style='custom'),
+                    Include('status_group'),
+                    Item('paradigm', style='custom', editor=InstanceEditor()),
+                    show_labels=False,
+                ),
+                Include('plots_group'),
+                Include('experiment_group'),
+                show_labels=False,
+                ),
+            resizable=True,
+            kind='live',
+            handler=AbstractPositiveController)
