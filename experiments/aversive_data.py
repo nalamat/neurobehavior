@@ -521,13 +521,42 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
     def _compute_contact_scores(self, trial_log):
         # Right now the algorithm assumes that you are computing from the
         # beginning of the trial and does not handle variable-length trials.
+
+        # Contact is an instance of cns.channel.Channel and contains the TTL
+        # contact data (0=not on spout, 1=on spout) sampled at a fixed samplign
+        # frequency (the sampling frequency is stored as an attribute `fs` in
+        # the instance).
         contact = self.data.contact_digital
+
+        # Channel.to_samples(time) converts time (in seconds) to the
+        # corresponding number of samples given the sampling frequency of the
+        # channel.  If the trial begins at sample n, then we want to analyze
+        # contact during the interval [n+lb_index, n+ub_index).
         lb_index = contact.to_samples(self.contact_offset)
         ub_index = contact.to_samples(self.contact_offset+self.contact_dur)
 
         scores = []
         for ts in trial_log['timestamp']:
-            score = contact.get_range_index(lb_index, ub_index, ts).mean()
+            # Variable ts is the sample number at which the trial began and is a
+            # multiple of the contact sampling frequency.
+            # Channel.get_range_index(lb_sample, ub_sample, reference_sample)
+            # will return the specified range relative to the reference sample.
+            # Since we are interested in extracting the range [contact_offset,
+            # contact_offset+contact_dur) relative to the timestamp, we need to
+            # first convert the range to the number of samples (which we did
+            # above where we have it as [lb_index, ub_index)).  Since our
+            # reference index (the timestamp) is already in the correct units,
+            # we don't need to convert it.
+            range = contact.get_range_index(lb_index, ub_index, ts)
+
+            # Range will be an array of 0's and 1's indicating whether the subject
+            # was on the spout during that period.  We simply compute the mean
+            # of this range to compute the fraction of the time the subject was
+            # on the spout during this interval.  The score is a value between 0
+            # and 1, with 0 indicating the subject never touched the spout
+            # during this period and 1 indicating the subject was in contact
+            # during the full period.
+            score = range.mean()
             scores.append(score)
         return scores
 
