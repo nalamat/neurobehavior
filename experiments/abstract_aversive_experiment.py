@@ -35,7 +35,6 @@ class AbstractAversiveExperiment(AbstractExperiment):
     par_dprime_chart    = Instance(Component)
 
     def _data_node_changed(self, new):
-        log.debug("Data node changed")
         self.data = AversiveData(store_node=new)
         self.analyzed = AnalyzedAversiveData(data=self.data)
         self._update_experiment_plot()

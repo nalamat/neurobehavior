@@ -14,7 +14,7 @@ from cns.data.h5_utils import append_node
 from cns.util.signal import rfft
 from enthought.traits.api import HasTraits, Property, Array, Int, Event, \
     Instance, on_trait_change, Bool, Any, String, Float, cached_property, List, Str, \
-    DelegatesTo, Enum
+    DelegatesTo, Enum, Dict
 import numpy as np
 import tables
 
@@ -56,12 +56,17 @@ class Channel(HasTraits):
         waveform for analysis.  
     '''
 
+    metadata = Dict({'selections': None})
+
     fs = Float                          # Sampling frequency
     t0 = Float(0)                       # Time of first sample (typically zero)
 
     updated = Event
 
     signal = Property
+
+    def get_data(self):
+        return self.signal
 
     def _get_signal(self):
         raise NotImplementedError, 'Use a subclass of Channel'

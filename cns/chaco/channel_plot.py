@@ -3,7 +3,7 @@ import numpy as np
 from enthought.chaco.api import BaseXYPlot
 from enthought.enable.api import black_color_trait, LineStyle
 from enthought.traits.api import Instance, Float, Event, Bool, Enum, \
-        on_trait_change
+        on_trait_change, Property
 
 class ChannelPlot(BaseXYPlot):
     '''
@@ -21,6 +21,11 @@ class ChannelPlot(BaseXYPlot):
     data_changed            = Event
     _data_cache_valid       = Bool(False)
     _screen_cache_valid     = Bool(False)
+
+    index                   = Property(depends_on='channel')
+
+    def _get_index(self):
+        return self.channel
 
     def __init__(self, **kwargs):
         super(ChannelPlot, self).__init__(**kwargs)

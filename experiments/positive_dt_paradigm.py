@@ -32,6 +32,18 @@ class PositiveDTParadigm(AbstractPositiveParadigm):
     parameters = List(Instance(TrialSetting), [], store='child', init=True)
     rise_fall_time = Float(0.0025, store='attribute', init=True)
 
+    def _parameters_default(self):
+        return [TrialSetting(parameter=0.016, attenuation=80),
+                TrialSetting(parameter=0.032, attenuation=80),
+                TrialSetting(parameter=0.064, attenuation=80),
+                TrialSetting(parameter=0.128, attenuation=80),
+                TrialSetting(parameter=0.256, attenuation=80),
+                TrialSetting(parameter=0.256, attenuation=90),
+                TrialSetting(parameter=0.128, attenuation=90),
+                TrialSetting(parameter=0.064, attenuation=90),
+                TrialSetting(parameter=0.032, attenuation=90),
+                TrialSetting(parameter=0.016, attenuation=90),]
+
     parameter_view = VGroup(
             VGroup(Item('parameter_order', label='Order')),
             Item('parameters', editor=table_editor,

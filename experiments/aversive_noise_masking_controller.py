@@ -123,8 +123,8 @@ class AversiveNoiseMaskingController(AbstractAversiveController):
 
             trial_duration = self.model.paradigm.trial_duration
             reps = self.model.paradigm.repeats
-
             total_duration = reps*trial_duration
+
             self.iface_behavior.cset_tag('trial_dur_n', total_duration, 's',
                     'n')
         else:
