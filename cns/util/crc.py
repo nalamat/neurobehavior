@@ -6,14 +6,6 @@
 """The CRC 16 CCITT algorithm was obtained from another project:
 http://code.google.com/p/bf2142stats/
 
-Package for querying EA/IGN's stat server. 
-
-B{Read the readme and beware of banning!}
-
-See the L{rpc.StatsWrapper} class first.
-
-Copyright © 2006 Alexander Bondarenko <wiz@aenor.ru>
-
 Licence
 =======
 
@@ -26,6 +18,8 @@ This library is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 See the GNU Lesser General Public License for more details.
+
+Copyright © 2006 Alexander Bondarenko <wiz@aenor.ru>
 """
 
 crc16_CCITT_table = (
