@@ -8,6 +8,7 @@ from cns.data.h5_utils import append_node, append_date_node, \
 from cns.data.persistence import add_or_update_object
 from cns import choice
 from functools import partial
+from copy import deepcopy
 
 from abstract_experiment_controller import AbstractExperimentController
 from pump_controller_mixin import PumpControllerMixin
@@ -28,19 +29,7 @@ class AbstractAversiveController(AbstractExperimentController,
     * Configure variables
     * Hit the run (i.e. start) button
     * start_experiment is called
-    * start_experiment calls init_equipment and init_current
     '''
-
-    def init_current(self, info=None):
-        paradigm = self.model.paradigm 
-
-        # choice_setting is a generator (i.e. functions that remember their
-        # state in between calls).  Thus, they are a great way for tracking what
-        # the next parameter and number of safes should be.
-        self.choice_setting = choice.get(self.current_order,
-                                         paradigm.warn_sequence)
-        self.current_warn = self.choice_setting.next()
-        self.current_trial = 1
 
     def init_equipment(self):
         # I have broken this out into a separate function because
@@ -59,7 +48,6 @@ class AbstractAversiveController(AbstractExperimentController,
         self.init_equipment()
         self.init_pump(info)
         self.init_paradigm(self.model.paradigm)
-        self.init_current(self.model.paradigm)
 
         # Ensure that sampling frequencies are stored properly
         self.model.data.contact_digital.fs = self.buffer_TTL.fs
@@ -166,7 +154,6 @@ class AbstractAversiveController(AbstractExperimentController,
                     log.debug('processing warning trial')
                     par = self.current_warn.parameter
                     self.model.data.log_trial(ts, par, -1, 'warn')
-                    print self.choice_num_safe
                     self.current_num_safe = self.choice_num_safe()
                     self.current_warn = self.choice_setting.next()
 
@@ -239,6 +226,20 @@ class AbstractAversiveController(AbstractExperimentController,
 
     def set_order(self, value):
         self.current_order = value
+        self.reset_sequence()
+
+    def set_warn_sequence(self, value):
+        self.current_warn_sequence = deepcopy(value)
+        self.reset_sequence()
+
+    def reset_sequence(self):
+        order = self.current_order
+        parameters = self.current_warn_sequence
+        if order is not None and parameters is not None:
+            self.choice_setting = choice.get(order, parameters)
+            self.current_trial = 1
+            if self.current_warn is None:
+                self.current_warn = self.choice_setting.next()
 
     def set_min_safe(self, value):
         self.current_min_safe = value
@@ -306,9 +307,7 @@ class AbstractAversiveController(AbstractExperimentController,
     def update_safe(self):
         raise NotImplementedError
 
-    set_warn_sequence   = AbstractExperimentController.reset_current
-
-    @on_trait_change(' model.paradigm.warn_sequence')
+    @on_trait_change('model.paradigm.warn_sequence.+')
     def queue_warn_sequence_change(self, object, name, old, new):
         self.queue_change(self.model.paradigm, 'warn_sequence',
                 self.current_warn_sequence, self.model.paradigm.warn_sequence)
