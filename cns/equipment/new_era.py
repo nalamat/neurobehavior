@@ -1,12 +1,4 @@
-'''
-Overview
-========
-
->>> pump = PumpInterface()
->>> pump.rate = 0.5
->>> pump.diameter = 18.5
-
-'''
+# -*- coding: utf-8 -*-
 
 import re
 import logging
@@ -15,9 +7,6 @@ log = logging.getLogger(__name__)
 #####################################################################
 # Custom-defined pump error messages
 #####################################################################
-# We could use the built-in error and exception classes, but I subclass these
-# exceptions so that we can provide messages and information specific to
-# problems with the pump hardware.
 
 class PumpError(BaseException):
 
