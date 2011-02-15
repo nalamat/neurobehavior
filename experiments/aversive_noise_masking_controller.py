@@ -3,6 +3,15 @@ from numpy import random, zeros, concatenate
 from tdt import DSPCircuit
 from abstract_aversive_controller import AbstractAversiveController
 
+from cns.data.h5_utils import append_node, append_date_node, \
+    get_or_append_node
+
+import logging
+log = logging.getLogger(__name__)
+from aversive_data import RawAversiveData as AversiveData
+from cns.pipeline import deinterleave_bits
+
+
 class AversiveNoiseMaskingController(AbstractAversiveController):
 
     def init_equipment(self):
@@ -10,17 +19,79 @@ class AversiveNoiseMaskingController(AbstractAversiveController):
         # relative path to the circuit itself.  If you launch the program from
         # the "root" directory (i.e. <path_to_neurobehavior> where components is
         # a subfolder) this will work.
-        self.iface_behavior = DSPCircuit('components/aversive-behavior-masking', 'RZ6')
+#        self.iface_behavior = DSPCircuit('components/aversive-behavior-masking', 'RZ6')
+        self.iface_behavior = DSPCircuit('C:/experiments/programs/neurobehavior/branches/stable/components/aversive-behavior-masking_RX6', 'RX6')
 
         # Handlers to the data buffers on the RZ6
-        self.buffer_TTL = self.iface_behavior.get_buffer('TTL',
+        self.buffer_TTL = self.iface_behavior.get_buffer('TTL','r',
                 src_type='int8', dest_type='int8', block_size=24)
-        self.buffer_contact = self.iface_behavior.get_buffer('contact',
+        self.buffer_contact = self.iface_behavior.get_buffer('contact','r',
                 src_type='int8', dest_type='float32', block_size=24)
 
         # Handles to the trial and intertrial signal buffers on the RZ6
-        self.buffer_trial = self.iface_behavior.get_buffer('trial')
-        self.buffer_int = self.iface_behavior.get_buffer('int')
+        self.buffer_trial = self.iface_behavior.get_buffer('trial','w')
+        self.buffer_int = self.iface_behavior.get_buffer('int','w')
+
+# This is pasted in from abstract_aversive_controller.py, since this controller will
+# is a subclass and will override the class instance
+    def start_experiment(self, info):
+        self.init_equipment()
+        self.init_pump(info)
+
+        # Set up the data node
+        self.model.exp_node = append_date_node(self.model.store_node,
+                pre='aversive_date_')
+        log.debug('Created experiment node for experiment at %r',
+                self.model.exp_node)
+        self.model.data_node = append_node(self.model.exp_node, 'Data')
+        log.debug('Created data node for experiment at %r', self.model.data_node)
+        self.model.data = AversiveData(store_node=self.model.data_node)
+
+        self.init_current(info)
+
+        # Be sure that all relevant circuit parameters are set properly before
+        # we start the experiment! 
+        self.set_aversive_delay(self.model.paradigm.aversive_delay)
+        self.set_aversive_duration(self.model.paradigm.aversive_duration)
+        self.set_contact_threshold(self.model.paradigm.lick_th)
+        self.set_trial_duration(self.model.paradigm.trial_duration)
+#        self.set_attenuation(self.model.paradigm.attenuation)
+
+        # Ensure that sampling frequencies are stored properly
+        self.model.data.contact_digital.fs = self.buffer_TTL.fs
+        self.model.data.contact_digital_mean.fs = self.buffer_contact.fs
+        self.model.data.trial_running.fs = self.buffer_TTL.fs
+        self.model.data.shock_running.fs = self.buffer_TTL.fs
+        self.model.data.warn_running.fs = self.buffer_TTL.fs
+
+        # Since several streams of data are compressed into individual bits
+        # (which are transmitted to the computer as an 8-bit integer), we need
+        # to decompress them (via int_to_TTL) and store them in the appropriate
+        # data buffers via deinterleave.
+        targets = [ self.model.data.trial_running, 
+                    self.model.data.contact_digital,
+                    self.model.data.shock_running,
+                    self.model.data.warn_running, ]
+        self.pipeline_TTL = deinterleave_bits(targets)
+
+        # The buffer for contact_digital_mean does not need any processing, so
+        # we just grab it and pass it along to the data buffer.
+        self.pipeline_contact = self.model.data.contact_digital_mean
+
+        # Initialize signal buffers
+        self.update_safe()
+        self.update_warn()
+
+        # We monitor current_trial_end_ts to determine when a trial is over.
+        # Let's grab the current value of trial_end_ts
+        self.current_trial_ts = self.get_trial_end_ts()
+        # We want to start the circuit in the paused state (i.e. playing the
+        # intertrial signal but not presenting trials)
+        self.pause()
+        # Now we start the circuit
+        self.iface_behavior.start()
+        # The circuit requires a "high" zBUS trigger A to enable data collection
+        self.iface_behavior.trigger('A', 'high')
 
     def update_safe(self):
         waveform = self.compute_waveform(self.current_safe.parameter,
