@@ -5,7 +5,7 @@ BASE_DIRECTORIES = {
         'REGINA'    : 'E:/',
         'DFNKWCH1'  : 'C:/EXPERIMENTS',
         'SEMPLE'    : None,
-        'ROSEN'     : None,
+        'ROSENLAB'  : 'C:/EXPERIMENTS',
         }
 
 BASE_DIRECTORY = BASE_DIRECTORIES[os.getenv('COMPUTERNAME')]
