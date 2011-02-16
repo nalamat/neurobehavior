@@ -16,32 +16,6 @@ from enthought.chaco.api import Plot, DataRange1D, LinearMapper, \
         VPlotContainer, PlotGrid
 from cns.chaco.dynamic_bar_plot import DynamicBarPlot, DynamicBarplotAxis
 
-from enthought.chaco.default_colors import cbrewer
-COLOR_PALETTE = ['cadetblue', 'springgreen', 'red', 'pink', 'darkgray', 'silver']
-
-from enthought.traits.ui.api import TableEditor, ObjectColumn
-
-class LegendColumn(ObjectColumn):
-
-    def get_cell_color(self, object):
-        return object.color
-
-    def get_value(self, object):
-        return object.label
-
-class ColorCategory(HasTraits):
-
-    color = Any
-    label = Any
-
-    def __cmp__(self, other):
-        return cmp(self.label, other.label)
-
-legend_table = TableEditor(
-        editable=False,
-        columns = [LegendColumn(name='label')]
-        )
-
 def add_default_grids(plot, 
         major_index_spacing=1,
         minor_index_spacing=None,
@@ -82,8 +56,6 @@ class PositiveDTExperiment(AbstractPositiveExperiment):
     #plot_data           = Instance(ArrayPlotData, ())
     plot_data           = Dict(Str, Instance(ArrayDataSource))
     plot_range          = Dict(Str, Instance(DataRange1D))
-    color_legend        = List(Instance(ColorCategory), editor=legend_table)
-    category_colors     = Dict()
     color_index         = Int(0)
 
     def _data_node_changed(self, new):
@@ -120,11 +92,6 @@ class PositiveDTExperiment(AbstractPositiveExperiment):
                 index_range.add(index_data)
                 value_range = self.plot_range[value_name]
                 value_range.add(value_data)
-
-                if not category_name in self.category_colors:
-                    c = COLOR_PALETTE[self.color_index]
-                    self.category_colors[category_name] = c
-                    self.color_index += 1
 
                 index_mapper = LogMapper(range=index_range)
                 value_mapper = LinearMapper(range=value_range)
@@ -185,9 +152,9 @@ class PositiveDTExperiment(AbstractPositiveExperiment):
             HSplit(
                 VGroup(
                     Item('handler.toolbar', style='custom'),
+                    Include('pump_group'),
                     Include('status_group'),
                     Item('paradigm', style='custom', editor=InstanceEditor()),
-                    Item('color_legend'),
                     show_labels=False,
                 ),
                 Include('plots_group'),

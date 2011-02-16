@@ -279,6 +279,17 @@ class AbstractPositiveExperiment(AbstractExperiment):
         plot.underlays.append(PlotAxis(plot, orientation='left'))
         self.par_dprime_plot = plot
 
+    pump_group = VGroup(
+            Item('handler.pump_toolbar', style='custom',
+                 show_label=False), 
+            Item('handler.current_volume_dispensed', 
+                 label='Dispensed (mL)', style='readonly'),
+            Item('object.paradigm.pump_syringe'),
+            Item('object.paradigm.pump_syringe_diameter', 
+                 label='Diameter (mm)', style='readonly'),
+            label='Pump Status',
+            show_border=True,
+            )
 
     status_group = VGroup(
             Item('handler.status', style='readonly'),
@@ -322,6 +333,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
     traits_group = HSplit(
             VGroup(
                 Item('handler.toolbar', style='custom'),
+                Include('pump_group'),
                 Include('status_group'),
                 Item('paradigm', style='custom', editor=InstanceEditor()),
                 show_labels=False,
@@ -335,6 +347,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
             HSplit(
                 VGroup(
                     Item('handler.toolbar', style='custom'),
+                    Include('pump_group'),
                     Include('status_group'),
                     Item('paradigm', style='custom', editor=InstanceEditor()),
                     show_labels=False,
