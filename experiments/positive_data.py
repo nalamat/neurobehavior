@@ -323,10 +323,9 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
     def _get_nogo_trial_count(self):
         return len(self.nogo_indices)
 
-    @on_trait_change('go_trial_count')
+    @on_trait_change('par_dprime')
     def fire_data_changed(self):
-        print 'data changed'
-        self.data_changed = {'changed': ['pars', 'par_go_count']}
+        self.data_changed = True
 
 PositiveData = PositiveData_0_1
 

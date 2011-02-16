@@ -111,8 +111,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
         index_range.sources = [self.data.spout_TTL]
         index_mapper = LinearMapper(range=index_range)
 
-        container = OverlayPlotContainer(bgcolor='white', fill_padding=True,
-                padding=50, spacing=50)
+        container = OverlayPlotContainer(padding=50)
 
         value_range = DataRange1D(low_setting=-0, high_setting=1)
         value_mapper = LinearMapper(range=value_range)

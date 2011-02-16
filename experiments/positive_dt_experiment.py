@@ -1,6 +1,6 @@
 import numpy as np
 from enthought.traits.api import Instance, Int, on_trait_change, \
-        Dict, HasTraits, Any, List
+        Dict, HasTraits, Any, List, Str
 from enthought.traits.ui.api import View, Include, VSplit, HSplit, \
         VGroup, Item, InstanceEditor
 
@@ -11,7 +11,10 @@ from positive_dt_controller import PositiveDTController
 from positive_dt_data import PositiveDTData
 
 from enthought.chaco.api import Plot, DataRange1D, LinearMapper, \
-        PlotAxis, ArrayPlotData, Legend, LogMapper
+        PlotAxis, ArrayPlotData, Legend, LogMapper, ArrayDataSource, \
+        OverlayPlotContainer, LinePlot, ScatterPlot, BarPlot, \
+        VPlotContainer, PlotGrid
+from cns.chaco.dynamic_bar_plot import DynamicBarPlot, DynamicBarplotAxis
 
 from enthought.chaco.default_colors import cbrewer
 COLOR_PALETTE = ['cadetblue', 'springgreen', 'red', 'pink', 'darkgray', 'silver']
@@ -39,10 +42,46 @@ legend_table = TableEditor(
         columns = [LegendColumn(name='label')]
         )
 
+def add_default_grids(plot, 
+        major_index_spacing=1,
+        minor_index_spacing=None,
+        major_value_spacing=1, 
+        minor_value_spacing=None):
+
+    if major_index_spacing is not None:
+        grid = PlotGrid(mapper=plot.index_mapper,
+                orientation='horizontal', line_style='solid',
+                line_color='lightgray',
+                grid_interval=major_index_spacing)
+        plot.underlays.append(grid)
+
+    if minor_index_spacing is not None:
+        grid = PlotGrid(mapper=plot.index_mapper,
+                orientation='horizontal', line_style='dot',
+                line_color='lightgray',
+                grid_interval=minor_index_spacing)
+        plot.underlays.append(grid)
+
+    if major_value_spacing is not None:
+        grid = PlotGrid(mapper=plot.value_mapper,
+                orientation='vertical', line_style='solid',
+                line_color='lightgray',
+                grid_interval=major_value_spacing)
+        plot.underlays.append(grid)
+
+    if minor_value_spacing is not None:
+        grid = PlotGrid(mapper=plot.value_mapper,
+                orientation='vertical', line_style='dot',
+                line_color='lightgray',
+                grid_interval=minor_value_spacing)
+        plot.underlays.append(grid)
+
 class PositiveDTExperiment(AbstractPositiveExperiment):
 
     paradigm            = Instance(PositiveDTParadigm, ())
-    plot_data           = Instance(ArrayPlotData, ())
+    #plot_data           = Instance(ArrayPlotData, ())
+    plot_data           = Dict(Str, Instance(ArrayDataSource))
+    plot_range          = Dict(Str, Instance(DataRange1D))
     color_legend        = List(Instance(ColorCategory), editor=legend_table)
     category_colors     = Dict()
     color_index         = Int(0)
@@ -50,11 +89,11 @@ class PositiveDTExperiment(AbstractPositiveExperiment):
     def _data_node_changed(self, new):
         self.data = PositiveDTData(store_node=new)
 
-    def _update_data_categories(self, index_name, value_name, plot):
+    def _update_data_categories(self, index_name, value_name, component):
+        plot_name = index_name+value_name
         index = self.data.get_data(index_name)
         value = self.data.get_data(value_name)
         categories = [p[1:] for p in index]
-        names = self.plot_data.list_data()
 
         for category in sorted(set(categories)):
             mask = np.equal(categories, category)
@@ -65,25 +104,50 @@ class PositiveDTExperiment(AbstractPositiveExperiment):
                 category_name = ', '.join([str(e) for e in category])
             else:
                 category_name = str(category)
-            self.plot_data.set_data(category_name+index_name, category_index)
-            self.plot_data.set_data(category_name+value_name, category_value)
-            if not category_name+value_name in names:
+
+            if category_name+value_name+plot_name in self.plot_data:
+                self.plot_data[category_name+index_name+plot_name].set_data(category_index)
+                self.plot_data[category_name+value_name+plot_name].set_data(category_value)
+            else:
                 # This is a new category.  Let's add the plot.  First, check to
                 # see if we have already assigned a color to this category.
+                index_data = ArrayDataSource(category_index)
+                self.plot_data[category_name+index_name+plot_name] = index_data
+                value_data = ArrayDataSource(category_value)
+                self.plot_data[category_name+value_name+plot_name] = value_data
+
+                index_range = self.plot_range[index_name]
+                index_range.add(index_data)
+                value_range = self.plot_range[value_name]
+                value_range.add(value_data)
+
                 if not category_name in self.category_colors:
                     c = COLOR_PALETTE[self.color_index]
                     self.category_colors[category_name] = c
                     self.color_index += 1
 
-                color = self.category_colors[category_name] 
+                index_mapper = LogMapper(range=index_range)
+                value_mapper = LinearMapper(range=value_range)
 
-                xy = (category_name+index_name, category_name+value_name)
-                plot.plot(xy, type='line', line_width=4, color=color)
-                p, = plot.plot(xy, type='scatter', color=color, line_width=0)
+                # Create the line plot
+                overlay = OverlayPlotContainer()
+                p = LinePlot(index=index_data, value=value_data,
+                        index_mapper=index_mapper, value_mapper=value_mapper,
+                        line_width=5)
+                overlay.add(p)
+                # Create the points for the line plot (i.e. scatter)
+                p = ScatterPlot(index=index_data, value=value_data,
+                        index_mapper=index_mapper, value_mapper=value_mapper,
+                        marker='circle', outline_color='white', marker_size=8,
+                        line_width=2)
+                overlay.add(p)
+                component.add(overlay)
 
-                color_category = ColorCategory(label=category_name, color=color)
-                if color_category not in self.color_legend:
-                    self.color_legend.append(color_category)
+                p.overlays.append(PlotAxis(p, orientation='left',
+                    small_haxis_style=True, title=category_name))
+                if len(component.components) == 1:
+                    p.overlays.append(PlotAxis(p, orientation='bottom',
+                        small_haxis_style=False))
 
     @on_trait_change('data.data_changed')
     def _update(self):
@@ -95,66 +159,27 @@ class PositiveDTExperiment(AbstractPositiveExperiment):
                 self.par_dprime_plot)
 
     def _generate_summary_plots(self):
-        plot = Plot(data=self.plot_data)
-
-        #bounds = lambda low, high, margin, tight: (low-0.5, high+0.5)
-        #index_range = DataRange1D(bounds_func=bounds)
+        container_kw = dict(padding=(50, 5, 5, 50), spacing=10,
+                bgcolor='transparent')
+        # COUNT
+        container = VPlotContainer(**container_kw)
         index_range = DataRange1D()
-        bounds = lambda low, high, margin, tight: (0, high+1)
-        value_range = DataRange1D(low_setting=0, high_setting='auto',
-                bounds_func=bounds)
-        plot.index_range = index_range
-        plot.value_range = value_range
-        #plot.index_mapper = LogMapper(range=index_range)
-        #plot.value_mapper = LogMapper(range=value_range)
+        self.plot_range['pars'] = index_range
+        value_range = DataRange1D(low_setting=0, high_setting='auto')
+        self.plot_range['par_go_count'] = value_range
+        self.par_count_plot = container
 
-        axis = PlotAxis(plot, orientation='bottom')
-        axis = PlotAxis(plot, orientation='bottom', title='Parameter')
-        plot.underlays.append(axis)
-        axis = PlotAxis(plot, orientation='left', title='Count')
-        plot.underlays.append(axis)
-
-        self.legend = Legend(resizable='')
-
-        plot.overlays.append(self.legend)
-
-        self.par_count_plot = plot
-
-        # HIT rate
-        plot = Plot(data=self.plot_data)
-
-        #bounds = lambda low, high, margin, tight: (low-0.5, high+0.5)
-        #index_range = DataRange1D(bounds_func=bounds)
-        index_range = DataRange1D()
+        # HIT RATE
+        container = VPlotContainer(**container_kw)
         value_range = DataRange1D(low_setting=0, high_setting=1)
-        plot.index_range = index_range
-        plot.value_range = value_range
-
-        axis = PlotAxis(plot, orientation='bottom')
-        axis = PlotAxis(plot, orientation='bottom', title='Parameter')
-        plot.underlays.append(axis)
-        axis = PlotAxis(plot, orientation='left', title='Hit rate (fraction)')
-        plot.underlays.append(axis)
-
-        self.par_score_plot = plot
+        self.plot_range['par_hit_frac'] = value_range
+        self.par_score_plot = container
 
         # D'
-        plot = Plot(data=self.plot_data)
-
-        #bounds = lambda low, high, margin, tight: (low-0.5, high+0.5)
-        #index_range = DataRange1D(bounds_func=bounds)
-        index_range = DataRange1D()
+        container = VPlotContainer(**container_kw)
         value_range = DataRange1D(low_setting=-1, high_setting=3)
-        plot.index_range = index_range
-        plot.value_range = value_range
-
-        axis = PlotAxis(plot, orientation='bottom')
-        axis = PlotAxis(plot, orientation='bottom', title='Parameter')
-        plot.underlays.append(axis)
-        axis = PlotAxis(plot, orientation='left', title='Sensitivity (d\')')
-        plot.underlays.append(axis)
-
-        self.par_dprime_plot = plot
+        self.plot_range['par_dprime'] = value_range
+        self.par_dprime_plot = container
 
     traits_view = View(
             HSplit(
