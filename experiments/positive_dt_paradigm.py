@@ -5,8 +5,8 @@ from abstract_positive_paradigm import AbstractPositiveParadigm
 
 class TrialSetting(HasTraits):
 
-    parameter       = Float(1.0, store='attribute')
-    attenuation     = Float(30.0, store='attribute')
+    parameter           = Float(1.0, store='attribute')
+    attenuation         = Float(30.0, store='attribute')
 
     def __cmp__(self, other):
         return cmp(self.parameter, other.parameter)
@@ -29,8 +29,11 @@ table_editor = TableEditor(
 
 class PositiveDTParadigm(AbstractPositiveParadigm):
 
-    parameters = List(Instance(TrialSetting), [], store='child', init=True)
-    rise_fall_time = Float(0.0025, store='attribute', init=True)
+    parameters          = List(Instance(TrialSetting), [], store='child',
+                               init=True)
+    rise_fall_time      = Float(0.0025, store='attribute', init=True)
+    fc                  = Float(20e3, store='attribute', init=True)
+    bandwidth           = Float(20e3, store='attribute', init=True)
 
     def _parameters_default(self):
         return [TrialSetting(parameter=0.016, attenuation=80),
@@ -54,5 +57,7 @@ class PositiveDTParadigm(AbstractPositiveParadigm):
 
     signal_group = VGroup(
             Item('rise_fall_time', label='Rise/fall time (s)'),
+            Item('fc', label='Center frequency (Hz)'),
+            Item('bandwidth', label='Bandwidth (Hz)'),
             label='Signal',
             )
