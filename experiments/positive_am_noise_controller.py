@@ -1,4 +1,4 @@
-from enthought.traits.api import Any 
+from enthought.traits.api import Any
 
 from abstract_positive_controller import AbstractPositiveController
 import neurogen.block_definitions as blocks
@@ -11,8 +11,11 @@ class PositiveAMNoiseController(AbstractPositiveController):
     envelope    = Any
     output      = Any
 
+    def set_seed(self, value):
+        self.carrier.seed = value
+
     def _carrier_default(self):
-        return blocks.BroadbandNoise(seed=-1)
+        return blocks.BroadbandNoise()
 
     def _modulator_default(self):
         return blocks.SAM(token=self.carrier, 
