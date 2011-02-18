@@ -20,7 +20,13 @@ def apply_mask(fun, seq, mask):
 # Datatype information for the various tables and lists used in this module. All
 # timestamps reflect the sample number of the contact data
 WATER_DTYPE = [('timestamp', 'i'), ('infused', 'f')]
-TRIAL_DTYPE = [('timestamp', 'i'), ('par', 'f'), ('shock', 'f'), ('type', 'S16'), ]
+
+TRIAL_DTYPE = [('timestamp', 'i'), 
+               ('par', 'f'), 
+               ('type', 'S16'), 
+               ('trial_end_ts', 'i'),
+              ]
+
 EVENT_DTYPE = [('timestamp', 'i'), ('name', 'S64'), ('value', 'S128'), ]
 RAW_PAR_INFO_DTYPE = [('par', 'f'), ('safe_count', 'i'), ('count', 'i')]
 ANALYZED_PAR_INFO_DTYPE = [('par', 'f'), 
@@ -60,8 +66,8 @@ class RawAversiveData_v0_2(AbstractExperimentData):
     def log_event(self, timestamp, name, value):
         self.event_log.append((timestamp, name, '%r' % value))
 
-    def log_trial(self, timestamp, par, shock, type):
-        self.trial_log.append((timestamp, par, shock, type))
+    def log_trial(self, ts_start, ts_end, end, par, type):
+        self.trial_log.append((ts_start, par, type, ts_end))
 
     #-------------------------------------------------------------------
     # Raw data

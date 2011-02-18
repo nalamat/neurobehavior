@@ -34,7 +34,7 @@ class CohortEditor(TableEditor):
     dclick          = 'dclicked'
 
     columns=[
-        AnimalColumn(name='nyu_id', label='NYU ID'),
+        AnimalColumn(name='nyu_id', label='ID'),
         AnimalColumn(name='parents'),
         AnimalColumn(name='birth'),
         AnimalColumn(name='age', editable=False),
@@ -42,53 +42,6 @@ class CohortEditor(TableEditor):
         AnimalColumn(name='identifier'),
         ]
 
-#class AnimalAdapter(TabularAdapter):
-#    """
-#    Adapt a list of animals to a detailed table view.
-#    """
-#
-#    columns = [('NYU ID', 'nyu_id'),
-#               ('parents', 'parents'),
-#               ('birth', 'birth'),
-#               ('age (days)', 'age'),
-#               ('sex', 'sex'),
-#               ('identifier', 'identifier'), ]
-#
-#    widths = [100, 75, 150, 75, 50, 100]
-#
-#    birth_text = Property
-#
-#    def _get_birth_text(self):
-#        if self.item.birth is None: return 'Unknown'
-#        else: return self.item.birth.strftime('%x')
-#
-#    def _get_bg_color(self):
-#        return sex_colormap[self.item.sex]
-#
-#    def get_width(self, object, trait, column):
-#        return self.widths[column]
-
-#detailed_cohort_table = TabularEditor(adapter=AnimalAdapter(), 
-#                                      editable=False)
-
-#class SimpleAnimalAdapter(TabularAdapter):
-#    
-#    columns = [('animal', 'animal')]
-#    
-#    animal_text = Property
-#    
-#    def _get_animal_text(self):
-#        try:
-#            attributes = (self.item.identifier.capitalize(), 
-#                          self.item.parents,
-#                          self.item.birth.strftime('%x'))
-#            return '%s\t(Litter %s born %s)' % attributes
-#        except:
-#            return 'Unknown'
-#        
-#    def _get_bg_color(self):
-#        return sex_colormap[self.item.sex]
-    
 class CohortViewHandler(FileHandler):
 
     path            = File(cns.COHORT_PATH)
@@ -127,20 +80,19 @@ class CohortViewHandler(FileHandler):
 
 class CohortView(HasTraits):
 
-    cohort = Instance(Cohort, ())
-    selected = Instance(Animal)
-    dclicked = Event
-    rclicked = Event
-    update = Event
-    column_clicked = Event
-    _modified = Bool(False)
+    cohort      = Instance(Cohort, ())
+    selected    = Instance(Animal)
+    dclicked    = Event
+    rclicked    = Event
+    update      = Event
+    _modified   = Bool(False)
 
     add = Button('Add animal')
     delete = Button('Delete animal')
 
     def _animal_factory(self):
         if self.selected is not None:
-            return Animal(nyu_id=self.selected.nyu_id+1,
+            return Animal(animal_id=self.selected.animal_id+1,
                           parents=self.selected.parents,
                           birth=self.selected.birth,
                           sex=self.selected.sex)

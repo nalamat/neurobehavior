@@ -1,4 +1,5 @@
 from numpy import random, zeros, concatenate
+import os
 
 from tdt import DSPCircuit
 from abstract_aversive_controller import AbstractAversiveController
@@ -11,16 +12,51 @@ log = logging.getLogger(__name__)
 from aversive_data import RawAversiveData as AversiveData
 from cns.pipeline import deinterleave_bits
 
+from cns import RCX_ROOT
 
 class AversiveNoiseMaskingController(AbstractAversiveController):
+    # NOTE: Paradigms have access to all the classes (paradigm, data,
+    # experiment, view) via self.model (experiment), self.model.paradigm,
+    # self.model.data, and self.info.ui (view).
+
+    # When the user hits the "Run" button, the paradigm is inspected.  If the
+    # attribute has the metadata init=True, the set_<attribute name> method on
+    # the controller is called with the value of the attribute.  Some set
+    # methods need to change a hardware configuration (e.g. a tag value in the
+    # RCX file, others simply need to store the current value in an attribute on
+    # the controller.  Likewise, these methods are called when the user changes
+    # a value via the GUI (when the experiment is running) and hits the apply
+    # button.
+
+    # At no point should your controller methods query the paradigm object
+    # (available via self.model.paradigm) because the values may reflect changes
+    # to the GUI that have not been applied yet.  If your controller needs a
+    # certain value, store the current (i.e. most recently "applied" value) in
+    # an attribute on the controller.  All of the set methods below follow this
+    # strategy.
+
+    def set_repeats(self, value):
+        self.current_repeats = value
+
+    def set_masker_duration(self, value):
+        self.current_masker_duration = value
+
+    def set_masker_amplitude(self, value):
+        self.current_masker_amplitude = value
+
+    def set_probe_duration(self, value):
+        self.current_probe_duration = value
+
+    def set_trial_duration(self, value):
+        self.current_trial_duration = value
 
     def init_equipment(self):
         # Handle to the circuit itself.  You need to provide the absolute or
         # relative path to the circuit itself.  If you launch the program from
         # the "root" directory (i.e. <path_to_neurobehavior> where components is
         # a subfolder) this will work.
-#        self.iface_behavior = DSPCircuit('components/aversive-behavior-masking', 'RZ6')
-        self.iface_behavior = DSPCircuit('C:/experiments/programs/neurobehavior/branches/stable/components/aversive-behavior-masking_RX6', 'RX6')
+        circuit = os.path.join(RCX_ROOT, 'aversive-behavior-masking_RX6')
+        self.iface_behavior = DSPCircuit(circuit, 'RX6')
 
         # Handlers to the data buffers on the RZ6
         self.buffer_TTL = self.iface_behavior.get_buffer('TTL','r',
@@ -32,70 +68,9 @@ class AversiveNoiseMaskingController(AbstractAversiveController):
         self.buffer_trial = self.iface_behavior.get_buffer('trial','w')
         self.buffer_int = self.iface_behavior.get_buffer('int','w')
 
-# This is pasted in from abstract_aversive_controller.py, since this controller will
-# is a subclass and will override the class instance
-    def start_experiment(self, info):
-        self.init_equipment()
-        self.init_pump(info)
-
-        # Set up the data node
-        self.model.exp_node = append_date_node(self.model.store_node,
-                pre='aversive_date_')
-        log.debug('Created experiment node for experiment at %r',
-                self.model.exp_node)
-        self.model.data_node = append_node(self.model.exp_node, 'Data')
-        log.debug('Created data node for experiment at %r', self.model.data_node)
-        self.model.data = AversiveData(store_node=self.model.data_node)
-
-        self.init_current(info)
-
-        # Be sure that all relevant circuit parameters are set properly before
-        # we start the experiment! 
-        self.set_aversive_delay(self.model.paradigm.aversive_delay)
-        self.set_aversive_duration(self.model.paradigm.aversive_duration)
-        self.set_contact_threshold(self.model.paradigm.lick_th)
-        self.set_trial_duration(self.model.paradigm.trial_duration)
-#        self.set_attenuation(self.model.paradigm.attenuation)
-
-        # Ensure that sampling frequencies are stored properly
-        self.model.data.contact_digital.fs = self.buffer_TTL.fs
-        self.model.data.contact_digital_mean.fs = self.buffer_contact.fs
-        self.model.data.trial_running.fs = self.buffer_TTL.fs
-        self.model.data.shock_running.fs = self.buffer_TTL.fs
-        self.model.data.warn_running.fs = self.buffer_TTL.fs
-
-        # Since several streams of data are compressed into individual bits
-        # (which are transmitted to the computer as an 8-bit integer), we need
-        # to decompress them (via int_to_TTL) and store them in the appropriate
-        # data buffers via deinterleave.
-        targets = [ self.model.data.trial_running, 
-                    self.model.data.contact_digital,
-                    self.model.data.shock_running,
-                    self.model.data.warn_running, ]
-        self.pipeline_TTL = deinterleave_bits(targets)
-
-        # The buffer for contact_digital_mean does not need any processing, so
-        # we just grab it and pass it along to the data buffer.
-        self.pipeline_contact = self.model.data.contact_digital_mean
-
-        # Initialize signal buffers
-        self.update_safe()
-        self.update_warn()
-
-        # We monitor current_trial_end_ts to determine when a trial is over.
-        # Let's grab the current value of trial_end_ts
-        self.current_trial_ts = self.get_trial_end_ts()
-        # We want to start the circuit in the paused state (i.e. playing the
-        # intertrial signal but not presenting trials)
-        self.pause()
-        # Now we start the circuit
-        self.iface_behavior.start()
-        # The circuit requires a "high" zBUS trigger A to enable data collection
-        self.iface_behavior.trigger('A', 'high')
-
     def update_safe(self):
         waveform = self.compute_waveform(self.current_safe.parameter,
-                position=0)
+                                         position=0)
         # set is a special method on DSPBuffer that uploads the entire waveform
         # to the buffer starting at index zero then "truncates" the buffer to
         # the length of the waveform by setting <buffername>_n tag.  The RPvds
@@ -112,39 +87,49 @@ class AversiveNoiseMaskingController(AbstractAversiveController):
         self.buffer_int.set(waveform)
 
     def update_warn(self):
-        repetitions = self.model.paradigm.repeats
+        # self.current_repeats is created by set_repeats, which is called when
+        # the user starts the experiment (and also when the user makes a change
+        # to the GUI)
+        repetitions = self.current_repeats
+
         position = random.randint(1, 4)
         self.current_position = position
+
+        # current_warn is set in abstract_aversive_paradigm in set_warn_sequence
+        # (via reset_sequence) and also in tick_fast.
         par = self.current_warn.parameter
         shock_level = self.current_warn.shock_level
-        # This is a list comprehension.  We are computing #repetition tokens and
-        # have a list of that size.
-        waveforms = [self.compute_waveform(par, position) for i in range(repetitions)]
-        # Concatenate brings together those three (or whatever the nubmer is)
-        # into a single waveform.
+
+        # This is a list comprehension.  We are computing the token for each
+        # repetition.  len(waveforms) will be equal to the number of
+        # repetitions.
+        waveforms = [self.compute_waveform(par, position) \
+                     for i in range(repetitions)]
+
+        # Equivalent approach to the above line
+        # waveforms = []
+        # for i in range(repetitions):
+        #     waveform = self.compute_waveform(par, position)
+        #     waveforms.append(waveform)
+
+        # Concatenate brings together the list of waveforms into a single
+        # waveform.
         waveform = concatenate(waveforms)
-        # Buffer is a handle to the trial buffer on the RPvds.
+
+        # Buffer is a handle to the trial buffer on the RPvds
         self.buffer_trial.set(waveform)
 
     def compute_waveform(self, parameter, position=0):
         fs = self.iface_behavior.fs
 
-        # right now the variables are not protected.  If you change the value in
-        # the GUI but don't hit Apply, the code will end up using the modified
-        # value anyway.  The way to protect against this is to copy the
-        # variables over during init_current to current_<variablename> and then
-        # adding set_<variablename> = ExperimentController.reset_current to
-        # allow the change to be applied when one hits "Apply".
-        # I may add a feature that does this behind the scenes at some point
-        # (i.e. you can call a variable a shadow variable and the controller
-        # will recognize this and automatically copy it over).
-
-        trial_duration = self.model.paradigm.trial_duration
-        masker_duration = self.model.paradigm.masker_duration
-        probe_duration = self.model.paradigm.probe_duration
+        # Let's make local copies of the instance attributes (so the code is
+        # more readable)
+        trial_duration = self.current_trial_duration
+        masker_duration = self.current_masker_duration
+        probe_duration = self.current_probe_duration
         probe_amplitude = parameter
 
-        # This assumes that the values entered in the GUI are reasonable.  NO
+        # This assumes that the values entered in the GUI are reasonable.  No
         # error-checking is done.
         waveform = zeros(int(fs*trial_duration))
         masker = random.normal(size=int(fs*masker_duration))
@@ -170,7 +155,8 @@ class AversiveNoiseMaskingController(AbstractAversiveController):
         return waveform
 
     def update_remind(self):
-        repetitions = self.model.paradigm.repeats
+        repetitions = self.current_repeats
+
         position = random.randint(1, 4)
         self.current_position = position
         par = self.current_remind.parameter
@@ -192,31 +178,32 @@ class AversiveNoiseMaskingController(AbstractAversiveController):
             # Next trial is a warn trial
             self.iface_behavior.set_tag('warn?', 1)
 
-            trial_duration = self.model.paradigm.trial_duration
-            reps = self.model.paradigm.repeats
+            trial_duration = self.current_trial_duration
+            reps = self.current_repeats
             total_duration = reps*trial_duration
 
             self.iface_behavior.cset_tag('trial_dur_n', total_duration, 's',
-                    'n')
+                                         'n')
         else:
             ttype = 'safe'
 
         if ttype in ['warn', 'remind']:
             self.iface_behavior.set_tag('warn?', 1)
-            reps = self.model.paradigm.repeats
+            reps = self.current_repeats
         else:
-            reps = random.randint(1, self.model.paradigm.repeats+1)
+            reps = random.randint(1, self.current_repeats+1)
             self.iface_behavior.set_tag('warn?', 0)
 
         # Set duration of trial to trial_duration*number of repeats
-        trial_duration = self.model.paradigm.trial_duration
+        trial_duration = self.current_trial_duration
         total_duration = trial_duration*reps
         self.iface_behavior.cset_tag('trial_dur_n', total_duration, 's', 'n')
         
         # cset_tag(tag, value, from_unit, to_unit) will convert the provided
         # value from from_unit to to_unit before setting the tag in the
         # circuit).  i.e. converting seconds to samples is basically
-        # int(value*circuit.fs)
+        # int(value*circuit.fs).  This is very similar to some functions in
+        # Sharad's toolbox called ms2n
 
         # Fire a trigger when you've finished doing everything you need to
         # prepare for the next trial.
