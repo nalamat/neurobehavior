@@ -5,8 +5,8 @@ class TrialShockSetting(HasTraits):
 
     parameter           = Float(store='attribute')
     aversive_duration   = Float(store='attribute')
-    #traits_view         = View(HGroup('parameter', 'aversive_duration'))
-    traits_view         = View('parameter')
+    traits_view         = View(HGroup('parameter', 'shock_level'))
+#    traits_view         = View('parameter')
 
     def __str__(self):
         return "{0}".format(self.parameter)
@@ -38,6 +38,7 @@ table_editor = TableEditor(
         columns=[
             #SettingColumn(name='trial_type', label='Type', width=75),
             ObjectColumn(name='parameter', label='Parameter', width=75),
+            ObjectColumn(name='shock_level', label='Shock level', width=75),
             #ObjectColumn(name='aversive_duration', label='Aversive duration (s)', width=75),
             ]
         )

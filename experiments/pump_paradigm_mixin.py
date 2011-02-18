@@ -3,7 +3,7 @@ from enthought.traits.ui.api import View, Item, VGroup, HGroup
 
 class PumpParadigmMixin(HasTraits):
     
-    SYRINGE_DEFAULT = 'B-D 60cc (plastic)'
+    SYRINGE_DEFAULT = 'Popper 20cc (glass)'
     SYRINGE_DATA = {
             'B-D 10cc (plastic)': 14.43,
             'B-D 20cc (plastic)': 19.05,
@@ -13,18 +13,19 @@ class PumpParadigmMixin(HasTraits):
             'B-D 10cc (glass)': 14.20,
             }
 
-    pump_rate = Float(0.5, store='attribute', 
-            label='Rate (mL/min)')
-    pump_rate_delta = Float(0.025, store='attribute', 
-            label=u'\u0394 Rate (mL/min)')
+    pump_rate = Float(0.5, store='attribute', init=True)
+    pump_rate_delta = Float(0.025, store='attribute', init=True)
     pump_syringe = Enum(SYRINGE_DEFAULT, sorted(SYRINGE_DATA.keys()),
-            store='attribute', label='Syringe')
+                        store='attribute')
     pump_syringe_diameter = Property(store='attribute',
-            depends_on='pump_syringe', label='Syringe diameter (mm)')
+                                     depends_on='pump_syringe', init=True)
 
     def _get_pump_syringe_diameter(self):
         return self.SYRINGE_DATA[self.pump_syringe]
 
+    # Note that we have defined two views here, a simple view and a more
+    # detailed view.  When including this mixin class, you can choose which view
+    # is used.
     detailed_pump_settings = VGroup(
             HGroup(
                 Item('pump_rate', label=u'Rate (mL/min)'),
@@ -41,7 +42,6 @@ class PumpParadigmMixin(HasTraits):
             )
 
     simple_pump_settings = VGroup(
-            #Item('handler.pump_toolbar', style='custom'),
             Item('pump_rate', label=u'Rate (mL/min)'),
             Item('pump_rate_delta', label=u'\u0394 Rate (mL/min)'),
             Item('pump_syringe', label='Syringe'),

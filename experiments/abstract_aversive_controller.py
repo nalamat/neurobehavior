@@ -12,6 +12,10 @@ from copy import deepcopy
 
 from abstract_experiment_controller import AbstractExperimentController
 from pump_controller_mixin import PumpControllerMixin
+
+from cns import RCX_ROOT
+from os.path import join
+
 from aversive_data import RawAversiveData as AversiveData
 
 import logging
@@ -36,7 +40,8 @@ class AbstractAversiveController(AbstractExperimentController,
         # AversiveFMController needs to change the initialization sequence a
         # little (i.e. it needs to use different microcode and the microcode
         # does not contain int and trial buffers).
-        self.iface_behavior = DSPCircuit('components/aversive-behavior', 'RZ6')
+        circuit = join(RCX_ROOT, 'aversive-behavior')
+        self.iface_behavior = DSPCircuit(circuit, 'RX6')
         self.buffer_trial = self.iface_behavior.get_buffer('trial', 'w')
         self.buffer_int = self.iface_behavior.get_buffer('int', 'w')
         self.buffer_TTL = self.iface_behavior.get_buffer('TTL', 'r',
@@ -134,13 +139,11 @@ class AbstractAversiveController(AbstractExperimentController,
             ts_end = self.get_trial_end_ts()
             self.current_trial_ts = ts_end
 
-            ts = self.get_trial_contact_start_ts()
-
             # Process "reminder" signals
             if self.state == 'manual':
                 self.pause()
                 par = self.current_remind.parameter
-                self.model.data.log_trial(ts, par, -1, 'remind')
+                self.model.data.log_trial(ts_start, par, 'remind', ts_end)
                 self.update_warn()
             else:
                 last_trial = self.current_trial
@@ -153,7 +156,7 @@ class AbstractAversiveController(AbstractExperimentController,
                     # signal.
                     log.debug('processing warning trial')
                     par = self.current_warn.parameter
-                    self.model.data.log_trial(ts, par, -1, 'warn')
+                    self.model.data.log_trial(ts_start, par, 'warn', ts_end)
                     self.current_num_safe = self.choice_num_safe()
                     self.current_warn = self.choice_setting.next()
 
@@ -167,9 +170,11 @@ class AbstractAversiveController(AbstractExperimentController,
                 elif last_trial <= self.current_num_safe: 
                     # The last trial was a safe trial
                     par = self.current_warn.parameter
-                    self.model.data.log_trial(ts, par, 0, 'safe')
+                    self.model.data.log_trial(ts_start, par, 'safe', ts_end)
                 else:
-                    # Something bad happened
+                    # Something bad happened.  We should never end up in this
+                    # situation, so if we do this means that it is likely an
+                    # unrecoverable error.  Let's exit.
                     log.debug('last_trial: %d, current_num_safe %d', last_trial,
                               self.current_num_safe)
                     raise SystemError, 'There is a mismatch.'
@@ -201,9 +206,6 @@ class AbstractAversiveController(AbstractExperimentController,
     # to implement a new backend, you would subclass this and override the
     # appropriate set_* methods.
     ############################################################################
-
-    def get_trial_contact_start_ts(self):
-        return self.iface_behavior.get_tag('trial_contact/')
 
     def get_trial_start_ts(self):
         return self.iface_behavior.get_tag('trial/')

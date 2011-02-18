@@ -12,6 +12,9 @@ from cns.data.persistence import add_or_update_object
 from positive_data import PositiveData
 from copy import deepcopy
 
+from cns import RCX_ROOT
+from os.path import join
+
 import numpy as np
 
 
@@ -55,7 +58,8 @@ class AbstractPositiveController(AbstractExperimentController,
         self.init_pump()
 
         log.debug("initializing circuit")
-        self.iface_behavior = DSPCircuit('components/positive-behavior', 'RZ6')
+        circuit = join(RCX_ROOT, 'positive-behavior')
+        self.iface_behavior = DSPCircuit(circuit, 'RZ6')
         self.buffer_signal = self.iface_behavior.get_buffer('speaker', 'w')
         self.buffer_TTL = self.iface_behavior.get_buffer('TTL', 'r',
                 src_type=np.int8, dest_type=np.int8, block_size=24)
@@ -79,8 +83,6 @@ class AbstractPositiveController(AbstractExperimentController,
         self.model.data.reaction_TTL.fs = self.buffer_TTL.fs
         self.model.data.response_TTL.fs = self.buffer_TTL.fs
         self.model.data.reward_TTL.fs = self.buffer_TTL.fs
-
-        #self.model.exp_node = exp_node
 
         log.debug("creating pipeline")
         targets = [self.model.data.poke_TTL, self.model.data.spout_TTL,

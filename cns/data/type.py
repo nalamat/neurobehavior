@@ -1,30 +1,21 @@
-from cns.data.constants import ANIMAL_IDS, ANIMAL_STATUS
 from cns.data.trait_types import CTuple, CDate
 from enthought.traits.api import HasTraits, Date, Enum, Instance, CList, \
-    Property, Int, Str, CInt, CFloat, List, Any, Bool
+    Property, Int, Str, List, Any, Bool
 import datetime
-
-#from cns.experiment.paradigm import Paradigm
-#from cns.experiment.data.experiment_data import ExperimentData
-
-class Experiment(HasTraits):
-
-    #paradigm = Instance(Paradigm, store='node')
-    #data = Instance(ExperimentData, store='node')
-    pass
 
 class Animal(HasTraits):
 
-    nyu_id = CInt(store='attribute', label='NYU ID')
-    identifier = Enum(*ANIMAL_IDS, store='attribute')
-    sex = Enum('U', 'M', 'F', store='attribute')
-    birth = Date(store='attribute')
-    parents = Str(store='attribute')
-    age = Property(Int, depends_on='birth')
-    processed = Bool(False)
+    nyu_id      = Int(store='attribute', label='Animal ID')
+    identifier  = Str(store='attribute')
+    sex         = Enum('U', 'M', 'F', store='attribute')
+    birth       = Date(store='attribute')
+    parents     = Str(store='attribute')
+    age         = Property(Int, depends_on='birth')
+
+    processed   = Bool(False)
 
     experiments = Property(List)
-    name = Property(Str)
+    name        = Property(Str)
 
     def _get_experiments(self):
         try:
@@ -68,8 +59,8 @@ class Animal(HasTraits):
 class Cohort(HasTraits):
 
     description = Str(store='attribute')
-    animals = List(Instance(Animal), store='child')
-    size = Property(Int, depends_on='animals[]')
+    animals     = List(Instance(Animal), store='child')
+    size        = Property(Int, depends_on='animals[]')
 
     def _get_size(self):
         return len(self.animals)
