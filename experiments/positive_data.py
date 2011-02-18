@@ -33,10 +33,7 @@ LOG_DTYPE = [('timestamp', 'i'), ('name', 'S64'), ('value', 'S128'), ]
 class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
     def get_data(self, name):
-        print 'getting', name
-        data = getattr(self, name)
-        print data
-        return data
+        return getattr(self, name)
 
     version = Float(0.0)
     latest_version = 0.1

@@ -1,6 +1,5 @@
 import numpy as np
 
-from enthought import kiva
 from enthought.chaco.api import BaseXYPlot
 from enthought.enable.api import black_color_trait, LineStyle
 from enthought.traits.api import Instance, Float, Event, Bool, Enum, \
@@ -75,17 +74,10 @@ class TimeseriesPlot(BaseXYPlot):
             gc.set_line_width(self.line_width) 
             gc.set_line_dash(self.line_style_)
             gc.set_line_join(0) # Curved
-            #gc.set_font(kiva.Font())
 
             gc.begin_path()
             gc.line_set(starts, ends)
-            #gc.rotate_ctm(self.text_rotation)
             for i, (x, y) in enumerate(starts):
-                #gc.set_text_position(x, y)
-                #try:
-                #    gc.show_text(self.label + "%r" % self.series.metadata[i])
-                #except:
-                #    gc.show_text(self.label)
                 gc.draw_marker_at_points([[x, y]], 1, 1)
             gc.draw_path()
             self._draw_default_axes(gc)
