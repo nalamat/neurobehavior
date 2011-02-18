@@ -1,5 +1,6 @@
 import numpy as np
 from channel_plot import ChannelPlot
+from enthought.traits.api import List
 
 def decimate_extremes(data, downsample):
     # Axis that we want to decimate across
@@ -35,13 +36,14 @@ class ExtremesChannelPlot(ChannelPlot):
     '''
 
     offset = 0.5e-3
+    visible = List([1, 2, 3, 4, 5, 6])
 
     def _get_screen_points(self):
         if not self._screen_cache_valid:
             # Get the decimated data
             decimation_factor = self._decimation_factor()
-            values = decimate_extremes(self._cached_data, decimation_factor)
-
+            cached_data = self._cached_data[self.visible]
+            values = decimate_extremes(cached_data, decimation_factor)
 
             if type(values) == type(()):
                 channels, samples = values[0].shape
