@@ -239,7 +239,6 @@ class AbstractAversiveExperiment(AbstractExperiment):
                 VGroup(
                     Item('animal', show_label=False),
                     Item('handler.status', label='Status'),
-                    #Item('handler.current_warn', label='Next warn'),
                     label='Experiment',
                     style='readonly',
                     show_border=True,

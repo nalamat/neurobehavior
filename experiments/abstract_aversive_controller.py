@@ -26,7 +26,7 @@ class AbstractAversiveController(AbstractExperimentController,
     # Derive from PumpControllerMixin since the code used to control the pump is
     # same regardless of whether it's positive or aversive paradigm.
 
-    status = Property(Str, depends_on='state, current_+')
+    status = Property(Str, depends_on='state, current_trial')
 
     '''
     Sequence of initialization

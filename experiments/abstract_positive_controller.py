@@ -230,8 +230,9 @@ class AbstractPositiveController(AbstractExperimentController,
         if order is not None and parameters is not None:
             self.choice_parameter = order(parameters)
             # Refresh experiment state
-            self.current_trial = 1
-            self.current_setting_go = self.choice_parameter.next()
+            if self.current_trial is None:
+                self.current_trial = 1
+                self.current_setting_go = self.choice_parameter.next()
 
     def set_poke_duration_lb(self, value):
         self.current_poke_duration_lb = value

@@ -1,8 +1,8 @@
 from cns.widgets.toolbar import ToolBar
 from enthought.etsconfig.api import ETSConfig
 from enthought.traits.ui.api import View, HGroup, Item, Controller, VGroup
-from enthought.savage.traits.ui.svg_button import SVGButton
 from enthought.traits.api import Instance, Bool, HasTraits, Button
+from enthought.savage.traits.ui.svg_button import SVGButton
 from cns.widgets import icons
 
 class PumpToolBar(ToolBar):
@@ -12,26 +12,24 @@ class PumpToolBar(ToolBar):
     override the TTL input (so pump continuously infuses). 
     '''
 
-    if ETSConfig.toolkit == 'qt4':
-        kw               = dict(height=20, width=20, action=True)
-        pump_increase    = SVGButton(filename=icons.up, tooltip='Increase rate',
-                                     **kw)
-        pump_decrease    = SVGButton(filename=icons.down, 
-                                     tooltip='Decrease rate',**kw)
-        pump_override    = SVGButton(filename=icons.right2, 
-                                     tooltip='Override', toggle=True, **kw)
-        pump_initialize  = SVGButton(filename=icons.start,
-                                     tooltip='Initialize', **kw)
-        pump_shutdown    = SVGButton(filename=icons.stop, tooltip='Shutdown',
-                                     **kw)
-        item_kw          = dict()
-    else:
-        pump_increase    = Button('+')
-        pump_decrease    = Button('-')
-        pump_override    = Button('O')
-        pump_initialize  = Button('I')
-        pump_shutdown    = Button('W')
-        item_kw          = dict(width= -24, height= -24)
+    kw               = dict(height=20, width=20, action=True)
+    pump_increase    = SVGButton(filename=icons.up, tooltip='Increase rate',
+                                 **kw)
+    pump_decrease    = SVGButton(filename=icons.down, 
+                                 tooltip='Decrease rate',**kw)
+    pump_override    = SVGButton(filename=icons.right2, 
+                                 tooltip='Override', toggle=True, **kw)
+    pump_initialize  = SVGButton(filename=icons.start,
+                                 tooltip='Initialize', **kw)
+    pump_shutdown    = SVGButton(filename=icons.stop, tooltip='Shutdown',
+                                 **kw)
+    item_kw          = dict()
+    #pump_increase    = Button('+')
+    #pump_decrease    = Button('-')
+    #pump_override    = Button('O')
+    #pump_initialize  = Button('I')
+    #pump_shutdown    = Button('W')
+    #item_kw          = dict(width= -24, height= -24)
 
     traits_view = View(
             HGroup(Item('pump_override', **item_kw),

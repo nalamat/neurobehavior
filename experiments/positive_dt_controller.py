@@ -18,7 +18,7 @@ class PositiveDTController(AbstractPositiveController):
                                   (parameter, attenuation))
 
     def _carrier_default(self):
-        return blocks.BroadbandNoise(seed=-1)
+        return blocks.BandlimitedNoise(seed=-1)
 
     def _envelope_default(self):
         return blocks.Cos2Envelope(token=self.carrier)
@@ -32,6 +32,12 @@ class PositiveDTController(AbstractPositiveController):
 
     def set_rise_fall_time(self, value):
         self.envelope.rise_time = value
+
+    def set_fc(self, value):
+        self.carrier.fc = value
+
+    def set_bandwidth(self, value):
+        self.carrier.bandwidth = value
 
     def set_attenuation(self, value):
         self.iface_behavior.set_tag('att_A', value)
