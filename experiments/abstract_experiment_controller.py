@@ -7,9 +7,10 @@ from enthought.etsconfig.api import ETSConfig
 from enthought.traits.api import Any, Instance, Enum, Dict, on_trait_change, \
         HasTraits, List, Button
 from enthought.traits.ui.api import Controller, View, HGroup, Item, spring
-from enthought.savage.traits.ui.svg_button import SVGButton
 
 from cns.widgets.toolbar import ToolBar
+from enthought.savage.traits.ui.svg_button import SVGButton
+from cns.widgets import icons
 
 import logging
 log = logging.getLogger(__name__)
@@ -18,39 +19,35 @@ class ExperimentToolBar(ToolBar):
 
     size = 24, 24
 
-    if ETSConfig.toolkit == 'qt4':
-        # We protect this import since we only need it for the Qt4 toolkit.  We
-        # don't want this imported if we use the WX backend.
-        from cns.widgets import icons
-
-        kw      = dict(height=size[0], width=size[1], action=True)
-        apply   = SVGButton('Apply', filename=icons.apply,
-                            tooltip='Apply settings', **kw)
-        revert  = SVGButton('Revert', filename=icons.undo,
-                            tooltip='Revert settings', **kw)
-        start   = SVGButton('Run', filename=icons.start,
-                            tooltip='Begin experiment', **kw)
-        pause   = SVGButton('Pause', filename=icons.pause,
-                            tooltip='Pause', **kw)
-        resume  = SVGButton('Resume', filename=icons.resume,
-                            tooltip='Resume', **kw)
-        stop    = SVGButton('Stop', filename=icons.stop,
-                            tooltip='stop', **kw)
-        remind  = SVGButton('Remind', filename=icons.warn,
-                            tooltip='Remind', **kw)
-        item_kw = dict(show_label=False)
-    else:
-        # The WX backend renderer for SVG buttons is ugly, so let's use text
-        # buttons instead.  Eventually I'd like to unite these under ONE
-        # backend.
-        apply   = Button('A', action=True)
-        revert  = Button('R', action=True)
-        start   = Button('>>', action=True)
-        pause   = Button('||', action=True)
-        resume  = Button('>', action=True)
-        stop    = Button('X', action=True)
-        remind  = Button('!', action=True)
-        item_kw = dict(show_label=False, height=-size[0], width=-size[1])
+    # We protect this import since we only need it for the Qt4 toolkit.  We
+    # don't want this imported if we use the WX backend.
+    kw      = dict(height=size[0], width=size[1], action=True)
+    apply   = SVGButton('Apply', filename=icons.apply,
+                        tooltip='Apply settings', **kw)
+    revert  = SVGButton('Revert', filename=icons.undo,
+                        tooltip='Revert settings', **kw)
+    start   = SVGButton('Run', filename=icons.start,
+                        tooltip='Begin experiment', **kw)
+    pause   = SVGButton('Pause', filename=icons.pause,
+                        tooltip='Pause', **kw)
+    resume  = SVGButton('Resume', filename=icons.resume,
+                        tooltip='Resume', **kw)
+    stop    = SVGButton('Stop', filename=icons.stop,
+                        tooltip='stop', **kw)
+    remind  = SVGButton('Remind', filename=icons.warn,
+                        tooltip='Remind', **kw)
+    item_kw = dict(show_label=False)
+    # The WX backend renderer for SVG buttons is ugly, so let's use text
+    # buttons instead.  Eventually I'd like to unite these under ONE
+    # backend.
+    #apply   = Button('A', action=True)
+    #revert  = Button('R', action=True)
+    #start   = Button('>>', action=True)
+    #pause   = Button('||', action=True)
+    #resume  = Button('>', action=True)
+    #stop    = Button('X', action=True)
+    #remind  = Button('!', action=True)
+    #item_kw = dict(show_label=False, height=-size[0], width=-size[1])
 
     traits_view = View(
             HGroup(Item('apply',
