@@ -13,47 +13,12 @@ from positive_dt_data import PositiveDTData
 from enthought.chaco.api import Plot, DataRange1D, LinearMapper, \
         PlotAxis, ArrayPlotData, Legend, LogMapper, ArrayDataSource, \
         OverlayPlotContainer, LinePlot, ScatterPlot, BarPlot, \
-        VPlotContainer, PlotGrid
-from cns.chaco.dynamic_bar_plot import DynamicBarPlot, DynamicBarplotAxis
-
-def add_default_grids(plot, 
-        major_index_spacing=1,
-        minor_index_spacing=None,
-        major_value_spacing=1, 
-        minor_value_spacing=None):
-
-    if major_index_spacing is not None:
-        grid = PlotGrid(mapper=plot.index_mapper,
-                orientation='horizontal', line_style='solid',
-                line_color='lightgray',
-                grid_interval=major_index_spacing)
-        plot.underlays.append(grid)
-
-    if minor_index_spacing is not None:
-        grid = PlotGrid(mapper=plot.index_mapper,
-                orientation='horizontal', line_style='dot',
-                line_color='lightgray',
-                grid_interval=minor_index_spacing)
-        plot.underlays.append(grid)
-
-    if major_value_spacing is not None:
-        grid = PlotGrid(mapper=plot.value_mapper,
-                orientation='vertical', line_style='solid',
-                line_color='lightgray',
-                grid_interval=major_value_spacing)
-        plot.underlays.append(grid)
-
-    if minor_value_spacing is not None:
-        grid = PlotGrid(mapper=plot.value_mapper,
-                orientation='vertical', line_style='dot',
-                line_color='lightgray',
-                grid_interval=minor_value_spacing)
-        plot.underlays.append(grid)
+        VPlotContainer
+from enthought.chaco.tools.api import ScatterInspector, DataPrinter
 
 class PositiveDTExperiment(AbstractPositiveExperiment):
 
     paradigm            = Instance(PositiveDTParadigm, ())
-    #plot_data           = Instance(ArrayPlotData, ())
     plot_data           = Dict(Str, Instance(ArrayDataSource))
     plot_range          = Dict(Str, Instance(DataRange1D))
     color_index         = Int(0)
@@ -109,6 +74,9 @@ class PositiveDTExperiment(AbstractPositiveExperiment):
                         line_width=2)
                 overlay.add(p)
                 component.add(overlay)
+
+
+                #p.tools.append(ScatterInspector(p))
 
                 p.overlays.append(PlotAxis(p, orientation='left',
                     small_haxis_style=True, title=category_name))
