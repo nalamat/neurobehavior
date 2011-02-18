@@ -20,6 +20,7 @@ from cns.chaco.channel_data_range import ChannelDataRange
 from cns.chaco.ttl_plot import TTLPlot
 from cns.chaco.timeseries_plot import TimeseriesPlot
 from cns.chaco.dynamic_bar_plot import DynamicBarPlot, DynamicBarplotAxis
+from cns.chaco.helpers import add_default_grids
 
 colors = {'light green': '#98FB98',
           'dark green': '#2E8B57',
@@ -111,8 +112,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
         index_range.sources = [self.data.spout_TTL]
         index_mapper = LinearMapper(range=index_range)
 
-        container = OverlayPlotContainer(bgcolor='white', fill_padding=True,
-                padding=50, spacing=50)
+        container = OverlayPlotContainer(padding=[20, 20, 50, 50])
 
         value_range = DataRange1D(low_setting=-0, high_setting=1)
         value_mapper = LinearMapper(range=value_range)
@@ -120,19 +120,11 @@ class AbstractPositiveExperiment(AbstractExperiment):
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(0.25, 0.41, 0.88, 0.5), rect_center=0.25,
                 rect_height=0.2)
-        grid = PlotGrid(mapper=plot.index_mapper, component=plot,
-                orientation='vertical', line_color='lightgray',
-                line_style='dot', grid_interval=0.25)
-        plot.underlays.append(grid)
-        grid = PlotGrid(mapper=plot.index_mapper, component=plot,
-                orientation='vertical', line_color='lightgray',
-                line_style='solid', grid_interval=1)
-        plot.underlays.append(grid)
-        axis = PlotAxis(component=plot, title="Time (s)",
-                        orientation="top", ticks_visible=True)
-        plot.underlays.append(axis)
+
+        add_default_grids(plot, major_index=5, minor_index=1)
+
         tick_formatter = lambda s: "{0}:{1:02}".format(*divmod(int(s), 60))
-        axis = PlotAxis(component=plot, orientation="bottom",
+        axis = PlotAxis(component=plot, orientation="top",
                 title="Time(min:sec)",
                 tick_label_formatter=tick_formatter)
         plot.underlays.append(axis)
@@ -212,10 +204,9 @@ class AbstractPositiveExperiment(AbstractExperiment):
                 value_mapper=value_mapper, index_mapper=index_mapper)
         index_range.add(plot.index)
         value_range.add(plot.value)
-        grid = PlotGrid(mapper=plot.value_mapper, component=plot,
-                orientation='horizontal', line_color='lightgray',
-                line_style='dot', grid_interval=5)
-        plot.underlays.append(grid)
+
+
+        add_default_grids(plot, major_value=5)
         axis = DynamicBarplotAxis(plot, orientation='bottom',
                 source=self.data, label_trait='pars')
         plot.underlays.append(axis)
@@ -243,10 +234,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
         plot.underlays.append(axis)
         plot.underlays.append(PlotAxis(plot, orientation='left'))
         
-        grid = PlotGrid(mapper=plot.value_mapper, component=plot,
-                orientation='horizontal', line_color='lightgray',
-                line_style='dot', grid_interval=0.2)
-        plot.underlays.append(grid)
+        add_default_grids(plot, minor_value=0.2)
         self.par_score_plot.add(plot)
 
         plot = DynamicBarPlot(source=self.data, label_trait='pars',
@@ -280,6 +268,17 @@ class AbstractPositiveExperiment(AbstractExperiment):
         plot.underlays.append(PlotAxis(plot, orientation='left'))
         self.par_dprime_plot = plot
 
+    pump_group = VGroup(
+            Item('handler.pump_toolbar', style='custom',
+                 show_label=False), 
+            Item('handler.current_volume_dispensed', 
+                 label='Dispensed (mL)', style='readonly'),
+            Item('object.paradigm.pump_syringe'),
+            Item('object.paradigm.pump_syringe_diameter', 
+                 label='Diameter (mm)', style='readonly'),
+            label='Pump Status',
+            show_border=True,
+            )
 
     status_group = VGroup(
             Item('handler.status', style='readonly'),
@@ -323,6 +322,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
     traits_group = HSplit(
             VGroup(
                 Item('handler.toolbar', style='custom'),
+                Include('pump_group'),
                 Include('status_group'),
                 Item('paradigm', style='custom', editor=InstanceEditor()),
                 show_labels=False,
@@ -336,6 +336,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
             HSplit(
                 VGroup(
                     Item('handler.toolbar', style='custom'),
+                    Include('pump_group'),
                     Include('status_group'),
                     Item('paradigm', style='custom', editor=InstanceEditor()),
                     show_labels=False,
