@@ -111,7 +111,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
         index_range.sources = [self.data.spout_TTL]
         index_mapper = LinearMapper(range=index_range)
 
-        container = OverlayPlotContainer(padding=50)
+        container = OverlayPlotContainer(padding=[20, 20, 50, 50])
 
         value_range = DataRange1D(low_setting=-0, high_setting=1)
         value_mapper = LinearMapper(range=value_range)
@@ -127,11 +127,11 @@ class AbstractPositiveExperiment(AbstractExperiment):
                 orientation='vertical', line_color='lightgray',
                 line_style='solid', grid_interval=1)
         plot.underlays.append(grid)
-        axis = PlotAxis(component=plot, title="Time (s)",
-                        orientation="top", ticks_visible=True)
-        plot.underlays.append(axis)
+        #axis = PlotAxis(component=plot, title="Time (s)",
+        #                orientation="top", ticks_visible=True)
+        #plot.underlays.append(axis)
         tick_formatter = lambda s: "{0}:{1:02}".format(*divmod(int(s), 60))
-        axis = PlotAxis(component=plot, orientation="bottom",
+        axis = PlotAxis(component=plot, orientation="top",
                 title="Time(min:sec)",
                 tick_label_formatter=tick_formatter)
         plot.underlays.append(axis)
