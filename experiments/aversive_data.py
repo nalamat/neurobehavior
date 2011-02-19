@@ -23,8 +23,8 @@ WATER_DTYPE = [('timestamp', 'i'), ('infused', 'f')]
 
 TRIAL_DTYPE = [('timestamp', 'i'), 
                ('par', 'f'), 
-               ('type', 'S16'), 
                ('trial_end_ts', 'i'),
+               ('type', 'S16'), 
               ]
 
 EVENT_DTYPE = [('timestamp', 'i'), ('name', 'S64'), ('value', 'S128'), ]
