@@ -124,10 +124,10 @@ class AbstractExperimentController(Controller):
     state = Enum('halted', 'paused', 'running', 'manual', 'disconnected',
                  'complete')
 
-    timer_ = Any
-
-    # Trait wildcards (see http://code.enthought.com/projects/traits/docs
+    # name_ = Any are Trait wildcards
+    # see http://code.enthought.com/projects/traits/docs
     # /html/traits_user_manual/advanced.html#trait-attribute-name-wildcard)
+    timer_ = Any
 
     # current_* and choice_* are variables tracked by the controller to
     # determine the current "state" of the experiment and what values to use for
@@ -162,7 +162,8 @@ class AbstractExperimentController(Controller):
             error(info.ui.control, str(e))
 
     def close(self, info, is_ok):
-        '''Prevent user from closing window while an experiment is running since
+        '''
+        Prevent user from closing window while an experiment is running since
         data is not saved to file until the stop button is pressed.
         '''
         if self.state not in ('disconnected', 'halted', 'complete'):
@@ -245,7 +246,7 @@ class AbstractExperimentController(Controller):
             else:
                 self.pending_changes[key] = new
 
-    def apply_change(self, instance, name):
+    def apply_change(self, instance, name, info=None):
         '''
         Applies an individual change
         '''
@@ -256,23 +257,22 @@ class AbstractExperimentController(Controller):
             getattr(self, 'set_'+name)(value)
             self.log_event(ts, name, value)
         except AttributeError:
-            log.warn("Can't set %s to %r", name, value)
-            log.warn("Removing this from the stack")
+            mesg = "Can't set %s to %r", name, value
+            # Notify the user
+            error(info.ui.control, mesg)
+            log.warn(mesg + ", removing from stack")
+            # Set paradigm value back to "old" value
+            setattr(self.model.paradigm, name, value)
         del self.pending_changes[(instance, name)]
         del self.old_values[(instance, name)]
 
     def apply(self, info=None):
         '''
         Called when Apply button is pressed.  Goes through all parameters that
-        have changed and attempts to apply them.  Once parameters have been
-        applied, checks state of _reset_current_settings to see if it is True,
-        if True, calls init_current() as well.
+        have changed and attempts to apply them.
         '''
         for instance, name in self.pending_changes.keys():
-            self.apply_change(instance, name)
-        if self._reset_current_settings == True:
-            self.init_current()
-            self._reset_current_settings = False
+            self.apply_change(instance, name, info)
 
     def log_event(self, ts, name, value):
         log.debug("%d, %s, %r", ts, name, value)
@@ -284,12 +284,6 @@ class AbstractExperimentController(Controller):
             setattr(object, name, value)
         self.old_values = {}
         self.pending_changes = {}
-
-    def _apply_circuit_change(self, name, value, circuit=None):
-        setattr(self.circuit, name, value)
-
-    def reset_current(self, value):
-        self._reset_current_settings = True
 
     ############################################################################
     # Method stubs to be implemented
