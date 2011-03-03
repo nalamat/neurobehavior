@@ -4,8 +4,8 @@ from os.path import dirname, join, abspath
 BASE_DIRECTORIES = {
         'REGINA'        : 'E:/',            # In 1016
         'DFNKWCH1'      : 'C:/EXPERIMENTS', # In 1012
-        'SEMPLE'        : None,
-        'ROSENLAB'      : 'C:/EXPERIMENTS',
+        'SEMPLE'        : None,             # Placeholder for Mal's computer
+        'ROSENLAB'      : 'C:/EXPERIMENTS', # Merri's NEOUCOM computer
         'PHOENIX-NYU'   : 'C:/users/brad/workspace/neurobehavior_base',
         }
 
@@ -13,13 +13,16 @@ BASE_DIRECTORY = BASE_DIRECTORIES[os.getenv('COMPUTERNAME')]
 LOG_ROOT    = join(BASE_DIRECTORY, 'logs') # where log files should be stored
 TEMP_ROOT   = join(BASE_DIRECTORY, 'temp') # location for temporary files
 DATA_ROOT   = join(BASE_DIRECTORY, 'data') # location for data files
-COHORT_PATH = DATA_ROOT                    # location for cohort files
+COHORT_ROOT = DATA_ROOT                    # location for cohort files
 
 # __file__ is a special variable that is available in all Python files (when
 # loaded by the Python interpreter) that contains the file path.  We extract the
 # directory portion of the path and use that to determine where the RCX files
 # are stored.
-RCX_PATH = join(abspath(dirname(__file__), '../components')
+RCX_ROOT = join(abspath(dirname(__file__)), '../components')
+TDT_AUDIO = 'RZ6'
+TDT_BEHAVIOR = 'RZ6'
+TDT_PHYSIOLOGY = 'RZ5'
 
 # extension to use for cohort files
 COHORT_WILDCARD = 'Cohort files (*.cohort.hd5)|*.cohort.hd5|'

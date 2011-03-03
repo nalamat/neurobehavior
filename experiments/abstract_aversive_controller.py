@@ -41,7 +41,7 @@ class AbstractAversiveController(AbstractExperimentController,
         # little (i.e. it needs to use different microcode and the microcode
         # does not contain int and trial buffers).
         circuit = join(RCX_ROOT, 'aversive-behavior')
-        self.iface_behavior = DSPCircuit(circuit, 'RX6')
+        self.iface_behavior = DSPCircuit(circuit, 'RZ6')
         self.buffer_trial = self.iface_behavior.get_buffer('trial', 'w')
         self.buffer_int = self.iface_behavior.get_buffer('int', 'w')
         self.buffer_TTL = self.iface_behavior.get_buffer('TTL', 'r',
@@ -143,7 +143,7 @@ class AbstractAversiveController(AbstractExperimentController,
             if self.state == 'manual':
                 self.pause()
                 par = self.current_remind.parameter
-                self.model.data.log_trial(ts_start, par, 'remind', ts_end)
+                self.model.data.log_trial(ts_start, ts_end, par, 'remind')
                 self.update_warn()
             else:
                 last_trial = self.current_trial
@@ -156,7 +156,7 @@ class AbstractAversiveController(AbstractExperimentController,
                     # signal.
                     log.debug('processing warning trial')
                     par = self.current_warn.parameter
-                    self.model.data.log_trial(ts_start, par, 'warn', ts_end)
+                    self.model.data.log_trial(ts_start, ts_end, par, 'warn')
                     self.current_num_safe = self.choice_num_safe()
                     self.current_warn = self.choice_setting.next()
 
@@ -170,7 +170,7 @@ class AbstractAversiveController(AbstractExperimentController,
                 elif last_trial <= self.current_num_safe: 
                     # The last trial was a safe trial
                     par = self.current_warn.parameter
-                    self.model.data.log_trial(ts_start, par, 'safe', ts_end)
+                    self.model.data.log_trial(ts_start, ts_end, par, 'safe')
                 else:
                     # Something bad happened.  We should never end up in this
                     # situation, so if we do this means that it is likely an
@@ -258,10 +258,10 @@ class AbstractAversiveController(AbstractExperimentController,
             self.current_num_safe = self.choice_num_safe()
 
     def set_safe(self, value):
-        self.current_safe = value
+        self.current_safe = deepcopy(value)
 
     def set_remind(self, value):
-        self.current_remind = value
+        self.current_remind = deepcopy(value)
 
     def set_prevent_disarm(self, value):
         self.iface_behavior.set_tag('no_disarm', value)
