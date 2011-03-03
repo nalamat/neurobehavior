@@ -20,7 +20,7 @@ from cns.chaco.channel_data_range import ChannelDataRange
 from cns.chaco.ttl_plot import TTLPlot
 from cns.chaco.timeseries_plot import TimeseriesPlot
 from cns.chaco.dynamic_bar_plot import DynamicBarPlot, DynamicBarplotAxis
-from cns.chaco.helpers import add_default_grids
+from cns.chaco.helpers import add_default_grids, add_time_axis
 
 colors = {'light green': '#98FB98',
           'dark green': '#2E8B57',
@@ -122,13 +122,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
                 rect_height=0.2)
 
         add_default_grids(plot, major_index=5, minor_index=1)
-
-        tick_formatter = lambda s: "{0}:{1:02}".format(*divmod(int(s), 60))
-        axis = PlotAxis(component=plot, orientation="top",
-                title="Time(min:sec)",
-                tick_label_formatter=tick_formatter)
-        plot.underlays.append(axis)
-
+        add_time_axis(plot, orientation='top')
         container.add(plot)
 
         plots["Spout Contact"] = plot
@@ -204,7 +198,6 @@ class AbstractPositiveExperiment(AbstractExperiment):
                 value_mapper=value_mapper, index_mapper=index_mapper)
         index_range.add(plot.index)
         value_range.add(plot.value)
-
 
         add_default_grids(plot, major_value=5)
         axis = DynamicBarplotAxis(plot, orientation='bottom',

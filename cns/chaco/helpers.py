@@ -1,4 +1,4 @@
-from enthought.chaco.api import PlotGrid
+from enthought.chaco.api import PlotGrid, PlotAxis
 
 def add_default_grids(plot, 
         major_index=None,
@@ -33,3 +33,9 @@ def add_default_grids(plot,
                 line_color='lightgray',
                 grid_interval=minor_value)
         plot.underlays.append(grid)
+
+def add_time_axis(plot, orientation='bottom'):
+    tick_formatter = lambda s: "{0}:{1:02}".format(*divmod(int(s), 60))
+    axis = PlotAxis(component=plot, orientation='top', title="Time (min:sec)",
+            tick_label_formatter=tick_formatter)
+    plot.underlays.append(axis)
