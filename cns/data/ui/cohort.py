@@ -44,7 +44,7 @@ class CohortEditor(TableEditor):
 
 class CohortViewHandler(FileHandler):
 
-    path            = File(cns.COHORT_PATH)
+    path            = File(cns.COHORT_ROOT)
     wildcard        = Str(cns.COHORT_WILDCARD)
     modified_trait  = '_modified'
 

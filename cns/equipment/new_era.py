@@ -2,6 +2,8 @@
 
 import re
 import logging
+import serial
+
 log = logging.getLogger(__name__)
 
 #####################################################################
@@ -10,12 +12,15 @@ log = logging.getLogger(__name__)
 
 class PumpError(BaseException):
 
-    def __init__(self, code, cmd=''):
+    def __init__(self, code, mesg=None):
         self.code = code
-        self.cmd = cmd
+        self.mesg = mesg
 
     def __str__(self):
-        return '%s\n\n%s: %s' % (self._todo, self.cmd, self._mesg[self.code])
+        result = '%s\n\n%s' % (self._todo, self._mesg[self.code]) 
+        if self.mesg is not None:
+            result += ' ' + self.mesg
+        return result
 
 class PumpCommError(PumpError):
     '''Handles error messages resulting from problems with communication via the
@@ -31,6 +36,7 @@ class PumpCommError(PumpError):
             # Custom codes
             'NR'    : 'No response from pump',
             'SER'   : 'Unable to open serial port',
+            'UNK'   : 'Unknown error',
             }
 
     _todo = 'Unable to connect to pump.  Please ensure that no other ' + \
@@ -64,23 +70,7 @@ class PumpUnitError(Exception):
         mesg = '%s: Expected units in %s, receved %s'
         return mesg % (self.cmd, self.expected, self.actual)
 
-try:
-    import serial
-    connection_settings = dict(port=0, baudrate=19200, bytesize=8, parity='N',
-            stopbits=1, timeout=.05, xonxoff=0, rtscts=0, writeTimeout=1,
-            dsrdtr=None, interCharTimeout=None)
-    SERIAL = serial.Serial(**connection_settings)
-except serial.SerialException, e:
-    pass
-
 class PumpInterface(object):
-
-    # The Syringe Pump uses a standard 8N1 frame with a default baud rate of
-    # 19200.  These are actually the default parameters when calling the command
-    # to init the serial port, but I define them here for clarity.
-    connection_settings = dict(port=0, baudrate=19200, bytesize=8, parity='N',
-            stopbits=1, timeout=1, xonxoff=0, rtscts=0, writeTimeout=1,
-            dsrdtr=None, interCharTimeout=None)
 
     #####################################################################
     # Basic information required for creating and parsing RS-232 commands
@@ -90,19 +80,21 @@ class PumpInterface(object):
     # transmission between pump and computer.
     ETX = '\x03'    # End of packet transmission
     STX = '\x02'    # Start of packet transmission
-    CR = '\x0D'    # Carriage return
+    CR  = '\x0D'    # Carriage return
+
+    # The Syringe Pump uses a standard 8N1 frame with a default baud rate of
+    # 19200.  These are actually the default parameters when calling the command
+    # to init the serial port, but I define them here for clarity (especially if
+    # they ever change in the future).
+    connection_settings = dict(port=0, baudrate=19200, bytesize=8, parity='N',
+            stopbits=1, timeout=.05, xonxoff=0, rtscts=0, writeTimeout=1,
+            dsrdtr=None, interCharTimeout=None)
 
     _status = dict(I='infusing', W='withdrawing', S='halted', P='paused',
                    T='in timed pause', U='waiting for trigger', X='purging')
 
     # The response from the pump always includes a status flag which indicates
     # the pump state (or error).  We'll store the "latest" response from the
-    # pump in _cur_status to get an idea of what the state is if we ever need
-    # it.  Use with caution though, as the state of the pump is also controlled
-    # by external factors (e.g. the spout contact circuit) so it could have
-    # changed since the last time the pump was polled.
-    _cur_status = None
-
     # Response is in the format <STX><address><status>[<data>]<ETX>
     _basic_response = re.compile(STX + '(?P<address>\d+)' + \
                                        '(?P<status>[IWSPTUX]|A\?)' + \
@@ -146,6 +138,8 @@ class PumpInterface(object):
             'AL 1',
             ]
 
+    ser = serial.Serial(**connection_settings)
+
     #####################################################################
     # Special functions for controlling pump
     #####################################################################
@@ -157,7 +151,7 @@ class PumpInterface(object):
         try: self.ser.close()
         except: pass
         try:
-            self.ser = SERIAL
+            self.ser.open()
             for cmd in self._connect_seq:
                 try:
                     self.xmit(cmd)
@@ -177,10 +171,11 @@ class PumpInterface(object):
             # of concern so we reraise them.
             if e.code != 'R':
                 raise
-        except NameError:
+        except NameError, e:
             # Raised when it cannot find the global name 'SERIAL' (which
             # typically indicates a problem connecting to COM1).  Let's
             # translate this to a human-understandable error.
+            print e
             raise PumpCommError('SER')
 
     def disconnect(self):
@@ -197,7 +192,7 @@ class PumpInterface(object):
 
         To make the pump continuosly dispense 10 mL at a rate of 1 mL/min:
 
-        >>>  pump.run(trigger='start', volume=10, rate=1.0) will cause the pump
+        >>>  pump.run(trigger='start', volume=10, rate=1.0) 
         '''
         for k, v in kw.items():
             setattr(self, k, v)
@@ -214,10 +209,9 @@ class PumpInterface(object):
         the TTL logic controls the pump (also change rate while an animal is
         drinking).
 
-        ..note:: 
-            This handling does not factor in TTL modes where a low or falling
-            edge is meant to START the pump (not stop it).  Right now we do not
-            have a need for this, so I will not worry about it.
+        This handling does not factor in TTL modes where a low or falling edge
+        is meant to start the pump (not stop it).  Right now we do not have a
+        need for this, so I will not worry about it.
         '''
         # Some changes to properties are stored in volatile memory if the pump
         # is currently executing a program.  Once the pump stops (e.g. if the
@@ -310,7 +304,6 @@ class PumpInterface(object):
         # in volatile memory remains in effect.  It isn't until you hit a button
         # on the keypad or power-cycle the pump that the pump reverts to the old
         # rate.
-
         if rate < 0: 
             self.direction = 'withdraw'
         else: 
@@ -358,14 +351,14 @@ class PumpInterface(object):
         else: raise PumpCommError('', 'IN 2')
 
     # The actual property definitions
-    infused = property(_get_infused)
-    withdrawn = property(_get_withdrawn)
-    volume = property(_get_volume, _set_volume)
-    direction = property(_get_direction, _set_direction)
-    rate = property(_get_rate, _set_rate)
-    diameter = property(_get_diameter, _set_diameter)
-    trigger = property(_get_trigger, _set_trigger)
-    TTL = property(_get_ttl)
+    infused     = property(_get_infused)
+    withdrawn   = property(_get_withdrawn)
+    volume      = property(_get_volume, _set_volume)
+    direction   = property(_get_direction, _set_direction)
+    rate        = property(_get_rate, _set_rate)
+    diameter    = property(_get_diameter, _set_diameter)
+    trigger     = property(_get_trigger, _set_trigger)
+    TTL         = property(_get_ttl)
 
     #####################################################################
     # RS232 functions
@@ -395,13 +388,13 @@ class PumpInterface(object):
         '''
         self.ser.write(cmd + self.CR)
         result = self.readline()
-
         if result == '':
             raise PumpCommError('NR', cmd)
         match = self._basic_response.match(result)
+        if match is None:
+            raise PumpCommError('NR')
         if match.group('status') == 'A?':
             raise PumpHardwareError(match.group('data'), cmd)
         elif match.group('data').startswith('?'):
             raise PumpCommError(match.group('data')[1:], cmd)
-        self.cur_status = match.group('status')
         return match.group('data')

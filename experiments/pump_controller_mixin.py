@@ -5,6 +5,8 @@ from enthought.traits.api import Instance, Bool, HasTraits, Button
 from enthought.savage.traits.ui.svg_button import SVGButton
 from cns.widgets import icons
 
+from cns.equipment.new_era import PumpInterface
+
 class PumpToolBar(ToolBar):
     '''
     Toolbar containing command buttons that allow us to control the pump via a
@@ -24,12 +26,6 @@ class PumpToolBar(ToolBar):
     pump_shutdown    = SVGButton(filename=icons.stop, tooltip='Shutdown',
                                  **kw)
     item_kw          = dict()
-    #pump_increase    = Button('+')
-    #pump_decrease    = Button('-')
-    #pump_override    = Button('O')
-    #pump_initialize  = Button('I')
-    #pump_shutdown    = Button('W')
-    #item_kw          = dict(width= -24, height= -24)
 
     traits_view = View(
             HGroup(Item('pump_override', **item_kw),
@@ -38,13 +34,12 @@ class PumpToolBar(ToolBar):
                    enabled_when="object.handler.state<>'halted'",
                    show_labels=False,
                    ),
-            #kind='subpanel'
             )
 
 class PumpControllerMixin(HasTraits):
 
     pump_toolbar = Instance(PumpToolBar, (), toolbar=True)
-    iface_pump = Instance('cns.equipment.new_era.PumpInterface', ())
+    iface_pump   = Instance(PumpInterface, ())
 
     def monitor_pump(self):
         self.current_volume_dispensed = self.iface_pump.infused

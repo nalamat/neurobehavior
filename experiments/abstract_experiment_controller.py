@@ -1,7 +1,7 @@
 from copy import deepcopy
 from datetime import datetime, timedelta
 
-from enthought.pyface.api import error
+from enthought.pyface.api import error, confirm, YES
 from enthought.pyface.timer.api import Timer
 from enthought.etsconfig.api import ETSConfig
 from enthought.traits.api import Any, Instance, Enum, Dict, on_trait_change, \
@@ -37,17 +37,6 @@ class ExperimentToolBar(ToolBar):
     remind  = SVGButton('Remind', filename=icons.warn,
                         tooltip='Remind', **kw)
     item_kw = dict(show_label=False)
-    # The WX backend renderer for SVG buttons is ugly, so let's use text
-    # buttons instead.  Eventually I'd like to unite these under ONE
-    # backend.
-    #apply   = Button('A', action=True)
-    #revert  = Button('R', action=True)
-    #start   = Button('>>', action=True)
-    #pause   = Button('||', action=True)
-    #resume  = Button('>', action=True)
-    #stop    = Button('X', action=True)
-    #remind  = Button('!', action=True)
-    #item_kw = dict(show_label=False, height=-size[0], width=-size[1])
 
     traits_view = View(
             HGroup(Item('apply',
@@ -113,26 +102,21 @@ class AbstractExperimentController(Controller):
     The controller listens for changes to paradigm parameters.  All requested
     changes are intercepted and cached.  If a parameter is changed several times
     (before applying or reverting), the cache is updated with the most recent
-    value.  To make a parameter configurable during an experiment it must
-    either:
-    - Have a function handler named `_apply_<parameter name>` that takes the new
-      value of the parameter and performs the necessary logic to update the
-      experiment state.
-    - Have an entry in `parameter_map` 
+    value.  To make a parameter configurable during an experiment it must have a
+    function handler named `_apply_<parameter name>` that takes the new value of
+    the parameter and performs the necessary logic to update the experiment
+    state.
 
-    If both methods of configuring a parameter are present, the first method
-    encountered (i.e. `_apply_<parameter name>`) takes precedence.  If the
-    change is not allowed, a warning will be raised (but the handler will
+    If the change is not allowed, a warning will be raised (but the handler will
     continue running).  If a parameter is not configurable, be sure to set the
-    view accordingly (e.g. hide or disable the field).
+    view accordingly (e.g. hide or disable the field) so the user knows why the
+    change isn't getting applied.
 
     Very important!  To ensure that your controller logic ties in cleanly with
     the apply/revert mechanism, never read values directly from the paradigm
     itself.  Always make a copy of the variable and store it elsewhere (e.g. in
     the controller object) and create an apply handler to update the copy of the
     variable from the paradigm.
-
-    Typically handlers need to work closely with a DSP device.
     """
 
     toolbar = Instance(ExperimentToolBar, (), toolbar=True)
@@ -182,11 +166,14 @@ class AbstractExperimentController(Controller):
         data is not saved to file until the stop button is pressed.
         '''
         if self.state not in ('disconnected', 'halted', 'complete'):
-            mesg = 'Please halt experiment before attempting to close window.'
-            error(info.ui.control, mesg)
-            return False
+            mesg = 'Experiment is still running.  Are you sure you want to exit?'
+            if confirm(info.ui.control, mesg) == YES:
+                self.stop(info)
+                return True
+            else:
+                return False
         else:
-            return True    
+            return True
 
     def start(self, info=None):
         '''
@@ -231,9 +218,8 @@ class AbstractExperimentController(Controller):
     ############################################################################
     # Apply/Revert code
     ############################################################################
-    deferred_changes = List
-    pending_changes = Dict({})
-    old_values = Dict({})
+    pending_changes     = Dict({})
+    old_values          = Dict({})
 
     def init_paradigm(self, paradigm):
         '''

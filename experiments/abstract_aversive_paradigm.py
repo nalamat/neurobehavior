@@ -5,7 +5,7 @@ from enthought.traits.ui.api import VGroup, Item, HGroup, View, Include, \
 
 from cns import choice
 
-from trial_setting import TrialShockSetting, table_editor
+from trial_setting import TrialSetting, trial_setting_editor
 from abstract_experiment_paradigm import AbstractExperimentParadigm
 from pump_paradigm_mixin import PumpParadigmMixin
 
@@ -20,13 +20,13 @@ class AbstractAversiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
     # options
     order         = Trait('descending', choice.options, store='attribute',
                           init=True)
-    warn_sequence = List(Instance(TrialShockSetting), minlen=1,
+    warn_sequence = List(Instance(TrialSetting), minlen=1,
                          store='child', init=True)
-    remind        = Instance(TrialShockSetting, (), store='child', init=True)
-    safe          = Instance(TrialShockSetting, (), store='child', init=True)
+    remind        = Instance(TrialSetting, (), store='child', init=True)
+    safe          = Instance(TrialSetting, (), store='child', init=True)
 
     def _warn_sequence_default(self):
-        return [TrialShockSetting()]
+        return [TrialSetting()]
 
     prevent_disarm = Bool(True, store='attribute', init=True)
 
@@ -62,7 +62,8 @@ class AbstractAversiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
             VGroup(
                 Item('order', label='Order'),
                 HGroup(
-                    Item('warn_sequence', show_label=False, editor=table_editor)
+                    Item('warn_sequence', show_label=False,
+                         editor=trial_setting_editor)
                     ),
                 show_border=True, 
                 label='Warn'

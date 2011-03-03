@@ -1,7 +1,7 @@
 from enthought.etsconfig.api import ETSConfig
 ETSConfig.toolkit='qt4'
 
-from enthought.pyface.api import error
+from enthought.pyface.api import error, information
 from cns.data.ui.cohort import CohortView, CohortViewHandler
 from cns.data import persistence
 from cns.data.h5_utils import get_or_append_node
@@ -86,22 +86,34 @@ class ExperimentLauncher(CohortViewHandler):
                                        rootUEP=item.store_node_path)
                 animal_node = file.root
             
+            # Try to load settings from the last time the subject was run.  If
+            # we cannot load the settings for whatever reason, notify the user
+            # and fall back to the default settings.
             store_node = get_or_append_node(animal_node, 'experiments')
             paradigm_node = get_or_append_node(store_node, 'last_paradigm')
             paradigm_name = etype.__name__
+            paradigm = None
             try:
                 paradigm = persistence.load_object(paradigm_node, paradigm_name)
             except tables.NoSuchNodeError:
-                log.debug('No prior paradigm found.  Creating new paradigm.')
-                paradigm = None
+                mesg = 'No prior paradigm found.  Creating new paradigm.'
+                log.debug(mesg)
+                information(info.ui.control, mesg)
             except TraitError, e:
-                log.debug('Prior paradigm found, but was unable to load.')
+                mesg = 'Unable to load prior settings.  Creating new paradigm.'
+                log.debug(mesg)
                 log.exception(e)
-                paradigm = None
+                error(info.ui.control, mesg)
             except ImportError, e:
-                log.debug('Old paradigm found, but could not be loaded')
+                mesg = 'Unable to load prior settings.  Creating new paradigm.'
+                log.debug(mesg)
                 log.exception(e)
-                paradigm = None
+                error(info.ui.control, mesg)
+            except persistence.PersistenceReadError, e:
+                mesg = 'Unable to load prior settings.  Creating new paradigm.'
+                log.debug(mesg)
+                log.exception(e)
+                error(info.ui.control, mesg)
                 
             model = etype(store_node=store_node, animal=item)
             

@@ -50,24 +50,6 @@ class AversiveNoiseMaskingController(AbstractAversiveController):
     def set_trial_duration(self, value):
         self.current_trial_duration = value
 
-    def init_equipment(self):
-        # Handle to the circuit itself.  You need to provide the absolute or
-        # relative path to the circuit itself.  If you launch the program from
-        # the "root" directory (i.e. <path_to_neurobehavior> where components is
-        # a subfolder) this will work.
-        circuit = os.path.join(RCX_ROOT, 'aversive-behavior-masking_RX6')
-        self.iface_behavior = DSPCircuit(circuit, 'RX6')
-
-        # Handlers to the data buffers on the RZ6
-        self.buffer_TTL = self.iface_behavior.get_buffer('TTL','r',
-                src_type='int8', dest_type='int8', block_size=24)
-        self.buffer_contact = self.iface_behavior.get_buffer('contact','r',
-                src_type='int8', dest_type='float32', block_size=24)
-
-        # Handles to the trial and intertrial signal buffers on the RZ6
-        self.buffer_trial = self.iface_behavior.get_buffer('trial','w')
-        self.buffer_int = self.iface_behavior.get_buffer('int','w')
-
     def update_safe(self):
         waveform = self.compute_waveform(self.current_safe.parameter,
                                          position=0)
