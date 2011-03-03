@@ -4,8 +4,7 @@ from enthought.traits.api import Instance, on_trait_change
 from enthought.traits.ui.api import View, Item, VGroup, HGroup, HSplit, Tabbed
 from enthought.enable.api import Component, ComponentEditor
 from enthought.chaco.api import DataRange1D, LinearMapper, PlotLabel, \
-        VPlotContainer, PlotAxis, PlotGrid, add_default_grids, \
-        OverlayPlotContainer, Legend, ToolTip
+        VPlotContainer, PlotAxis, OverlayPlotContainer, Legend, ToolTip
 
 from aversive_data import RawAversiveData as AversiveData
 from aversive_data import AnalyzedAversiveData
@@ -14,6 +13,7 @@ from cns.chaco.channel_data_range import ChannelDataRange
 from cns.chaco.channel_plot import ChannelPlot
 from cns.chaco.ttl_plot import TTLPlot
 from cns.chaco.dynamic_bar_plot import DynamicBarPlot, DynamicBarplotAxis
+from cns.chaco.helpers import add_default_grids, add_time_axis
 
 from abstract_experiment import AbstractExperiment
 from abstract_aversive_paradigm import AbstractAversiveParadigm
@@ -81,22 +81,8 @@ class AbstractAversiveExperiment(AbstractExperiment):
         container.add(plot)
 
         # Add axes and grids to the first plot
-        grid = PlotGrid(mapper=plot.index_mapper, component=plot,
-                orientation='vertical', line_color='lightgray',
-                line_style='dot', grid_interval=0.25)
-        plot.underlays.append(grid)
-        grid = PlotGrid(mapper=plot.index_mapper, component=plot,
-                orientation='vertical', line_color='lightgray',
-                line_style='solid', grid_interval=1)
-        plot.underlays.append(grid)
-        axis = PlotAxis(component=plot, title="Time (s)",
-                        orientation="top", ticks_visible=True)
-        plot.overlays.append(axis)
-        tick_formatter = lambda s: "{0}:{1:02}".format(*divmod(int(s), 60))
-        axis = PlotAxis(component=plot, orientation="bottom",
-                title="Time(min:sec)",
-                tick_label_formatter=tick_formatter)
-        plot.underlays.append(axis)
+        add_default_grids(plot, minor_index=0.25, major_index=1)
+        add_time_axis(plot)
 
         self.experiment_plot = container
 
@@ -158,10 +144,7 @@ class AbstractAversiveExperiment(AbstractExperiment):
                 padding=50, fill_padding=True, bar_width=0.9,
                 value_mapper=value_mapper, index_mapper=index_mapper)
         index_range.add(plot.index)
-        grid = PlotGrid(mapper=plot.value_mapper, component=plot,
-                orientation='horizontal', line_color='lightgray',
-                line_style='dot', grid_interval=1)
-        plot.underlays.append(grid)
+        add_default_grids(plot, major_value=1)
         axis = DynamicBarplotAxis(plot, orientation='bottom',
                 source=self.analyzed, label_trait='pars', title='Parameter')
         plot.underlays.append(axis)
@@ -183,10 +166,7 @@ class AbstractAversiveExperiment(AbstractExperiment):
                 value_mapper=value_mapper, index_mapper=index_mapper)
         index_range.add(plot.index)
         value_range.add(plot.value)
-        grid = PlotGrid(mapper=plot.value_mapper, component=plot,
-                orientation='horizontal', line_color='lightgray',
-                line_style='dot', grid_interval=5)
-        plot.underlays.append(grid)
+        add_default_grids(plot, major_value=5)
         axis = DynamicBarplotAxis(plot, orientation='bottom',
                 source=self.analyzed, label_trait='pars', title='Parameter')
         plot.underlays.append(axis)
@@ -218,10 +198,7 @@ class AbstractAversiveExperiment(AbstractExperiment):
         label = PlotLabel(component=plot, text="FA (red) and Hit (black)")
         plot.underlays.append(label)
         
-        grid = PlotGrid(mapper=plot.value_mapper, component=plot,
-                orientation='horizontal', line_color='lightgray',
-                line_style='dot', grid_interval=0.2)
-        plot.underlays.append(grid)
+        add_default_grids(plot, major_value=0.2)
         chart.add(plot)
 
         plot = DynamicBarPlot(source=self.analyzed, label_trait='pars',

@@ -51,7 +51,6 @@ class AbstractAversiveController(AbstractExperimentController,
 
     def start_experiment(self, info):
         self.init_equipment()
-        self.init_pump(info)
         self.init_paradigm(self.model.paradigm)
 
         # Ensure that sampling frequencies are stored properly

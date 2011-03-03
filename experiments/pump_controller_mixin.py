@@ -44,14 +44,6 @@ class PumpControllerMixin(HasTraits):
     def monitor_pump(self):
         self.current_volume_dispensed = self.iface_pump.infused
 
-    def init_pump(self, info=None):
-        '''
-        Initialize pump rate and syringe diameter
-        '''
-        self.set_pump_syringe_diameter(self.model.paradigm.pump_syringe_diameter)
-        self.set_pump_rate(self.model.paradigm.pump_rate)
-        self.set_pump_rate_delta(self.model.paradigm.pump_rate_delta)
-
     def pump_override(self, info):
         if self.iface_pump.trigger == 'run_high':
             self.iface_pump.run(trigger='start')

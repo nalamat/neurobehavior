@@ -55,7 +55,6 @@ class AbstractPositiveController(AbstractExperimentController,
     def start_experiment(self, info):
         # Load interface for the experiment
         log.debug("start_experiment")
-        self.init_pump()
 
         log.debug("initializing circuit")
         circuit = join(RCX_ROOT, 'positive-behavior')
