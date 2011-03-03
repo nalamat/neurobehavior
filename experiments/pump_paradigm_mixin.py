@@ -16,9 +16,9 @@ class PumpParadigmMixin(HasTraits):
     pump_rate = Float(0.5, store='attribute', init=True)
     pump_rate_delta = Float(0.025, store='attribute', init=True)
     pump_syringe = Enum(SYRINGE_DEFAULT, sorted(SYRINGE_DATA.keys()),
-                        store='attribute')
+            store='attribute')
     pump_syringe_diameter = Property(store='attribute',
-                                     depends_on='pump_syringe', init=True)
+            depends_on='pump_syringe', init=True)
 
     def _get_pump_syringe_diameter(self):
         return self.SYRINGE_DATA[self.pump_syringe]
