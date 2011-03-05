@@ -43,8 +43,11 @@ class PositiveExperimentToolBar(ExperimentToolBar):
             kind='subpanel',
             )
 
+from physiology_controller_mixin import PhysiologyControllerMixin
+
 class AbstractPositiveController(AbstractExperimentController,
-                                 PumpControllerMixin):
+                                 PumpControllerMixin,
+                                 PhysiologyControllerMixin):
 
     # Override default implementation of toolbar used by AbstractExperiment
     toolbar = Instance(PositiveExperimentToolBar, (), toolbar=True)
@@ -55,6 +58,7 @@ class AbstractPositiveController(AbstractExperimentController,
     def start_experiment(self, info):
         # Load interface for the experiment
         log.debug("start_experiment")
+        self.setup_physiology()
 
         log.debug("initializing circuit")
         circuit = join(RCX_ROOT, 'positive-behavior')
@@ -164,6 +168,7 @@ class AbstractPositiveController(AbstractExperimentController,
     def tick_fast(self):
         ts_end = self.get_trial_end_ts()
         self.pipeline_contact.send(self.buffer_TTL.read())
+        self.monitor_physiology()
         if ts_end > self.current_trial_end_ts:
             # Trial is over.  Process new data and set up for next trial.
             self.current_trial_end_ts = ts_end

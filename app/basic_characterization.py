@@ -150,7 +150,6 @@ class MedusaSettings(HasTraits):
         return tables.openFile('basic_characterization.h5', 'w')
 
     def _raw_data_default(self):
-        print 'getting raw data'
         return FileMultiChannel(channels=16, node=self.file.root,
                 name='raw_data', compression_level=0)
 
@@ -181,13 +180,8 @@ class MedusaSettings(HasTraits):
         plot.underlays.append(axis)
         plot.underlays.append(axis)
         self.plot = plot
-        #axis = PlotAxis(component=plot, orientation="left")
-        #plot.underlays.append(axis)
-        #axis = PlotAxis(component=plot, orientation="right")
-        #plot.underlays.append(axis)
         container.add(plot)
         return container
-
 
     traits_view = View(
             HSplit(
@@ -234,7 +228,6 @@ class MedusaController(Controller):
     
     def init(self, info=None):
         self.circuit = DSPProcess('components/physiology', 'RZ5')
-        print 'loaded circuit'
         self.buffer_raw = self.circuit.get_buffer('craw', 'r', src_type='int16',
                 dest_type='float32', channels=16) 
         self.model.raw_data.fs = self.buffer_raw.fs

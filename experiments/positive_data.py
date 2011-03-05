@@ -30,7 +30,28 @@ def apply_mask(fun, seq, mask):
 
 LOG_DTYPE = [('timestamp', 'i'), ('name', 'S64'), ('value', 'S128'), ]
 
-class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
+from enthought.traits.api import HasTraits
+from cns.channel import FileMultiChannel
+
+class PhysiologyDataMixin(HasTraits):
+
+    physiology_raw = Instance(FileMultiChannel, store='channel',
+            store_path='physiology/raw')
+    physiology_ts = Instance(FileChannel, store='channel',
+            store_path='physiology/ts')
+
+    def _physiology_raw_default(self):
+        physiology_node = get_or_append_node(self.store_node, 'physiology')
+        return FileMultiChannel(node=physiology_node, channels=16, name='raw',
+                dtype=np.float32)
+
+    def _physiology_ts_default(self):
+        physiology_node = get_or_append_node(self.store_node, 'physiology')
+        return FileChannel(node=physiology_node, channels=1, name='ts',
+                dtype=np.int32)
+
+class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData,
+        PhysiologyDataMixin):
 
     def get_data(self, name):
         return getattr(self, name)
@@ -41,7 +62,6 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
     version = 0.2
 
     store_node = Any
-    contact_fs = Float(500.0)
 
     contact_data = Any
 
@@ -69,8 +89,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
     def _create_channel(self, name, dtype):
         contact_node = get_or_append_node(self.store_node, 'contact')
-        return FileChannel(node=contact_node, fs=self.contact_fs,
-                           name=name, dtype=dtype)
+        return FileChannel(node=contact_node, name=name, dtype=dtype)
 
     def _poke_TTL_default(self):
         return self._create_channel('poke_TTL', np.bool)
