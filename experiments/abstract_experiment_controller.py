@@ -234,45 +234,50 @@ class AbstractExperimentController(Controller):
             getattr(self, 'set_' + trait_name)(value)
 
     @on_trait_change('model.paradigm.+')
-    def queue_change(self, object, name, old, new):
+    def queue_change(self, instance, name, old, new):
         if self.state <> 'halted':
-            key = object, name
-            if key not in self.old_values:
-                self.old_values[key] = old
-                self.pending_changes[key] = new
-            elif new == self.old_values[key]:
-                del self.pending_changes[key]
-                del self.old_values[key]
+            trait = self.model.paradigm.trait(name)
+            if trait.immediate == True:
+                print 'applying', name
+                self.apply_change(instance, name, new)
             else:
-                self.pending_changes[key] = new
+                key = instance, name
+                if key not in self.old_values:
+                    self.old_values[key] = old
+                    self.pending_changes[key] = new
+                elif new == self.old_values[key]:
+                    del self.pending_changes[key]
+                    del self.old_values[key]
+                else:
+                    self.pending_changes[key] = new
 
-    def apply_change(self, instance, name, info=None):
+    def apply_change(self, instance, name, value, info=None):
         '''
         Applies an individual change
         '''
         ts = self.get_ts()
-        value = self.pending_changes[(instance, name)]
         log.debug("Apply: setting %s:%s to %r", instance, name, value)
         try:
             getattr(self, 'set_'+name)(value)
             self.log_event(ts, name, value)
         except AttributeError:
-            mesg = "Can't set %s to %r", name, value
+            mesg = "Can't set %s to %r" % (name, value)
             # Notify the user
             error(info.ui.control, mesg)
             log.warn(mesg + ", removing from stack")
             # Set paradigm value back to "old" value
             setattr(self.model.paradigm, name, value)
-        del self.pending_changes[(instance, name)]
-        del self.old_values[(instance, name)]
 
     def apply(self, info=None):
         '''
         Called when Apply button is pressed.  Goes through all parameters that
         have changed and attempts to apply them.
         '''
-        for instance, name in self.pending_changes.keys():
-            self.apply_change(instance, name, info)
+        for key, value in self.pending_changes.items():
+            instance, name = key
+            self.apply_change(instance, name, value, info)
+            del self.pending_changes[key]
+            del self.old_values[key]
 
     def log_event(self, ts, name, value):
         log.debug("%d, %s, %r", ts, name, value)

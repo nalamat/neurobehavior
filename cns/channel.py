@@ -28,7 +28,6 @@ class Timeseries(HasTraits):
     t0 = Float(0)
 
     buffer = List([])
-    metadata = List([])
 
     def send(self, timestamps):
         #timestamps = np.array(timestamps)/self.fs
@@ -149,9 +148,6 @@ class Channel(HasTraits):
             ub = max(0, self.to_index(end)+ref_idx)
 
         return self.signal[..., lb:ub]
-        #lb_time = lb/self.fs + self.t0 - ref_idx/self.fs
-        #ub_time = lb_time + len(signal)/self.fs
-        #return signal, lb_time, ub_time
 
     def get_recent_range(self, start, end=0):
         '''
@@ -233,22 +229,19 @@ class FileChannel(Channel):
     Note that if compression_level is > 0 and compression_type is None,
     tables.Filter will raise an exception.
     '''
-    compression_level = Int(1)
-    compression_type = Enum('zlib', 'lzo', 'bzip', None)
-    use_checksum = Bool(False)
+    compression_level   = Int(9)
+    compression_type    = Enum('zlib', 'lzo', 'bzip', 'blosc', None)
+    use_checksum        = Bool(False)
     
-    # It is important to implement dtype appropriately, otherwise it defaults
-    # to float64 (double-precision float).
-    #dtype = Instance(type) # TODO: How do we restrict this to a dtype?
+    # It is important to implement dtype appropriately, otherwise it defaults to
+    # float64 (double-precision float).
     dtype = Any
 
-    node = Instance(tables.group.Group)
-    name = String('FileChannel')
-    expected_duration = Float(60) # seconds
-
-    shape = Property
-    
-    buffer = Instance(tables.array.Array)
+    node                = Instance(tables.group.Group)
+    name                = String('FileChannel')
+    expected_duration   = Float(1800) # seconds
+    shape               = Property
+    buffer              = Instance(tables.array.Array)
 
     def _get_shape(self):
         return (0,)
@@ -256,11 +249,10 @@ class FileChannel(Channel):
     def _buffer_default(self):
         atom = tables.Atom.from_dtype(np.dtype(self.dtype))
         filters = tables.Filters(complevel=self.compression_level,
-                                 complib=self.compression_type,
-                                 fletcher32=self.use_checksum)
+                complib=self.compression_type, fletcher32=self.use_checksum)
         buffer = append_node(self.node, self.name, 'EArray', atom, self.shape,
-                             expectedrows=int(self.fs*self.expected_duration),
-                             filters=filters)
+                expectedrows=int(self.fs*self.expected_duration),
+                filters=filters)
         buffer.setAttr('fs', self.fs)
         return buffer
 
@@ -372,11 +364,6 @@ class RAMMultiChannel(RAMChannel, MultiChannel):
 
     def _buffer_default(self):
         return np.empty((self.channels, self.samples))
-
-#class BufferedMultiChannel(BufferedChannel, MultiChannel):
-#
-#    def _buffer_default(self):
-#        return SoftwareRingBuffer((self.channels, self.samples))
 
 class FileMultiChannel(MultiChannel, FileChannel):
 

@@ -4,7 +4,7 @@ import numpy as np
 from enthought.traits.api import HasTraits, Any, Instance, DelegatesTo, \
         Int, Float, Property
 from enthought.traits.ui.api import View, Item, VGroup, HGroup, InstanceEditor,\
-    VSplit, HSplit, TabularEditor, Group, Include
+    VSplit, HSplit, TabularEditor, Group, Include, Tabbed
 
 from enthought.enable.api import Component, ComponentEditor
 
@@ -19,8 +19,21 @@ from enthought.chaco.api import DataRange1D, LinearMapper, PlotAxis, PlotGrid, \
 from cns.chaco.channel_data_range import ChannelDataRange
 from cns.chaco.ttl_plot import TTLPlot
 from cns.chaco.timeseries_plot import TimeseriesPlot
+from cns.chaco.extremes_channel_plot import ExtremesChannelPlot
 from cns.chaco.dynamic_bar_plot import DynamicBarPlot, DynamicBarplotAxis
 from cns.chaco.helpers import add_default_grids, add_time_axis
+
+from enthought.traits.ui.api import TableEditor, ObjectColumn, VGroup, Item
+from enthought.traits.ui.qt4.extra.bounds_editor import BoundsEditor
+
+monitor_editor = TableEditor(
+        show_row_labels=True,
+        sortable=False,
+        columns=[
+            ObjectColumn(name='number'),
+            ObjectColumn(name='gain'),
+            ]
+        )
 
 colors = {'light green': '#98FB98',
           'dark green': '#2E8B57',
@@ -30,7 +43,7 @@ colors = {'light green': '#98FB98',
           'light blue': '#ADD8E6',
           }
 
-from enthought.traits.ui.api import TableEditor, ListColumn
+from enthought.traits.ui.api import TableEditor, ListColumn, ObjectColumn
 
 class TrialTypeColumn(ListColumn):
 
@@ -79,7 +92,29 @@ trial_log_table = TableEditor(
             ]
         )
 
+from enthought.traits.ui.api import ListEditor
+
 class AbstractPositiveExperiment(AbstractExperiment):
+
+    def _raw_view_default(self):
+        container = OverlayPlotContainer(bgcolor='white', fill_padding=True,
+                padding=50)
+
+        index_range = ChannelDataRange(sources=[self.data.physiology_raw],
+                range=12,
+                interval=10)
+
+        index_mapper = LinearMapper(range=index_range)
+        value_range = DataRange1D(low_setting=-1.3e-3, high_setting=9.3e-3)
+        value_mapper = LinearMapper(range=value_range)
+
+    def _generate_physiology_plot(self):
+        plot = ExtremesChannelPlot(channel=self.data.physiology_raw,
+                index_mapper=index_mapper, value_mapper=value_mapper)
+
+        self.plot = plot
+        container.add(plot)
+        return container
 
     data = Instance(PositiveData)
     paradigm = Instance(AbstractPositiveParadigm, ())
@@ -181,6 +216,10 @@ class AbstractPositiveExperiment(AbstractExperiment):
         plot = TimeseriesPlot(series=self.data.timeout_end_timestamp,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 line_color='red', line_width=2, label="End TIMEOUT")
+        container.add(plot)
+
+        plot = ExtremesChannelPlot(channel=self.data.physiology_raw,
+                index_mapper=index_mapper, value_mapper=value_mapper)
         container.add(plot)
 
         self.experiment_plot = container
@@ -285,7 +324,9 @@ class AbstractPositiveExperiment(AbstractExperiment):
 
     plots_group = VGroup(
             Item('experiment_plot', editor=ComponentEditor(),
-                show_label=False, width=600, height=200),
+                show_label=False, width=600, height=400),
+            #Item('raw_view', editor=ComponentEditor(), 
+            #    show_label=False, width=600, height=200),
             HGroup(
                 Item('par_count_plot', editor=ComponentEditor(),
                     show_label=False, width=150, height=150),
@@ -312,12 +353,34 @@ class AbstractPositiveExperiment(AbstractExperiment):
             show_labels=False,
             )
 
+    physiology_group = VGroup(
+            VGroup(
+                HGroup(
+                    Item('object.paradigm.monitor_fc_highpass', label='Low'),
+                    Item('object.paradigm.monitor_fc_lowpass', label='High'),
+                    label='Bandpass Settings',
+                    show_border=True,
+                    ),
+                'object.paradigm.monitor_gain',
+                'object.paradigm.monitor_speaker',
+                'object.paradigm.monitor_1',
+                'object.paradigm.monitor_2',
+                'object.paradigm.monitor_3',
+                label='Monitor Settings',
+                show_border=True,
+                ),
+            )
+
     traits_group = HSplit(
             VGroup(
                 Item('handler.toolbar', style='custom'),
                 Include('pump_group'),
                 Include('status_group'),
-                Item('paradigm', style='custom', editor=InstanceEditor()),
+                Tabbed(
+                    Item('paradigm', style='custom', editor=InstanceEditor()),
+                    Include('physiology_group'),
+                    show_labels=False,
+                    ),
                 show_labels=False,
             ),
             Include('plots_group'),
@@ -326,18 +389,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
         )
     
     traits_view = View(
-            HSplit(
-                VGroup(
-                    Item('handler.toolbar', style='custom'),
-                    Include('pump_group'),
-                    Include('status_group'),
-                    Item('paradigm', style='custom', editor=InstanceEditor()),
-                    show_labels=False,
-                ),
-                Include('plots_group'),
-                Include('experiment_group'),
-                show_labels=False,
-                ),
+            Include('traits_group'),
             resizable=True,
             kind='live',
             handler=AbstractPositiveController)
