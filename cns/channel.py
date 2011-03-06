@@ -180,7 +180,8 @@ class Channel(HasTraits):
         '''
         Returns valid range of times as a tuple (lb, ub)
         '''
-        return self.t0, self.t0 + self.signal.shape[-1]/self.fs
+        #return self.t0, self.t0 + self.signal.shape[-1]/self.fs
+        return self.t0, self.t0 + self.get_size()/self.fs
 
     def filter(self, filter):
         raise NotImplementedException
@@ -202,7 +203,7 @@ class FileChannel(Channel):
         that Matlab does not currently support the HDF5 BITFIELD (e.g. boolean)
         type and will be unable to read waveforms stored in this format.
     node
-        A HDF5 node that the array should be added to
+        A HDF5 node that will host the array
     name
         Name of the array
     expected_duration
@@ -282,16 +283,16 @@ class RAMChannel(Channel):
         Number of seconds to buffer
     '''
 
-    window = Float(10)
+    window  = Float(30)
     samples = Property(Int, depends_on='window, fs')
+    t0      = Property(depends_on="offset, fs")
 
     buffer = Array
     offset = Int(0)
     dropped = Int(0)
 
     partial_idx = 0
-
-    t0 = Property(depends_on="offset, fs")
+    buffer_full = False
 
     @cached_property
     def _get_t0(self):
@@ -303,6 +304,13 @@ class RAMChannel(Channel):
 
     def _buffer_default(self):
         return np.empty(self.samples)
+
+    def _samples_changed(self):
+        self.buffer = np.empty(self.samples)
+        self.offset = 0
+        self.dropped = 0
+        self.partial_idx = 0
+        self._write = self._partial_write
 
     def _get_signal(self):
         return self.buffer
@@ -321,9 +329,10 @@ class RAMChannel(Channel):
         elif self.partial_idx+size > self.samples:
             overflow = (self.partial_idx+size)-self.samples
             remainder = size-overflow
-            self.buffer[... ,self.partial_idx:] = data[..., :remainder]
+            self.buffer[..., self.partial_idx:] = data[..., :remainder]
             del self.partial_idx
             self._write = self._full_write
+            self.buffer_full = True
             self._write(data[..., -overflow:])
         else:
             self.buffer[..., self.partial_idx:self.partial_idx+size] = data
@@ -349,6 +358,12 @@ class RAMChannel(Channel):
 
     _write = _partial_write
 
+    def get_size(self):
+        if self.buffer_full:
+            return self.samples
+        else:
+            return self.partial_idx
+
 class MultiChannel(Channel):
 
     channels = Int(8)
@@ -364,6 +379,13 @@ class RAMMultiChannel(RAMChannel, MultiChannel):
 
     def _buffer_default(self):
         return np.empty((self.channels, self.samples))
+
+    def _samples_changed(self):
+        self.buffer = np.empty((self.channels, self.samples))
+        self.offset = 0
+        self.dropped = 0
+        self.partial_idx = 0
+        self._write = self._partial_write
 
 class FileMultiChannel(MultiChannel, FileChannel):
 

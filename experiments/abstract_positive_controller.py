@@ -1,8 +1,9 @@
 from functools import partial
 
-from enthought.traits.api import Str, Property, Float, on_trait_change, Instance
+from enthought.traits.api import Str, Property, Float, on_trait_change, \
+        Instance, Any
 from enthought.traits.ui.api import View, Item, HGroup, spring
-from tdt import DSPCircuit
+from tdt import DSPProcess
 from pump_controller_mixin import PumpControllerMixin
 from abstract_experiment_controller import AbstractExperimentController
 from abstract_experiment_controller import ExperimentToolBar
@@ -55,14 +56,15 @@ class AbstractPositiveController(AbstractExperimentController,
     water_infused = Float(0)
     status = Property(Str, depends_on='state, current_trial, current_num_nogo')
 
-    def start_experiment(self, info):
-        # Load interface for the experiment
-        log.debug("start_experiment")
-        self.setup_physiology()
+    process = Any
+    
+    def setup_process(self):
+        self.process = DSPProcess()
 
-        log.debug("initializing circuit")
+    def setup_behavior(self):
         circuit = join(RCX_ROOT, 'positive-behavior')
-        self.iface_behavior = DSPCircuit(circuit, 'RZ6')
+        self.iface_behavior = self.process.load_circuit(circuit, 'RZ6')
+
         self.buffer_signal = self.iface_behavior.get_buffer('speaker', 'w')
         self.buffer_TTL = self.iface_behavior.get_buffer('TTL', 'r',
                 src_type=np.int8, dest_type=np.int8, block_size=24)
@@ -71,6 +73,13 @@ class AbstractPositiveController(AbstractExperimentController,
                 src_type=np.int32, block_size=1)
         self.buffer_to_end_TS = self.iface_behavior.get_buffer('TO\\', 'r',
                 src_type=np.int32, block_size=1)
+
+    def start_experiment(self, info):
+        # Load interface for the experiment
+        self.setup_process()
+        self.setup_behavior()
+        self.setup_physiology()
+        self.process.start()
 
         log.debug("initializing paradigm")
         self.init_paradigm(self.model.paradigm)
@@ -99,7 +108,7 @@ class AbstractPositiveController(AbstractExperimentController,
 
         log.debug("starting")
         self.state = 'running'
-        self.iface_behavior.start()
+        #self.iface_behavior.start()
         self.iface_behavior.trigger('A', 'high')
         self.trigger_next()
 
@@ -167,7 +176,7 @@ class AbstractPositiveController(AbstractExperimentController,
 
     def tick_fast(self):
         ts_end = self.get_trial_end_ts()
-        self.pipeline_contact.send(self.buffer_TTL.read())
+        self.pipeline_contact.send(self.buffer_TTL.read().astype('i'))
         self.monitor_physiology()
         if ts_end > self.current_trial_end_ts:
             # Trial is over.  Process new data and set up for next trial.

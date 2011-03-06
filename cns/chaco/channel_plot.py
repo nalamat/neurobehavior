@@ -17,7 +17,6 @@ class ChannelPlot(BaseXYPlot):
     line_color              = black_color_trait
     line_width              = Float(1.0)
     line_style              = LineStyle
-    reference               = Float(-1.0)
     data_changed            = Event
     _data_cache_valid       = Bool(False)
     _screen_cache_valid     = Bool(False)
@@ -111,6 +110,7 @@ class ChannelPlot(BaseXYPlot):
             print len(idx), len(val)
 
     def _data_changed(self):
+        #print "DATA CHANGE"
         self.invalidate_draw()
         self._data_cache_valid = False
         self.request_redraw()
