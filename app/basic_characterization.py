@@ -42,18 +42,6 @@ class MonitorSetting(HasTraits):
     def __len__(self):
         return 1
 
-from enthought.traits.ui.api import TableEditor, ObjectColumn
-from enthought.traits.ui.extras.checkbox_column import CheckboxColumn
-
-channel_editor = TableEditor(
-        show_row_labels=True,
-        sortable=False,
-        columns=[
-            ObjectColumn(name='number', editable=False, width=10, label=''),
-            CheckboxColumn(name='visible', width=10, label=''), 
-            ObjectColumn(name='differential'),
-            ]
-        )
 
 monitor_editor = TableEditor(
         show_row_labels=True,
@@ -65,36 +53,7 @@ monitor_editor = TableEditor(
             ]
         )
 
-def to_list(string):
-    '''
-    Converts a string to a list of integers
-
-    >>> to_list('11')
-    [11]
-
-    >>> to_list('1-4')
-    [1, 2, 3, 4]
-
-    >>> to_list('1, 3-6')
-    [1, 3, 4, 5, 6]
-
-    >>> to_list('1, 3-4, 10')
-    [1, 3, 4, 10]
-
-    >>> to_list('1, 3 - 4, 10')
-    [1, 3, 4, 10]
-    '''
-    elements = [s.strip() for s in string.split(',')]
-    indices = []
-    for element in elements:
-        if '-' in element:
-            lb, ub = [int(e.strip()) for e in element.split('-')]
-            indices.extend(range(lb, ub+1))
-        elif element == '':
-            pass
-        else:
-            indices.append(int(element))
-    return indices
+from cns.util import to_list
 
 from enthought.enable.api import Component, ComponentEditor
 from enthought.traits.ui.api import TextEditor
@@ -113,10 +72,8 @@ class MedusaSettings(HasTraits):
     raw_plot            = Instance(ExtremesChannelPlot)
     index_range         = Instance(ChannelDataRange)
 
-
     def set_visible_channels(self, value):
         self.model.raw_plot.visible = value
-
 
     # We can monitor up to four channels.  These map to DAC outputs 9, 10, 11
     # and 12 on the RZ5.  The first output (9) also goes to the speaker.
@@ -136,29 +93,6 @@ class MedusaSettings(HasTraits):
 
     def _channel_settings_default(self):
         return [ChannelSetting(number=i) for i in range(1, 17)]
-
-    # List of the channels visible in the plot
-    visible_channels = Property(depends_on='channel_settings.visible')
-
-    @cached_property
-    def _get_visible_channels(self):
-        return [i for i, ch in enumerate(self.channel_settings) if ch.visible]
-
-    # Generates the matrix that will be used to compute the differential for the
-    # channels.  This matrix will be uploaded to the RZ5.
-    diff_matrix = Property(depends_on='channel_settings.differential')
-
-    @cached_property
-    def _get_diff_matrix(self):
-        n_chan = len(self.channel_settings)
-        map = np.zeros((n_chan, n_chan))
-        for channel in self.channel_settings:
-            channels = to_list(channel.differential)
-            if len(channels) != 0:
-                sf = -1.0/len(channels)
-                for d in channels:
-                    map[channel.number, d-1] = sf
-        return map
 
     # When the visible channels change, we need to update the plot!
     @on_trait_change('visible_channels')

@@ -8,6 +8,8 @@ from enthought.traits.ui.api import View, Item, VGroup, HGroup, InstanceEditor,\
 
 from enthought.enable.api import Component, ComponentEditor
 
+import cns
+
 from abstract_experiment import AbstractExperiment
 from positive_data import PositiveData
 from abstract_positive_paradigm import AbstractPositiveParadigm
@@ -19,7 +21,6 @@ from enthought.chaco.api import DataRange1D, LinearMapper, PlotAxis, PlotGrid, \
 from cns.chaco.channel_data_range import ChannelDataRange
 from cns.chaco.ttl_plot import TTLPlot
 from cns.chaco.timeseries_plot import TimeseriesPlot
-from cns.chaco.extremes_channel_plot import ExtremesChannelPlot
 from cns.chaco.dynamic_bar_plot import DynamicBarPlot, DynamicBarplotAxis
 from cns.chaco.helpers import add_default_grids, add_time_axis
 
@@ -92,9 +93,9 @@ trial_log_table = TableEditor(
             ]
         )
 
-from enthought.traits.ui.api import ListEditor
+from physiology_experiment_mixin import PhysiologyExperimentMixin
 
-class AbstractPositiveExperiment(AbstractExperiment):
+class AbstractPositiveExperiment(AbstractExperiment, PhysiologyExperimentMixin):
 
     data = Instance(PositiveData)
     paradigm = Instance(AbstractPositiveParadigm, ())
@@ -116,23 +117,6 @@ class AbstractPositiveExperiment(AbstractExperiment):
     par_score_plot  = Instance(Component)
     par_dprime_plot = Instance(Component)
 
-    physiology_plot = Instance(Component)
-
-    def _generate_physiology_plot(self):
-        container = OverlayPlotContainer()
-        self.index_range = ChannelDataRange()
-        self.index_range.sources = [self.data.physiology_ram]
-        index_mapper = LinearMapper(range=self.index_range)
-        value_range = DataRange1D(low_setting=-0.3e-3, high_setting=3.6e-3)
-        value_mapper = LinearMapper(range=value_range)
-        plot = ExtremesChannelPlot(channel=self.data.physiology_ram, 
-                index_mapper=index_mapper, value_mapper=value_mapper,
-                visible=range(0, 16), use_backbuffer=True)
-        add_default_grids(plot, major_index=1, minor_index=0.25)
-        add_time_axis(plot)
-        container.add(plot)
-        self.physiology_plot = container
-    
     def _data_changed(self):
         self._generate_experiment_plot()
         self._generate_summary_plots()
@@ -153,7 +137,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
                 fill_color=(0.25, 0.41, 0.88, 0.5), rect_center=0.25,
                 rect_height=0.2)
 
-        add_default_grids(plot, major_index=5, minor_index=1)
+        add_default_grids(plot, major_index=1, minor_index=0.25)
         add_time_axis(plot, orientation='top')
         container.add(plot)
 
@@ -344,39 +328,16 @@ class AbstractPositiveExperiment(AbstractExperiment):
             show_labels=False,
             )
 
-    physiology_group = VGroup(
-            VGroup(
-                HGroup(
-                    Item('object.paradigm.monitor_fc_highpass', label='Low'),
-                    Item('object.paradigm.monitor_fc_lowpass', label='High'),
-                    label='Bandpass Settings',
-                    show_border=True,
-                    ),
-                'object.paradigm.monitor_gain',
-                'object.paradigm.monitor_speaker',
-                'object.paradigm.monitor_1',
-                'object.paradigm.monitor_2',
-                'object.paradigm.monitor_3',
-                label='Monitor Settings',
-                show_border=True,
-                ),
-            )
-
     traits_group = HSplit(
             VGroup(
                 Item('handler.toolbar', style='custom'),
                 Include('pump_group'),
                 Include('status_group'),
-                Tabbed(
-                    Item('paradigm', style='custom', editor=InstanceEditor()),
-                    Include('physiology_group'),
-                    show_labels=False,
-                    ),
+                Item('paradigm', style='custom', editor=InstanceEditor()),
                 show_labels=False,
             ),
             Include('plots_group'),
             Include('experiment_group'),
-            Item('physiology_plot', editor=ComponentEditor(), width=1920),
             show_labels=False,
         )
     

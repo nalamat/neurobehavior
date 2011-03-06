@@ -27,6 +27,34 @@ TDT_PHYSIOLOGY = 'RZ5'
 # extension to use for cohort files
 COHORT_WILDCARD = 'Cohort files (*.cohort.hd5)|*.cohort.hd5|'
 
+try:
+    import ctypes
+    user32 = ctypes.windll.user32
+
+    def get_monitors():
+        return user32.GetSystemMetrics(80)
+
+    def get_monitor_geometry():
+        return user32.GetSystemMetrics(1), user32.GetSystemMetrics(0)
+
+    def get_available_geometry():
+        return user32.GetSystemMetrics(17), user32.GetSystemMetrics(61)
+
+    def get_virtual_geometry():
+        return user32.GetSystemMetrics(79), user32.GetSystemMetrics(78)
+
+    def get_secondary_offset():
+        if get_monitors() == 2:
+            return user32.GetSystemMetrics(0)
+        elif get_monitors() == 1:
+            return 0
+
+    MONITORS = get_monitors()
+    MONITOR_GEOMETRY = get_monitor_geometry()
+    MONITOR_OFFSET = get_secondary_offset()
+except:
+    pass
+
 if __name__ == '__main__':
     # When you first install Neurobehavior on a new computer, you need to create
     # the appropriate folders for saving the data and related information.  To

@@ -92,28 +92,30 @@ class ChannelPlot(BaseXYPlot):
         self._render(gc, points)
 
     def _render(self, gc, points):
-        try:
-            idx, val = points
-            if len(idx) == 0:
-                return
-            gc.save_state()
-            gc.set_antialias(True)
-            gc.clip_to_rect(self.x, self.y, self.width, self.height)
-            gc.set_stroke_color(self.line_color_)
-            gc.set_line_width(self.line_width) 
-            gc.begin_path()
-            gc.lines(np.column_stack((idx, val)))
-            gc.stroke_path()
-            self._draw_default_axes(gc)
-            gc.restore_state()
-        except ValueError, e:
-            print len(idx), len(val)
+        idx, val = points
+        if len(idx) == 0:
+            return
+        gc.save_state()
+        gc.set_antialias(True)
+        gc.clip_to_rect(self.x, self.y, self.width, self.height)
+        gc.set_stroke_color(self.line_color_)
+        gc.set_line_width(self.line_width) 
+        gc.begin_path()
+        gc.lines(np.column_stack((idx, val)))
+        gc.stroke_path()
+        self._draw_default_axes(gc)
+        gc.restore_state()
 
-    def _data_changed(self):
-        #print "DATA CHANGE"
-        self.invalidate_draw()
-        self._data_cache_valid = False
-        self.request_redraw()
+    def _data_changed(self, bounds):
+        # We need to be smart about the "data changed" event.  If we're not
+        # tracking the index range, then the data that has changed *may* be
+        # off-screen.  In which case, we're doing a *lot* of work to redraw the
+        # exact same picture.
+        if self.index_range.mask_data(np.array(bounds)).any():
+            self._new_bounds_cache = bounds
+            self.invalidate_draw()
+            self._data_cache_valid = False
+            self.request_redraw()
 
     def _channel_changed(self, old, new):
         if old is not None:

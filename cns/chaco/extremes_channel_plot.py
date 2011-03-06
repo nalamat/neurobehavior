@@ -41,8 +41,14 @@ class ExtremesChannelPlot(ChannelPlot):
     reverts to a standard "connected" XY plot.
     '''
 
-    offset  = Float(0.5e-3)
-    visible = List([1, 2])
+    offset  = Float(-0.5e-3)
+    spacing = Float(0.5e-3)
+    visible = List([])
+
+    def _visible_changed(self):
+        self.invalidate_draw()
+        self._screen_cache_valid = False
+        self.request_redraw()
 
     def _get_screen_points(self):
         if not self._screen_cache_valid:
@@ -50,7 +56,6 @@ class ExtremesChannelPlot(ChannelPlot):
                 self._cached_screen_index = []
                 self._cached_screen_data = []
             else:
-                #log.debug("Decimating data")
                 # Get the decimated data
                 decimation_factor = self._decimation_factor()
                 cached_data = self._cached_data[self.visible]
@@ -58,9 +63,8 @@ class ExtremesChannelPlot(ChannelPlot):
 
                 if type(values) == type(()):
                     channels, samples = values[0].shape
-                    offsets = self.offset*np.arange(channels)[:,np.newaxis]
-                    #s_val_min = self.value_mapper.map_screen(values[0]+offsets) 
-                    #s_val_max = self.value_mapper.map_screen(values[1]+offsets) 
+                    offsets = self.spacing*np.arange(channels)[:,np.newaxis]
+                    offsets += self.offset
 
                     mins = values[0] + offsets
                     s_val_min = self.value_mapper.map_screen(mins)
@@ -71,7 +75,6 @@ class ExtremesChannelPlot(ChannelPlot):
                 else:
                     channels, samples = values.shape
                     offsets = self.offset*np.arange(channels)[:np.newaxis]
-                    #s_val_pts = self.value_mapper.map_screen(values+offsets) 
                     s_val_pts = self.value_mapper.map_screen(values)
                     s_val_pts = s_val_pts/channels + offsets
                     self._cached_screen_data = s_val_pts
