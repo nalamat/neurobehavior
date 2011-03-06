@@ -47,19 +47,32 @@ class PhysiologyControllerMixin(HasTraits):
     def set_monitor_fc_lowpass(self, value):
         self.iface_physiology.set_tag('FiltLP', value)
 
-    def set_monitor_speaker(self, value):
+    def set_monitor_ch_1(self, value):
         self.iface_physiology.set_tag('ch1_out', value)
 
-    def set_monitor_1(self, value):
+    def set_monitor_ch_2(self, value):
         self.iface_physiology.set_tag('ch2_out', value)
 
-    def set_monitor_2(self, value):
+    def set_monitor_ch_3(self, value):
         self.iface_physiology.set_tag('ch3_out', value)
 
-    def set_monitor_3(self, value):
+    def set_monitor_ch_4(self, value):
         self.iface_physiology.set_tag('ch4_out', value)
 
-    def set_monitor_gain(self, value):
-        value *= 1e3
-        for i in range(1, 5):
-            self.iface_physiology.set_tag('ch%d_out_sf' % i, value)
+    def set_monitor_gain_1(self, value):
+        self.iface_physiology.set_tag('ch1_out_sf', value*1e3)
+
+    def set_monitor_gain_2(self, value):
+        self.iface_physiology.set_tag('ch2_out_sf', value*1e3)
+
+    def set_monitor_gain_3(self, value):
+        self.iface_physiology.set_tag('ch3_out_sf', value*1e3)
+
+    def set_monitor_gain_4(self, value):
+        self.iface_physiology.set_tag('ch4_out_sf', value*1e3)
+
+    def set_visible_channels(self, value):
+        self.model.physiology_plot.visible = value
+
+    def set_diff_matrix(self, value):
+        print value

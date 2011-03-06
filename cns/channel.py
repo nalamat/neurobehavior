@@ -39,6 +39,12 @@ class Timeseries(HasTraits):
         mask = (timestamps>=lb)&(timestamps<ub)
         return timestamps[mask]
 
+    def latest(self):
+        if len(self.buffer) > 0:
+            return self.buffer[-1]/self.fs
+        else:
+            return np.nan
+
 class Channel(HasTraits):
     '''
     Base class for dealing with a continuous stream of data.  Facilitates
@@ -57,11 +63,17 @@ class Channel(HasTraits):
 
     metadata = Dict({'selections': None})
 
-    fs = Float                          # Sampling frequency
-    t0 = Float(0)                       # Time of first sample (typically zero)
+    # Sampling frequency of the data stored in the buffer
+    fs = Float
 
+    # Time of first sample in the buffer.  Typically this is 0, but if we delay
+    # acquisition or discard "old" data (e.g. via a RAMBuffer), then we need to
+    # update t0.
+    t0 = Float(0)
+
+    # Fired when new data is added
     updated = Event
-
+   
     signal = Property
 
     def get_data(self):
@@ -79,6 +91,9 @@ class Channel(HasTraits):
         return int((time-self.t0)*self.fs)
 
     def to_samples(self, time):
+        '''
+        Convert time to number of samples.
+        '''
         return int(time*self.fs)
 
     def get_range_index(self, start, end, reference=0):
@@ -180,13 +195,33 @@ class Channel(HasTraits):
         '''
         Returns valid range of times as a tuple (lb, ub)
         '''
-        #return self.t0, self.t0 + self.signal.shape[-1]/self.fs
         return self.t0, self.t0 + self.get_size()/self.fs
 
-    def filter(self, filter):
-        raise NotImplementedException
-        '''Takes b,a parameters for filter'''
-        self.signal = filtfilt(self.signal, **filter)
+    def latest(self):
+        if self.get_size() > 0:
+            return self.signal[-1]/self.fs
+        else:
+            return self.t0
+
+    def send(self, data):
+        '''
+        Convenience method that allows us to use a Channel as a "sink" for a
+        processing pipeline.
+        '''
+        self.write(data)
+
+    def write(self, data):
+        '''
+        Write data to buffer.
+        '''
+        lb = self.get_size()
+        self._write(data)
+        ub = self.get_size()
+
+        # Updated has the upper and lower bound of the data that was added.
+        # Some plots will use this to determine whether the updated region of
+        # the data is within the visible region.  If not, no update is made.
+        self.updated = lb/self.fs, ub/self.fs
 
 class FileChannel(Channel):
     '''
@@ -260,14 +295,10 @@ class FileChannel(Channel):
     def _get_signal(self):
         return self.buffer
 
-    def send(self, data):
+    def _write(self, data):
         if data.ndim != 1 and data.shape[0] != 1:
             raise ValueError, "First dimension must be 1"
         self.buffer.append(data.ravel())
-        self.updated = True
-
-    def write(self, data):
-        self.send(data)
 
 class RAMChannel(Channel):
     '''Buffers data in memory without saving it to disk.
@@ -283,7 +314,7 @@ class RAMChannel(Channel):
         Number of seconds to buffer
     '''
 
-    window  = Float(30)
+    window  = Float(10)
     samples = Property(Int, depends_on='window, fs')
     t0      = Property(depends_on="offset, fs")
 
@@ -315,10 +346,6 @@ class RAMChannel(Channel):
     def _get_signal(self):
         return self.buffer
 
-    def send(self, data):
-        self._write(data)
-        self.updated = True
-
     def _partial_write(self, data):
         size = data.shape[-1]
         if size > self.samples:
@@ -341,7 +368,9 @@ class RAMChannel(Channel):
     def _full_write(self, data):
         #size = len(data)
         size = data.shape[-1]
-        if size > self.samples:
+        if size == 0:
+            return
+        elif size > self.samples:
             self.buffer = data[..., -self.samples:]
             self.dropped += size-self.samples
             self.offset += size-self.samples
@@ -371,9 +400,8 @@ class MultiChannel(Channel):
     def _get_signal(self):
         return self.buffer
 
-    def send(self, data):
+    def _write(self, data):
         self.buffer.append(data)
-        self.updated = True
 
 class RAMMultiChannel(RAMChannel, MultiChannel):
 
@@ -400,46 +428,46 @@ class FileMultiChannel(MultiChannel, FileChannel):
         buffer.setAttr('channels', self.channels)
         return buffer
 
-class SnippetChannel(Channel):
-
-    buffer = Instance(SoftwareRingBuffer)
-    samples = Int
-    history = Int
-    signal = Property(Array(dtype='f'))
-    average_signal = Property(Array(dtype='f'))
-    buffered = Int(0)
-    buffer_full = Bool(False)
-
-    @on_trait_change('samples, fs, history')
-    def _configure_buffer(self):
-        self.buffer = SoftwareRingBuffer((self.history, self.samples))
-
-    def _get_t(self):
-        return np.arange(-self.samples, 0) / self.fs
-
-    def _get_signal(self):
-        return self.buffer.buffered
-
-    def send(self, data):
-        # Ensure that 1D arrays containing a single snippet are broadcast
-        # properly to the correct shape.
-        data.shape = (-1, self.samples)
-        added = self.buffer.write(data)
-
-        if self.buffer_full:
-            self.updated = added, added
-        else:
-            self.buffered += added
-            if self.buffered > self.history:
-                self.buffer_full = True
-                removed = self.buffered % self.history
-                self.buffer_full
-                self.updated = removed, added
-            else:
-                self.updated = 0, added
-
-    def _get_average_signal(self):
-        return self.buffer.buffered.mean(0)
-
-    def __len__(self):
-        return self.samples
+#class SnippetChannel(Channel):
+#
+#    buffer = Instance(SoftwareRingBuffer)
+#    samples = Int
+#    history = Int
+#    signal = Property(Array(dtype='f'))
+#    average_signal = Property(Array(dtype='f'))
+#    buffered = Int(0)
+#    buffer_full = Bool(False)
+#
+#    @on_trait_change('samples, fs, history')
+#    def _configure_buffer(self):
+#        self.buffer = SoftwareRingBuffer((self.history, self.samples))
+#
+#    def _get_t(self):
+#        return np.arange(-self.samples, 0) / self.fs
+#
+#    def _get_signal(self):
+#        return self.buffer.buffered
+#
+#    def send(self, data):
+#        # Ensure that 1D arrays containing a single snippet are broadcast
+#        # properly to the correct shape.
+#        data.shape = (-1, self.samples)
+#        added = self.buffer.write(data)
+#
+#        if self.buffer_full:
+#            self.updated = added, added
+#        else:
+#            self.buffered += added
+#            if self.buffered > self.history:
+#                self.buffer_full = True
+#                removed = self.buffered % self.history
+#                self.buffer_full
+#                self.updated = removed, added
+#            else:
+#                self.updated = 0, added
+#
+#    def _get_average_signal(self):
+#        return self.buffer.buffered.mean(0)
+#
+#    def __len__(self):
+#        return self.samples
