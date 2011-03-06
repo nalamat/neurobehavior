@@ -30,7 +30,7 @@ class PositiveAMNoiseController(AbstractPositiveController):
 
     def _compute_signal(self, parameter):
         self.modulator.depth = parameter
-        return self.output.realize(self.iface_behavior.fs,
+        return self.output.realize(self.buffer_signal.fs,
                                    self.current_duration)
 
     def set_rise_fall_time(self, value):
@@ -56,7 +56,7 @@ class PositiveAMNoiseController(AbstractPositiveController):
 
         # Prepare next signal
         waveform = self._compute_signal(par)
-        self.buffer_signal.set(waveform)
+        #self.buffer_signal.set(waveform)
         self.iface_behavior.set_tag('signal_dur_n', len(waveform))
         self.set_poke_duration(self.current_poke_dur)
         self.iface_behavior.trigger(1)

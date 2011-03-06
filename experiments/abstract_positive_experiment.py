@@ -96,29 +96,8 @@ from enthought.traits.ui.api import ListEditor
 
 class AbstractPositiveExperiment(AbstractExperiment):
 
-    def _raw_view_default(self):
-        container = OverlayPlotContainer(bgcolor='white', fill_padding=True,
-                padding=50)
-
-        index_range = ChannelDataRange(sources=[self.data.physiology_raw],
-                range=12,
-                interval=10)
-
-        index_mapper = LinearMapper(range=index_range)
-        value_range = DataRange1D(low_setting=-1.3e-3, high_setting=9.3e-3)
-        value_mapper = LinearMapper(range=value_range)
-
-    def _generate_physiology_plot(self):
-        plot = ExtremesChannelPlot(channel=self.data.physiology_raw,
-                index_mapper=index_mapper, value_mapper=value_mapper)
-
-        self.plot = plot
-        container.add(plot)
-        return container
-
     data = Instance(PositiveData)
     paradigm = Instance(AbstractPositiveParadigm, ())
-
     trial_log_view = Property(depends_on='data.trial_log')
 
     def _data_node_changed(self, new):
@@ -136,10 +115,28 @@ class AbstractPositiveExperiment(AbstractExperiment):
     par_count_plot  = Instance(Component)
     par_score_plot  = Instance(Component)
     par_dprime_plot = Instance(Component)
+
+    physiology_plot = Instance(Component)
+
+    def _generate_physiology_plot(self):
+        container = OverlayPlotContainer()
+        self.index_range = ChannelDataRange()
+        self.index_range.sources = [self.data.physiology_ram]
+        index_mapper = LinearMapper(range=self.index_range)
+        value_range = DataRange1D(low_setting=-0.3e-3, high_setting=3.6e-3)
+        value_mapper = LinearMapper(range=value_range)
+        plot = ExtremesChannelPlot(channel=self.data.physiology_ram, 
+                index_mapper=index_mapper, value_mapper=value_mapper,
+                visible=range(0, 16), use_backbuffer=True)
+        add_default_grids(plot, major_index=1, minor_index=0.25)
+        add_time_axis(plot)
+        container.add(plot)
+        self.physiology_plot = container
     
     def _data_changed(self):
         self._generate_experiment_plot()
         self._generate_summary_plots()
+        self._generate_physiology_plot()
 
     def _generate_experiment_plot(self):
         plots = {}
@@ -216,10 +213,6 @@ class AbstractPositiveExperiment(AbstractExperiment):
         plot = TimeseriesPlot(series=self.data.timeout_end_timestamp,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 line_color='red', line_width=2, label="End TIMEOUT")
-        container.add(plot)
-
-        plot = ExtremesChannelPlot(channel=self.data.physiology_raw,
-                index_mapper=index_mapper, value_mapper=value_mapper)
         container.add(plot)
 
         self.experiment_plot = container
@@ -325,8 +318,6 @@ class AbstractPositiveExperiment(AbstractExperiment):
     plots_group = VGroup(
             Item('experiment_plot', editor=ComponentEditor(),
                 show_label=False, width=600, height=400),
-            #Item('raw_view', editor=ComponentEditor(), 
-            #    show_label=False, width=600, height=200),
             HGroup(
                 Item('par_count_plot', editor=ComponentEditor(),
                     show_label=False, width=150, height=150),
@@ -385,6 +376,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
             ),
             Include('plots_group'),
             Include('experiment_group'),
+            Item('physiology_plot', editor=ComponentEditor(), width=1920),
             show_labels=False,
         )
     

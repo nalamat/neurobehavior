@@ -7,8 +7,10 @@ Created on Jun 9, 2010
 '''
 import settings
 
+from cns.chaco.extremes_channel_plot import ExtremesChannelPlot
+from cns.chaco.channel_data_range import ChannelDataRange
 from scipy.signal import filtfilt
-from tdt import DSPProcess as DSPProcess
+from tdt import DSPProcess
 
 from cns.channel import FileMultiChannel, MultiChannel, RAMMultiChannel, \
     RAMChannel, Channel
@@ -18,7 +20,7 @@ from enthought.traits.api import Range, Float, HasTraits, Instance, DelegatesTo,
     Int, Any, on_trait_change, Enum, Trait, Tuple, List, Property, Str, \
     cached_property, Bool
 from enthought.traits.ui.api import View, VGroup, HGroup, Action, Controller, \
-        Item, TupleEditor, HSplit, VSplit
+        Item, TupleEditor, HSplit, VSplit, RangeEditor, Label
 import numpy as np
 import tables
 
@@ -33,8 +35,12 @@ class ChannelSetting(HasTraits):
 
 class MonitorSetting(HasTraits):
 
+    number  = Int, Label
     channel = Range(1, 16, 1)
     gain    = Int(50e3)
+
+    def __len__(self):
+        return 1
 
 from enthought.traits.ui.api import TableEditor, ObjectColumn
 from enthought.traits.ui.extras.checkbox_column import CheckboxColumn
@@ -53,7 +59,8 @@ monitor_editor = TableEditor(
         show_row_labels=True,
         sortable=False,
         columns=[
-            ObjectColumn(name='number'),
+            ObjectColumn(name='number', editable=False, width=10, label=''),
+            ObjectColumn(name='number', width=10, label=''),
             ObjectColumn(name='gain'),
             ]
         )
@@ -91,6 +98,7 @@ def to_list(string):
 
 from enthought.enable.api import Component, ComponentEditor
 from enthought.traits.ui.api import TextEditor
+from cns.chaco.helpers import add_time_axis, add_default_grids
 
 editor = []
 for i in range(4):
@@ -100,11 +108,28 @@ editor = TupleEditor(editors=editor)
 
 class MedusaSettings(HasTraits):
 
-    raw_data    = Instance(MultiChannel)
-    raw_view    = Instance(Component)
+    raw_data            = Instance(MultiChannel)
+    raw_view            = Instance(Component)
+    raw_plot            = Instance(ExtremesChannelPlot)
+    index_range         = Instance(ChannelDataRange)
 
+
+    def set_visible_channels(self, value):
+        self.model.raw_plot.visible = value
+
+
+    # We can monitor up to four channels.  These map to DAC outputs 9, 10, 11
+    # and 12 on the RZ5.  The first output (9) also goes to the speaker.
     monitor_settings    = List(Instance(MonitorSetting))
+
+    # We adjust two key settings, whether the channel is visible in the plot and
+    # the differentials to apply to it.
     channel_settings    = List(Instance(ChannelSetting))
+
+    plot_mode           = Enum('continuous', 'triggered')
+
+    def _index_range_default(self):
+        return ChannelDataRange(range=10, interval=8)
 
     def _monitor_settings_default(self):
         return [MonitorSetting(number=i) for i in range(1, 5)]
@@ -112,6 +137,15 @@ class MedusaSettings(HasTraits):
     def _channel_settings_default(self):
         return [ChannelSetting(number=i) for i in range(1, 17)]
 
+    # List of the channels visible in the plot
+    visible_channels = Property(depends_on='channel_settings.visible')
+
+    @cached_property
+    def _get_visible_channels(self):
+        return [i for i, ch in enumerate(self.channel_settings) if ch.visible]
+
+    # Generates the matrix that will be used to compute the differential for the
+    # channels.  This matrix will be uploaded to the RZ5.
     diff_matrix = Property(depends_on='channel_settings.differential')
 
     @cached_property
@@ -126,23 +160,21 @@ class MedusaSettings(HasTraits):
                     map[channel.number, d-1] = sf
         return map
 
-    visible = Property(depends_on='channel_settings.visible')
+    # When the visible channels change, we need to update the plot!
+    @on_trait_change('visible_channels')
+    def _update_plot(self):
+        self.raw_plot.visible = self.visible_channels
 
-    @cached_property
-    def _get_visible(self):
-        return [setting.visible for setting in self.channel_settings]
+    # If plot offset or number of visible channels change, we need to update the
+    # value range accordingly.
+    @on_trait_change('visible_channels, plot_offset')
+    def _update_range(self):
+        offset = self.raw_plot.offset
+        self.range.high_setting = offset*len(self.visible_channels)
 
-    attenuation = Range(0.0, 120.0, 20.0)
+    # Filter cutoff
     fc_low      = Float(10e3)
     fc_high     = Float(300)
-    trial_dur   = Float(5)
-    filt_coeffs = Property(depends_on='fc_low, fc_high')
-
-    @cached_property
-    def _get_filt_coeffs(self):
-        from scipy import signal
-        Wn = self.fc_high/25e3, self.fc_low/25e3
-        return signal.butter(4, Wn, 'band')
 
     file = Any
 
@@ -150,45 +182,48 @@ class MedusaSettings(HasTraits):
         return tables.openFile('basic_characterization.h5', 'w')
 
     def _raw_data_default(self):
-        return FileMultiChannel(channels=16, node=self.file.root,
-                name='raw_data', compression_level=0)
+        #return FileMultiChannel(channels=16, node=self.file.root,
+        #        name='raw_data', compression_level=0)
+        return RAMMultiChannel(channels=16, fs=25e3)
 
-    def _processed_data_default(self):
-        return FileMultiChannel(channels=16, fs=self.iface_physiology.fs,
-                node=self.file.root, name='processed_data')
+    def _raw_plot_default(self):
+        self.index_range.sources = [self.raw_data]
+        index_mapper = LinearMapper(range=self.index_range)
+        value_range = DataRange1D(low_setting=-0.3e-3, high_setting=0.6e-3)
+        value_mapper = LinearMapper(range=value_range)
+        plot = ExtremesChannelPlot(channel=self.raw_data, 
+                index_mapper=index_mapper, value_mapper=value_mapper,
+                visible=self.visible_channels)
+        add_default_grids(plot, major_index=1, minor_index=0.25)
+        add_time_axis(plot)
+        self.range = value_range
+        return plot
 
     def _raw_view_default(self):
         container = OverlayPlotContainer(bgcolor='white', fill_padding=True,
                 padding=50)
-
-        index_range = ChannelDataRange(sources=[self.raw_data], range=12,
-                interval=10)
-        index_mapper = LinearMapper(range=index_range)
-        value_range = DataRange1D(low_setting=-1.3e-3, high_setting=9.3e-3)
-        value_mapper = LinearMapper(range=value_range)
-        plot = ExtremesChannelPlot(channel=self.raw_data,
-                index_mapper=index_mapper, value_mapper=value_mapper)
-        grid = PlotGrid(mapper=plot.index_mapper, component=plot,
-                orientation='vertical', line_color='lightgray',
-                line_style='dot', grid_interval=0.25)
-        plot.underlays.append(grid)
-        grid = PlotGrid(mapper=plot.index_mapper, component=plot,
-                orientation='vertical', line_color='lightgray',
-                line_style='solid', grid_interval=1)
-        plot.underlays.append(grid)
-        axis = PlotAxis(component=plot, title="Time (s)", orientation="top")
-        plot.underlays.append(axis)
-        plot.underlays.append(axis)
-        self.plot = plot
-        container.add(plot)
+        container.add(self.raw_plot)
         return container
+
+    plot_offset = DelegatesTo('raw_plot', 'offset')
+    time_range = DelegatesTo('index_range', 'range')
+    time_interval = DelegatesTo('index_range', 'interval')
 
     traits_view = View(
             HSplit(
                 VGroup(
+                    HGroup(
+                        Item('fc_high'), 
+                        Label('to'), 
+                        Item('fc_low'),
+                        Label('Hz'),
+                        show_labels=False,
+                        label='Filter Settings',
+                        show_border=True,
+                        ),
                     VGroup(
                         Item('monitor_settings', show_label=False, 
-                             editor=monitor_editor),
+                             editor=monitor_editor, height=-100),
                         label='Monitor Settings',
                         show_border=True),
                     VGroup(
@@ -196,20 +231,26 @@ class MedusaSettings(HasTraits):
                              show_label=False),
                         label='Channel configuration', show_border=True
                         ),
-                    'fc_low{Lowpass cutoff (Hz)}',
-                    'fc_high{Highpass cutoff (Hz)}',
-                    'trial_dur{Trial duration (s)}',
                     ),
-                Item('raw_view', editor=ComponentEditor(),
-                     show_label=False, width=1000, height=600),
+                VGroup(
+                    HGroup(
+                        Item('plot_mode', label='Update mode'),
+                        Item('plot_offset', label='Channel spacing'),
+                        Item('time_range', label='Range'),
+                        Item('time_interval', label='Update interval'),
+                        ),
+                    Item('raw_view', editor=ComponentEditor(),
+                         show_label=False, width=1000, height=600),
+                    ),
                 ),
             resizable=True,
             )
 
 from enthought.chaco.api import OverlayPlotContainer, LinearMapper, \
         DataRange1D, PlotAxis, PlotGrid
-from cns.chaco.extremes_channel_plot import ExtremesChannelPlot
-from cns.chaco.channel_data_range import ChannelDataRange
+
+from cns import RCX_ROOT
+from os.path import join
 
 class MedusaController(Controller):
     
@@ -220,18 +261,37 @@ class MedusaController(Controller):
     buffer_     = Any
     timer       = Instance(Timer)
 
+    process             = Any
     iface_physiology    = Any
+    iface_signal        = Any
     buffer_raw          = Any
     buffer_processed    = Any
     pipeline_raw        = Any
     pipeline_processed  = Any
-    
+
+    def _process_default(self):
+        return DSPProcess()
+
+    #def _iface_signal_default(self):
+    #    circuit = join(RCX_ROOT, 'physiology')
+    #    return self.process.load_circuit(circuit, 'RZ6')
+
+    def _iface_physiology_default(self):
+        circuit = join(RCX_ROOT, 'physiology')
+        return self.process.load_circuit(circuit, 'RZ6')
+
+    def _buffer_raw_default(self):
+        print 'getting buffer'
+        return self.iface_physiology.get_buffer('cfiltered', 'r',
+                src_type='int16', dest_type='float32', channels=16) 
+
     def init(self, info=None):
-        self.circuit = DSPProcess('components/physiology', 'RZ5')
-        self.buffer_raw = self.circuit.get_buffer('craw', 'r', src_type='int16',
-                dest_type='float32', channels=16) 
+        self.model = info.object
+        print self.iface_physiology
+        print self.buffer_raw
         self.model.raw_data.fs = self.buffer_raw.fs
-        self.circuit.start()
+        self.process.start()
+        self.timer = Timer(500, self.tick)
 
     def _pipeline_processed_default(self):
         return self.model.processed_data
@@ -239,28 +299,21 @@ class MedusaController(Controller):
     def _pipeline_raw_default(self):
         return self.model.raw_data
 
-    def init(self, info):
-        self.timer = Timer(100, self.tick)
-        self.model = info.object
-
     def tick(self):
         data = self.buffer_raw.read()
         if not len(data) == 0:
             self.pipeline_raw.send(data)
-    
-    def object_attenuation_changed(self, value):
-        print 'setting attneuation'
-        self.iface_RZ6.set_tag('sig_atten', value)
-    
-    @on_trait_change('setting.fc_high')
-    def set_highpass_frequency(self, value):
+
+    @on_trait_change('object.setting.fc_high')
+    def set_fc_high(self, value):
         self.iface_physiology.set_tag('FiltHP', value)
 
     @on_trait_change('object.setting.fc_low')
-    def set_lowpass_frequency(self, value):
+    def set_fc_low(self, value):
         self.iface_physiology.set_tag('FiltLP', value)
 
 def test_medusa():
+    #MedusaSettings().configure_traits()
     MedusaSettings().configure_traits(handler=MedusaController())
 
 if __name__ == '__main__':

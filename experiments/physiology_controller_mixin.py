@@ -1,5 +1,5 @@
-from enthought.traits.api import HasTraits, Instance
-from tdt import DSPCircuit
+from enthought.traits.api import HasTraits, Instance, Any
+from tdt import DSPProcess
 from cns import RCX_ROOT
 from os.path import join
 
@@ -8,14 +8,14 @@ class PhysiologyControllerMixin(HasTraits):
     # By convention, all mixin classes should prepend attribute names with the
     # mixin name (e.g. physiology).  This prevents potential namespace
     # collisions.
-    iface_physiology        = Instance('tdt.DSPCircuit')
-    buffer_physiology_raw   = Instance('tdt.DSPBuffer')
-    buffer_physiology_ts    = Instance('tdt.DSPBuffer')
+    iface_physiology        = Any
+    buffer_physiology_raw   = Any
+    buffer_physiology_ts    = Any
 
     def setup_physiology(self):
         # Load the circuit
         circuit = join(RCX_ROOT, 'physiology')
-        self.iface_physiology = DSPCircuit(circuit, 'RZ5')
+        self.iface_physiology = self.process.load_circuit(circuit, 'RZ5')
 
         # Initialize the buffers that will be spooling the data
         self.buffer_physiology_raw = self.iface_physiology.get_buffer('craw',
@@ -25,19 +25,21 @@ class PhysiologyControllerMixin(HasTraits):
 
         # Ensure that the data store has the correct sampling frequency
         self.model.data.physiology_raw.fs = self.buffer_physiology_raw.fs
+        self.model.data.physiology_ram.fs = self.buffer_physiology_raw.fs
         self.model.data.physiology_ts.fs = self.buffer_physiology_ts.fs
         
         # Start the circuit
-        self.iface_physiology.start()
+        #self.iface_physiology.start()
 
     def monitor_physiology(self):
-        # Acquire spooled physiology data
+        # Acquire spooled physiology data and send it to the HDF5 store plus the
+        # memory "shadow" copy
         waveform = self.buffer_physiology_raw.read()
         self.model.data.physiology_raw.send(waveform)
+        self.model.data.physiology_ram.send(waveform)
         # Get the timestamps
         ts = self.buffer_physiology_ts.read()
         self.model.data.physiology_ts.send(ts)
-        print ts
 
     def set_monitor_fc_highpass(self, value):
         self.iface_physiology.set_tag('FiltHP', value)
