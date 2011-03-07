@@ -14,8 +14,7 @@ def test_experiment():
     test_file = tables.openFile(file_name, 'w')
 
     experiment = PositiveAMNoiseExperiment(store_node=test_file.root)
-    experiment.edit_traits(kind='live', view='physiology_view')
-    experiment.edit_traits(kind='livemodal')
+    experiment.configure_traits(kind='livemodal')
 
 def profile_experiment():
     from cns import TEMP_ROOT

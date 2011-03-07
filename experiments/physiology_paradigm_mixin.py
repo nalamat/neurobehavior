@@ -1,7 +1,9 @@
+from __future__ import division
+from math import floor, ceil
 import numpy as np
 
 from enthought.traits.api import HasTraits, Range, Tuple, Bool, Int, Str, \
-        List, Instance, Property, cached_property
+        List, Instance, Property, cached_property, Button
 from enthought.traits.ui.api import View, VGroup, HGroup, Item, Label, Include
 
 from enthought.traits.ui.api import TableEditor, ObjectColumn, RangeEditor
@@ -26,6 +28,91 @@ channel_editor = TableEditor(
         )
 
 class PhysiologyParadigmMixin(HasTraits):
+
+    diff_bundle     = Button('Bundle')
+    diff_sagittal   = Button('Sagittal')
+    diff_coronal    = Button('Coronal')
+
+    def _get_diff_group(self, channel, group):
+        ub = int(ceil(channel/group)*group + 1)
+        lb = ub - group
+        diff = range(lb, ub)
+        print lb, ub, diff, channel
+        diff.remove(channel)
+        return ', '.join(str(ch) for ch in diff)
+
+    def _diff_bundle_fired(self):
+        for channel in self.channel_settings:
+            value = self._get_diff_group(channel.number, 4)
+            channel.set(True, differential=value)
+
+    def _diff_sagittal_fired(self):
+        for channel in self.channel_settings:
+            value = self._get_diff_group(channel.number, 8)
+            channel.set(True, differential=value)
+
+    diff_group = HGroup(
+            Item('diff_bundle'),
+            Item('diff_sagittal'),
+            Item('diff_coronal'),
+            show_labels=False,
+            )
+
+    # Groups of 4
+    ch_14   = Button(label='1-4')
+    ch_24   = Button(label='5-8')
+    ch_34   = Button(label='9-12')
+    ch_44   = Button(label='13-16')
+
+    # Groups of 8
+    ch_18   = Button(label='1-8')
+    ch_28   = Button(label='9-16')
+
+    # All
+    all     = Button(label='All')
+    none    = Button(label='None')
+
+    visible_group = HGroup(
+            Item('ch_14'),
+            Item('ch_24'),
+            Item('ch_34'),
+            Item('ch_44'),
+            '_',
+            Item('ch_18'),
+            Item('ch_28'),
+            '_',
+            Item('all'),
+            Item('none'),
+            show_labels=False,
+            )
+
+    def _set_visible(self, channels):
+        for channel in self.channel_settings:
+            channel.visible = channel.number in channels
+
+    def _ch_14_fired(self):
+        self._set_visible(range(1, 5))
+
+    def _ch_24_fired(self):
+        self._set_visible(range(5, 9))
+
+    def _ch_34_fired(self):
+        self._set_visible(range(9, 13))
+
+    def _ch_44_fired(self):
+        self._set_visible(range(13, 17))
+
+    def _ch_18_fired(self):
+        self._set_visible(range(1, 9))
+
+    def _ch_28_fired(self):
+        self._set_visible(range(9, 17))
+
+    def _all_fired(self):
+        self._set_visible(range(1, 17))
+
+    def _none_fired(self):
+        self._set_visible([])
 
     monitor_ch_1        = Range(1, 16, 1, init=True, immediate=True)
     monitor_ch_2        = Range(1, 16, 5, init=True, immediate=True)
@@ -65,7 +152,7 @@ class PhysiologyParadigmMixin(HasTraits):
             if len(channels) != 0:
                 sf = -1.0/len(channels)
                 for d in channels:
-                    map[channel.number, d-1] = sf
+                    map[channel.number-1, d-1] = sf
         return map
 
     monitor_group = HGroup(
@@ -102,6 +189,8 @@ class PhysiologyParadigmMixin(HasTraits):
             VGroup(
                 Include('filter_group'),
                 Include('monitor_group'),
+                Include('visible_group'),
+                Include('diff_group'),
                 Item('channel_settings', editor=channel_editor),
                 show_labels=False,
                 )

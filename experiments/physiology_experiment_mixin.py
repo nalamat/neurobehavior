@@ -1,7 +1,7 @@
 from enthought.enable.api import Component, ComponentEditor
 from enthought.chaco.api import LinearMapper, DataRange1D
 from enthought.traits.ui.api import VGroup, HGroup, Item, Include, View, \
-        InstanceEditor
+        InstanceEditor, RangeEditor
 from enthought.traits.api import Instance, HasTraits, Float, DelegatesTo
 
 from cns.chaco.helpers import add_default_grids, add_time_axis
@@ -15,13 +15,14 @@ class PhysiologyExperimentMixin(HasTraits):
     physiology_plot = Instance(Component)
     physiology_index_range = Instance(ChannelDataRange)
     physiology_value_range = Instance(DataRange1D, ())
-    physiology_scale = Float(1e-3)
 
+    physiology_scale = Float(0.5e-3)
     physiology_visible = DelegatesTo('physiology_plot', 'visible')
+    physiology_offset = DelegatesTo('physiology_plot', 'offset')
+    physiology_spacing = DelegatesTo('physiology_plot', 'spacing')
 
     def _physiology_value_range_update(self):
         value = len(self.physiology_visible)*self.physiology_scale
-        print value
         self.physiology_value_range.high_setting = value
         self.physiology_value_range.low_setting = 0
 
@@ -47,6 +48,7 @@ class PhysiologyExperimentMixin(HasTraits):
         self.physiology_plot = plot
 
     physiology_settings_group = VGroup(
+            #Item('handler.physiology_toolbar', style='custom'),
             Item('paradigm', style='custom',
                 editor=InstanceEditor(view='physiology_view')),
             Include('physiology_view_settings_group'),
@@ -54,27 +56,36 @@ class PhysiologyExperimentMixin(HasTraits):
             show_labels=False,
             )
 
-    physiology_view_settings_group = HGroup(
-            Item('object.physiology_index_range.update_mode'),
-            Item('object.physiology_index_range.span'),
-            Item('object.physiology_index_range.trig_delay'),
+    physiology_view_settings_group = VGroup(
+            Item('object.physiology_index_range.update_mode', 
+                label='Trigger mode'),
+            Item('object.physiology_index_range.span',
+                label='X span',
+                editor=RangeEditor(low=0.1, high=10)),
+            Item('object.physiology_index_range.trig_delay',
+                label='Trigger delay',
+                editor=RangeEditor(low=0.0, high=5.0)),
+            Item('physiology_scale', label='Y span',
+                editor=RangeEditor(low=0, high=5e-3)),
+            Item('physiology_offset', label='Plot offset',
+                editor=RangeEditor(low=0, high=5e-3)),
+            Item('physiology_spacing', label='Plot spacing',
+                editor=RangeEditor(low=0, high=5e-3)),
+            label='Plot Settings',
+            show_border=True,
             )
 
     physiology_view = View(
             HGroup(
                 Include('physiology_settings_group'),
-                VGroup(
-                    Include('physiology_view_settings_group'),
-                    Item('physiology_plot', editor=ComponentEditor(), width=1400,
-                        resizable=True),
-                    show_labels=False,
-                    ),
+                Item('physiology_plot', editor=ComponentEditor(), width=1400,
+                    resizable=True),
                 show_labels=False,
                 ),
             resizable=True,
-            height=0.9,
-            width=0.9,
+            height=1,
+            width=1,
             # Offset this view so it appears on the second monitor.  If there is
             # no second monitor, the views will overlap (oh well).
-            x=cns.MONITOR_OFFSET+10,
+            x=cns.MONITOR_OFFSET,
             )
