@@ -160,21 +160,38 @@ class AbstractExperimentController(Controller):
                 getattr(self, toolbar).install(self, info)
             log.debug("Successfully initialized equipment")
 
+            main_window = info.ui.control
             # We always want to show the experiment in fullscreen mode.  This
-            # assumes Qt4 is the GUI.
-            info.ui.control.showMaximized()
+            # assumes Qt4 is the GUI (wx has a slightly different method name).
+            #main_window.showMaximized()
+            main_window.showFullScreen()
 
             # If we want to spool physiology, launch the physiology window as
             # well.  It should appear in the second monitor.  The parent of this
             # window should be the current window (info.ui.control) that way
             # both windows get closed when the app exits.
             if self.acquire_physiology:
-                ui = info.object.edit_traits(parent=info.ui.control,
+                secondary_ui = info.object.edit_traits(parent=main_window,
                         view='physiology_view')
+                secondary_window = secondary_ui.control
 
-                # We already "offset" the view in the settings so it is in the
-                # second monitor.
-                ui.control.showMaximized()
+                # Now, let's get some information about the screen geometry so
+                # that the secondary window appears in the other monitor.  This
+                # does not deal with triple-head systems (nor has it been tested
+                # on "virtual" desktops).
+                from PyQt4.QtGui import QApplication
+                desktop = QApplication.desktop()
+
+                # Determine which screen is the main one and set the secondary
+                # window geometry to the non-main screen.
+                if desktop.screenCount() == 2:
+                    primary = desktop.primaryScreen()
+                    if primary == 0:
+                        geometry = desktop.screenGeometry(1)
+                    else:
+                        geometry = desktop.screenGeometry(0)
+                    secondary_window.setGeometry(geometry)
+                    secondary_window.showFullScreen()
 
         except Exception, e:
             log.error(e)
