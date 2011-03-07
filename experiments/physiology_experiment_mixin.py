@@ -48,7 +48,6 @@ class PhysiologyExperimentMixin(HasTraits):
         self.physiology_plot = plot
 
     physiology_settings_group = VGroup(
-            #Item('handler.physiology_toolbar', style='custom'),
             Item('paradigm', style='custom',
                 editor=InstanceEditor(view='physiology_view')),
             Include('physiology_view_settings_group'),
@@ -82,10 +81,4 @@ class PhysiologyExperimentMixin(HasTraits):
                     resizable=True),
                 show_labels=False,
                 ),
-            resizable=True,
-            height=1,
-            width=1,
-            # Offset this view so it appears on the second monitor.  If there is
-            # no second monitor, the views will overlap (oh well).
-            x=cns.MONITOR_OFFSET,
-            )
+            resizable=True)
