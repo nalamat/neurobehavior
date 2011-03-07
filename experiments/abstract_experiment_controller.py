@@ -5,7 +5,7 @@ from enthought.pyface.api import error, confirm, YES
 from enthought.pyface.timer.api import Timer
 from enthought.etsconfig.api import ETSConfig
 from enthought.traits.api import Any, Instance, Enum, Dict, on_trait_change, \
-        HasTraits, List, Button
+        HasTraits, List, Button, Bool
 from enthought.traits.ui.api import Controller, View, HGroup, Item, spring
 
 from cns.widgets.toolbar import ToolBar
@@ -124,6 +124,9 @@ class AbstractExperimentController(Controller):
     state = Enum('halted', 'paused', 'running', 'manual', 'disconnected',
                  'complete')
 
+    # Acquire physiology?
+    acquire_physiology  = Bool(True)
+
     # name_ = Any are Trait wildcards
     # see http://code.enthought.com/projects/traits/docs
     # /html/traits_user_manual/advanced.html#trait-attribute-name-wildcard)
@@ -156,6 +159,23 @@ class AbstractExperimentController(Controller):
             for toolbar in self.trait_names(toolbar=True):
                 getattr(self, toolbar).install(self, info)
             log.debug("Successfully initialized equipment")
+
+            # We always want to show the experiment in fullscreen mode.  This
+            # assumes Qt4 is the GUI.
+            info.ui.control.showMaximized()
+
+            # If we want to spool physiology, launch the physiology window as
+            # well.  It should appear in the second monitor.  The parent of this
+            # window should be the current window (info.ui.control) that way
+            # both windows get closed when the app exits.
+            if self.acquire_physiology:
+                ui = info.object.edit_traits(parent=info.ui.control,
+                        view='physiology_view')
+
+                # We already "offset" the view in the settings so it is in the
+                # second monitor.
+                ui.control.showMaximized()
+
         except Exception, e:
             log.error(e)
             self.state = 'disconnected'
@@ -166,8 +186,22 @@ class AbstractExperimentController(Controller):
         Prevent user from closing window while an experiment is running since
         data is not saved to file until the stop button is pressed.
         '''
+
+        # We can abort a close event by returning False.  If an experiment
+        # is currently running, confirm that the user really did want to close
+        # the window.  If no experiment is running, then it's OK since the user
+        # can always restart the experiment.
         if self.state not in ('disconnected', 'halted', 'complete'):
             mesg = 'Experiment is still running.  Are you sure you want to exit?'
+
+            # The function confirm returns an integer that represents the
+            # response that the user requested.  YES is a constant (also
+            # imported from the same module as confirm) corresponding to the
+            # return value of confirm when the user presses the "yes" button on
+            # the dialog.  If any other button (e.g. "no", "abort", etc.) is
+            # pressed, the return value will be something other than YES and we
+            # will assume that the user has requested not to quit the
+            # experiment.
             if confirm(info.ui.control, mesg) == YES:
                 self.stop(info)
                 return True

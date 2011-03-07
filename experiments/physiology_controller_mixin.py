@@ -1,4 +1,5 @@
 from enthought.traits.api import HasTraits, Instance, Any
+from enthought.traits.ui.api import HGroup, View, Item
 from tdt import DSPProcess
 from cns import RCX_ROOT
 from os.path import join
@@ -8,9 +9,11 @@ class PhysiologyControllerMixin(HasTraits):
     # By convention, all mixin classes should prepend attribute names with the
     # mixin name (e.g. physiology).  This prevents potential namespace
     # collisions.
+
     iface_physiology        = Any
     buffer_physiology_raw   = Any
     buffer_physiology_ts    = Any
+    buffer_diff_map    = Any
 
     def setup_physiology(self):
         # Load the circuit
@@ -22,14 +25,13 @@ class PhysiologyControllerMixin(HasTraits):
                 'r', src_type='int16', dest_type='float32', channels=16) 
         self.buffer_physiology_ts = self.iface_physiology.get_buffer('trig/',
                 'r', src_type='int32', dest_type='int32', block_size=1)
+        self.buffer_diff_map = self.iface_physiology.get_buffer('diff_map', 'w',
+                block_size=1)
 
         # Ensure that the data store has the correct sampling frequency
         self.model.data.physiology_raw.fs = self.buffer_physiology_raw.fs
         self.model.data.physiology_ram.fs = self.buffer_physiology_raw.fs
         self.model.data.physiology_ts.fs = self.buffer_physiology_ts.fs
-        
-        # Start the circuit
-        #self.iface_physiology.start()
 
     def monitor_physiology(self):
         # Acquire spooled physiology data and send it to the HDF5 store plus the
@@ -75,4 +77,4 @@ class PhysiologyControllerMixin(HasTraits):
         self.model.physiology_plot.visible = value
 
     def set_diff_matrix(self, value):
-        print value
+        self.buffer_diff_map.set(value)

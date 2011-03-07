@@ -12,6 +12,7 @@ def decimate_extremes(data, downsample):
 
     last_dim = data.ndim
     offset = data.shape[-1] % downsample
+
     # Force a copy to be made, which speeds up min()/max().  Apparently min/max
     # make a copy of a reshaped array before performing the operation, so we
     # force it now so the copy only occurs once.
@@ -41,14 +42,31 @@ class ExtremesChannelPlot(ChannelPlot):
     reverts to a standard "connected" XY plot.
     '''
 
-    offset  = Float(-0.5e-3)
+    # Offset of all channels along the value axis
+    offset  = Float(0.5e-3)
+
+    # Distance between each channel along the value axis
     spacing = Float(0.5e-3)
+
+    # Which channels are visible?
     visible = List([])
 
-    def _visible_changed(self):
+    # Offset, spacing and visible only affect the screen points, so we only
+    # invalidate the screen cache.  The data cache is fine.
+
+    def _invalidate_screen(self):
         self.invalidate_draw()
         self._screen_cache_valid = False
         self.request_redraw()
+
+    def _offset_changed(self):
+        self._invalidate_screen()
+
+    def _visible_changed(self):
+        self._invalidate_screen()
+
+    def _spacing_changed(self):
+        self._invalidate_screen()
 
     def _get_screen_points(self):
         if not self._screen_cache_valid:
@@ -93,7 +111,6 @@ class ExtremesChannelPlot(ChannelPlot):
             return
 
         gc.save_state()
-        #gc.set_antialias(True)
         gc.clip_to_rect(self.x, self.y, self.width, self.height)
         gc.set_stroke_color(self.line_color_)
         gc.set_line_width(self.line_width) 
