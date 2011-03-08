@@ -29,6 +29,9 @@ channel_editor = TableEditor(
 
 class PhysiologyParadigmMixin(HasTraits):
 
+    # These are convenience buttons for quickly setting the differentials of
+    # each channel.
+    diff_none       = Button('None')
     diff_bundle     = Button('Bundle')
     diff_sagittal   = Button('Sagittal')
     diff_coronal    = Button('Coronal')
@@ -40,6 +43,10 @@ class PhysiologyParadigmMixin(HasTraits):
         print lb, ub, diff, channel
         diff.remove(channel)
         return ', '.join(str(ch) for ch in diff)
+
+    def _diff_none_fired(self):
+        for channel in self.channel_settings:
+            channel.set(True, differential='')
 
     def _diff_bundle_fired(self):
         for channel in self.channel_settings:
@@ -57,6 +64,9 @@ class PhysiologyParadigmMixin(HasTraits):
             Item('diff_coronal'),
             show_labels=False,
             )
+
+    # These are convenience buttons for selecting subgroups of channels for
+    # display on the computer scren.
 
     # Groups of 4
     ch_14   = Button(label='1-4')
@@ -114,6 +124,10 @@ class PhysiologyParadigmMixin(HasTraits):
     def _none_fired(self):
         self._set_visible([])
 
+    # The RZ5 has four DAC channels.  We can send each of these channels to an
+    # oscilloscope for monitoring.  The first DAC channel (corresponding to
+    # channel 9 in the RPvds file) is linked to the speaker.  Gain is multiplied
+    # by a factor of 1000 before being applied to the corresponding channel.
     monitor_ch_1        = Range(1, 16, 1, init=True, immediate=True)
     monitor_ch_2        = Range(1, 16, 5, init=True, immediate=True)
     monitor_ch_3        = Range(1, 16, 9, init=True, immediate=True)
@@ -122,6 +136,8 @@ class PhysiologyParadigmMixin(HasTraits):
     monitor_gain_2      = Range(0, 100, 50, init=True, immediate=True)
     monitor_gain_3      = Range(0, 100, 50, init=True, immediate=True)
     monitor_gain_4      = Range(0, 100, 50, init=True, immediate=True)
+
+    # Bandpass filter settings
     monitor_fc_highpass = Range(0, 12.5e3, 300, init=True, immediate=True)
     monitor_fc_lowpass  = Range(0, 12.5e3, 10e3, init=True, immediate=True)
 

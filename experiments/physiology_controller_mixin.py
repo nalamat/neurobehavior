@@ -9,11 +9,10 @@ class PhysiologyControllerMixin(HasTraits):
     # By convention, all mixin classes should prepend attribute names with the
     # mixin name (e.g. physiology).  This prevents potential namespace
     # collisions.
-
     iface_physiology        = Any
     buffer_physiology_raw   = Any
+    buffer_physiology_proc  = Any
     buffer_physiology_ts    = Any
-    buffer_diff_map    = Any
 
     def setup_physiology(self):
         # Load the circuit
@@ -23,22 +22,29 @@ class PhysiologyControllerMixin(HasTraits):
         # Initialize the buffers that will be spooling the data
         self.buffer_physiology_raw = self.iface_physiology.get_buffer('craw',
                 'r', src_type='int16', dest_type='float32', channels=16) 
+        self.buffer_physiology_filt = self.iface_physiology.get_buffer('cfilt',
+                'r', src_type='int16', dest_type='float32', channels=16) 
         self.buffer_physiology_ts = self.iface_physiology.get_buffer('trig/',
                 'r', src_type='int32', dest_type='int32', block_size=1)
-        self.buffer_diff_map = self.iface_physiology.get_buffer('diff_map', 'w',
-                block_size=1)
 
         # Ensure that the data store has the correct sampling frequency
         self.model.data.physiology_raw.fs = self.buffer_physiology_raw.fs
+        self.model.data.physiology_processed.fs = self.buffer_physiology_filt.fs
         self.model.data.physiology_ram.fs = self.buffer_physiology_raw.fs
         self.model.data.physiology_ts.fs = self.buffer_physiology_ts.fs
 
     def monitor_physiology(self):
-        # Acquire spooled physiology data and send it to the HDF5 store plus the
-        # memory "shadow" copy
+        # Acquire spooled physiology data and send it to the HDF5 file
         waveform = self.buffer_physiology_raw.read()
         self.model.data.physiology_raw.send(waveform)
+        waveform = self.buffer_physiology_filt.read()
+        self.model.data.physiology_processed.send(waveform)
+
+        # We also send the processed data to a memory buffer for display in the
+        # plotting.  It's very slow when the plot has to re-extract the data
+        # from the file and we'd like to avoid this.
         self.model.data.physiology_ram.send(waveform)
+
         # Get the timestamps
         ts = self.buffer_physiology_ts.read()
         self.model.data.physiology_ts.send(ts)
@@ -77,4 +83,4 @@ class PhysiologyControllerMixin(HasTraits):
         self.model.physiology_plot.visible = value
 
     def set_diff_matrix(self, value):
-        self.buffer_diff_map.set(value)
+        self.iface_physiology.set_coefficients('diff_map', value.ravel())
