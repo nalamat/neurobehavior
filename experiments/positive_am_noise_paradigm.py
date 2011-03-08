@@ -10,6 +10,7 @@ class PositiveAMNoiseParadigm(AbstractPositiveParadigm):
     fm = Float(5, store='attribute', init=True)
     attenuation = Range(0.0, 120.0, 30.0, store='attribute', init=True)
     seed = Int(-1, store='attribute', init=True)
+    delay = Float(0.1, store='attribute', init=True)
 
     signal_group = VGroup(
             Item('attenuation', style='custom', 
@@ -17,6 +18,7 @@ class PositiveAMNoiseParadigm(AbstractPositiveParadigm):
             Item('duration', label='Signal duration (s)'),
             Item('rise_fall_time', label='Rise/fall time (s)'),
             Item('fm', label='Modulation frequency (Hz)'),
+            Item('delay', label='Modulation delay (s)'),
             Item('seed', label='Random seed (-1=nonfrozen)'),
             label='Signal',
             show_border=True,

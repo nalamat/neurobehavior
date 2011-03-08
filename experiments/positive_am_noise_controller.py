@@ -33,6 +33,13 @@ class PositiveAMNoiseController(AbstractPositiveController):
         return self.output.realize(self.iface_behavior.fs,
                                    self.current_duration)
 
+    def set_delay(self, value):
+        if value == 0:
+            self.modulator.equalize_phase = False
+        else:
+            self.modulator.equalize_phase = True
+        self.modulator.delay = value
+
     def set_rise_fall_time(self, value):
         self.envelope.rise_time = value
 
