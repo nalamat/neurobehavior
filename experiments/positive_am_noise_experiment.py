@@ -14,8 +14,6 @@ class PositiveAMNoiseExperiment(AbstractPositiveExperiment):
         self.data = PositiveData(store_node=new)
 
     traits_view = View(Include('traits_group'),
-                       resizable=True,
-                       kind='live',
-                       height=1,
-                       width=1,
+                       resizable=True, kind='live',
+                       key_bindings=AbstractPositiveExperiment.key_bindings,
                        handler=PositiveAMNoiseController)

@@ -151,6 +151,10 @@ class AbstractExperimentController(Controller):
     data_       = Any
     pipeline_   = Any
 
+    # Hold information about the windows we have configured
+    window_     = Any
+    screen_     = Any
+
     def init(self, info):
         log.debug("Initializing equipment")
         try:
@@ -160,20 +164,16 @@ class AbstractExperimentController(Controller):
                 getattr(self, toolbar).install(self, info)
             log.debug("Successfully initialized equipment")
 
-            main_window = info.ui.control
-            # We always want to show the experiment in fullscreen mode.  This
-            # assumes Qt4 is the GUI (wx has a slightly different method name).
-            #main_window.showMaximized()
-            main_window.showFullScreen()
+            self.window_behavior = info.ui.control
 
             # If we want to spool physiology, launch the physiology window as
             # well.  It should appear in the second monitor.  The parent of this
             # window should be the current window (info.ui.control) that way
             # both windows get closed when the app exits.
             if self.acquire_physiology:
-                secondary_ui = info.object.edit_traits(parent=main_window,
-                        view='physiology_view')
-                secondary_window = secondary_ui.control
+                self.window_physiology = info.object.edit_traits(
+                        parent=self.window_behavior,
+                        view='physiology_view').control
 
                 # Now, let's get some information about the screen geometry so
                 # that the secondary window appears in the other monitor.  This
@@ -184,19 +184,52 @@ class AbstractExperimentController(Controller):
 
                 # Determine which screen is the main one and set the secondary
                 # window geometry to the non-main screen.
-                if desktop.screenCount() == 2:
-                    primary = desktop.primaryScreen()
-                    if primary == 0:
-                        geometry = desktop.screenGeometry(1)
-                    else:
-                        geometry = desktop.screenGeometry(0)
-                    secondary_window.setGeometry(geometry)
-                    secondary_window.showFullScreen()
+                self.screen_count = desktop.screenCount()
+                if self.screen_count == 2:
+                    self.screen_primary = desktop.primaryScreen()
+                    self.screen_0_geometry = desktop.screenGeometry(0)
+                    self.screen_1_geometry = desktop.screenGeometry(1)
+                self.window_toggle = 0
+
+                # We always want to show the experiment in fullscreen mode.  This
+                # assumes Qt4 is the GUI (wx has a slightly different method name).
+                self.window_behavior.showFullScreen()
+                self.window_mode = 'fullscreen'
+                self.swap_screens(None)
 
         except Exception, e:
             log.error(e)
             self.state = 'disconnected'
             error(info.ui.control, str(e))
+
+    def toggle_maximized(self, info):
+        if info.ui.control.isMaximized():
+            info.ui.control.showNormal()
+        else:
+            info.ui.control.showMaximized()
+
+    def toggle_fullscreen(self, info):
+        if info.ui.control.isFullScreen():
+            info.ui.control.showNormal()
+        else:
+            info.ui.control.showFullScreen()
+
+    def swap_screens(self, info):
+        # This code is Qt4 specific
+        if self.window_toggle:
+            self.window_physiology.setGeometry(self.screen_0_geometry)
+            self.window_behavior.setGeometry(self.screen_1_geometry)
+            self.window_toggle = 0
+        else:
+            self.window_physiology.setGeometry(self.screen_1_geometry)
+            self.window_behavior.setGeometry(self.screen_0_geometry)
+            self.window_toggle = 1
+        if self.window_mode == 'fullscreen':
+            self.window_physiology.showFullScreen()
+            self.window_behavior.showFullScreen()
+        elif self.window_mode == 'maximized':
+            self.window_physiology.showMaximized()
+            self.window_behavior.showMaximized()
 
     def close(self, info, is_ok):
         '''
