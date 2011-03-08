@@ -9,6 +9,8 @@ from abstract_experiment_controller import AbstractExperimentController
 from abstract_experiment_data import AbstractExperimentData
 from abstract_experiment_paradigm import AbstractExperimentParadigm
 
+from enthought.traits.ui.key_bindings import KeyBinding, KeyBindings
+
 import logging
 log = logging.getLogger(__name__)
 
@@ -42,5 +44,12 @@ class AbstractExperiment(HasTraits):
             return datetime.now()-self.start_time
         else:
             return self.stop_time-self.start_time
+
+    key_bindings = KeyBindings(
+        KeyBinding(binding1='Ctrl-m', method_name='toggle_maximized'),
+        KeyBinding(binding1='Ctrl-f', method_name='toggle_fullscreen'),
+        KeyBinding(binding1='Ctrl-s', method_name='swap_screens'),
+        KeyBinding(binding1='Ctrl-r', method_name='start'),
+        )
 
     traits_view = View(handler=AbstractExperimentController)

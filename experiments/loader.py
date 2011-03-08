@@ -9,8 +9,8 @@ import sys
 import tables
 from os.path import join
 
-from enthought.traits.api import Any, Trait, TraitError
-from enthought.traits.ui.api import View, Item, VGroup, Group
+from enthought.traits.api import Any, Trait, TraitError, Bool
+from enthought.traits.ui.api import View, Item, VGroup, HGroup
 
 import logging
 log = logging.getLogger(__name__)
@@ -48,9 +48,14 @@ cohort_editor = CohortEditor(menu=Menu(
 
 class ExperimentCohortView(CohortView):
 
+    acquire_physiology = Bool(False)
+
     traits_view = View(
         VGroup(
-            Group(Item('object.cohort.description', style='readonly')),
+            HGroup(
+                Item('object.cohort.description', style='readonly'),
+                Item('acquire_physiology'),
+                ),
             Item('object.cohort.animals', editor=cohort_editor,
                  show_label=False, style='readonly'),
         ),
@@ -130,18 +135,19 @@ class ExperimentLauncher(CohortViewHandler):
     
             ui = model.edit_traits(parent=info.ui.control, kind='livemodal')
             if ui.result:
-                #persistence.delete_object(paradigm_node, paradigm_name)
                 persistence.add_or_update_object(model.paradigm, paradigm_node,
                         paradigm_name)
                 item.processed = True
                 self.last_paradigm = model.paradigm
             
             # Close the file if we opened it
-            try: file.close()
-            except NameError: pass
+            try: 
+                file.close()
+            except NameError: 
+                pass
             
         except AttributeError, e: 
-            log.error(e)
+            log.exception(e)
         except SystemError, e:
             from textwrap import dedent
             mesg = """\

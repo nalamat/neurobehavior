@@ -34,7 +34,10 @@ table_editor = TableEditor(
             ]
         )
 
-class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
+from physiology_paradigm_mixin import PhysiologyParadigmMixin
+
+class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin,
+        PhysiologyParadigmMixin):
 
     parameters = List(Instance(TrialSetting), [], store='child', init=True)
 

@@ -1,11 +1,18 @@
 import numpy as np
 from channel_plot import ChannelPlot
-from enthought.traits.api import List
+from enthought.traits.api import List, Float
+
+import logging
+log = logging.getLogger(__name__)
 
 def decimate_extremes(data, downsample):
     # Axis that we want to decimate across
+    if data.shape[-1] == 0:
+        return [], []
+
     last_dim = data.ndim
     offset = data.shape[-1] % downsample
+
     # Force a copy to be made, which speeds up min()/max().  Apparently min/max
     # make a copy of a reshaped array before performing the operation, so we
     # force it now so the copy only occurs once.
@@ -18,13 +25,13 @@ def decimate_extremes(data, downsample):
 
 class ExtremesChannelPlot(ChannelPlot):
     '''
-    Often our neurophysiology data involves sampling at up to 200kHz.  If we
-    are viewing a second's worth of data on screen using standard plotting
+    Often our neurophysiology data involves sampling at up to 200kHz.  If we are
+    viewing a second's worth of data on screen using standard plotting
     functions, then this means we are computing the data to screen coordinate
     transform of 200,000 points every few milliseconds and then blitting this to
     screen.
 
-    instead, each time a new call to render the plot on screen is made (e.g.
+    Instead, each time a new call to render the plot on screen is made (e.g.
     there's new data, the screen is resized, or the data bounds change), the
     data is downsampled so there is only one vertical "line" per screen pixel.
     The line runs from the minimum to the maximum.  This is great for plotting
@@ -35,33 +42,66 @@ class ExtremesChannelPlot(ChannelPlot):
     reverts to a standard "connected" XY plot.
     '''
 
-    offset = 0.5e-3
-    visible = List([1, 2, 3, 4, 5, 6])
+    # Offset of all channels along the value axis
+    offset  = Float(0.5e-3)
+
+    # Distance between each channel along the value axis
+    spacing = Float(0.5e-3)
+
+    # Which channels are visible?
+    visible = List([])
+
+    # Offset, spacing and visible only affect the screen points, so we only
+    # invalidate the screen cache.  The data cache is fine.
+
+    def _invalidate_screen(self):
+        self.invalidate_draw()
+        self._screen_cache_valid = False
+        self.request_redraw()
+
+    def _offset_changed(self):
+        self._invalidate_screen()
+
+    def _visible_changed(self):
+        self._invalidate_screen()
+
+    def _spacing_changed(self):
+        self._invalidate_screen()
 
     def _get_screen_points(self):
         if not self._screen_cache_valid:
-            # Get the decimated data
-            decimation_factor = self._decimation_factor()
-            cached_data = self._cached_data[self.visible]
-            values = decimate_extremes(cached_data, decimation_factor)
-
-            if type(values) == type(()):
-                channels, samples = values[0].shape
-                offsets = self.offset*np.arange(channels)[:,np.newaxis]
-                s_val_min = self.value_mapper.map_screen(values[0]+offsets) 
-                s_val_max = self.value_mapper.map_screen(values[1]+offsets) 
-                self._cached_screen_data = s_val_min, s_val_max
+            if self._cached_data.shape[-1] == 0:
+                self._cached_screen_index = []
+                self._cached_screen_data = []
             else:
-                channels, samples = values.shape
-                offsets = self.offset*np.arange(channels)[:np.newaxis]
-                s_val_pts = self.value_mapper.map_screen(values+offsets) 
-                self._cached_screen_data = s_val_pts
+                # Get the decimated data
+                decimation_factor = self._decimation_factor()
+                cached_data = self._cached_data[self.visible]
+                values = decimate_extremes(cached_data, decimation_factor)
 
-            total_samples = self._cached_data.shape[-1]
-            t = self.index_values[:total_samples:decimation_factor][:samples]
-            t_screen = self.index_mapper.map_screen(t)
-            self._cached_screen_index = t_screen
-            self._screen_cache_valid = True
+                if type(values) == type(()):
+                    channels, samples = values[0].shape
+                    offsets = self.spacing*np.arange(channels)[:,np.newaxis]
+                    offsets += self.offset
+
+                    mins = values[0] + offsets
+                    s_val_min = self.value_mapper.map_screen(mins)
+
+                    maxes = values[1] + offsets
+                    s_val_max = self.value_mapper.map_screen(maxes)
+                    self._cached_screen_data = s_val_min, s_val_max
+                else:
+                    channels, samples = values.shape
+                    offsets = self.offset*np.arange(channels)[:np.newaxis]
+                    s_val_pts = self.value_mapper.map_screen(values)
+                    s_val_pts = s_val_pts/channels + offsets
+                    self._cached_screen_data = s_val_pts
+
+                total_samples = self._cached_data.shape[-1]
+                t = self.index_values[:total_samples:decimation_factor][:samples]
+                t_screen = self.index_mapper.map_screen(t)
+                self._cached_screen_index = t_screen
+                self._screen_cache_valid = True
 
         return self._cached_screen_index, self._cached_screen_data
 
@@ -71,7 +111,6 @@ class ExtremesChannelPlot(ChannelPlot):
             return
 
         gc.save_state()
-        gc.set_antialias(True)
         gc.clip_to_rect(self.x, self.y, self.width, self.height)
         gc.set_stroke_color(self.line_color_)
         gc.set_line_width(self.line_width) 

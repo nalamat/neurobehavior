@@ -5,7 +5,7 @@ from enthought.pyface.api import error, confirm, YES
 from enthought.pyface.timer.api import Timer
 from enthought.etsconfig.api import ETSConfig
 from enthought.traits.api import Any, Instance, Enum, Dict, on_trait_change, \
-        HasTraits, List, Button
+        HasTraits, List, Button, Bool
 from enthought.traits.ui.api import Controller, View, HGroup, Item, spring
 
 from cns.widgets.toolbar import ToolBar
@@ -124,6 +124,9 @@ class AbstractExperimentController(Controller):
     state = Enum('halted', 'paused', 'running', 'manual', 'disconnected',
                  'complete')
 
+    # Acquire physiology?
+    acquire_physiology  = Bool(True)
+
     # name_ = Any are Trait wildcards
     # see http://code.enthought.com/projects/traits/docs
     # /html/traits_user_manual/advanced.html#trait-attribute-name-wildcard)
@@ -148,6 +151,10 @@ class AbstractExperimentController(Controller):
     data_       = Any
     pipeline_   = Any
 
+    # Hold information about the windows we have configured
+    window_     = Any
+    screen_     = Any
+
     def init(self, info):
         log.debug("Initializing equipment")
         try:
@@ -156,18 +163,95 @@ class AbstractExperimentController(Controller):
             for toolbar in self.trait_names(toolbar=True):
                 getattr(self, toolbar).install(self, info)
             log.debug("Successfully initialized equipment")
+
+            self.window_behavior = info.ui.control
+
+            # If we want to spool physiology, launch the physiology window as
+            # well.  It should appear in the second monitor.  The parent of this
+            # window should be the current window (info.ui.control) that way
+            # both windows get closed when the app exits.
+            if self.acquire_physiology:
+                self.window_physiology = info.object.edit_traits(
+                        parent=self.window_behavior,
+                        view='physiology_view').control
+
+                # Now, let's get some information about the screen geometry so
+                # that the secondary window appears in the other monitor.  This
+                # does not deal with triple-head systems (nor has it been tested
+                # on "virtual" desktops).
+                from PyQt4.QtGui import QApplication
+                desktop = QApplication.desktop()
+
+                # Determine which screen is the main one and set the secondary
+                # window geometry to the non-main screen.
+                self.screen_count = desktop.screenCount()
+                if self.screen_count == 2:
+                    self.screen_primary = desktop.primaryScreen()
+                    self.screen_0_geometry = desktop.screenGeometry(0)
+                    self.screen_1_geometry = desktop.screenGeometry(1)
+                self.window_toggle = 0
+
+                # We always want to show the experiment in fullscreen mode.  This
+                # assumes Qt4 is the GUI (wx has a slightly different method name).
+                self.window_behavior.showFullScreen()
+                self.window_mode = 'fullscreen'
+                self.swap_screens(None)
+
         except Exception, e:
             log.error(e)
             self.state = 'disconnected'
             error(info.ui.control, str(e))
+
+    def toggle_maximized(self, info):
+        if info.ui.control.isMaximized():
+            info.ui.control.showNormal()
+        else:
+            info.ui.control.showMaximized()
+
+    def toggle_fullscreen(self, info):
+        if info.ui.control.isFullScreen():
+            info.ui.control.showNormal()
+        else:
+            info.ui.control.showFullScreen()
+
+    def swap_screens(self, info):
+        # This code is Qt4 specific
+        if self.window_toggle:
+            self.window_physiology.setGeometry(self.screen_0_geometry)
+            self.window_behavior.setGeometry(self.screen_1_geometry)
+            self.window_toggle = 0
+        else:
+            self.window_physiology.setGeometry(self.screen_1_geometry)
+            self.window_behavior.setGeometry(self.screen_0_geometry)
+            self.window_toggle = 1
+        if self.window_mode == 'fullscreen':
+            self.window_physiology.showFullScreen()
+            self.window_behavior.showFullScreen()
+        elif self.window_mode == 'maximized':
+            self.window_physiology.showMaximized()
+            self.window_behavior.showMaximized()
 
     def close(self, info, is_ok):
         '''
         Prevent user from closing window while an experiment is running since
         data is not saved to file until the stop button is pressed.
         '''
+
+        # We can abort a close event by returning False.  If an experiment
+        # is currently running, confirm that the user really did want to close
+        # the window.  If no experiment is running, then it's OK since the user
+        # can always restart the experiment.
         if self.state not in ('disconnected', 'halted', 'complete'):
             mesg = 'Experiment is still running.  Are you sure you want to exit?'
+
+            # The function confirm returns an integer that represents the
+            # response that the user requested.  YES is a constant (also
+            # imported from the same module as confirm) corresponding to the
+            # return value of confirm when the user presses the "yes" button on
+            # the dialog.  If any other button (e.g. "no", "abort", etc.) is
+            # pressed, the return value will be something other than YES and we
+            # will assume that the user has requested not to quit the
+            # experiment.
             if confirm(info.ui.control, mesg) == YES:
                 self.stop(info)
                 return True
@@ -234,45 +318,50 @@ class AbstractExperimentController(Controller):
             getattr(self, 'set_' + trait_name)(value)
 
     @on_trait_change('model.paradigm.+')
-    def queue_change(self, object, name, old, new):
+    def queue_change(self, instance, name, old, new):
         if self.state <> 'halted':
-            key = object, name
-            if key not in self.old_values:
-                self.old_values[key] = old
-                self.pending_changes[key] = new
-            elif new == self.old_values[key]:
-                del self.pending_changes[key]
-                del self.old_values[key]
+            trait = self.model.paradigm.trait(name)
+            if trait.immediate == True:
+                print 'applying', name
+                self.apply_change(instance, name, new)
             else:
-                self.pending_changes[key] = new
+                key = instance, name
+                if key not in self.old_values:
+                    self.old_values[key] = old
+                    self.pending_changes[key] = new
+                elif new == self.old_values[key]:
+                    del self.pending_changes[key]
+                    del self.old_values[key]
+                else:
+                    self.pending_changes[key] = new
 
-    def apply_change(self, instance, name, info=None):
+    def apply_change(self, instance, name, value, info=None):
         '''
         Applies an individual change
         '''
         ts = self.get_ts()
-        value = self.pending_changes[(instance, name)]
         log.debug("Apply: setting %s:%s to %r", instance, name, value)
         try:
             getattr(self, 'set_'+name)(value)
             self.log_event(ts, name, value)
         except AttributeError:
-            mesg = "Can't set %s to %r", name, value
+            mesg = "Can't set %s to %r" % (name, value)
             # Notify the user
             error(info.ui.control, mesg)
             log.warn(mesg + ", removing from stack")
             # Set paradigm value back to "old" value
             setattr(self.model.paradigm, name, value)
-        del self.pending_changes[(instance, name)]
-        del self.old_values[(instance, name)]
 
     def apply(self, info=None):
         '''
         Called when Apply button is pressed.  Goes through all parameters that
         have changed and attempts to apply them.
         '''
-        for instance, name in self.pending_changes.keys():
-            self.apply_change(instance, name, info)
+        for key, value in self.pending_changes.items():
+            instance, name = key
+            self.apply_change(instance, name, value, info)
+            del self.pending_changes[key]
+            del self.old_values[key]
 
     def log_event(self, ts, name, value):
         log.debug("%d, %s, %r", ts, name, value)
