@@ -4,9 +4,11 @@ import numpy as np
 from enthought.traits.api import HasTraits, Any, Instance, DelegatesTo, \
         Int, Float, Property
 from enthought.traits.ui.api import View, Item, VGroup, HGroup, InstanceEditor,\
-    VSplit, HSplit, TabularEditor, Group, Include
+    VSplit, HSplit, TabularEditor, Group, Include, Tabbed
 
 from enthought.enable.api import Component, ComponentEditor
+
+import cns
 
 from abstract_experiment import AbstractExperiment
 from positive_data import PositiveData
@@ -22,6 +24,18 @@ from cns.chaco.timeseries_plot import TimeseriesPlot
 from cns.chaco.dynamic_bar_plot import DynamicBarPlot, DynamicBarplotAxis
 from cns.chaco.helpers import add_default_grids, add_time_axis
 
+from enthought.traits.ui.api import TableEditor, ObjectColumn, VGroup, Item
+from enthought.traits.ui.qt4.extra.bounds_editor import BoundsEditor
+
+monitor_editor = TableEditor(
+        show_row_labels=True,
+        sortable=False,
+        columns=[
+            ObjectColumn(name='number'),
+            ObjectColumn(name='gain'),
+            ]
+        )
+
 colors = {'light green': '#98FB98',
           'dark green': '#2E8B57',
           'light red': '#FFC8CB',
@@ -30,7 +44,7 @@ colors = {'light green': '#98FB98',
           'light blue': '#ADD8E6',
           }
 
-from enthought.traits.ui.api import TableEditor, ListColumn
+from enthought.traits.ui.api import TableEditor, ListColumn, ObjectColumn
 
 class TrialTypeColumn(ListColumn):
 
@@ -79,11 +93,12 @@ trial_log_table = TableEditor(
             ]
         )
 
-class AbstractPositiveExperiment(AbstractExperiment):
+from physiology_experiment_mixin import PhysiologyExperimentMixin
+
+class AbstractPositiveExperiment(AbstractExperiment, PhysiologyExperimentMixin):
 
     data = Instance(PositiveData)
     paradigm = Instance(AbstractPositiveParadigm, ())
-
     trial_log_view = Property(depends_on='data.trial_log')
 
     def _data_node_changed(self, new):
@@ -101,10 +116,11 @@ class AbstractPositiveExperiment(AbstractExperiment):
     par_count_plot  = Instance(Component)
     par_score_plot  = Instance(Component)
     par_dprime_plot = Instance(Component)
-    
+
     def _data_changed(self):
         self._generate_experiment_plot()
         self._generate_summary_plots()
+        self._generate_physiology_plot()
 
     def _generate_experiment_plot(self):
         plots = {}
@@ -121,7 +137,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
                 fill_color=(0.25, 0.41, 0.88, 0.5), rect_center=0.25,
                 rect_height=0.2)
 
-        add_default_grids(plot, major_index=5, minor_index=1)
+        add_default_grids(plot, major_index=1, minor_index=0.25)
         add_time_axis(plot, orientation='top')
         container.add(plot)
 
@@ -285,7 +301,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
 
     plots_group = VGroup(
             Item('experiment_plot', editor=ComponentEditor(),
-                show_label=False, width=600, height=200),
+                show_label=False, width=600, height=400),
             HGroup(
                 Item('par_count_plot', editor=ComponentEditor(),
                     show_label=False, width=150, height=150),
@@ -326,18 +342,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
         )
     
     traits_view = View(
-            HSplit(
-                VGroup(
-                    Item('handler.toolbar', style='custom'),
-                    Include('pump_group'),
-                    Include('status_group'),
-                    Item('paradigm', style='custom', editor=InstanceEditor()),
-                    show_labels=False,
-                ),
-                Include('plots_group'),
-                Include('experiment_group'),
-                show_labels=False,
-                ),
+            Include('traits_group'),
             resizable=True,
             kind='live',
             handler=AbstractPositiveController)

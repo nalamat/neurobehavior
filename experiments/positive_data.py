@@ -30,18 +30,53 @@ def apply_mask(fun, seq, mask):
 
 LOG_DTYPE = [('timestamp', 'i'), ('name', 'S64'), ('value', 'S128'), ]
 
-class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
+from enthought.traits.api import HasTraits
+from cns.channel import FileMultiChannel, RAMMultiChannel
+
+class PhysiologyDataMixin(HasTraits):
+
+    # This stores a copy of the most recent data in computer memory for quick
+    # access by the plotting functions.  This will *not* be saved in the HDF5
+    # file.
+    physiology_ram = Instance(RAMMultiChannel)
+
+    # These are the actual data stores
+    physiology_raw = Instance(FileMultiChannel, store='channel',
+            store_path='physiology/raw')
+
+    # These are the actual data stores
+    physiology_processed = Instance(FileMultiChannel, store='channel',
+            store_path='physiology/processed')
+
+    # The array of timestamps corresponding to stimulus onset
+    physiology_ts = Instance(FileChannel, store='channel',
+            store_path='physiology/ts')
+
+    def _physiology_ram_default(self):
+        return RAMMultiChannel(channels=16, fs=25e3)
+
+    def _physiology_raw_default(self):
+        physiology_node = get_or_append_node(self.store_node, 'physiology')
+        return FileMultiChannel(node=physiology_node, channels=16, name='raw',
+                dtype=np.float32)
+
+    def _physiology_processed_default(self):
+        physiology_node = get_or_append_node(self.store_node, 'physiology')
+        return FileMultiChannel(node=physiology_node, channels=16,
+                name='processed', dtype=np.float32)
+
+    def _physiology_ts_default(self):
+        physiology_node = get_or_append_node(self.store_node, 'physiology')
+        return FileChannel(node=physiology_node, channels=1, name='ts',
+                dtype=np.int32)
+
+class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData,
+        PhysiologyDataMixin):
 
     def get_data(self, name):
         return getattr(self, name)
 
-    version = Float(0.0)
-    latest_version = 0.1
-
-    version = 0.2
-
     store_node = Any
-    contact_fs = Float(500.0)
 
     contact_data = Any
 
@@ -69,8 +104,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
     def _create_channel(self, name, dtype):
         contact_node = get_or_append_node(self.store_node, 'contact')
-        return FileChannel(node=contact_node, fs=self.contact_fs,
-                           name=name, dtype=dtype)
+        return FileChannel(node=contact_node, name=name, dtype=dtype)
 
     def _poke_TTL_default(self):
         return self._create_channel('poke_TTL', np.bool)

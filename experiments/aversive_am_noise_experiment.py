@@ -12,4 +12,6 @@ class AversiveAMNoiseExperiment(AbstractAversiveExperiment):
     traits_view = View(Include('traits_group'),
                        resizable=True,
                        kind='live',
+                       height=0.9,
+                       width=0.9,
                        handler=AversiveAMNoiseController)
