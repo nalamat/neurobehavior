@@ -1,27 +1,19 @@
 from enthought.traits.api import HasTraits, Float, Enum, Property
 from enthought.traits.ui.api import View, Item, VGroup, HGroup
 
+from cns import SYRINGE_DEFAULT, SYRINGE_DATA
+
 class PumpParadigmMixin(HasTraits):
     
-    SYRINGE_DEFAULT = 'Popper 20cc (glass)'
-    SYRINGE_DATA = {
-            'B-D 10cc (plastic)': 14.43,
-            'B-D 20cc (plastic)': 19.05,
-            'B-D 30cc (plastic)': 21.59,
-            'B-D 60cc (plastic)': 26.59,
-            'Popper 20cc (glass)': 19.58,
-            'B-D 10cc (glass)': 14.20,
-            }
-
-    pump_rate = Float(0.5, store='attribute', init=True)
-    pump_rate_delta = Float(0.025, store='attribute', init=True)
+    pump_rate = Float(0.5, store='attribute', queue=True, init=True)
+    pump_rate_delta = Float(0.025, store='attribute', queue=True, init=True)
     pump_syringe = Enum(SYRINGE_DEFAULT, sorted(SYRINGE_DATA.keys()),
             store='attribute')
     pump_syringe_diameter = Property(store='attribute',
-            depends_on='pump_syringe', init=True)
+            depends_on='pump_syringe', queue=True, init=True)
 
     def _get_pump_syringe_diameter(self):
-        return self.SYRINGE_DATA[self.pump_syringe]
+        return SYRINGE_DATA[self.pump_syringe]
 
     # Note that we have defined two views here, a simple view and a more
     # detailed view.  When including this mixin class, you can choose which view

@@ -12,7 +12,8 @@ import logging
 from time import strftime
  
 # Log detailed information to file
-filename = 'C:/experiments/logs/%s neurobehavior' % strftime('%Y%m%d_%H%M')
+from cns import LOG_ROOT
+filename = join(LOG_ROOT, strftime('%Y%m%d_%H%M.log'))
 file_handler = logging.FileHandler(filename)
 fmt = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(fmt)
@@ -27,12 +28,3 @@ console_handler.setLevel(logging.DEBUG)
 logging.root.addHandler(console_handler)
 
 logging.root.setLevel(logging.DEBUG)
-
-#import logging.config
-#logging.config.fileConfig(log_config)
-
-if __name__ == '__main__':
-    log = logging.getLogger('test')
-    log.error('This is an error')
-    log.warn('This is a warning')
-    log.debug('This is a debug message')

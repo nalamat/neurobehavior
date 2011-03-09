@@ -1,6 +1,6 @@
-from enthought.traits.api import HasTraits
+from physiology_data_mixin import PhysiologyDataMixin
 
-class AbstractExperimentData(HasTraits):
+class AbstractExperimentData(PhysiologyDataMixin):
 
     def channel_from_buffer(self, buffer, channel_name):
         channel_trait = self.trait(channel_name)

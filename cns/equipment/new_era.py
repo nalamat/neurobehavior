@@ -70,6 +70,9 @@ class PumpUnitError(Exception):
         mesg = '%s: Expected units in %s, receved %s'
         return mesg % (self.cmd, self.expected, self.actual)
 
+
+print "\n\n\n\nLOADING MODULE\n\n\n"
+
 class PumpInterface(object):
 
     #####################################################################
@@ -148,10 +151,11 @@ class PumpInterface(object):
         self.connect()
 
     def connect(self):
-        try: self.ser.close()
-        except: pass
+        #try: self.ser.close()
+        #except: pass
         try:
-            self.ser.open()
+            if not self.ser.isOpen():
+                self.ser.open()
             for cmd in self._connect_seq:
                 try:
                     self.xmit(cmd)

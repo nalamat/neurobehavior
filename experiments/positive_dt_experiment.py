@@ -23,8 +23,8 @@ class PositiveDTExperiment(AbstractPositiveExperiment):
     plot_range          = Dict(Str, Instance(DataRange1D))
     color_index         = Int(0)
 
-    def _data_node_changed(self, new):
-        self.data = PositiveDTData(store_node=new)
+    #def _data_node_changed(self, new):
+    #    self.data = PositiveDTData(store_node=new)
 
     def _update_data_categories(self, index_name, value_name, component):
         plot_name = index_name+value_name
@@ -74,9 +74,6 @@ class PositiveDTExperiment(AbstractPositiveExperiment):
                         line_width=2)
                 overlay.add(p)
                 component.add(overlay)
-
-
-                #p.tools.append(ScatterInspector(p))
 
                 p.overlays.append(PlotAxis(p, orientation='left',
                     small_haxis_style=True, title=category_name))

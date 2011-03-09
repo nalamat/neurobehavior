@@ -7,8 +7,7 @@ from os.path import join
 
 class AversiveFMController(AbstractAversiveController):
 
-    def init_equipment(self):
-        # I have broken this out into a separate function because
+    def setup_experiment(self, info):
         # AversiveFMController needs to change the initialization sequence a
         # little (i.e. it needs to use different microcode and the microcode
         # does not contain int and trial buffers).

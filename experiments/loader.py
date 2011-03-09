@@ -10,53 +10,48 @@ import tables
 from os.path import join
 
 from enthought.traits.api import Any, Trait, TraitError, Bool
-from enthought.traits.ui.api import View, Item, VGroup, HGroup
+from enthought.traits.ui.api import View, Item, VGroup, HGroup, Spring
 
 import logging
 log = logging.getLogger(__name__)
 
 # Import the experiments
-from positive_stage1_experiment import PositiveStage1Experiment
-from positive_am_noise_experiment import PositiveAMNoiseExperiment
-from positive_dt_experiment import PositiveDTExperiment
-from aversive_fm_experiment import AversiveFMExperiment
-from aversive_am_noise_experiment import AversiveAMNoiseExperiment
-from aversive_noise_masking_experiment import AversiveNoiseMaskingExperiment
-
 from cns.data.ui.cohort import CohortEditor, CohortView, CohortViewHandler
 
-from enthought.traits.ui.menu import Menu, Action
+# Aversive
+from abstract_aversive_experiment import AbstractAversiveExperiment
+from aversive_data import RawAversiveData as AversiveData
+# Aversive FM
+from aversive_fm_paradigm import AversiveFMParadigm
+from aversive_fm_controller import AversiveFMController
+# Aversive AM Noise
+from aversive_am_noise_paradigm import AversiveAMNoiseParadigm
+from aversive_am_noise_controller import AversiveAMNoiseController
 
-cohort_editor = CohortEditor(menu=Menu(
-    # This is a list of the different "actions" one can call for each of the
-    # animals in the cohort file.  The action is a function defined on the
-    # handler.  All of these actions are currently tied to functions that launch
-    # the appropriate experiment.  Name is the string that should be displayed
-    # in the context menu (i.e.  the right-click pop-up menu).  action is the
-    # function on the controller/handler that should be called when that
-    # particular menu item is selected.  
-    Action(name='Appetitive (temporal integration)',
-           action='launch_appetitive_dt'),
-    Action(name='Appetitive (AM noise)',
-           action='launch_appetitive_am_noise'),
-    Action(name='Appetitive (Stage 1)', action='launch_appetitive_stage1'),
-    Action(name='Aversive (FM)', action='launch_aversive_fm'),
-    Action(name='Aversive (AM Noise)', action='launch_aversive_am_noise'),
-    Action(name='Aversive (Noise Masking)',
-           action='launch_aversive_noise_masking'),
-    ))
+# Positive
+from abstract_positive_experiment import AbstractPositiveExperiment
+from positive_data import PositiveData
+# Positive AM Noise
+from positive_am_noise_paradigm import PositiveAMNoiseParadigm
+from positive_am_noise_controller import PositiveAMNoiseController
+# Positive DT
+from positive_dt_experiment import PositiveDTExperiment
+from positive_dt_paradigm import PositiveDTParadigm
+from positive_dt_controller import PositiveDTController
+from positive_dt_data import PositiveDTData
+
+from cns.data.h5_utils import append_node, append_date_node
 
 class ExperimentCohortView(CohortView):
-
-    acquire_physiology = Bool(False)
 
     traits_view = View(
         VGroup(
             HGroup(
-                Item('object.cohort.description', style='readonly'),
-                Item('acquire_physiology'),
+                Item('object.cohort.description', style='readonly',
+                    springy=True),
+                show_border=True,
                 ),
-            Item('object.cohort.animals', editor=cohort_editor,
+            Item('object.cohort.animals', editor=CohortEditor(),
                  show_label=False, style='readonly'),
         ),
         title='Cohort',
@@ -67,13 +62,19 @@ class ExperimentCohortView(CohortView):
 
 class ExperimentLauncher(CohortViewHandler):
 
-    last_paradigm = Trait(None, Any)
+    experiment      = Any
+    paradigm        = Any
+    controller      = Any
+    data            = Any
+    spool_physiology = Bool(True)
+
+    last_paradigm   = Trait(None, Any)
 
     def init(self, info):
         if not self.load_file(info):
             sys.exit()
 
-    def launch_experiment(self, info, selected, etype):
+    def launch_experiment(self, info, selected):
         '''
         Runs specified experiment type.  On successful completion of an
         experiment, marks the animal as processed and saves the last paradigm
@@ -96,7 +97,7 @@ class ExperimentLauncher(CohortViewHandler):
             # and fall back to the default settings.
             store_node = get_or_append_node(animal_node, 'experiments')
             paradigm_node = get_or_append_node(store_node, 'last_paradigm')
-            paradigm_name = etype.__name__
+            paradigm_name = self.experiment.__name__
             paradigm = None
             try:
                 paradigm = persistence.load_object(paradigm_node, paradigm_name)
@@ -120,7 +121,19 @@ class ExperimentLauncher(CohortViewHandler):
                 log.exception(e)
                 error(info.ui.control, mesg)
                 
-            model = etype(store_node=store_node, animal=item)
+            pre = self.__class__.__name__ + '_'
+            exp_node = append_date_node(store_node, pre)
+            data_node = append_node(exp_node, 'data')
+
+            model = self.experiment(
+                    store_node=store_node, 
+                    exp_node=exp_node,
+                    data_node=data_node, 
+                    animal=item,
+                    data=self.data(store_node=data_node),
+                    paradigm=self.paradigm(),
+                    spool_physiology=self.spool_physiology,
+                    )
             
             try:
                 if paradigm is not None:
@@ -133,7 +146,12 @@ class ExperimentLauncher(CohortViewHandler):
             except TraitError:
                 log.debug('Prior paradigm is not compatible with experiment')
     
-            ui = model.edit_traits(parent=info.ui.control, kind='livemodal')
+            if self.controller is not None:
+                ui = model.edit_traits(parent=info.ui.control, kind='livemodal',
+                        handler=self.controller())
+            else:
+                ui = model.edit_traits(parent=info.ui.control, kind='livemodal')
+
             if ui.result:
                 persistence.add_or_update_object(model.paradigm, paradigm_node,
                         paradigm_name)
@@ -163,62 +181,83 @@ class ExperimentLauncher(CohortViewHandler):
             """
             error(info.ui.control, str(e) + '\n\n' + dedent(mesg))
 
-    # Functions to launch the different experiments from the context menu.  The
-    # options for the context menu are defined in cns.data.ui.cohort (in the
-    # animal_editor).  That really should be moved to this file since where it
-    # currently is located is not obvious.
+    def object_dclicked_changed(self, info):
+        if info.initialized:
+            self.launch_experiment(info, info.object.selected)
 
-    # When the context menu item is selected, it calls the function specified by
-    # "action" with two arguments, info (a handle to the current window) and the
-    # selected item.
-
-    def launch_appetitive_am_noise(self, info, selected):
-        self.launch_experiment(info, selected[0], PositiveAMNoiseExperiment)
-    
-    def launch_appetitive_dt(self, info, selected):
-        self.launch_experiment(info, selected[0], PositiveDTExperiment)
-
-    def launch_aversive_am_noise(self, info, selected):
-        self.launch_experiment(info, selected[0], AversiveAMNoiseExperiment)
-
-    def launch_aversive_fm(self, info, selected):
-        self.launch_experiment(info, selected[0], AversiveFMExperiment)
-
-    def launch_appetitive_stage1(self, info, selected):
-        self.launch_experiment(info, selected[0], PositiveStage1Experiment)
-
-    def launch_aversive_noise_masking(self, info, selected):
-        self.launch_experiment(info, selected[0], AversiveNoiseMaskingExperiment)
-
-def load_experiment_launcher():
-    ExperimentCohortView().configure_traits(handler=ExperimentLauncher())
-
-def test_experiment(etype):
-    # Since we are testing our experiment paradigm, we need to provide a
-    # temporary HDF5 file (i.e. a "dummy" cohort file) that the experiment can
-    # save its data to.
-    import tables
+def test_experiment(etype, spool_physiology):
     from cns import TEMP_ROOT
-    file_name = join(TEMP_ROOT, 'test.h5')
-    test_file = tables.openFile(file_name, 'w')
+    filename = join(TEMP_ROOT, 'test_experiment.hd5')
+    file = tables.openFile(filename, 'w')
+    store_node = file.root
 
-    if not etype.endswith('Experiment'):
-        etype += 'Experiment'
-    log.debug("Looking for experiment %s", etype)
-    experiment_class = globals()[etype]
-    log.debug("Setting up experiment %s", etype)
-    experiment = experiment_class(store_node=test_file.root)
-    log.debug("Initializing GUI for %s", etype)
-    experiment.configure_traits()
+    classes = EXPERIMENTS[etype]
+    experiment_class = classes[0]
+    paradigm_class = classes[1]
+    controller_class = classes[2]
+    data_class = classes[3]
 
-def profile_experiment(etype):
+    pre = experiment_class.__class__.__name__ + '_'
+    exp_node = append_date_node(store_node, pre)
+    data_node = append_node(exp_node, 'data')
+
+    model = experiment_class(
+            store_node=store_node, 
+            exp_node=exp_node,
+            data_node=data_node, 
+            data=data_class(store_node=data_node),
+            paradigm=paradigm_class(),
+            spool_physiology=spool_physiology,
+            )
+    model.configure_traits(handler=controller_class())
+
+def profile_experiment(etype, spool_physiology=False):
     from cns import TEMP_ROOT
     import cProfile
     profile_data_file = join(TEMP_ROOT, 'profile.dmp')
-    cProfile.run('test_experiment("%s")' % etype, profile_data_file)
+    cProfile.run('test_experiment("%s", %s)' % (etype, spool_physiology),
+            profile_data_file)
+
+    # Once experiment is done, print out some statistics
     import pstats
     p = pstats.Stats(profile_data_file)
     p.strip_dirs().sort_stats('cumulative').print_stats(50)
 
-if __name__ == '__main__':
-    profile_experiment(sys.argv[1])
+def launch_experiment(etype, spool_physiology=False, profile=False):
+    classes = EXPERIMENTS[etype]
+    experiment_class = classes[0]
+    paradigm_class = classes[1]
+    controller_class = classes[2]
+    data_class = classes[3]
+
+    handler = ExperimentLauncher(experiment=experiment_class,
+            paradigm=paradigm_class, controller=controller_class,
+            data=data_class, spool_physiology=spool_physiology)
+    ExperimentCohortView().configure_traits(handler=handler)
+
+EXPERIMENTS = {
+        'positive_am_noise': (
+            AbstractPositiveExperiment, 
+            PositiveAMNoiseParadigm,
+            PositiveAMNoiseController, 
+            PositiveData,
+            ),
+        'positive_dt': (
+            PositiveDTExperiment, 
+            PositiveDTParadigm,
+            PositiveDTController, 
+            PositiveDTData,
+            ),
+        'aversive_fm': (
+            AbstractAversiveExperiment, 
+            AversiveFMParadigm,
+            AversiveFMController, 
+            AversiveData,
+            ),
+        'aversive_am_noise': (
+            AbstractAversiveExperiment, 
+            AversiveFMParadigm,
+            AversiveFMController, 
+            AversiveData,
+            ),
+        }

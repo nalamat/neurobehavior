@@ -2,24 +2,28 @@ from enthought.enable.api import Component, ComponentEditor
 from enthought.chaco.api import LinearMapper, DataRange1D
 from enthought.traits.ui.api import VGroup, HGroup, Item, Include, View, \
         InstanceEditor, RangeEditor
-from enthought.traits.api import Instance, HasTraits, Float, DelegatesTo
+from enthought.traits.api import Instance, HasTraits, Float, DelegatesTo, Bool
+
+from physiology_paradigm_mixin import PhysiologyParadigmMixin
 
 from cns.chaco.helpers import add_default_grids, add_time_axis
 from cns.chaco.channel_data_range import ChannelDataRange
 from cns.chaco.extremes_channel_plot import ExtremesChannelPlot
 
-import cns
-
 class PhysiologyExperimentMixin(HasTraits):
 
-    physiology_plot = Instance(Component)
-    physiology_index_range = Instance(ChannelDataRange)
-    physiology_value_range = Instance(DataRange1D, ())
+    # Acquire physiology?
+    spool_physiology        = Bool(False)
+    physiology_settings     = Instance(PhysiologyParadigmMixin, ())
 
-    physiology_scale = Float(0.5e-3)
-    physiology_visible = DelegatesTo('physiology_plot', 'visible')
-    physiology_offset = DelegatesTo('physiology_plot', 'offset')
-    physiology_spacing = DelegatesTo('physiology_plot', 'spacing')
+    physiology_plot         = Instance(Component)
+    physiology_index_range  = Instance(ChannelDataRange)
+    physiology_value_range  = Instance(DataRange1D, ())
+
+    physiology_scale        = Float(0.5e-3)
+    physiology_visible      = DelegatesTo('physiology_plot', 'visible')
+    physiology_offset       = DelegatesTo('physiology_plot', 'offset')
+    physiology_spacing      = DelegatesTo('physiology_plot', 'spacing')
 
     def _physiology_value_range_update(self):
         value = len(self.physiology_visible)*self.physiology_scale
@@ -48,7 +52,7 @@ class PhysiologyExperimentMixin(HasTraits):
         self.physiology_plot = plot
 
     physiology_settings_group = VGroup(
-            Item('paradigm', style='custom',
+            Item('physiology_settings', style='custom',
                 editor=InstanceEditor(view='physiology_view')),
             Include('physiology_view_settings_group'),
             show_border=True,

@@ -28,20 +28,13 @@ class AbstractAversiveController(AbstractExperimentController,
 
     status = Property(Str, depends_on='state, current_trial')
 
-    '''
-    Sequence of initialization
-    * Configure variables
-    * Hit the run (i.e. start) button
-    * start_experiment is called
-    '''
-
-    def init_equipment(self):
+    def setup_experiment(self, info):
         # I have broken this out into a separate function because
         # AversiveFMController needs to change the initialization sequence a
         # little (i.e. it needs to use different microcode and the microcode
         # does not contain int and trial buffers).
         circuit = join(RCX_ROOT, 'aversive-behavior')
-        self.iface_behavior = DSPCircuit(circuit, 'RZ6')
+        self.iface_behavior = self.process.load_circuit(circuit, 'RZ6')
         self.buffer_trial = self.iface_behavior.get_buffer('trial', 'w')
         self.buffer_int = self.iface_behavior.get_buffer('int', 'w')
         self.buffer_TTL = self.iface_behavior.get_buffer('TTL', 'r',
@@ -50,7 +43,6 @@ class AbstractAversiveController(AbstractExperimentController,
                 src_type='int8', dest_type='float32', block_size=24)
 
     def start_experiment(self, info):
-        self.init_equipment()
         self.init_paradigm(self.model.paradigm)
 
         # Ensure that sampling frequencies are stored properly
@@ -78,12 +70,6 @@ class AbstractAversiveController(AbstractExperimentController,
         self.update_safe()
         self.update_warn()
 
-        # We want to start the circuit in the paused state (i.e. playing the
-        # intertrial signal but not presenting trials)
-        self.pause()
-        # Now we start the circuit
-        self.iface_behavior.start()
-
         # We monitor current_trial_end_ts to determine when a trial is over.
         # Let's grab the current value of trial_end_ts before we do anything
         # else.  If we grab it before starting the circuit, then it may not
@@ -93,6 +79,13 @@ class AbstractAversiveController(AbstractExperimentController,
         # known bug and the easiest way to work around it is to let the circuit
         # initialize and "settle" before grabbing the relevant values.
         self.current_trial_ts = self.get_trial_end_ts()
+
+        # We want to start the circuit in the paused state (i.e. playing the
+        # intertrial signal but not presenting trials)
+        self.pause()
+        
+        #self.tasks.append((self.monitor_pump, 5))
+        self.tasks.append((self.monitor_behavior, 1))
 
     def remind(self, info=None):
         self.state = 'manual'
@@ -113,7 +106,6 @@ class AbstractAversiveController(AbstractExperimentController,
 
     def stop_experiment(self, info=None):
         self.state = 'halted'
-        self.iface_behavior.stop()
 
         self.model.analyzed.mask_mode = 'none'
         # Save the data in our newly created node
@@ -123,14 +115,13 @@ class AbstractAversiveController(AbstractExperimentController,
         analyzed_node = get_or_append_node(self.model.data.store_node, 'Analyzed')
         add_or_update_object(self.model.analyzed, analyzed_node)
 
-    def tick_slow(self):
-        ts = self.get_ts()
-        seconds = int(ts/self.iface_behavior.fs)
-        self.monitor_pump()
-
-    def tick_fast(self):
+    def monitor_behavior(self):
+        print "monitor"
         self.update_safe()
-        self.pipeline_TTL.send(self.buffer_TTL.read())
+        data = self.buffer_TTL.read()
+        print data
+        #self.pipeline_TTL.send(self.buffer_TTL.read())
+        self.pipeline_TTL.send(data)
         self.pipeline_contact.send(self.buffer_contact.read())
 
         if self.current_trial_ts < self.get_trial_end_ts():

@@ -93,16 +93,11 @@ trial_log_table = TableEditor(
             ]
         )
 
-from physiology_experiment_mixin import PhysiologyExperimentMixin
-
-class AbstractPositiveExperiment(AbstractExperiment, PhysiologyExperimentMixin):
+class AbstractPositiveExperiment(AbstractExperiment):
 
     data = Instance(PositiveData)
     paradigm = Instance(AbstractPositiveParadigm, ())
     trial_log_view = Property(depends_on='data.trial_log')
-
-    def _data_node_changed(self, new):
-        self.data = PositiveData(store_node=new)
 
     def _get_trial_log_view(self):
         trial_log = np.array(self.data.trial_log, dtype=object)
@@ -340,9 +335,3 @@ class AbstractPositiveExperiment(AbstractExperiment, PhysiologyExperimentMixin):
             Include('experiment_group'),
             show_labels=False,
         )
-    
-    traits_view = View(
-            Include('traits_group'),
-            resizable=True,
-            kind='live',
-            handler=AbstractPositiveController)
