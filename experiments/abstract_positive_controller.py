@@ -3,7 +3,6 @@ from functools import partial
 from enthought.traits.api import Str, Property, Float, on_trait_change, \
         Instance, Any
 from enthought.traits.ui.api import View, Item, HGroup, spring
-from tdt import DSPProcess
 from pump_controller_mixin import PumpControllerMixin
 from abstract_experiment_controller import AbstractExperimentController
 from abstract_experiment_controller import ExperimentToolBar
@@ -44,11 +43,7 @@ class PositiveExperimentToolBar(ExperimentToolBar):
             kind='subpanel',
             )
 
-from physiology_controller_mixin import PhysiologyControllerMixin
-
-class AbstractPositiveController(AbstractExperimentController,
-                                 PumpControllerMixin,
-                                 PhysiologyControllerMixin):
+class AbstractPositiveController(AbstractExperimentController, PumpControllerMixin):
 
     # Override default implementation of toolbar used by AbstractExperiment
     toolbar = Instance(PositiveExperimentToolBar, (), toolbar=True)
@@ -56,12 +51,7 @@ class AbstractPositiveController(AbstractExperimentController,
     water_infused = Float(0)
     status = Property(Str, depends_on='state, current_trial, current_num_nogo')
 
-    process = Any
-    
-    def setup_process(self):
-        self.process = DSPProcess()
-
-    def setup_behavior(self):
+    def setup_experiment(self, info):
         circuit = join(RCX_ROOT, 'positive-behavior')
         self.iface_behavior = self.process.load_circuit(circuit, 'RZ6')
 
@@ -74,17 +64,6 @@ class AbstractPositiveController(AbstractExperimentController,
         self.buffer_to_end_TS = self.iface_behavior.get_buffer('TO\\', 'r',
                 src_type=np.int32, block_size=1)
 
-    def start_experiment(self, info):
-        # Load interface for the experiment
-        self.setup_process()
-        self.setup_behavior()
-        self.setup_physiology()
-        self.process.start()
-
-        log.debug("initializing paradigm")
-        self.init_paradigm(self.model.paradigm)
-
-        log.debug("updating data")
         self.model.data.trial_start_timestamp.fs = self.buffer_TTL.fs
         self.model.data.trial_end_timestamp.fs = self.buffer_TTL.fs
         self.model.data.timeout_start_timestamp.fs = self.buffer_TTL.fs
@@ -96,27 +75,25 @@ class AbstractPositiveController(AbstractExperimentController,
         self.model.data.response_TTL.fs = self.buffer_TTL.fs
         self.model.data.reward_TTL.fs = self.buffer_TTL.fs
 
-        log.debug("creating pipeline")
         targets = [self.model.data.poke_TTL, self.model.data.spout_TTL,
                    self.model.data.reaction_TTL, self.model.data.signal_TTL,
                    self.model.data.response_TTL, self.model.data.reward_TTL, ]
-
         self.pipeline_contact = deinterleave_bits(targets)
-        
-        # Configure circuit
+
+    def start_experiment(self, info):
+        self.init_paradigm(self.model.paradigm)
         self.current_trial_end_ts = self.get_trial_end_ts()
 
-        log.debug("starting")
         self.state = 'running'
-        #self.iface_behavior.start()
         self.iface_behavior.trigger('A', 'high')
         self.trigger_next()
 
+        self.tasks.append((self.monitor_behavior, 1))
+        self.tasks.append((self.monitor_pump, 5))
+        self.tasks.append((self.monitor_timeout, 5))
+
     def stop_experiment(self, info=None):
         self.state = 'halted'
-        self.iface_behavior.trigger('A', 'low')
-        self.iface_behavior.stop()
-
         add_or_update_object(self.model.paradigm, self.model.exp_node, 'paradigm')
         add_or_update_object(self.model.data, self.model.exp_node, 'data')
 
@@ -163,21 +140,17 @@ class AbstractPositiveController(AbstractExperimentController,
     ############################################################################
     # Master controller
     ############################################################################
-    def tick_slow(self):
-        ts = self.get_ts()
-        seconds = int(ts/self.iface_behavior.fs)
-        self.monitor_pump()
-        self.model.data.timeout_start_timestamp.send(self.buffer_to_start_TS.read())
-        self.model.data.timeout_end_timestamp.send(self.buffer_to_end_TS.read())
-
     def log_trial(self, ts_start, ts_end, last_ttype):
         parameter = self.current_setting_go.parameter
         self.model.data.log_trial(ts_start, ts_end, last_ttype, parameter)
 
-    def tick_fast(self):
+    def monitor_timeout(self):
+        self.model.data.timeout_start_timestamp.send(self.buffer_to_start_TS.read())
+        self.model.data.timeout_end_timestamp.send(self.buffer_to_end_TS.read())
+    
+    def monitor_behavior(self):
         ts_end = self.get_trial_end_ts()
         self.pipeline_contact.send(self.buffer_TTL.read().astype('i'))
-        self.monitor_physiology()
         if ts_end > self.current_trial_end_ts:
             # Trial is over.  Process new data and set up for next trial.
             self.current_trial_end_ts = ts_end
@@ -215,7 +188,6 @@ class AbstractPositiveController(AbstractExperimentController,
 
             log.debug('Next trial: %d, NOGO count: %d', self.current_trial,
                       self.current_num_nogo)
-
             self.trigger_next()
 
     ############################################################################

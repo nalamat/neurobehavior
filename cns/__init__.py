@@ -18,7 +18,8 @@ COHORT_ROOT = DATA_ROOT                    # location for cohort files
 # __file__ is a special variable that is available in all Python files (when
 # loaded by the Python interpreter) that contains the file path.  We extract the
 # directory portion of the path and use that to determine where the RCX files
-# are stored.
+# are stored.  We keep components in source code control as well to ensure that
+# changes to the RCX files track changes to the software.
 RCX_ROOT = join(abspath(dirname(__file__)), '../components')
 TDT_AUDIO = 'RZ6'
 TDT_BEHAVIOR = 'RZ6'
@@ -26,6 +27,17 @@ TDT_PHYSIOLOGY = 'RZ5'
 
 # extension to use for cohort files
 COHORT_WILDCARD = 'Cohort files (*.cohort.hd5)|*.cohort.hd5|'
+
+# Syringe data for the pump
+SYRINGE_DEFAULT = 'Popper 20cc (glass)'
+SYRINGE_DATA = {
+        'B-D 10cc (plastic)'    : 14.43,
+        'B-D 20cc (plastic)'    : 19.05,
+        'B-D 30cc (plastic)'    : 21.59,
+        'B-D 60cc (plastic)'    : 26.59,
+        'Popper 20cc (glass)'   : 19.58,
+        'B-D 10cc (glass)'      : 14.20,
+        }
 
 if __name__ == '__main__':
     # When you first install Neurobehavior on a new computer, you need to create

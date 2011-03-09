@@ -34,9 +34,10 @@ class AbstractAversiveExperiment(AbstractExperiment):
     par_count_chart     = Instance(Component)
     par_dprime_chart    = Instance(Component)
 
-    def _data_node_changed(self, new):
-        self.data = AversiveData(store_node=new)
-        self.analyzed = AnalyzedAversiveData(data=self.data)
+    def _data_changed(self, new):
+        #self.data = AversiveData(store_node=new)
+        print 'updating data location'
+        self.analyzed = AnalyzedAversiveData(data=new)
         self._update_experiment_plot()
         self._update_score_chart()
         self._update_plots()
@@ -261,10 +262,8 @@ class AbstractAversiveExperiment(AbstractExperiment):
            show_labels=False,
            )
     
-    traits_view = View(traits_group,
-                       resizable=True,
-                       kind='live',
-                       handler=AbstractAversiveController)
+    traits_view = View(traits_group, kind='live',
+            handler=AbstractAversiveController)
 
 if __name__ == "__main__":
     import tables

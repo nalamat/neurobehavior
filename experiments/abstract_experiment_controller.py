@@ -1,26 +1,27 @@
 from copy import deepcopy
 from datetime import datetime, timedelta
 
+from tdt import DSPProcess
+
 from enthought.pyface.api import error, confirm, YES
 from enthought.pyface.timer.api import Timer
 from enthought.etsconfig.api import ETSConfig
 from enthought.traits.api import Any, Instance, Enum, Dict, on_trait_change, \
-        HasTraits, List, Button, Bool
+        HasTraits, List, Button, Bool, Tuple, Callable, Int
 from enthought.traits.ui.api import Controller, View, HGroup, Item, spring
 
 from cns.widgets.toolbar import ToolBar
 from enthought.savage.traits.ui.svg_button import SVGButton
 from cns.widgets import icons
 
+from physiology_controller_mixin import PhysiologyControllerMixin
+
 import logging
 log = logging.getLogger(__name__)
 
 class ExperimentToolBar(ToolBar):
 
-    size = 24, 24
-
-    # We protect this import since we only need it for the Qt4 toolkit.  We
-    # don't want this imported if we use the WX backend.
+    size    = 24, 24
     kw      = dict(height=size[0], width=size[1], action=True)
     apply   = SVGButton('Apply', filename=icons.apply,
                         tooltip='Apply settings', **kw)
@@ -68,7 +69,7 @@ class ExperimentToolBar(ToolBar):
             kind='subpanel',
             )
 
-class AbstractExperimentController(Controller):
+class AbstractExperimentController(Controller, PhysiologyControllerMixin):
     """Primary controller for TDT System 3 hardware.  This class must be
     configured with a model that contains the appropriate parameters (e.g.
     Paradigm) and a view to show these parameters.
@@ -124,9 +125,6 @@ class AbstractExperimentController(Controller):
     state = Enum('halted', 'paused', 'running', 'manual', 'disconnected',
                  'complete')
 
-    # Acquire physiology?
-    acquire_physiology  = Bool(True)
-
     # name_ = Any are Trait wildcards
     # see http://code.enthought.com/projects/traits/docs
     # /html/traits_user_manual/advanced.html#trait-attribute-name-wildcard)
@@ -155,52 +153,72 @@ class AbstractExperimentController(Controller):
     window_     = Any
     screen_     = Any
 
+    # List of tasks to be run during experiment.  Each entry is a tuple
+    # (callable, frequency) where frequency is how often the task should be run.
+    # Tasks that are slow (e.g. communciating with the pump) should not be run
+    # as often.  A frequency of 1 indicates the task should be run on every
+    # "tick" of the timer, a frequency of 5 indicates the task should be run
+    # every 5 "ticks".  If the timer interval is set to 100 ms, then a frequency
+    # of 5 corresponds to 500 ms.  However, be warned that this is not
+    # deterministic.  If tasks take a while to complete, then the timer "slows
+    # down" as a result.
+    tasks       = List(Tuple(Callable, Int))
+    tick_count  = Int(1)
+
+    # The DSP process that will be responsible for handling all communication
+    # with the DSPs.  All circuits must be loaded and buffers initialized before
+    # the process is started (so the process can appropriately allocate the
+    # required shared memory resources).
+    process     = Any
+
     def init(self, info):
-        log.debug("Initializing equipment")
         try:
             self.model = info.object
-            log.debug("Initializing toolbars")
+
+            # The toolbars need a reference to the handler (i.e. this class) so
+            # they can communicate button-presses.
             for toolbar in self.trait_names(toolbar=True):
                 getattr(self, toolbar).install(self, info)
-            log.debug("Successfully initialized equipment")
 
             self.window_behavior = info.ui.control
+            self.window_behavior.showFullScreen()
 
             # If we want to spool physiology, launch the physiology window as
             # well.  It should appear in the second monitor.  The parent of this
             # window should be the current window (info.ui.control) that way
             # both windows get closed when the app exits.
-            if self.acquire_physiology:
+            if self.model.spool_physiology:
                 self.window_physiology = info.object.edit_traits(
                         parent=self.window_behavior,
                         view='physiology_view').control
 
-                # Now, let's get some information about the screen geometry so
-                # that the secondary window appears in the other monitor.  This
-                # does not deal with triple-head systems (nor has it been tested
-                # on "virtual" desktops).
-                from PyQt4.QtGui import QApplication
-                desktop = QApplication.desktop()
+            # Now, let's get some information about the screen geometry so that
+            # the secondary window appears in the other monitor.  This does not
+            # deal with triple-head systems (nor has it been tested on "virtual"
+            # desktops).
+            from PyQt4.QtGui import QApplication
+            desktop = QApplication.desktop()
 
-                # Determine which screen is the main one and set the secondary
-                # window geometry to the non-main screen.
-                self.screen_count = desktop.screenCount()
-                if self.screen_count == 2:
-                    self.screen_primary = desktop.primaryScreen()
-                    self.screen_0_geometry = desktop.screenGeometry(0)
-                    self.screen_1_geometry = desktop.screenGeometry(1)
-                self.window_toggle = 0
+            # Determine which screen is the main one and set the secondary
+            # window geometry to the non-main screen.
+            self.screen_count = desktop.screenCount()
+            if self.screen_count == 2:
+                self.screen_primary = desktop.primaryScreen()
+                self.screen_0_geometry = desktop.screenGeometry(0)
+                self.screen_1_geometry = desktop.screenGeometry(1)
+            self.window_toggle = 0
 
-                # We always want to show the experiment in fullscreen mode.  This
-                # assumes Qt4 is the GUI (wx has a slightly different method name).
-                self.window_behavior.showFullScreen()
-                self.window_mode = 'fullscreen'
-                self.swap_screens(None)
+            # We always want to show the experiment in fullscreen mode.  This
+            # assumes Qt4 is the GUI (wx has a slightly different method name).
+            self.window_mode = 'fullscreen'
+            self.swap_screens(None)
 
         except Exception, e:
-            log.error(e)
+            log.exception(e)
             self.state = 'disconnected'
             error(info.ui.control, str(e))
+
+    # GUI commands to toggle between window modes
 
     def toggle_maximized(self, info):
         if info.ui.control.isMaximized():
@@ -215,21 +233,26 @@ class AbstractExperimentController(Controller):
             info.ui.control.showFullScreen()
 
     def swap_screens(self, info):
-        # This code is Qt4 specific
+        # This code is Qt4 specific and will not work if wx is used
         if self.window_toggle:
-            self.window_physiology.setGeometry(self.screen_0_geometry)
             self.window_behavior.setGeometry(self.screen_1_geometry)
+            if self.window_physiology is not None:
+                self.window_physiology.setGeometry(self.screen_0_geometry)
             self.window_toggle = 0
         else:
-            self.window_physiology.setGeometry(self.screen_1_geometry)
             self.window_behavior.setGeometry(self.screen_0_geometry)
+            if self.window_physiology is not None:
+                self.window_physiology.setGeometry(self.screen_1_geometry)
             self.window_toggle = 1
+
         if self.window_mode == 'fullscreen':
-            self.window_physiology.showFullScreen()
             self.window_behavior.showFullScreen()
+            if self.window_physiology is not None:
+                self.window_physiology.showFullScreen()
         elif self.window_mode == 'maximized':
-            self.window_physiology.showMaximized()
             self.window_behavior.showMaximized()
+            if self.window_physiology is not None:
+                self.window_physiology.showMaximized()
 
     def close(self, info, is_ok):
         '''
@@ -271,21 +294,44 @@ class AbstractExperimentController(Controller):
             mesg += self.model.paradigm.err_messages()
             error(self.info.ui.control, mesg)
         try:
+            self.process = DSPProcess()
+            # I don't really like having this check here; however, it works for
+            # our purposes.
+            if self.model.spool_physiology:
+                # Ensure that the settings are applied
+                self.setup_physiology()
+
+            # setup_experiment should load the necessary circuits and initialize
+            # the buffers.  This data is required before the hardware process is
+            # launched since the shared memory, locks and pipelines must be
+            # created.  
+            self.setup_experiment(info)
+
+            # Start the harware process
+            self.process.start()
+
+            if self.model.spool_physiology:
+                settings = self.model.physiology_settings
+                self.init_paradigm(settings)
+                settings.on_trait_change(self.queue_change, '+')
+                self.tasks.append((self.monitor_physiology, 1))
+
+            # Now that the process is started, we can configure the circuit
+            # (e.g. read/write to tags) and gather the information we need to
+            # run the experiment.
             self.start_experiment(info)
+
+            # Save the start time in the model
             self.model.start_time = datetime.now()
-            self.timer_fast = Timer(100, self.tick_fast)
-            self.timer_slow = Timer(500, self.tick_slow)
+            self.timer = Timer(100, self.run_tasks)
+
         except BaseException, e:
             log.exception(e)
             error(self.info.ui.control, str(e))
 
     def stop(self, info=None):
-        try:
-            self.timer_fast.Stop()
-            self.timer_slow.Stop()
-        except AttributeError:
-            self.timer_fast.stop()
-            self.timer_slow.stop()
+        self.timer.stop()
+        self.process.stop()
 
         try:
             self.stop_experiment(info)
@@ -299,6 +345,12 @@ class AbstractExperimentController(Controller):
         except BaseException, e:
             log.exception(e)
             error(self.info.ui.control, str(e))
+
+    def run_tasks(self):
+        for task, frequency in self.tasks:
+            if frequency == 1 or self.tick_count % frequency:
+                task()
+        self.tick_count += 1
 
     ############################################################################
     # Apply/Revert code
@@ -320,9 +372,9 @@ class AbstractExperimentController(Controller):
     @on_trait_change('model.paradigm.+')
     def queue_change(self, instance, name, old, new):
         if self.state <> 'halted':
-            trait = self.model.paradigm.trait(name)
+            #trait = self.model.paradigm.trait(name)
+            trait = instance.trait(name)
             if trait.immediate == True:
-                print 'applying', name
                 self.apply_change(instance, name, new)
             else:
                 key = instance, name
@@ -350,7 +402,10 @@ class AbstractExperimentController(Controller):
             error(info.ui.control, mesg)
             log.warn(mesg + ", removing from stack")
             # Set paradigm value back to "old" value
-            setattr(self.model.paradigm, name, value)
+            try:
+                setattr(self.model.paradigm, name, value)
+            except:
+                pass
 
     def apply(self, info=None):
         '''
