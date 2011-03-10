@@ -3,14 +3,34 @@ Created on Jul 20, 2010
 
 @author: Brad
 '''
+import numpy as np
+import re
 import tables
 import logging
+from datetime import datetime
+
 log = logging.getLogger(__name__)
 
 name_lookup = {'group':     'Group',
                'earray':    'EArray',
                'array':     'Array',
                'table':     'Table'}
+
+def node_keys(node):
+    attrs = node._v_attrs._f_list('user')
+    attrs = set(attrs) - set(['module', 'klass'])
+    return list(attrs)
+
+def node_items(node):
+    attrs = node_keys(node)
+    values = [node._v_attrs[attr] for attr in attrs]
+    return attrs, values
+
+def rgetattr_or_none(obj, attr):
+    try:
+        return rgetattr(obj, attr)
+    except AttributeError:
+        return None
 
 def get_or_append_node(node, name, type='group', *arg, **kw):
     try:
@@ -32,17 +52,31 @@ def append_node(node, name, type='group', *arg, **kw):
 time_fmt = '%Y_%m_%d_%H_%M_%S'
 
 def extract_date_from_name(node, pre='date', post=''):
-    from datetime import datetime
-    import re
     name = node._v_name
     string = re.sub('^'+pre, '', name)
     string = re.sub(post+'$', '', string)
     return datetime.strptime(string, time_fmt)
     
 def append_date_node(node, pre='date', post='', type='group', *arg, **kw):
-    from datetime import datetime
     name = pre + datetime.now().strftime(time_fmt) + post
     return append_node(node, name, type, *arg, **kw)
+
+def _v_getattr(obj, extended_attr, strict=False):
+    if extended_attr == '':
+        return obj
+    if not strict and not hasattr(obj, extended_attr):
+        obj = getattr(obj, '_v_attrs')
+    return getattr(obj, extended_attr)
+
+def rgetattr(obj, extended_attr, strict=False):
+    if '.' in extended_attr:
+        base, extended_attr = extended_attr.split('.', 1)
+        if base == '':
+            base = '_v_parent'
+        obj = _v_getattr(obj, base, strict)
+        return rgetattr(obj, extended_attr, strict)
+    else:
+        return _v_getattr(obj, extended_attr, strict)
 
 def node_match(n, filter):
     '''Checks for match against each keyword.  If an attribute is missing or
@@ -50,16 +84,12 @@ def node_match(n, filter):
 
     Filter must be a dictionary
     '''
-    import re
 
-    for k, v in filter.items():
-        value = n
-        # Traverse object tree to get final attribute
-        for attr in k.split('.'):
-            try:
-                value = getattr(value, attr)
-            except AttributeError:
-                return False
+    for extended_attr, v in filter.items():
+        try:
+            value = rgetattr(n, extended_attr)
+        except AttributeError:
+            return False
 
         # Check to see if last value returned is a match
         if type(v) == type(''):
@@ -97,7 +127,7 @@ def _walk(where, filter, mode):
 
     To return all nodes with the attribute klass='Animal'
     >>> fh = tables.openFile('example_data.h5', 'r')
-    >>> animal_nodes = [n for n in walk_nodes(fh.root, {'klass': 'Animal'}]
+    >>> animal_nodes = list(walk_nodes(fh.root, {'_v_attrs.klass': 'Animal'}))
 
     To return all nodes who have a subnode, data, with the attribute
     klass='RawAversiveData*'
