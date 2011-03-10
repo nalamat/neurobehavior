@@ -4,29 +4,52 @@ import h5_utils
 class TestNode(object):
     
     def __init__(self, **kw):
+        for v in kw.values():
+            if isinstance(v, TestNode):
+                v._v_parent = self
         self.__dict__.update(kw)
 
     def _f_walkNodes(self):
-        for item in self.__dict__.values():
-            yield item
-            try:
-                for subitem in item._f_walkNodes():
-                    yield subitem
-            except AttributeError:
-                pass
+        for key, item in self.__dict__.items():
+            if key != '_v_parent':
+                yield item
+                try:
+                    for subitem in item._f_walkNodes():
+                        yield subitem
+                except AttributeError:
+                    pass
 
     def _f_iterNodes(self):
-        for item in self.__dict__.values():
-            yield item
-        
+        for key, item in self.__dict__.items():
+            if key != '_v_parent':
+                yield item
+
 class TestWalkNodes(unittest.TestCase):
 
     def setUp(self):
         #s Emulates dummy node
-        subnode_a = TestNode(x=4, y=5, z='hello')
-        subnode_b = TestNode(x=4, y=6, z=TestNode(x=4, y=6, a='world'))
-        subnode_c = TestNode(x=9, _v_attrs=TestNode(x='foo'))
-        self.node = TestNode(a=subnode_a, b=subnode_b, c=subnode_c)
+        subnode_a = TestNode(x=4, y=5, z='hello', a='test')
+        subnode_b = TestNode(a=7, x=4, y=6, z=TestNode(x=4, y=6, a='world'))
+        subnode_c = TestNode(x=9, _v_attrs=TestNode(x='foo', bar='zoo'))
+        self.node = TestNode(a=subnode_a, b=subnode_b, c=subnode_c, d=9)
+
+    def test_rgetattr(self):
+        attr = h5_utils.rgetattr(self.node, 'a')
+        self.assertEquals(attr, self.node.a)
+        attr = h5_utils.rgetattr(self.node, 'b.z.y')
+        self.assertEquals(attr, 6)
+        attr = h5_utils.rgetattr(self.node, 'c._v_attrs.x', strict=True)
+        self.assertEquals(attr, 'foo')
+        attr = h5_utils.rgetattr(self.node, 'c.bar', strict=False)
+        self.assertEquals(attr, 'zoo')
+        attr = h5_utils.rgetattr(self.node.b.z, '.a')
+        self.assertEquals(attr, 7)
+        attr = h5_utils.rgetattr(self.node.b.z, '..a.a')
+        self.assertEquals(attr, 'test')
+        attr = h5_utils.rgetattr(self.node.b.z, '.')
+        self.assertEquals(attr, self.node.b)
+        attr = h5_utils.rgetattr(self.node.b.z, '..')
+        self.assertEquals(attr, self.node)
 
     def assertNumNodes(self, iterable, num_expected):
         num_actual = len(list(iterable))
