@@ -1,0 +1,64 @@
+--- run.py
++++ run.py
+@@ -1,4 +1,7 @@
+ import logging
++logger = logging.getLogger()
++logger.addHandler(logging.StreamHandler())
++logger.setLevel(logging.DEBUG)
+ 
+ from enthought.envisage.core_plugin import CorePlugin
+ from enthought.envisage.ui.workbench.workbench_plugin import WorkbenchPlugin
+@@ -2,4 +5,5 @@
+ 
+ from enthought.envisage.core_plugin import CorePlugin
+ from enthought.envisage.ui.workbench.workbench_plugin import WorkbenchPlugin
++from enthought.envisage.ui.workbench.api import WorkbenchApplication
+ 
+@@ -5,6 +9,4 @@
+ 
+-from acme.lorenz.lorenz_application import LorenzApplication
+-from acme.lorenz.lorenz_plugin import LorenzPlugin
+-from acme.lorenz.lorenz_ui_plugin import LorenzUIPlugin
+-from acme.lorenz.animal_plugin import AnimalPlugin
++from plugins.cohort_plugin import CohortPlugin
++from plugins.cohort_ui_plugin import CohortUIPlugin
+ 
+@@ -10,2 +12,3 @@
+ 
++class AnalysisApplication(WorkbenchApplication):
+ 
+@@ -11,22 +14,10 @@
+ 
+-# Do whatever you want to do with log messages! Here we create a log file.
+-logger = logging.getLogger()
+-#logger.addHandler(logging.StreamHandler(file('lorenz.log', 'w')))
+-logger.addHandler(logging.StreamHandler())
+-logger.setLevel(logging.DEBUG)
+-
+-def main():
+-    """ Run the application. """
+-
+-    # Create an application with the specified plugins.
+-    lorenz_application = LorenzApplication(
+-        plugins=[
+-            CorePlugin(), WorkbenchPlugin(), LorenzPlugin(), LorenzUIPlugin(),
+-            AnimalPlugin(),
+-        ]
+-    )
+-
+-    lorenz_application.run()
+-    return
++    id = 'cns.analysis'
++    name = 'Data Analysis'
++    plugins = [CorePlugin(), 
++               WorkbenchPlugin(), 
++               CohortPlugin, 
++               CohortUIPlugin()
++              ]
+ 
+ if __name__ == '__main__':
+@@ -31,3 +22,3 @@
+ 
+ if __name__ == '__main__':
+-    main()
++    AnalysisApplication().run()
