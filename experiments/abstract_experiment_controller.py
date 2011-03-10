@@ -1,5 +1,6 @@
 from copy import deepcopy
 from datetime import datetime, timedelta
+from cns.data.persistence import add_or_update_object_node
 
 from tdt import DSPProcess
 
@@ -341,6 +342,8 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
 
             info.ui.view.close_result = True
             self.state = 'complete'
+
+            add_or_update_object_node(self.model, self.model.exp_node)
         except BaseException, e:
             log.exception(e)
             error(self.info.ui.control, str(e))
@@ -352,10 +355,10 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
                     task()
                 except BaseException, e:
                     # Display an error message to the user
-
+                    log.exception(e)
                     mesg = "The following exception occured in the program:" + \
                             "\n\n%s\n\nContinue or stop experiment and save" + \
-                            "data?"
+                            " data?"
                     mesg = mesg % str(e)
                     dialog = ConfirmationDialog(message=mesg, yes_label='Stop',
                             no_label='Continue')
@@ -479,7 +482,7 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
         Called when the experiment is stopped.  Shut down any pieces of hardware
         needed and be sure to save your data!
         '''
-        raise NotImplementedException
+        pass
 
     def get_ts(self):
         raise NotImplementedException

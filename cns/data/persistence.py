@@ -160,7 +160,7 @@ def add_object(object, node, name=None):
 
     persist_object(object, node)
 
-def add_or_update_object(object, node, name=None):
+def add_or_update_object(object, node, name=None, as_subnode=True):
     h5_file = node._v_file
     h5_path = node._v_pathname
     base_name = object.__class__.__name__
@@ -187,6 +187,9 @@ def add_or_update_object(object, node, name=None):
         except: 
             pass
 
+    add_or_update_object_node(object, object_node)
+
+def add_or_update_object_node(object, object_node):
     # Info that allows us to recreate the object later
     object_node._f_setAttr('module', object.__class__.__module__)
     object_node._f_setAttr('klass', object.__class__.__name__)
@@ -209,7 +212,7 @@ def add_or_update_object(object, node, name=None):
             store(object_node, object, name, trait)
 
     append_metadata(object, object_node)
-    h5_file.flush()
+    object_node._v_file.flush()
     return object_node
 
 date_classes = [datetime.date, datetime.time, datetime.datetime]
