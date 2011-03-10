@@ -70,9 +70,6 @@ class PumpUnitError(Exception):
         mesg = '%s: Expected units in %s, receved %s'
         return mesg % (self.cmd, self.expected, self.actual)
 
-
-print "\n\n\n\nLOADING MODULE\n\n\n"
-
 class PumpInterface(object):
 
     #####################################################################
@@ -179,7 +176,7 @@ class PumpInterface(object):
             # Raised when it cannot find the global name 'SERIAL' (which
             # typically indicates a problem connecting to COM1).  Let's
             # translate this to a human-understandable error.
-            print e
+            log.exception(e)
             raise PumpCommError('SER')
 
     def disconnect(self):

@@ -23,12 +23,13 @@ class AbstractExperiment(PhysiologyExperimentMixin):
     exp_node            = Any
     data_node           = Any
 
-    data                = Instance(AbstractExperimentData, store='node')
-    paradigm            = Instance(AbstractExperimentParadigm, store='node')
+    data                = Instance(AbstractExperimentData, store='child')
+    paradigm            = Instance(AbstractExperimentParadigm, store='child')
 
     start_time          = Instance(datetime, store='attribute')
     stop_time           = Instance(datetime, store='attribute')
     duration            = Property(store='attribute')
+    date                = Property(store='attribute', depends_on='start_time')
 
     def _get_date(self):
         return self.start_time.date()

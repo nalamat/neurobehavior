@@ -92,11 +92,6 @@ class AbstractPositiveController(AbstractExperimentController, PumpControllerMix
         self.tasks.append((self.monitor_pump, 5))
         self.tasks.append((self.monitor_timeout, 5))
 
-    def stop_experiment(self, info=None):
-        self.state = 'halted'
-        add_or_update_object(self.model.paradigm, self.model.exp_node, 'paradigm')
-        add_or_update_object(self.model.data, self.model.exp_node, 'data')
-
     def _get_status(self):
         if self.state == 'disconnected':
             return 'Cannot connect to equipment'

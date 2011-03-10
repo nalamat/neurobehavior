@@ -24,9 +24,9 @@ log = logging.getLogger(__name__)
 
 class AbstractAversiveExperiment(AbstractExperiment):
 
-    data                = Instance(AversiveData)
-    analyzed            = Instance(AnalyzedAversiveData)
-    paradigm            = Instance(AbstractAversiveParadigm, ())
+    data                = Instance(AversiveData, store='node')
+    analyzed            = Instance(AnalyzedAversiveData, store='node')
+    paradigm            = Instance(AbstractAversiveParadigm, (), store='node')
 
     experiment_plot     = Instance(Component)
     par_score_chart     = Instance(Component)
@@ -35,8 +35,6 @@ class AbstractAversiveExperiment(AbstractExperiment):
     par_dprime_chart    = Instance(Component)
 
     def _data_changed(self, new):
-        #self.data = AversiveData(store_node=new)
-        print 'updating data location'
         self.analyzed = AnalyzedAversiveData(data=new)
         self._update_experiment_plot()
         self._update_score_chart()

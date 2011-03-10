@@ -105,23 +105,11 @@ class AbstractAversiveController(AbstractExperimentController,
         self.trigger_next()
 
     def stop_experiment(self, info=None):
-        self.state = 'halted'
-
         self.model.analyzed.mask_mode = 'none'
-        # Save the data in our newly created node
-        #add_or_update_object(self.pump, self.model.exp_node, 'Pump')
-        add_or_update_object(self.model.paradigm, self.model.exp_node, 'Paradigm')
-        add_or_update_object(self.model.data, self.model.exp_node, 'Data')
-        analyzed_node = get_or_append_node(self.model.data.store_node, 'Analyzed')
-        add_or_update_object(self.model.analyzed, analyzed_node)
 
     def monitor_behavior(self):
-        print "monitor"
         self.update_safe()
-        data = self.buffer_TTL.read()
-        print data
-        #self.pipeline_TTL.send(self.buffer_TTL.read())
-        self.pipeline_TTL.send(data)
+        self.pipeline_TTL.send(self.buffer_TTL.read())
         self.pipeline_contact.send(self.buffer_contact.read())
 
         if self.current_trial_ts < self.get_trial_end_ts():
