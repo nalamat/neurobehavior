@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 from tdt import DSPProcess
 
-from enthought.pyface.api import error, confirm, YES
+from enthought.pyface.api import error, confirm, YES, ConfirmationDialog
 from enthought.pyface.timer.api import Timer
 from enthought.etsconfig.api import ETSConfig
 from enthought.traits.api import Any, Instance, Enum, Dict, on_trait_change, \
@@ -332,7 +332,6 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
     def stop(self, info=None):
         self.timer.stop()
         self.process.stop()
-
         try:
             self.stop_experiment(info)
             self.model.stop_time = datetime.now()
@@ -349,7 +348,20 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
     def run_tasks(self):
         for task, frequency in self.tasks:
             if frequency == 1 or self.tick_count % frequency:
-                task()
+                try:
+                    task()
+                except BaseException, e:
+                    # Display an error message to the user
+
+                    mesg = "The following exception occured in the program:" + \
+                            "\n\n%s\n\nContinue or stop experiment and save" + \
+                            "data?"
+                    mesg = mesg % str(e)
+                    dialog = ConfirmationDialog(message=mesg, yes_label='Stop',
+                            no_label='Continue')
+                    if dialog.open() == YES:
+                        self.stop(self.info)
+
         self.tick_count += 1
 
     ############################################################################

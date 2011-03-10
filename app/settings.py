@@ -8,23 +8,42 @@ import sys
 libdir = abspath(join(dirname(__file__), '..'))
 sys.path.insert(0, libdir)
 
-import logging
-from time import strftime
- 
-# Log detailed information to file
 from cns import LOG_ROOT
+import logging.config
+from time import strftime
+
+time_format = '[%(asctime)s] %(processName)s:%(threadName)s :: %(name)s - %(levelname)s - %(message)s'
+simple_format = '%(name)s - %(levelname)s - %(message)s'
 filename = join(LOG_ROOT, strftime('%Y%m%d_%H%M.log'))
-file_handler = logging.FileHandler(filename)
-fmt = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(fmt)
-file_handler.setLevel(logging.DEBUG)
-logging.root.addHandler(file_handler)
 
-# Print pertinent information to console
-console_handler = logging.StreamHandler()
-fmt = logging.Formatter(fmt='%(levelname)s - %(name)s - %(message)s')
-console_handler.setFormatter(fmt)
-console_handler.setLevel(logging.DEBUG)
-logging.root.addHandler(console_handler)
+logging_config = {
+        'version': 1,
+        'formatters': {
+            'time': { 'format': time_format },
+            'simple': { 'format': simple_format },
+            },
+        'handlers': {
+            'console': {
+                'class': 'logging.StreamHandler',
+                'level': 'WARN',
+                'formatter': 'simple',
+                },
+            'file': {
+                'class': 'logging.FileHandler',
+                'level': 'DEBUG',
+                'formatter': 'time',
+                'filename': filename,
+                }
+            },
+        'loggers': {
+            'enthought.chaco.barplot': {
+                'level': 'CRITICAL',
+                },
+            },
+        'root': {
+            'level': 'DEBUG',
+            'handlers': ['console', 'file'],
+            },
+        }
 
-logging.root.setLevel(logging.DEBUG)
+logging.config.dictConfig(logging_config)
