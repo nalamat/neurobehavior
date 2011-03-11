@@ -30,8 +30,22 @@ def cluster(r, groupby):
 common_nodes = {
     'paradigm': { '_v_name': 'paradigm' },
     'par_info': { '.klass': 'PositiveDTData', '_v_name': 'par_info' },
-    'animals': { 'klass': 'Animal' },
+    'animals':  { 'klass': 'Animal' },
     }
+
+# Before you can understand how the code works, you need to understand a little
+# about how the HDF5 data structure is represented in Python.  PyTables has a
+# really nice API (application programming interface) that we can use to access
+# the "nodes" of the table.  First, open a 'handle' to the file.
+# >>> fh = tables.openFile('filename', 'r')
+# The top-level node can be accessed via an attribute called root
+# >>> root = fh.root
+# A child node can be accessed via it's name
+# >>> animal = fh.root.Cohort_0.animals.Animal_0
+# The properties of the animal are stored in a special "node" called _v_attrs
+# (this is a PyTables-specific feature, other HDF5 libraries may have different
+# methods for accessing the attribute).
+# >>> nyu_id = fh.root.Cohort_0.animals.Animal_0._v_attrs.nyu_id
 
 def extract_table(input_files, output_file, filters, fields=None):
     # Gather all the data nodes by looking for the nodes in the HDF5 tree that
@@ -71,8 +85,9 @@ def extract_table(input_files, output_file, filters, fields=None):
                 new_attrs.append(attr)
                 new_names.append(name)
 
-        # set() is a special function that ensures that all items in the list
-        # are unique.
+        # set() is a special datatype that ensures that all items in the list
+        # are unique.  By converting our list to a set, then back, we can be
+        # guaranteed that our new list has only unique items.
         fields = sorted(set(zip(new_attrs, new_names)))
         attrs, names = zip(*fields)
 
