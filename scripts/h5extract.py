@@ -107,9 +107,9 @@ def extract_table(input_files, output_file, filters, fields=None):
             # float in a later version).  We cannot concatenate record arrays
             # that have slightly different datatypes.  However, Numpy offers a
             # very powerful function called fromrecords that automatically
-            # coerces fields (i.e. columns) in the records to a common datatype.
-            # We maintain a list of all the records (i.e. rows) found during the
-            # extraction process.
+            # coerces fields (i.e. columns) in the records to a common datatype
+            # when creating the record array.  We extract a list of the records
+            # in the array (using the tolist() function).  
             data_records.extend(d.tolist())
 
         # Now that we have a list of all the records, let's make the final

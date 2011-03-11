@@ -98,7 +98,8 @@ class ExperimentLauncher(CohortViewHandler):
             # and fall back to the default settings.
             store_node = get_or_append_node(animal_node, 'experiments')
             paradigm_node = get_or_append_node(store_node, 'last_paradigm')
-            paradigm_name = self.experiment.__name__
+            #paradigm_name = self.experiment.__name__
+            paradigm_name = self.node_name
             paradigm = None
             try:
                 paradigm = persistence.load_object(paradigm_node, paradigm_name)
