@@ -21,7 +21,7 @@ class AbstractAversiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
     order         = Trait('descending', choice.options, store='attribute',
                           init=True)
     warn_sequence = List(Instance(TrialSetting), minlen=1,
-                         store='child', init=True)
+                         store='child', init=True, editor=trial_setting_editor)
     remind        = Instance(TrialSetting, (), store='child', init=True)
     safe          = Instance(TrialSetting, (), store='child', init=True)
 
@@ -61,10 +61,7 @@ class AbstractAversiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
             Item('safe', style='custom', label='Safe'),
             VGroup(
                 Item('order', label='Order'),
-                HGroup(
-                    Item('warn_sequence', show_label=False,
-                         editor=trial_setting_editor)
-                    ),
+                HGroup(Item('warn_sequence', show_label=False)),
                 show_border=True, 
                 label='Warn'
                 ),
@@ -94,8 +91,8 @@ class AbstractAversiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
 
     traits_view = View(
             Tabbed(
-                par_group, 
-                timing_group, 
+                Include('par_group'), 
+                Include('timing_group'), 
                 Include('signal_group'),
                 ),
             resizable=True,
