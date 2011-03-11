@@ -1,5 +1,4 @@
 from enthought.traits.api import List, Tuple, Float, Int, Str, Property
-
 from positive_data import PositiveData
 
 class PositiveDTData(PositiveData):
