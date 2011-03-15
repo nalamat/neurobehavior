@@ -45,6 +45,7 @@ class ChannelPlot(BaseXYPlot):
                 low = int(self.channel.t0*fs)
             high = int(self.index_range.high*fs)
             self.index_values = np.arange(low, high)/fs
+            self._data_cache_valid = False
 
     def _index_mapper_changed(self, old, new):
         super(ChannelPlot, self)._index_mapper_changed(old, new)

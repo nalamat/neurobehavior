@@ -1,8 +1,7 @@
 from datetime import datetime
 
-from enthought.traits.api import HasTraits, Any, Instance, Property, Bool, \
-        DelegatesTo
-from enthought.traits.ui.api import View, Include
+from enthought.traits.api import HasTraits, Any, Instance, Property
+from enthought.traits.ui.api import View, Include, VGroup, Item
 
 from cns.data.h5_utils import append_date_node, append_node
 
@@ -48,6 +47,12 @@ class AbstractExperiment(PhysiologyExperimentMixin):
         KeyBinding(binding1='Ctrl-s', method_name='swap_screens'),
         KeyBinding(binding1='Ctrl-r', method_name='start'),
         )
+
+    traits_group = VGroup(
+            Item('handler.toolbar', style='custom'),
+            Item('paradigm', style='custom'),
+            show_labels=False,
+            )
 
     traits_view = View(
             Include('traits_group'), 

@@ -95,8 +95,6 @@ trial_log_table = TableEditor(
 
 class AbstractPositiveExperiment(AbstractExperiment):
 
-    #data = Instance(PositiveData, store='node')
-    #paradigm = Instance(AbstractPositiveParadigm, (), store='node')
     trial_log_view = Property(depends_on='data.trial_log')
 
     def _get_trial_log_view(self):
@@ -115,7 +113,6 @@ class AbstractPositiveExperiment(AbstractExperiment):
     def _data_changed(self):
         self._generate_experiment_plot()
         self._generate_summary_plots()
-        self._generate_physiology_plot()
 
     def _generate_experiment_plot(self):
         plots = {}

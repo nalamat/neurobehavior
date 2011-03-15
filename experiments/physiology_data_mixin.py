@@ -23,7 +23,7 @@ class PhysiologyDataMixin(HasTraits):
             store_path='physiology/ts')
 
     def _physiology_ram_default(self):
-        return RAMMultiChannel(channels=16, fs=25e3)
+        return RAMMultiChannel(channels=16, fs=25e3, window=5)
 
     def _physiology_raw_default(self):
         physiology_node = get_or_append_node(self.store_node, 'physiology')

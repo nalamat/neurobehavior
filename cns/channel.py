@@ -349,24 +349,35 @@ class RAMChannel(Channel):
     def _partial_write(self, data):
         size = data.shape[-1]
         if size > self.samples:
+            # If we have too much data to write to the buffer, drop the extra
+            # samples.  Offset should be incremented by the number of samples
+            # dropped.  Furthermore, we now have a "full" buffer so we switch to
+            # the _full_write method from now on.
             self.buffer = data[..., -self.samples:]
             self.dropped = size-self.samples
             self.offset = size-self.samples
+            # Switch to the full write mode
+            del self.partial_idx
+            self.buffer_full = True
             self._write = self._full_write
         elif self.partial_idx+size > self.samples:
-            overflow = (self.partial_idx+size)-self.samples
-            remainder = size-overflow
-            self.buffer[..., self.partial_idx:] = data[..., :remainder]
+            # If the number of samples available is greater than the remaining
+            # slots in the buffer, write what we can to the buffer and then
+            # switch to _full_write for the remaining samples.
+            overflow_size = (self.partial_idx+size)-self.samples
+            initial_size = size-overflow_size
+            self.buffer[..., self.partial_idx:] = data[..., :initial_size]
+            # Switch to the full write mode
             del self.partial_idx
-            self._write = self._full_write
             self.buffer_full = True
-            self._write(data[..., -overflow:])
+            self._write = self._full_write
+            # Write the remaining samples to the buffer
+            self._write(data[..., -overflow_size:])
         else:
             self.buffer[..., self.partial_idx:self.partial_idx+size] = data
             self.partial_idx += size
 
     def _full_write(self, data):
-        #size = len(data)
         size = data.shape[-1]
         if size == 0:
             return

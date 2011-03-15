@@ -43,7 +43,7 @@ class ExtremesChannelPlot(ChannelPlot):
     '''
 
     # Offset of all channels along the value axis
-    offset  = Float(0.5e-3)
+    offset  = Float(0.25e-3)
 
     # Distance between each channel along the value axis
     spacing = Float(0.5e-3)

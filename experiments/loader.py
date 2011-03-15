@@ -39,6 +39,12 @@ from positive_dt_experiment import PositiveDTExperiment
 from positive_dt_paradigm import PositiveDTParadigm
 from positive_dt_controller import PositiveDTController
 from positive_dt_data import PositiveDTData
+# Basic Characterization
+from abstract_experiment import AbstractExperiment
+from basic_characterization_paradigm import BasicCharacterizationParadigm
+from basic_characterization_controller import BasicCharacterizationController
+#from physiology_data_mixin import PhysiologyDataMixin
+from abstract_experiment_data import AbstractExperimentData
 
 from cns.data.h5_utils import append_node, append_date_node
 
@@ -222,6 +228,13 @@ def launch_experiment(etype, spool_physiology=False, profile=False):
     ExperimentCohortView().configure_traits(handler=handler)
 
 EXPERIMENTS = {
+        'basic_characterization': {
+            'experiment_class': AbstractExperiment, 
+            'paradigm_class': BasicCharacterizationParadigm,
+            'controller_class': BasicCharacterizationController, 
+            'data_class': AbstractExperimentData,
+            'node_name': 'BasicCharacterizationExperiment',
+            },
         'positive_am_noise': {
             'experiment_class': AbstractPositiveExperiment, 
             'paradigm_class': PositiveAMNoiseParadigm,

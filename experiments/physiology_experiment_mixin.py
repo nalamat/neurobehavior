@@ -1,8 +1,9 @@
 from enthought.enable.api import Component, ComponentEditor
 from enthought.chaco.api import LinearMapper, DataRange1D
 from enthought.traits.ui.api import VGroup, HGroup, Item, Include, View, \
-        InstanceEditor, RangeEditor
-from enthought.traits.api import Instance, HasTraits, Float, DelegatesTo, Bool
+        InstanceEditor, RangeEditor, HSplit
+from enthought.traits.api import Instance, HasTraits, Float, DelegatesTo, \
+        Bool, on_trait_change
 
 from physiology_paradigm_mixin import PhysiologyParadigmMixin
 
@@ -36,14 +37,15 @@ class PhysiologyExperimentMixin(HasTraits):
     def _physiology_scale_changed(self, value):
         self._physiology_value_range_update()
 
+    @on_trait_change('data')
     def _generate_physiology_plot(self):
         self.physiology_index_range = ChannelDataRange(span=5, trig_delay=1,
                 timeseries=self.data.physiology_ts,
-                sources=[self.data.physiology_ram])
+                sources=[self.data.physiology_processed])
 
         index_mapper = LinearMapper(range=self.physiology_index_range)
         value_mapper = LinearMapper(range=self.physiology_value_range)
-        plot = ExtremesChannelPlot(channel=self.data.physiology_ram, 
+        plot = ExtremesChannelPlot(channel=self.data.physiology_processed, 
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 padding=[20, 20, 50, 50], bgcolor='white')
 
@@ -79,7 +81,7 @@ class PhysiologyExperimentMixin(HasTraits):
             )
 
     physiology_view = View(
-            HGroup(
+            HSplit(
                 Include('physiology_settings_group'),
                 Item('physiology_plot', editor=ComponentEditor(), width=1400,
                     resizable=True),

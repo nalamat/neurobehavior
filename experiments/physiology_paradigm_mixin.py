@@ -35,6 +35,7 @@ class PhysiologyParadigmMixin(HasTraits):
     diff_bundle     = Button('Bundle')
     diff_sagittal   = Button('Sagittal')
     diff_coronal    = Button('Coronal')
+    diff_all        = Button('All')
 
     def _get_diff_group(self, channel, group):
         ub = int(ceil(channel/group)*group + 1)
@@ -58,10 +59,17 @@ class PhysiologyParadigmMixin(HasTraits):
             value = self._get_diff_group(channel.number, 8)
             channel.set(True, differential=value)
 
+    def _diff_all_fired(self):
+        for channel in self.channel-settings:
+            value = self._get_diff_group(channel.number, 16)
+            channel.set(True, differential=value)
+
     diff_group = HGroup(
             Item('diff_bundle'),
             Item('diff_sagittal'),
             Item('diff_coronal'),
+            Item('diff_all'),
+            Item('diff_none'),
             show_labels=False,
             )
 
