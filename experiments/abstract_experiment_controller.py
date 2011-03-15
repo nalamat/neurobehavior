@@ -343,6 +343,7 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
             info.ui.view.close_result = True
             self.state = 'complete'
 
+            print 'SAVING NODE'
             add_or_update_object_node(self.model, self.model.exp_node)
         except BaseException, e:
             log.exception(e)
