@@ -23,8 +23,8 @@ WATER_DTYPE = [('timestamp', 'i'), ('infused', 'f')]
 
 TRIAL_DTYPE = [('timestamp', 'i'), 
                ('par', 'f'), 
-               ('trial_end_ts', 'i'),
                ('type', 'S16'), 
+               ('trial_end_ts', 'i'),
               ]
 
 EVENT_DTYPE = [('timestamp', 'i'), ('name', 'S64'), ('value', 'S128'), ]
@@ -67,7 +67,7 @@ class RawAversiveData_v0_2(AbstractExperimentData):
         self.event_log.append((timestamp, name, '%r' % value))
 
     def log_trial(self, ts_start, ts_end, par, type):
-        self.trial_log.append((ts_start, par, type, ts_end))
+        self.trial_log.append((int(ts_start), par, type, int(ts_end)))
 
     #-------------------------------------------------------------------
     # Raw data
@@ -207,7 +207,7 @@ class RawAversiveData_v0_2(AbstractExperimentData):
 
     @cached_property
     def _get_ttype_seq(self):
-        return [t[3] for t in self.trial_log]
+        return [t[2] for t in self.trial_log]
 
     @cached_property
     def _get_total_indices(self):
