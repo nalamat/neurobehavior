@@ -30,7 +30,14 @@ def apply_mask(fun, seq, mask):
 
 LOG_DTYPE = [('timestamp', 'i'), ('name', 'S64'), ('value', 'S128'), ]
 
+# Version log
+#
+# 110315 - Fixed bug in par_info where fa_frac and hit_frac columns were
+# swapped.  Script migrate_positive_data_v1_v2 will correct this bug.
 class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
+
+    # VERSION is a reserved keyword in HDF5 files, so I avoid using it here.
+    OBJECT_ NoneVERSION = Float(2.0, store='attribute')
 
     def get_data(self, name):
         return getattr(self, name)

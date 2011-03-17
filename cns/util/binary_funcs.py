@@ -1,5 +1,14 @@
 import numpy as np
 
+def ts(TTL):
+    return np.flatnonzero(TTL)
+
+def edge_rising(TTL):
+    return np.r_[0, np.diff(TTL.astype('i'))] == 1
+
+def edge_falling(TTL):
+    return np.r_[0, np.diff(TTL.astype('i'))] == -1
+
 def int_to_TTL(a, width):
     '''
     Converts a 1D array of integers to a 2D boolean array based on the binary
