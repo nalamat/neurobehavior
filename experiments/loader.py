@@ -34,6 +34,7 @@ from positive_data import PositiveData
 # Positive AM Noise
 from positive_am_noise_paradigm import PositiveAMNoiseParadigm
 from positive_am_noise_controller import PositiveAMNoiseController
+from positive_am_noise_data import PositiveAMNoiseData
 # Positive DT
 from positive_dt_experiment import PositiveDTExperiment
 from positive_dt_paradigm import PositiveDTParadigm
@@ -221,12 +222,13 @@ def launch_experiment(etype, spool_physiology=False, profile=False):
             **EXPERIMENTS[etype])
     ExperimentCohortView().configure_traits(handler=handler)
 
+# Define the classes required for each experiment
 EXPERIMENTS = {
         'positive_am_noise': {
             'experiment_class': AbstractPositiveExperiment, 
             'paradigm_class': PositiveAMNoiseParadigm,
             'controller_class': PositiveAMNoiseController, 
-            'data_class': PositiveData,
+            'data_class': PositiveAMNoiseData,
             'node_name': 'PositiveAMNoiseExperiment',
             },
         'positive_dt': {

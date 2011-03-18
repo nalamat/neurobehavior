@@ -90,6 +90,7 @@ trial_log_table = TableEditor(
             TrialTypeColumn(index=0, label='parameter'),
             TrialResponseColumn(index=4, label='response'),
             TrialTypeColumn(index=5, label='reaction time'),
+            TrialTypeColumn(index=6, label='modulation delay'),
             ]
         )
 

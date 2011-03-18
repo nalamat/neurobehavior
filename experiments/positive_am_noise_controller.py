@@ -1,5 +1,5 @@
 from enthought.traits.api import Any
-
+from numpy.random import uniform
 from abstract_positive_controller import AbstractPositiveController
 import neurogen.block_definitions as blocks
 
@@ -11,6 +11,12 @@ class PositiveAMNoiseController(AbstractPositiveController):
     envelope    = Any
     output      = Any
 
+    def set_lb_modulation_onset(self, value):
+        self.current_lb = value
+
+    def set_ub_modulation_onset(self, value):
+        self.current_ub = value
+        
     def set_seed(self, value):
         self.carrier.seed = value
 
@@ -55,15 +61,29 @@ class PositiveAMNoiseController(AbstractPositiveController):
 
     def trigger_next(self):
         if self.current_trial == self.current_num_nogo + 1:
+            # Next trial should be a GO trial
             par = self.current_setting_go.parameter
             self.iface_behavior.set_tag('go?', 1)
+            # Draw a single value from the range [current_lb, current_ub)
+            onset = uniform(self.current_lb, self.current_ub, 1)[0]
+            # The logic for setting the modulation onset is defined in set_delay
+            self.set_delay(onset)
+            self.current_onset = onset
         else:
+            # Next trial should be a NOGO trial
             par = self.current_nogo_parameter
             self.iface_behavior.set_tag('go?', 0)
 
         # Prepare next signal
         waveform = self._compute_signal(par)
+        # Upload signal to hardware
         self.buffer_signal.set(waveform)
         self.iface_behavior.set_tag('signal_dur_n', len(waveform))
+        # Set poke duration for next trial
         self.set_poke_duration(self.current_poke_dur)
         self.iface_behavior.trigger(1)
+
+    def log_trial(self, ts_start, ts_end, last_ttype):
+        parameter = self.current_setting_go.parameter
+        onset = self.current_onset
+        self.model.data.log_trial(ts_start, ts_end, last_ttype, parameter, onset)
