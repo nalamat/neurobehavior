@@ -215,6 +215,8 @@ class AbstractPositiveController(AbstractExperimentController, PumpControllerMix
                 self.current_setting_go = self.choice_parameter.next()
 
     def set_poke_duration_lb(self, value):
+        # Save requested value for parameter as an attribute because we need
+        # this value so we can randomly select a number between the lb and ub
         self.current_poke_duration_lb = value
         self.reset_poke_duration()
 
