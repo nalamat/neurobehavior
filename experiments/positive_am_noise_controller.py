@@ -86,4 +86,6 @@ class PositiveAMNoiseController(AbstractPositiveController):
     def log_trial(self, ts_start, ts_end, last_ttype):
         parameter = self.current_setting_go.parameter
         onset = self.current_onset
+        if onset is None:
+            onset = 0
         self.model.data.log_trial(ts_start, ts_end, last_ttype, parameter, onset)
