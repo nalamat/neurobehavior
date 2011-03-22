@@ -37,7 +37,7 @@ LOG_DTYPE = [('timestamp', 'i'), ('name', 'S64'), ('value', 'S128'), ]
 class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
     # VERSION is a reserved keyword in HDF5 files, so I avoid using it here.
-    OBJECT_ NoneVERSION = Float(2.0, store='attribute')
+    OBJECT_VERSION = Float(2.0, store='attribute')
 
     def get_data(self, name):
         return getattr(self, name)

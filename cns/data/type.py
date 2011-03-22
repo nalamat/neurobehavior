@@ -6,11 +6,21 @@ import datetime
 class Animal(HasTraits):
 
     nyu_id      = Int(store='attribute', label='Animal ID')
+    animal_id   = Property(store='attribute')
     identifier  = Str(store='attribute')
     sex         = Enum('U', 'M', 'F', store='attribute')
     birth       = Date(store='attribute')
     parents     = Str(store='attribute')
     age         = Property(Int, depends_on='birth')
+
+    # Defining animal_id as a Property and providing the get/set methods
+    # which update nyu_id effectively makes animal_id an alias for
+    # nyu_id
+    def _get_animal_id(self):
+        return self.nyu_id
+
+    def _set_animal_id(self, value):
+        self.nyu_id = value
 
     processed   = Bool(False)
 
