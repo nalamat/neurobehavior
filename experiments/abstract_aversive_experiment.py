@@ -24,9 +24,9 @@ log = logging.getLogger(__name__)
 
 class AbstractAversiveExperiment(AbstractExperiment):
 
-    data                = Instance(AversiveData, store='node')
-    analyzed            = Instance(AnalyzedAversiveData, store='node')
-    paradigm            = Instance(AbstractAversiveParadigm, (), store='node')
+    data                = Instance(AversiveData, store='child')
+    analyzed            = Instance(AnalyzedAversiveData, store='child')
+    paradigm            = Instance(AbstractAversiveParadigm, (), store='child')
 
     experiment_plot     = Instance(Component)
     par_score_chart     = Instance(Component)

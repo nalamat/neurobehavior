@@ -6,7 +6,10 @@ import datetime
 class Animal(HasTraits):
 
     nyu_id      = Int(store='attribute', label='Animal ID')
-    animal_id   = Property(store='attribute')
+    # Eventually we should switch over to animal_id, but we leave nyu_id
+    # in until experiments using older versions of the file are done
+    # running.
+    animal_id   = Property(depends_on='nyu_id', store='attribute')
     identifier  = Str(store='attribute')
     sex         = Enum('U', 'M', 'F', store='attribute')
     birth       = Date(store='attribute')
@@ -16,6 +19,8 @@ class Animal(HasTraits):
     # Defining animal_id as a Property and providing the get/set methods
     # which update nyu_id effectively makes animal_id an alias for
     # nyu_id
+    def _get_animal_id(self):
+        return self.nyu_id
     def _get_animal_id(self):
         return self.nyu_id
 

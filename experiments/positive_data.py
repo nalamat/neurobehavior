@@ -124,11 +124,13 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
     response_hit_frac = Float(store='attribute')
 
     def log_trial(self, ts_start, ts_end, ttype, parameter):
-        log.debug('Logging trial %s (%d, %d)', ttype, ts_start, ts_end)
+        response, reaction_time = self.compute_response(ts_start, ts_end)
+        data = parameter, ts_start, ts_end, ttype, response, reaction_time
+        self.trial_log.append(data)
 
+    def compute_response(self, ts_start, ts_end):
         ts_start = int(ts_start)
         ts_end = int(ts_end)
-
         poke_data = self.poke_TTL.get_range_index(ts_start, ts_end)
         spout_data = self.spout_TTL.get_range_index(ts_start, ts_end)
         if poke_data.all():
@@ -149,9 +151,8 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
                 reaction_time = -1
         except:
             reaction_time = -1
-            
-        data = parameter, ts_start, ts_end, ttype, response, reaction_time
-        self.trial_log.append(data)
+
+        return response, reaction_time
 
     ts_seq       = Property(Array('i'), depends_on='trial_log')
     par_seq      = Property(Array('f'), depends_on='trial_log')
