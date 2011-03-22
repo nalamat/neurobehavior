@@ -234,6 +234,10 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
             info.ui.control.showFullScreen()
 
     def swap_screens(self, info):
+        # If we have only one monitor attached, the user is out of luck if
+        # they want to display the physiology in a second monitor
+        if self.screen_count == 1:
+            return
         # This code is Qt4 specific and will not work if wx is used
         if self.window_toggle:
             self.window_behavior.setGeometry(self.screen_1_geometry)
