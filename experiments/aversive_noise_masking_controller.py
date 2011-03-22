@@ -13,6 +13,7 @@ from aversive_data import RawAversiveData as AversiveData
 from cns.pipeline import deinterleave_bits
 
 from cns import RCX_ROOT
+from os.path import join
 
 class AversiveNoiseMaskingController(AbstractAversiveController):
     # NOTE: Paradigms have access to all the classes (paradigm, data,
@@ -34,6 +35,24 @@ class AversiveNoiseMaskingController(AbstractAversiveController):
     # certain value, store the current (i.e. most recently "applied" value) in
     # an attribute on the controller.  All of the set methods below follow this
     # strategy.
+
+    def setup_experiment(self, info=None):
+        # Handle to the circuit itself.  You need to provide the absolute or
+        # relative path to the circuit itself.  If you launch the program from
+        # the "root" directory (i.e. <path_to_neurobehavior> where components is
+        # a subfolder) this will work.
+        circuit = join(RCX_ROOT, 'aversive-behavior-masking_MjR')
+        # Now that we have switched TDT I/O to a second CPU, we need to load the
+        # circuits slightly differently.  This allows Python to inspect the
+        # circuit and compute how much shared memory is required before the I/O
+        # process launches.
+        self.iface_behavior = self.process.load_circuit(circuit, 'RZ6')
+        self.buffer_trial = self.iface_behavior.get_buffer('trial', 'w')
+        self.buffer_int = self.iface_behavior.get_buffer('int', 'w')
+        self.buffer_TTL = self.iface_behavior.get_buffer('TTL', 'r',
+                src_type='int8', dest_type='int8', block_size=24)
+        self.buffer_contact = self.iface_behavior.get_buffer('contact', 'r',
+                src_type='int8', dest_type='float32', block_size=24)
 
     def set_repeats(self, value):
         self.current_repeats = value
@@ -108,6 +127,7 @@ class AversiveNoiseMaskingController(AbstractAversiveController):
         # more readable)
         trial_duration = self.current_trial_duration
         masker_duration = self.current_masker_duration
+        masker_amplitude = self.current_masker_amplitude  # added 3.8.11
         probe_duration = self.current_probe_duration
         probe_amplitude = parameter
 
@@ -173,13 +193,17 @@ class AversiveNoiseMaskingController(AbstractAversiveController):
             self.iface_behavior.set_tag('warn?', 1)
             reps = self.current_repeats
         else:
-            reps = random.randint(1, self.current_repeats+1)
+##            reps = random.randint(1, self.current_repeats+1)
+            reps = 1
             self.iface_behavior.set_tag('warn?', 0)
 
         # Set duration of trial to trial_duration*number of repeats
         trial_duration = self.current_trial_duration
         total_duration = trial_duration*reps
         self.iface_behavior.cset_tag('trial_dur_n', total_duration, 's', 'n')
+
+        aversive_delay = self.current_trial_duration * reps
+        self.iface_behavior.cset_tag('aversive_del_n', aversive_delay, 's', 'n')
         
         # cset_tag(tag, value, from_unit, to_unit) will convert the provided
         # value from from_unit to to_unit before setting the tag in the
