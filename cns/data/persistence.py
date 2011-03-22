@@ -100,12 +100,13 @@ def store_child(node, object, name, trait):
             name = v.__class__.__name__ + '_' + str(i)
             child = add_or_update_object(v, group_node, name)
             group_children.append(child)
+        # TODO: study this carefully
         # We need to think about whether we should be deleting records.
         # Maybe just add a deleted attribute so we know not to load the
         # node when the parent object is loaded.
-        for child in group_node._v_children.values():
-            if child not in group_children:
-                child._f_remove(recursive=True)
+        #for child in group_node._v_children.values():
+        #    if child not in group_children:
+        #        child._f_remove(recursive=True)
     else: # nope, it's not a list, just a single object
         add_or_update_object(value, node, name)
 

@@ -107,6 +107,7 @@ class CohortView(HasTraits):
             VGroup(
                 Group('object.cohort.description'),
                 HGroup(spring, 'add', 'delete', show_labels=False),
+                #HGroup(spring, 'add', show_labels=False),
                 Item('object.cohort.animals', editor=CohortEditor(),
                      show_label=False),
                 ),
