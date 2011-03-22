@@ -57,8 +57,8 @@ class AversiveNoiseMaskingParadigm(AbstractAversiveParadigm):
 
     # You may override defaults defined in a superclass simply by assigning the
     # value here.
-    min_safe        = 3
-    max_safe        = 6
+    min_safe        = 1
+    max_safe        = 4
     trial_duration  = 0.5
 
     # The AbstractAversiveParadigm uses a "default" parameter sequence.  We want
@@ -103,3 +103,11 @@ class AversiveNoiseMaskingParadigm(AbstractAversiveParadigm):
             label='Masker Settings',
             show_border=True,
             )
+    timing_group = VGroup(
+            Item('prevent_disarm'),
+            Item('aversive_duration'),
+            Item('lick_th'),
+            show_border=True,
+            label='Trial settings',
+            )
+            
