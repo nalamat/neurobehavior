@@ -27,7 +27,9 @@ from aversive_fm_controller import AversiveFMController
 # Aversive AM Noise
 from aversive_am_noise_paradigm import AversiveAMNoiseParadigm
 from aversive_am_noise_controller import AversiveAMNoiseController
-
+# Aversive Noise Masking
+from aversive_noise_masking_paradigm import AversiveNoiseMaskingParadigm
+from aversive_noise_masking_controller import AversiveNoiseMaskingController
 # Positive
 from abstract_positive_experiment import AbstractPositiveExperiment
 from positive_data import PositiveData
@@ -251,5 +253,12 @@ EXPERIMENTS = {
             'controller_class': AversiveAMNoiseController, 
             'data_class': AversiveData,
             'node_name': 'AversiveAMNoiseExperiment',
+            },
+        'aversive_noise_masking': {
+            'experiment_class': AbstractAversiveExperiment, 
+            'paradigm_class': AversiveNoiseMaskingParadigm,
+            'controller_class': AversiveNoiseMaskingController, 
+            'data_class': AversiveData,
+            'node_name': 'AversiveNoiseMaskingExperiment',
             },
         }

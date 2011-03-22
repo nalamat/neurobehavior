@@ -6,12 +6,22 @@ import datetime
 class Animal(HasTraits):
 
     nyu_id      = Int(store='attribute', label='Animal ID')
+    # Eventually we should switch over to animal_id, but we leave nyu_id
+    # in until experiments using older versions of the file are done
+    # running.
+    animal_id   = Property(depends_on='nyu_id', store='attribute')
     identifier  = Str(store='attribute')
     sex         = Enum('U', 'M', 'F', store='attribute')
     birth       = Date(store='attribute')
     parents     = Str(store='attribute')
     age         = Property(Int, depends_on='birth')
 
+    # If we define a Trait as a Property, we need to provide a function
+    # that gets the value of that property.  The naming convention is
+    # _get_<trait_name>
+    def _get_animal_id(self):
+        return self.nyu_id
+    
     processed   = Bool(False)
 
     experiments = Property(List)
