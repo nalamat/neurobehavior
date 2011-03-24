@@ -215,6 +215,8 @@ class AbstractPositiveController(AbstractExperimentController, PumpControllerMix
                 self.current_setting_go = self.choice_parameter.next()
 
     def set_poke_duration_lb(self, value):
+        # Save requested value for parameter as an attribute because we need
+        # this value so we can randomly select a number between the lb and ub
         self.current_poke_duration_lb = value
         self.reset_poke_duration()
 
@@ -259,13 +261,20 @@ class AbstractPositiveController(AbstractExperimentController, PumpControllerMix
         self.iface_behavior.cset_tag('int_dur_n', value, 's', 'n')
 
     def set_reaction_window_delay(self, value):
-        self.iface_behavior.cset_tag('react_del_n', value, 's', 'n')
-        if self.iface_behavior.get_tag('react_del_n') == 0:
-            self.iface_behavior.set_tag('react_del_n', 1)
+        self.current_reaction_window_delay = value
+        if value is not None:
+            self.iface_behavior.cset_tag('react_del_n', value, 's', 'n')
+            # Check to see if the conversion of s to n resulted in a value of 0.
+            # If so, set the delay to 1 sample (0 means that the reaction window
+            # never triggers due to the nature of the RPvds component)
+            if self.iface_behavior.get_tag('react_del_n') == 0:
+                self.iface_behavior.set_tag('react_del_n', 1)
 
     def set_reaction_window_duration(self, value):
-        delay = self.model.paradigm.reaction_window_delay
-        self.iface_behavior.cset_tag('react_end_n', delay+value, 's', 'n')
+        self.current_reaction_window_duration = value
+        delay = self.current_reaction_window_delay
+        if value is not None and delay is not None:
+            self.iface_behavior.cset_tag('react_end_n', delay+value, 's', 'n')
 
     def set_response_window_duration(self, value):
         self.iface_behavior.cset_tag('resp_dur_n', value, 's', 'n')

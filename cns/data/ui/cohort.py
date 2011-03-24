@@ -92,7 +92,7 @@ class CohortView(HasTraits):
 
     def _animal_factory(self):
         if self.selected is not None:
-            return Animal(animal_id=self.selected.animal_id+1,
+            return Animal(nyu_id=self.selected.nyu_id+1,
                           parents=self.selected.parents,
                           birth=self.selected.birth,
                           sex=self.selected.sex)
@@ -107,6 +107,7 @@ class CohortView(HasTraits):
             VGroup(
                 Group('object.cohort.description'),
                 HGroup(spring, 'add', 'delete', show_labels=False),
+                #HGroup(spring, 'add', show_labels=False),
                 Item('object.cohort.animals', editor=CohortEditor(),
                      show_label=False),
                 ),

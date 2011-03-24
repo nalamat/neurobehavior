@@ -189,9 +189,12 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
             # window should be the current window (info.ui.control) that way
             # both windows get closed when the app exits.
             if self.model.spool_physiology:
+                print "attempting to open physiologyw indow"
+                print self.window_behavior
                 self.window_physiology = info.object.edit_traits(
                         parent=self.window_behavior,
                         view='physiology_view').control
+                print "success to open physiologyw indow"
 
             # Now, let's get some information about the screen geometry so that
             # the secondary window appears in the other monitor.  This does not
@@ -234,6 +237,10 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
             info.ui.control.showFullScreen()
 
     def swap_screens(self, info):
+        # If we have only one monitor attached, the user is out of luck if
+        # they want to display the physiology in a second monitor
+        if self.screen_count == 1:
+            return
         # This code is Qt4 specific and will not work if wx is used
         if self.window_toggle:
             self.window_behavior.setGeometry(self.screen_1_geometry)
@@ -343,6 +350,7 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
             info.ui.view.close_result = True
             self.state = 'complete'
 
+            print 'SAVING NODE'
             add_or_update_object_node(self.model, self.model.exp_node)
         except BaseException, e:
             log.exception(e)

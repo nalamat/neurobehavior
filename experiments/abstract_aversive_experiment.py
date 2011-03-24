@@ -24,9 +24,9 @@ log = logging.getLogger(__name__)
 
 class AbstractAversiveExperiment(AbstractExperiment):
 
-    data                = Instance(AversiveData, store='node')
-    analyzed            = Instance(AnalyzedAversiveData, store='node')
-    paradigm            = Instance(AbstractAversiveParadigm, (), store='node')
+    #data                = Instance(AversiveData, store='child')
+    analyzed            = Instance(AnalyzedAversiveData, store='child')
+    #paradigm            = Instance(AbstractAversiveParadigm, (), store='child')
 
     experiment_plot     = Instance(Component)
     par_score_chart     = Instance(Component)
@@ -36,10 +36,8 @@ class AbstractAversiveExperiment(AbstractExperiment):
 
     def _data_changed(self, new):
         self.analyzed = AnalyzedAversiveData(data=new)
-        self._update_experiment_plot()
-        self._update_score_chart()
-        self._update_plots()
 
+    @on_trait_change('data')
     def _update_experiment_plot(self):
         index_range = ChannelDataRange()
         index_range.sources = [self.data.contact_digital]
@@ -85,6 +83,7 @@ class AbstractAversiveExperiment(AbstractExperiment):
 
         self.experiment_plot = container
 
+    @on_trait_change('data')
     def _update_score_chart(self):
         preprocess = lambda x: clip(x, 0.2, 1.0)
         bounds = lambda low, high, margin, tight: (low-0.5, high+0.5)
@@ -130,6 +129,7 @@ class AbstractAversiveExperiment(AbstractExperiment):
 
         self.score_chart = view
 
+    @on_trait_change('data')
     def _update_plots(self):
         # dPrime
         bounds = lambda low, high, margin, tight: (low-0.5, high+0.5)
@@ -235,19 +235,33 @@ class AbstractAversiveExperiment(AbstractExperiment):
                 Tabbed(
                    Item('paradigm', style='custom', show_label=False), 
                    VGroup(
-                       Item('object.analyzed.mask_mode'),
-                       Item('object.analyzed.include_last'), 
-                       Item('object.analyzed.exclude_first'),
-                       Item('object.analyzed.exclude_last'),
+                       VGroup(
+                           Item('object.analyzed.mask_mode'),
+                           Item('object.analyzed.include_last'), 
+                           Item('object.analyzed.exclude_first'),
+                           Item('object.analyzed.exclude_last'),
+                           label='Mask settings',
+                           show_border=True,
+                           ),
+                       VGroup(
+                            Item('object.analyzed.contact_offset',
+                                label='Contact offset (s)'),
+                            Item('object.analyzed.contact_dur', 
+                                label='Contact duration (s)'),
+                            Item('object.analyzed.contact_reference'),
+                           label='Contact settings',
+                           show_border=True,
+                            ),
+                       label='Analysis Parameters',
                        ),
                    ),
                 show_labels=False,
                 ),
             VGroup(
                 Item('experiment_plot', editor=ComponentEditor(),
-                    show_label=False, width=600, height=150),
+                    show_label=False, width=1200, height=150),
                 Item('score_chart', editor=ComponentEditor(),
-                    show_label=False, width=600, height=150),
+                    show_label=False, width=1200, height=150),
                 HGroup(
                     Item('par_count_chart', show_label=False,
                         editor=ComponentEditor(), width=150, height=150),
@@ -259,9 +273,6 @@ class AbstractAversiveExperiment(AbstractExperiment):
                 ),
            show_labels=False,
            )
-    
-    traits_view = View(traits_group, kind='live',
-            handler=AbstractAversiveController)
 
 if __name__ == "__main__":
     import tables

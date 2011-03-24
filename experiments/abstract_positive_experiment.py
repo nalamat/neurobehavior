@@ -2,7 +2,7 @@ from __future__ import division
 
 import numpy as np
 from enthought.traits.api import HasTraits, Any, Instance, DelegatesTo, \
-        Int, Float, Property
+        Int, Float, Property, on_trait_change
 from enthought.traits.ui.api import View, Item, VGroup, HGroup, InstanceEditor,\
     VSplit, HSplit, TabularEditor, Group, Include, Tabbed
 
@@ -90,6 +90,7 @@ trial_log_table = TableEditor(
             TrialTypeColumn(index=0, label='parameter'),
             TrialResponseColumn(index=4, label='response'),
             TrialTypeColumn(index=5, label='reaction time'),
+            TrialTypeColumn(index=6, label='modulation delay'),
             ]
         )
 
@@ -110,10 +111,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
     par_score_plot  = Instance(Component)
     par_dprime_plot = Instance(Component)
 
-    def _data_changed(self):
-        self._generate_experiment_plot()
-        self._generate_summary_plots()
-
+    @on_trait_change('data')
     def _generate_experiment_plot(self):
         plots = {}
         index_range = ChannelDataRange()
@@ -193,6 +191,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
 
         self.experiment_plot = container
 
+    @on_trait_change('data')
     def _generate_summary_plots(self):
         bounds = lambda low, high, margin, tight: (low-0.5, high+0.5)
         index_range = DataRange1D(bounds_func=bounds)

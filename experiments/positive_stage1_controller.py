@@ -48,7 +48,6 @@ class PositiveStage1Controller(AbstractExperimentController,
 
         self.pipeline_TTL = deinterleave_bits(targets)
 
-        #self.model.data.start_time = datetime.now()
         self.iface_behavior.start()
         self.pause(info)
 

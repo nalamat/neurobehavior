@@ -27,13 +27,16 @@ from aversive_fm_controller import AversiveFMController
 # Aversive AM Noise
 from aversive_am_noise_paradigm import AversiveAMNoiseParadigm
 from aversive_am_noise_controller import AversiveAMNoiseController
-
+# Aversive Noise Masking
+from aversive_noise_masking_paradigm import AversiveNoiseMaskingParadigm
+from aversive_noise_masking_controller import AversiveNoiseMaskingController
 # Positive
 from abstract_positive_experiment import AbstractPositiveExperiment
 from positive_data import PositiveData
 # Positive AM Noise
 from positive_am_noise_paradigm import PositiveAMNoiseParadigm
 from positive_am_noise_controller import PositiveAMNoiseController
+from positive_am_noise_data import PositiveAMNoiseData
 # Positive DT
 from positive_dt_experiment import PositiveDTExperiment
 from positive_dt_paradigm import PositiveDTParadigm
@@ -227,6 +230,7 @@ def launch_experiment(etype, spool_physiology=False, profile=False):
             **EXPERIMENTS[etype])
     ExperimentCohortView().configure_traits(handler=handler)
 
+# Define the classes required for each experiment
 EXPERIMENTS = {
         'basic_characterization': {
             'experiment_class': AbstractExperiment, 
@@ -239,7 +243,7 @@ EXPERIMENTS = {
             'experiment_class': AbstractPositiveExperiment, 
             'paradigm_class': PositiveAMNoiseParadigm,
             'controller_class': PositiveAMNoiseController, 
-            'data_class': PositiveData,
+            'data_class': PositiveAMNoiseData,
             'node_name': 'PositiveAMNoiseExperiment',
             },
         'positive_dt': {
@@ -262,5 +266,12 @@ EXPERIMENTS = {
             'controller_class': AversiveAMNoiseController, 
             'data_class': AversiveData,
             'node_name': 'AversiveAMNoiseExperiment',
+            },
+        'aversive_noise_masking': {
+            'experiment_class': AbstractAversiveExperiment, 
+            'paradigm_class': AversiveNoiseMaskingParadigm,
+            'controller_class': AversiveNoiseMaskingController, 
+            'data_class': AversiveData,
+            'node_name': 'AversiveNoiseMaskingExperiment',
             },
         }
