@@ -99,8 +99,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
     TRIAL_DTYPE = [('parameter', 'f'), ('ts_start', 'i'), ('ts_end', 'i'),
                    ('type', 'S4'), ('response', 'S16'), ('reaction_time', 'f')]
 
-    trial_log = List(Tuple(Float, Int, Int, Str, Str, Float), store='table',
-                     dtype=TRIAL_DTYPE)
+    trial_log = List(store='table', dtype=TRIAL_DTYPE)
 
     # Total GO trials presented
     num_go = Int(store='attribute')

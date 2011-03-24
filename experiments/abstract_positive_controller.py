@@ -85,9 +85,8 @@ class AbstractPositiveController(AbstractExperimentController, PumpControllerMix
         self.current_trial_end_ts = self.get_trial_end_ts()
 
         self.state = 'running'
-        self.iface_behavior.trigger('A', 'high')
         self.trigger_next()
-
+        self.iface_behavior.trigger('A', 'high')
         self.tasks.append((self.monitor_behavior, 1))
         self.tasks.append((self.monitor_pump, 5))
         self.tasks.append((self.monitor_timeout, 5))

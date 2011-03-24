@@ -62,7 +62,7 @@ class RawAversiveData_v0_2(AbstractExperimentData):
         self.event_log.append((timestamp, name, '%r' % value))
 
     def log_trial(self, ts_start, ts_end, par, type):
-        self.trial_log.append((int(ts_start), par, type, int(ts_end)))
+        self.trial_log.append((ts_start, par, type, ts_end))
 
     #-------------------------------------------------------------------
     # Raw data

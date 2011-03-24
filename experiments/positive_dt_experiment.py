@@ -23,9 +23,6 @@ class PositiveDTExperiment(AbstractPositiveExperiment):
     plot_range          = Dict(Str, Instance(DataRange1D))
     color_index         = Int(0)
 
-    #def _data_node_changed(self, new):
-    #    self.data = PositiveDTData(store_node=new)
-
     def _update_data_categories(self, index_name, value_name, component):
         plot_name = index_name+value_name
         index = self.data.get_data(index_name)
@@ -81,7 +78,7 @@ class PositiveDTExperiment(AbstractPositiveExperiment):
                     p.overlays.append(PlotAxis(p, orientation='bottom',
                         small_haxis_style=False))
 
-    @on_trait_change('data.data_changed')
+    @on_trait_change('data.trial_log')
     def _update(self):
         self._update_data_categories('pars', 'par_go_count',
                 self.par_count_plot)
@@ -90,6 +87,7 @@ class PositiveDTExperiment(AbstractPositiveExperiment):
         self._update_data_categories('pars', 'par_dprime',
                 self.par_dprime_plot)
 
+    @on_trait_change('data')
     def _generate_summary_plots(self):
         container_kw = dict(padding=(50, 5, 5, 50), spacing=10,
                 bgcolor='transparent')
