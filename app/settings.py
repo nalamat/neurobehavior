@@ -41,7 +41,7 @@ logging_config = {
                 },
             },
         'root': {
-            'level': 'INFO',
+            'level': 'DEBUG',
             'handlers': ['console', 'file'],
             },
         }

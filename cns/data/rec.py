@@ -15,3 +15,14 @@ def flatten_dtype(dtype, prepend=''):
 def flatten_recarray(r):
     flattened_dtype = flatten_dtype(r.dtype)
     return r.view(flattened_dtype)
+
+def cluster(r, groupby):
+    rowd = dict()
+    for i, row in enumerate(r):
+        key = tuple([row[attr] for attr in groupby])
+        rowd.setdefault(key, []).append(i)
+    keys = rowd.keys()
+    keys.sort()
+    subarrays = [r[rowd[k]] for k in keys]
+    return zip(keys, subarrays)
+

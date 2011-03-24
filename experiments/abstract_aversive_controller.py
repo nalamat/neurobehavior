@@ -109,7 +109,7 @@ class AbstractAversiveController(AbstractExperimentController,
 
     def monitor_behavior(self):
         self.update_safe()
-        self.pipeline_TTL.send(self.buffer_TTL.read())
+        self.pipeline_TTL.send(self.buffer_TTL.read().astype('i'))
         self.pipeline_contact.send(self.buffer_contact.read())
 
         if self.current_trial_ts < self.get_trial_end_ts():
