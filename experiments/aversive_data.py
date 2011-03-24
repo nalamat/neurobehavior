@@ -19,8 +19,6 @@ def apply_mask(fun, seq, mask):
 
 # Datatype information for the various tables and lists used in this module. All
 # timestamps reflect the sample number of the contact data
-WATER_DTYPE = [('timestamp', 'i'), ('infused', 'f')]
-
 TRIAL_DTYPE = [('timestamp', 'i'), 
                ('par', 'f'), 
                ('type', 'S16'), 
@@ -60,9 +58,6 @@ class RawAversiveData_v0_2(AbstractExperimentData):
     #-------------------------------------------------------------------
     # Logging functions
     #------------------------------------------------------------------- 
-    def log_water(self, ts, infused):
-        self.water_log.append((ts, infused))
-
     def log_event(self, timestamp, name, value):
         self.event_log.append((timestamp, name, '%r' % value))
 
@@ -72,7 +67,6 @@ class RawAversiveData_v0_2(AbstractExperimentData):
     #-------------------------------------------------------------------
     # Raw data
     #------------------------------------------------------------------- 
-    water_log = List(store='table', dtype=WATER_DTYPE)
     trial_log = List(store='table', dtype=TRIAL_DTYPE)
     event_log = List(store='table', dtype=EVENT_DTYPE)
 
@@ -148,14 +142,6 @@ class RawAversiveData_v0_2(AbstractExperimentData):
     #------------------------------------------------------------------- 
     comment = Str('', store='attribute')
     exit_status = Enum('complete', 'partial', 'aborted', store='attribute')
-
-    water_infused = Property
-    
-    def _get_water_infused(self):
-        try:
-            return self.water_log[-1][1]
-        except:
-            return 0
 
     par_info = Property(store='table', dtype=RAW_PAR_INFO_DTYPE)
 

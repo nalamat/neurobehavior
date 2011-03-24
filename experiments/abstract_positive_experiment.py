@@ -96,7 +96,8 @@ trial_log_table = TableEditor(
 
 class AbstractPositiveExperiment(AbstractExperiment):
 
-    trial_log_view = Property(depends_on='data.trial_log')
+    trial_log_view = Property(depends_on='data.trial_log',
+            editor=trial_log_table)
 
     def _get_trial_log_view(self):
         trial_log = np.array(self.data.trial_log, dtype=object)
@@ -271,7 +272,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
     pump_group = VGroup(
             Item('handler.pump_toolbar', style='custom',
                  show_label=False), 
-            Item('handler.current_volume_dispensed', 
+            Item('object.data.water_infused',
                  label='Dispensed (mL)', style='readonly'),
             Item('object.paradigm.pump_syringe'),
             Item('object.paradigm.pump_syringe_diameter', 
@@ -292,7 +293,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
 
     plots_group = VGroup(
             Item('experiment_plot', editor=ComponentEditor(),
-                show_label=False, width=600, height=400),
+                show_label=False, width=1000, height=400),
             HGroup(
                 Item('par_count_plot', editor=ComponentEditor(),
                     show_label=False, width=150, height=150),

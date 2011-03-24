@@ -42,7 +42,7 @@ class PumpControllerMixin(HasTraits):
     iface_pump   = Instance(PumpInterface, ())
 
     def monitor_pump(self):
-        self.current_volume_dispensed = self.iface_pump.infused
+        self.model.data.log_water(self.get_ts(), self.iface_pump.infused)
 
     def pump_override(self, info):
         if self.iface_pump.trigger == 'run_high':

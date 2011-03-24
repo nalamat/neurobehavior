@@ -189,12 +189,9 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
             # window should be the current window (info.ui.control) that way
             # both windows get closed when the app exits.
             if self.model.spool_physiology:
-                print "attempting to open physiologyw indow"
-                print self.window_behavior
                 self.window_physiology = info.object.edit_traits(
                         parent=self.window_behavior,
                         view='physiology_view').control
-                print "success to open physiologyw indow"
 
             # Now, let's get some information about the screen geometry so that
             # the secondary window appears in the other monitor.  This does not
@@ -350,7 +347,6 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
             info.ui.view.close_result = True
             self.state = 'complete'
 
-            print 'SAVING NODE'
             add_or_update_object_node(self.model, self.model.exp_node)
         except BaseException, e:
             log.exception(e)
@@ -358,7 +354,7 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
 
     def run_tasks(self):
         for task, frequency in self.tasks:
-            if frequency == 1 or self.tick_count % frequency:
+            if frequency == 1 or not (self.tick_count % frequency):
                 try:
                     task()
                 except BaseException, e:
@@ -372,7 +368,6 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
                             no_label='Continue')
                     if dialog.open() == YES:
                         self.stop(self.info)
-
         self.tick_count += 1
 
     ############################################################################

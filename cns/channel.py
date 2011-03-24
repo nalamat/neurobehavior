@@ -289,8 +289,11 @@ class FileChannel(Channel):
         buffer = append_node(self.node, self.name, 'EArray', atom, self.shape,
                 expectedrows=int(self.fs*self.expected_duration),
                 filters=filters)
-        buffer.setAttr('fs', self.fs)
         return buffer
+
+    #@on_trait_change('fs')
+    def _fs_changed(self, new):
+        self.buffer.setAttr('fs', self.fs)
 
     def _get_signal(self):
         return self.buffer
