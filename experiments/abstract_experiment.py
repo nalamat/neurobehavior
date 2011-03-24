@@ -52,4 +52,6 @@ class AbstractExperiment(PhysiologyExperimentMixin):
     traits_view = View(
             Include('traits_group'), 
             key_bindings=key_bindings,
-            resizable=True)
+            resizable=True, 
+            height=0.9, 
+            width=0.9)

@@ -245,9 +245,9 @@ class AbstractAversiveExperiment(AbstractExperiment):
                 ),
             VGroup(
                 Item('experiment_plot', editor=ComponentEditor(),
-                    show_label=False, width=600, height=150),
+                    show_label=False, width=1200, height=150),
                 Item('score_chart', editor=ComponentEditor(),
-                    show_label=False, width=600, height=150),
+                    show_label=False, width=1200, height=150),
                 HGroup(
                     Item('par_count_chart', show_label=False,
                         editor=ComponentEditor(), width=150, height=150),
@@ -259,9 +259,6 @@ class AbstractAversiveExperiment(AbstractExperiment):
                 ),
            show_labels=False,
            )
-    
-    traits_view = View(traits_group, kind='live',
-            handler=AbstractAversiveController)
 
 if __name__ == "__main__":
     import tables
