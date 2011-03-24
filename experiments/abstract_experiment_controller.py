@@ -190,6 +190,7 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
             # both windows get closed when the app exits.
             if self.model.spool_physiology:
                 print "attempting to open physiologyw indow"
+                print self.window_behavior
                 self.window_physiology = info.object.edit_traits(
                         parent=self.window_behavior,
                         view='physiology_view').control

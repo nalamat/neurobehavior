@@ -24,9 +24,9 @@ log = logging.getLogger(__name__)
 
 class AbstractAversiveExperiment(AbstractExperiment):
 
-    data                = Instance(AversiveData, store='child')
+    #data                = Instance(AversiveData, store='child')
     analyzed            = Instance(AnalyzedAversiveData, store='child')
-    paradigm            = Instance(AbstractAversiveParadigm, (), store='child')
+    #paradigm            = Instance(AbstractAversiveParadigm, (), store='child')
 
     experiment_plot     = Instance(Component)
     par_score_chart     = Instance(Component)
@@ -36,10 +36,8 @@ class AbstractAversiveExperiment(AbstractExperiment):
 
     def _data_changed(self, new):
         self.analyzed = AnalyzedAversiveData(data=new)
-        self._update_experiment_plot()
-        self._update_score_chart()
-        self._update_plots()
 
+    @on_trait_change('data')
     def _update_experiment_plot(self):
         index_range = ChannelDataRange()
         index_range.sources = [self.data.contact_digital]
@@ -85,6 +83,7 @@ class AbstractAversiveExperiment(AbstractExperiment):
 
         self.experiment_plot = container
 
+    @on_trait_change('data')
     def _update_score_chart(self):
         preprocess = lambda x: clip(x, 0.2, 1.0)
         bounds = lambda low, high, margin, tight: (low-0.5, high+0.5)
@@ -130,6 +129,7 @@ class AbstractAversiveExperiment(AbstractExperiment):
 
         self.score_chart = view
 
+    @on_trait_change('data')
     def _update_plots(self):
         # dPrime
         bounds = lambda low, high, margin, tight: (low-0.5, high+0.5)
