@@ -55,13 +55,16 @@ class TrialTypeColumn(ListColumn):
             return colors['light red']
 
     def get_value(self, object):
-        value = object[self.index]
-        if type(value) in (list, tuple):
-            # Default Python formatting for a tuple or list is a bit ugly, so
-            # let's handle it ourselves.
-            return ", ".join([str(e) for e in value])
-        else:
-            return str(value)
+        try:
+            value = object[self.index]
+            if type(value) in (list, tuple):
+                # Default Python formatting for a tuple or list is a bit ugly, so
+                # let's handle it ourselves.
+                return ", ".join([str(e) for e in value])
+            else:
+                return str(value)
+        except IndexError:
+            return "NA"
 
 class TrialResponseColumn(ListColumn):
 

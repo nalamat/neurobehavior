@@ -197,8 +197,8 @@ class PumpInterface(object):
         '''
         for k, v in kw.items():
             setattr(self, k, v)
-        if self.cur_status not in 'IW':
-            self.start()
+        #if self.cur_status not in 'IW':
+        self.start()
 
     def run_if_TTL(self, **kw):
         '''In contrast to `run`, the state of the TTL is inspected.  If the TTL is
@@ -225,11 +225,15 @@ class PumpInterface(object):
         # Store value in a local variable so we don't have to send a new RS232
         # command the next time we need the value
         TTL = self.TTL
-        if TTL and self.cur_status not in 'IW':
-            #self.xmit('RUN')
+        if TTL:
             self.run()
-        elif not TTL and self.cur_status in 'IW':
+        else:
             self.stop()
+        #if TTL and self.cur_status not in 'IW':
+            #self.xmit('RUN')
+        #    self.run()
+        #elif not TTL and self.cur_status in 'IW':
+         #   self.stop()
             #self.xmit('STP')
 
     def reset_volume(self):
