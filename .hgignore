@@ -11,3 +11,4 @@ glob:*.swo
 glob:doc/_build/*
 glob:doc/*.idx
 glob:doc/*.aux
+glob:*.orig
