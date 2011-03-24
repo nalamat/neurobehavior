@@ -149,21 +149,8 @@ class RawAversiveData_v0_2(AbstractExperimentData):
     comment = Str('', store='attribute')
     exit_status = Enum('complete', 'partial', 'aborted', store='attribute')
 
-    #date = Property
-    #start_time = Instance(datetime, store='attribute')
-    #stop_time = Instance(datetime, store='attribute')
-    #duration = Property(store='attribute')
     water_infused = Property
     
-    #def _get_date(self):
-    #    return self.start_time.date()
-
-    #def _get_duration(self):
-    #    if self.stop_time is None:
-    #        return datetime.now()-self.start_time
-    #    else:
-    #        return self.stop_time-self.start_time
-
     def _get_water_infused(self):
         try:
             return self.water_log[-1][1]
@@ -399,6 +386,7 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
     contact_offset = Float(0.9, store='attribute')
     contact_dur = Float(0.1, store='attribute')
     contact_fraction = Range(0.0, 1.0, 0.5, store='attribute')
+    contact_reference = Enum('trial start', 'trial end')
 
     reaction_offset = Float(-1, store='attribute')
     reaction_dur = Float(3.0, store='attribute')
@@ -523,7 +511,6 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
     #-------------------------------------------------------------------
     # Process raw data based on masks
     #------------------------------------------------------------------- 
-
     def _compute_contact_scores(self, trial_log):
         # Right now the algorithm assumes that you are computing from the
         # beginning of the trial and does not handle variable-length trials.
@@ -542,7 +529,12 @@ class AnalyzedAversiveData(BaseAnalyzedAversiveData):
         ub_index = contact.to_samples(self.contact_offset+self.contact_dur)
 
         scores = []
-        for ts in trial_log['timestamp']:
+        if self.contact_reference == 'trial start':
+            timestamps = trial_log['timestamp']
+        else:
+            timestamps = trial_log['trial_end_ts']
+
+        for ts in timestamps:
             # Variable ts is the sample number at which the trial began and is a
             # multiple of the contact sampling frequency.
             # Channel.get_range_index(lb_sample, ub_sample, reference_sample)
@@ -748,15 +740,6 @@ class GrandAnalyzedAversiveData(BaseAnalyzedAversiveData):
     @cached_property
     def _get_global_fa_frac(self):
         return np.sum(self.par_fa_count)/np.sum(self.par_safe_count)
-
-class AnalyzedAversiveMaskingData(AnalyzedAversiveData):
-
-    def _compute_contact_scores(self, trial_log):
-        # You would override this function.  Right now the following line just
-        # calls the superclass implementation of this function.  Delete the line
-        # below once you have written your own implementation.
-        super(AnalyzedAversiveMaskingData,
-                self)._compute_contact_scores(trial_log)
 
 if __name__ == '__main__':
     import tables
