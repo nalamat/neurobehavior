@@ -235,10 +235,24 @@ class AbstractAversiveExperiment(AbstractExperiment):
                 Tabbed(
                    Item('paradigm', style='custom', show_label=False), 
                    VGroup(
-                       Item('object.analyzed.mask_mode'),
-                       Item('object.analyzed.include_last'), 
-                       Item('object.analyzed.exclude_first'),
-                       Item('object.analyzed.exclude_last'),
+                       VGroup(
+                           Item('object.analyzed.mask_mode'),
+                           Item('object.analyzed.include_last'), 
+                           Item('object.analyzed.exclude_first'),
+                           Item('object.analyzed.exclude_last'),
+                           label='Mask settings',
+                           show_border=True,
+                           ),
+                       VGroup(
+                            Item('object.analyzed.contact_offset',
+                                label='Contact offset (s)'),
+                            Item('object.analyzed.contact_dur', 
+                                label='Contact duration (s)'),
+                            Item('object.analyzed.contact_reference'),
+                           label='Contact settings',
+                           show_border=True,
+                            ),
+                       label='Analysis Parameters',
                        ),
                    ),
                 show_labels=False,
