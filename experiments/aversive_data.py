@@ -25,7 +25,6 @@ TRIAL_DTYPE = [('timestamp', 'i'),
                ('trial_end_ts', 'i'),
               ]
 
-EVENT_DTYPE = [('timestamp', 'i'), ('name', 'S64'), ('value', 'S128'), ]
 RAW_PAR_INFO_DTYPE = [('par', 'f'), ('safe_count', 'i'), ('count', 'i')]
 ANALYZED_PAR_INFO_DTYPE = [('par', 'f'), 
                            ('safe_count', 'i'),
@@ -58,9 +57,6 @@ class RawAversiveData_v0_2(AbstractExperimentData):
     #-------------------------------------------------------------------
     # Logging functions
     #------------------------------------------------------------------- 
-    def log_event(self, timestamp, name, value):
-        self.event_log.append((timestamp, name, '%r' % value))
-
     def log_trial(self, ts_start, ts_end, par, type):
         self.trial_log.append((ts_start, par, type, ts_end))
 
@@ -68,7 +64,6 @@ class RawAversiveData_v0_2(AbstractExperimentData):
     # Raw data
     #------------------------------------------------------------------- 
     trial_log = List(store='table', dtype=TRIAL_DTYPE)
-    event_log = List(store='table', dtype=EVENT_DTYPE)
 
     contact_digital = Instance(FileChannel, 
             store='channel', store_path='contact/contact_digital')

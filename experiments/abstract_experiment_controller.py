@@ -437,6 +437,7 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
             del self.old_values[key]
 
     def log_event(self, ts, name, value):
+        self.model.data.log_event(ts, name, value)
         log.debug("%d, %s, %r", ts, name, value)
         
     def revert(self, info=None):
