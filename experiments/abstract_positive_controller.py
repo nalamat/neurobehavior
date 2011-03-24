@@ -145,7 +145,7 @@ class AbstractPositiveController(AbstractExperimentController, PumpControllerMix
     
     def monitor_behavior(self):
         ts_end = self.get_trial_end_ts()
-        self.pipeline_contact.send(self.buffer_TTL.read().astype('i'))
+        self.pipeline_contact.send(self.buffer_TTL.read())
         if ts_end > self.current_trial_end_ts:
             # Trial is over.  Process new data and set up for next trial.
             self.current_trial_end_ts = ts_end

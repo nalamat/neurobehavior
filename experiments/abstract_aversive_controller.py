@@ -46,6 +46,7 @@ class AbstractAversiveController(AbstractExperimentController,
         self.init_paradigm(self.model.paradigm)
 
         # Ensure that sampling frequencies are stored properly
+        print 'updating sampling frequency'
         self.model.data.contact_digital.fs = self.buffer_TTL.fs
         self.model.data.contact_digital_mean.fs = self.buffer_contact.fs
         self.model.data.trial_running.fs = self.buffer_TTL.fs
@@ -84,7 +85,7 @@ class AbstractAversiveController(AbstractExperimentController,
         # intertrial signal but not presenting trials)
         self.pause()
         
-        #self.tasks.append((self.monitor_pump, 5))
+        self.tasks.append((self.monitor_pump, 5))
         self.tasks.append((self.monitor_behavior, 1))
 
     def remind(self, info=None):
@@ -109,7 +110,7 @@ class AbstractAversiveController(AbstractExperimentController,
 
     def monitor_behavior(self):
         self.update_safe()
-        self.pipeline_TTL.send(self.buffer_TTL.read().astype('i'))
+        self.pipeline_TTL.send(self.buffer_TTL.read())
         self.pipeline_contact.send(self.buffer_contact.read())
 
         if self.current_trial_ts < self.get_trial_end_ts():

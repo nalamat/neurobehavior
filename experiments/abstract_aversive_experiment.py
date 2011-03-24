@@ -24,9 +24,7 @@ log = logging.getLogger(__name__)
 
 class AbstractAversiveExperiment(AbstractExperiment):
 
-    #data                = Instance(AversiveData, store='child')
     analyzed            = Instance(AnalyzedAversiveData, store='child')
-    #paradigm            = Instance(AbstractAversiveParadigm, (), store='child')
 
     experiment_plot     = Instance(Component)
     par_score_chart     = Instance(Component)
@@ -222,7 +220,7 @@ class AbstractAversiveExperiment(AbstractExperiment):
                 VGroup(
                     Item('handler.pump_toolbar', style='custom',
                          show_label=False), 
-                    Item('handler.current_volume_dispensed', 
+                    Item('object.data.water_infused',
                          label='Dispensed (mL)', style='readonly'),
                     Item('object.paradigm.pump_rate'),
                     Item('object.paradigm.pump_syringe'),

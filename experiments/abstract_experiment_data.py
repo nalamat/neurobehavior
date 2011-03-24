@@ -1,6 +1,7 @@
 from physiology_data_mixin import PhysiologyDataMixin
+from pump_data_mixin import PumpDataMixin
 
-class AbstractExperimentData(PhysiologyDataMixin):
+class AbstractExperimentData(PhysiologyDataMixin, PumpDataMixin):
 
     def channel_from_buffer(self, buffer, channel_name):
         channel_trait = self.trait(channel_name)
