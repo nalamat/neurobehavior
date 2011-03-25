@@ -25,6 +25,10 @@ TDT_AUDIO = 'RZ6'
 TDT_BEHAVIOR = 'RZ6'
 TDT_PHYSIOLOGY = 'RZ5'
 
+RCX_USE_SUBPROCESS      = False # Run IO as a subprocess?
+RCX_PROCESS_POLL_PERIOD = 0.1   # Poll period in seconds
+RCX_PROCESS_CACHE_SIZE  = 30    # Cache size in seconds for each buffer
+
 # extension to use for cohort files
 COHORT_WILDCARD = 'Cohort files (*.cohort.hd5)|*.cohort.hd5|'
 
