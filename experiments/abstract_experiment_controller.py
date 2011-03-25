@@ -2,7 +2,8 @@ from copy import deepcopy
 from datetime import datetime, timedelta
 from cns.data.persistence import add_or_update_object_node
 
-from tdt import DSPProcess
+from tdt import DSPProcess, DSPProject
+import cns
 
 from enthought.pyface.api import error, confirm, YES, ConfirmationDialog
 from enthought.pyface.timer.api import Timer
@@ -170,7 +171,7 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
     # with the DSPs.  All circuits must be loaded and buffers initialized before
     # the process is started (so the process can appropriately allocate the
     # required shared memory resources).
-    process     = Any
+    process         = Any
 
     def init(self, info):
         try:
@@ -299,7 +300,12 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
             mesg += self.model.paradigm.err_messages()
             error(self.info.ui.control, mesg)
         try:
-            self.process = DSPProcess()
+            if cns.RCX_USE_SUBPROCESS:
+                log.debug("USING DSP PROCESS")
+                self.process = DSPProcess()
+            else:
+                log.debug("USING DSP PROJECT")
+                self.process = DSPProject()
             # I don't really like having this check here; however, it works for
             # our purposes.
             if self.model.spool_physiology:

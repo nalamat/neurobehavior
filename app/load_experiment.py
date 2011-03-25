@@ -13,8 +13,14 @@ if __name__ == '__main__':
     group.add_argument('-t', '--test', dest='test', action='store_true',
                        help='Test experiment') 
     parser.add_argument('-n', '--neural', dest='physiology',
-                        action='store_true', help='Acquire neurophysiology')
+                        action='store_true', help='Acquire neurophysiology',
+                        default=False)
+    parser.add_argument('-s', '--subprocess', dest='as_subprocess',
+                        action='store_true', help='Run TDT IO in a subprocess')
     args = parser.parse_args()
+
+    import cns
+    cns.RCX_USE_SUBPROCESS = args.as_subprocess
 
     if args.profile:
         profile_experiment(args.type[0], args.physiology)
