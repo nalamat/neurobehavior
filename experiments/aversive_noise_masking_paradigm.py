@@ -97,17 +97,20 @@ class AversiveNoiseMaskingParadigm(AbstractAversiveParadigm):
     # attribute and includes the contents in the view.
     signal_group = VGroup(
             Item('repeats'),
-            Item('masker_duration'),
-            Item('masker_amplitude'),
-            Item('probe_duration'),
+            Item('masker_duration',label='Masker duration (s)'),
+            Item('masker_amplitude',label='Masker amplitude (dB SPL)'),
+            Item('probe_duration',label='Probe duration (s)'),
             label='Masker Settings',
             show_border=True,
             )
     timing_group = VGroup(
-            Item('prevent_disarm'),
-            Item('aversive_duration'),
-            Item('lick_th'),
+            Item('min_safe',label='Minimum # safe trials'),
+            Item('max_safe',label='Maximum # safe trials'),
+            Item('trial_duration',label='Trial duration (s)'),
+            Item('prevent_disarm',label='Prevent disarming of shock/puff?'),
+            Item('aversive_delay',label='Shock/puff delay (s)'),
+            Item('aversive_duration',label='Shock/puff duration (s)'),
+            Item('lick_th',label='Contact threshold'),
             show_border=True,
             label='Trial settings',
             )
-            
