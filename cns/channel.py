@@ -1,12 +1,12 @@
-#------------------------------------------------------------------------------
-#
-#  Copyright (c) 2010, Brad N. Buran
-#  All rights reserved.
-#
-#  Author:        Brad N. Buran
-#  Original Date: 06/28/2010
-#
-#------------------------------------------------------------------------------
+'''
+:mod:`cns.channel` -- Containers for timeseries data
+====================================================
+
+.. module:: cns.channel
+    :platform: Unix, Windows, OSX
+    :synopsis: Provides containers for timeseries data
+.. moduleauthor:: Brad Buran <bburan@alum.mit.edu>
+'''
 
 import warnings
 from cns.buffer import SoftwareRingBuffer
@@ -47,9 +47,9 @@ class Timeseries(HasTraits):
 
 class Channel(HasTraits):
     '''
-    Base class for dealing with a continuous stream of data.  Facilitates
-    extracting a segment of the waveform (for analysis or plotting)
-    :func:`get_range` and :func:`get_recent_range`.
+    Base class for dealing with a continuous stream of data.  Subclasses are
+    responsible for implementing the data buffer (e.g. either a file-based or
+    memory-based buffer).
 
     fs
         Sampling frequency (number of samples per second)
@@ -59,6 +59,8 @@ class Channel(HasTraits):
         may discard old data (e.g.  :class:`RAMChannel`), so we need to factor
         in the time offset when attempting to extract a given segment of the
         waveform for analysis.  
+    signal
+        The sample sequence
     '''
 
     metadata = Dict({'selections': None})
