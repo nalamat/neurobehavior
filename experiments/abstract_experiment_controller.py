@@ -393,10 +393,9 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
             value = getattr(paradigm, trait_name)
             getattr(self, 'set_' + trait_name)(value)
 
-    @on_trait_change('model.paradigm.+')
+    @on_trait_change('model.paradigm.-ignore')
     def queue_change(self, instance, name, old, new):
         if self.state <> 'halted':
-            #trait = self.model.paradigm.trait(name)
             trait = instance.trait(name)
             if trait.immediate == True:
                 self.apply_change(instance, name, new)
@@ -416,20 +415,16 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
         Applies an individual change
         '''
         ts = self.get_ts()
-        log.debug("Apply: setting %s:%s to %r", instance, name, value)
         try:
+            log.debug("Apply: setting %s:%s to %r", instance, name, value)
             getattr(self, 'set_'+name)(value)
             self.log_event(ts, name, value)
         except AttributeError:
             mesg = "Can't set %s to %r" % (name, value)
             # Notify the user
             error(info.ui.control, mesg)
-            log.warn(mesg + ", removing from stack")
             # Set paradigm value back to "old" value
-            try:
-                setattr(self.model.paradigm, name, value)
-            except:
-                pass
+            setattr(instance, name, value)
 
     def apply(self, info=None):
         '''

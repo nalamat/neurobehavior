@@ -47,7 +47,7 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
     reward_duration = Float(1.0, store='attribute', init=True)
     pump_rate = Float(1.0, store='attribute', init=True)
     reward_volume = Property(Float, depends_on='reward_duration, pump_rate',
-                             store='attribute')
+                             store='attribute', ignore=True)
 
     def _get_reward_volume(self):
         # Rate is in ml/min, compute mls dispensed then return as ul
