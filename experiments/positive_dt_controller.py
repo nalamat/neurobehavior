@@ -54,7 +54,8 @@ class PositiveDTController(AbstractPositiveController):
         else:
             self.iface_behavior.set_tag('go?', 0)
             self.set_attenuation(120)
-            self.buffer_signal.clear()
+            # TODO: this is a bug!
+            #self.buffer_signal.clear()
             # If set to 0, then the signal will play "forever".  Need to look
             # into how to fix this in the rcx file.
             self.iface_behavior.set_tag('signal_dur_n', 1)

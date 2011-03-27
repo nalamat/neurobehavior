@@ -8,7 +8,7 @@ class PumpParadigmMixin(HasTraits):
     pump_rate = Float(0.5, store='attribute', queue=True, init=True)
     pump_rate_delta = Float(0.025, store='attribute', queue=True, init=True)
     pump_syringe = Enum(SYRINGE_DEFAULT, sorted(SYRINGE_DATA.keys()),
-            store='attribute')
+            store='attribute', ignore=True)
     pump_syringe_diameter = Property(store='attribute',
             depends_on='pump_syringe', queue=True, init=True)
 

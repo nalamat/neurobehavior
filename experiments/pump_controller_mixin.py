@@ -53,12 +53,16 @@ class PumpControllerMixin(HasTraits):
     def pump_increase(self, info):
         new_rate = self.iface_pump.rate + self.current_pump_rate_delta
         self.model.paradigm.pump_rate = new_rate
-        self.apply_change(self.model.paradigm, 'pump_rate')
+        self.apply_change(self.model.paradigm, 'pump_rate', new_rate)
+        del self.pending_changes[self.model.paradigm, 'pump_rate']
+        del self.old_values[self.model.paradigm, 'pump_rate']
 
     def pump_decrease(self, info):
         new_rate = self.iface_pump.rate - self.current_pump_rate_delta
         self.model.paradigm.pump_rate = new_rate
-        self.apply_change(self.model.paradigm, 'pump_rate')
+        self.apply_change(self.model.paradigm, 'pump_rate', new_rate)
+        del self.pending_changes[self.model.paradigm, 'pump_rate']
+        del self.old_values[self.model.paradigm, 'pump_rate']
 
     def set_pump_rate(self, value):
         self.iface_pump.rate = value

@@ -48,6 +48,7 @@ logging_config = {
             'enthought.chaco.barplot': { 'level': 'CRITICAL', },
             # The debug level for this module is extremely noisy.
             'tdt.dsp_buffer': { 'level': 'INFO', },
+            'tdt.dsp_circuit': { 'level': 'INFO', },
             'neurogen': { 'level': 'INFO', },
             },
         'root': {
