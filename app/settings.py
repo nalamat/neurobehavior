@@ -23,11 +23,13 @@ logging_config = {
             'simple': { 'format': simple_format },
             },
         'handlers': {
+            # This is what gets printed out to the console 
             'console': {
                 'class': 'logging.StreamHandler',
                 'level': 'DEBUG',
                 'formatter': 'simple',
                 },
+            # This is what gets saved to the file
             'file': {
                 'class': 'logging.FileHandler',
                 'level': 'DEBUG',
@@ -35,10 +37,18 @@ logging_config = {
                 'filename': filename,
                 }
             },
+        # This is where you would change the logging level of specific modules.
+        # This is very helpful when you are trying to debug a very specific
+        # module and want to turn off the messages from other modules.
         'loggers': {
-            'enthought.chaco.barplot': {
-                'level': 'CRITICAL',
-                },
+            # This module complains if you pass zero-length data to it for
+            # plotting.  However, we initialize the plots with zero-length data
+            # in the beginning of the experiment since we don't have any trials
+            # yet.  Let's silence this module.
+            'enthought.chaco.barplot': { 'level': 'CRITICAL', },
+            # The debug level for this module is extremely noisy.
+            'tdt.dsp_buffer': { 'level': 'INFO', },
+            'neurogen': { 'level': 'INFO', },
             },
         'root': {
             'level': 'DEBUG',
