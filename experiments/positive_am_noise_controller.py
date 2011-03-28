@@ -86,6 +86,8 @@ class PositiveAMNoiseController(AbstractPositiveController):
             par = self.current_nogo_parameter
             self.iface_behavior.set_tag('go?', 0)
 
+        self.update_attenuation()
+
         # Prepare next signal
         waveform = self._compute_signal(par)
         # Upload signal to hardware

@@ -300,7 +300,7 @@ class AbstractPositiveController(AbstractExperimentController, PumpControllerMix
         return self.iface_behavior.get_tag('trial/')
 
     def set_attenuation(self, value):
-        self.iface_behavior.set_tag('att_A', value)
+        self.current_attenuation = value
 
     def set_timeout_trigger(self, value):
         flag = 0 if value == 'FA only' else 1
@@ -320,3 +320,36 @@ class AbstractPositiveController(AbstractExperimentController, PumpControllerMix
 
     def set_pause_state(self, value):
         self.iface_behavior.set_tag('pause_state', value)
+
+    def set_nogo_parameter(self, value):
+        self.current_nogo_parameter = value
+
+    def select_speaker(self):
+        if self.current_speaker_mode in ('primary', 'secondary', 'both'):
+            return self.current_speaker_mode
+        #elif self.current_speaker_output == 'alternate':
+        #    if self.current_speaker == 'primary':
+        #        return 'secondary'
+        #    else:
+        #        return 'primary'
+        else:
+            toss = np.random.uniform()
+            if toss < 0.5:
+                return 'primary'
+            else:
+                return 'secondary'
+        
+    def update_attenuation(self):
+        self.current_speaker = self.select_speaker()
+        attenuation = self.current_attenuation
+        speaker = self.current_speaker
+
+        if speaker == 'primary':
+            self.iface_behavior.set_tag('att_A', attenuation)
+            self.iface_behavior.set_tag('att_B', 120)
+        elif speaker == 'secondary':
+            self.iface_behavior.set_tag('att_A', 120)
+            self.iface_behavior.set_tag('att_B', attenuation)
+        elif speaker == 'both':
+            self.iface_behavior.set_tag('att_A', attenuation)
+            self.iface_behavior.set_tag('att_B', attenuation)
