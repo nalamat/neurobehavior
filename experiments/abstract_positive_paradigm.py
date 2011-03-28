@@ -43,7 +43,7 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
 
     parameter_order = Trait('shuffled set', choice.options, store='attribute',
                             init=True)
-    nogo_parameter  = Float(store='attribute')
+    nogo_parameter  = Float(store='attribute', init=True)
     reward_duration = Float(1.0, store='attribute', init=True)
     pump_rate = Float(1.0, store='attribute', init=True)
     reward_volume = Property(Float, depends_on='reward_duration, pump_rate',

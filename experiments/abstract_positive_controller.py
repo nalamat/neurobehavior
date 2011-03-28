@@ -184,6 +184,9 @@ class AbstractPositiveController(AbstractExperimentController, PumpControllerMix
                       self.current_num_nogo)
             self.trigger_next()
 
+    def is_go(self):
+        return self.current_trial == self.current_num_nogo + 1
+
     ############################################################################
     # Code to apply parameter changes.  This is backend-specific.  If you want
     # to implement a new backend, you would subclass this and override the
