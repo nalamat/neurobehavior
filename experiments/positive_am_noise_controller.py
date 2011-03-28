@@ -59,11 +59,7 @@ class PositiveAMNoiseController(AbstractPositiveController):
     def set_nogo_parameter(self, value):
         self.current_nogo_parameter = value
 
-    def trigger_next(self):
-        if self.current_trial == self.current_num_nogo + 1:
-            # Next trial should be a GO trial
-            par = self.current_setting_go.parameter
-            self.iface_behavior.set_tag('go?', 1)
+    def _recompute_delay(self):
             # Draw a single value from the range [current_lb, current_ub)
             onset = uniform(self.current_lb, self.current_ub, 1)[0]
             # The logic for setting the modulation onset is defined in set_delay
@@ -77,6 +73,14 @@ class PositiveAMNoiseController(AbstractPositiveController):
             # wants the start time and end time of the reaction window, not the
             # delay and duration values).
             self.set_reaction_window_duration(self.current_reaction_window_duration)
+
+    def trigger_next(self):
+        self._recompute_delay()
+
+        if self.is_go():
+            # Next trial should be a GO trial
+            par = self.current_setting_go.parameter
+            self.iface_behavior.set_tag('go?', 1)
         else:
             # Next trial should be a NOGO trial
             par = self.current_nogo_parameter
@@ -92,8 +96,12 @@ class PositiveAMNoiseController(AbstractPositiveController):
         self.iface_behavior.trigger(1)
 
     def log_trial(self, ts_start, ts_end, last_ttype):
-        parameter = self.current_setting_go.parameter
+        if self.is_go():
+            parameter = self.current_setting_go.parameter
+        else:
+            parameter = self.current_nogo_parameter
         onset = self.current_onset
         if onset is None:
             onset = 0
-        self.model.data.log_trial(ts_start, ts_end, last_ttype, parameter, onset)
+        self.model.data.log_trial(ts_start, ts_end, last_ttype, parameter,
+                onset)
