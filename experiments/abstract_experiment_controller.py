@@ -491,3 +491,6 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
 
     def get_ts(self):
         raise NotImplementedException
+
+    def set_speaker_mode(self, value):
+        self.current_speaker_mode = value

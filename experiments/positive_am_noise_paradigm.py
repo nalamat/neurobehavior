@@ -14,6 +14,7 @@ class PositiveAMNoiseParadigm(AbstractPositiveParadigm):
     ub_modulation_onset = Float(0.2, store='attribute', init=True)
 
     signal_group = VGroup(
+            Item('speaker_mode', label='Speaker'),
             Item('attenuation', style='custom', 
                  label='Signal attenuation (dB)'),
             Item('duration', label='Signal duration (s)'),
