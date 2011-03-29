@@ -46,7 +46,6 @@ class AbstractAversiveController(AbstractExperimentController,
         self.init_paradigm(self.model.paradigm)
 
         # Ensure that sampling frequencies are stored properly
-        print 'updating sampling frequency'
         self.model.data.contact_digital.fs = self.buffer_TTL.fs
         self.model.data.contact_digital_mean.fs = self.buffer_contact.fs
         self.model.data.trial_running.fs = self.buffer_TTL.fs
