@@ -173,25 +173,39 @@ class AbstractPositiveExperiment(AbstractExperiment):
         container.add(plot)
         plots["Reward Window"] = plot
 
-        plot = TimeseriesPlot(series=self.data.trial_start_timestamp,
+        plot = TTLPlot(channel=self.data.TO_TTL, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
-                line_color='black', line_width=2, label="Start Trial")
+                fill_color=(1, 0, 0, 0.5), line_color=(1, 0, 0, 1),
+                line_width=1, rect_height=0.1, rect_center=0.05)
         container.add(plot)
+        plots["Timeout Window"] = plot
 
-        plot = TimeseriesPlot(series=self.data.trial_end_timestamp,
+        plot = TTLPlot(channel=self.data.TO_safe_TTL, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
-                line_color='black', line_width=2, label="End Trial")
+                fill_color=(0, 0.5, 0, 0.25), line_color=(0, 0.5, 0, 1),
+                line_width=1, rect_height=0.1, rect_center=0.05)
         container.add(plot)
+        plots["Timeout Safe Window"] = plot
 
-        plot = TimeseriesPlot(series=self.data.timeout_start_timestamp,
-                index_mapper=index_mapper, value_mapper=value_mapper,
-                line_color='red', line_width=2, label="Start TIMEOUT")
-        container.add(plot)
+        #plot = TimeseriesPlot(series=self.data.trial_start_timestamp,
+        #        index_mapper=index_mapper, value_mapper=value_mapper,
+        #        line_color='black', line_width=2, label="Start Trial")
+        #container.add(plot)
 
-        plot = TimeseriesPlot(series=self.data.timeout_end_timestamp,
-                index_mapper=index_mapper, value_mapper=value_mapper,
-                line_color='red', line_width=2, label="End TIMEOUT")
-        container.add(plot)
+        #plot = TimeseriesPlot(series=self.data.trial_end_timestamp,
+        #        index_mapper=index_mapper, value_mapper=value_mapper,
+        #        line_color='black', line_width=2, label="End Trial")
+        #container.add(plot)
+
+        #plot = TimeseriesPlot(series=self.data.timeout_start_timestamp,
+        #        index_mapper=index_mapper, value_mapper=value_mapper,
+        #        line_color='red', line_width=2, label="Start TIMEOUT")
+        #container.add(plot)
+
+        #plot = TimeseriesPlot(series=self.data.timeout_end_timestamp,
+        #        index_mapper=index_mapper, value_mapper=value_mapper,
+        #        line_color='red', line_width=2, label="End TIMEOUT")
+        #container.add(plot)
 
         self.experiment_plot = container
 

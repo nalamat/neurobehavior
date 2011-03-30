@@ -56,7 +56,9 @@ class AbstractPositiveController(AbstractExperimentController, PumpControllerMix
         self.iface_behavior = self.process.load_circuit(circuit, 'RZ6')
 
         self.buffer_signal = self.iface_behavior.get_buffer('speaker', 'w')
-        self.buffer_TTL = self.iface_behavior.get_buffer('TTL', 'r',
+        self.buffer_TTL1 = self.iface_behavior.get_buffer('TTL', 'r',
+                src_type=np.int8, dest_type=np.int8, block_size=24)
+        self.buffer_TTL2 = self.iface_behavior.get_buffer('TTL2', 'r',
                 src_type=np.int8, dest_type=np.int8, block_size=24)
 
         self.buffer_to_start_TS = self.iface_behavior.get_buffer('TO/', 'r',
@@ -64,21 +66,26 @@ class AbstractPositiveController(AbstractExperimentController, PumpControllerMix
         self.buffer_to_end_TS = self.iface_behavior.get_buffer('TO\\', 'r',
                 src_type=np.int32, block_size=1)
 
-        self.model.data.trial_start_timestamp.fs = self.buffer_TTL.fs
-        self.model.data.trial_end_timestamp.fs = self.buffer_TTL.fs
-        self.model.data.timeout_start_timestamp.fs = self.buffer_TTL.fs
-        self.model.data.timeout_end_timestamp.fs = self.buffer_TTL.fs
-        self.model.data.spout_TTL.fs = self.buffer_TTL.fs
-        self.model.data.poke_TTL.fs = self.buffer_TTL.fs
-        self.model.data.signal_TTL.fs = self.buffer_TTL.fs
-        self.model.data.reaction_TTL.fs = self.buffer_TTL.fs
-        self.model.data.response_TTL.fs = self.buffer_TTL.fs
-        self.model.data.reward_TTL.fs = self.buffer_TTL.fs
+        self.model.data.trial_start_timestamp.fs = self.buffer_TTL1.fs
+        self.model.data.trial_end_timestamp.fs = self.buffer_TTL1.fs
+        self.model.data.timeout_start_timestamp.fs = self.buffer_TTL1.fs
+        self.model.data.timeout_end_timestamp.fs = self.buffer_TTL1.fs
+        self.model.data.spout_TTL.fs = self.buffer_TTL1.fs
+        self.model.data.poke_TTL.fs = self.buffer_TTL1.fs
+        self.model.data.signal_TTL.fs = self.buffer_TTL1.fs
+        self.model.data.reaction_TTL.fs = self.buffer_TTL1.fs
+        self.model.data.response_TTL.fs = self.buffer_TTL1.fs
+        self.model.data.reward_TTL.fs = self.buffer_TTL1.fs
+        self.model.data.TO_TTL.fs = self.buffer_TTL2.fs
+        self.model.data.TO_safe_TTL.fs = self.buffer_TTL2.fs
 
-        targets = [self.model.data.poke_TTL, self.model.data.spout_TTL,
-                   self.model.data.reaction_TTL, self.model.data.signal_TTL,
-                   self.model.data.response_TTL, self.model.data.reward_TTL, ]
-        self.pipeline_contact = deinterleave_bits(targets)
+        targets1 = [self.model.data.poke_TTL, self.model.data.spout_TTL,
+                    self.model.data.reaction_TTL, self.model.data.signal_TTL,
+                    self.model.data.response_TTL, self.model.data.reward_TTL, ]
+        targets2 = [self.model.data.TO_safe_TTL, self.model.data.TO_TTL, ]
+
+        self.pipeline_TTL1 = deinterleave_bits(targets1)
+        self.pipeline_TTL2 = deinterleave_bits(targets2)
 
     def start_experiment(self, info):
         self.init_paradigm(self.model.paradigm)
@@ -144,7 +151,8 @@ class AbstractPositiveController(AbstractExperimentController, PumpControllerMix
     
     def monitor_behavior(self):
         ts_end = self.get_trial_end_ts()
-        self.pipeline_contact.send(self.buffer_TTL.read())
+        self.pipeline_TTL1.send(self.buffer_TTL1.read())
+        self.pipeline_TTL2.send(self.buffer_TTL2.read())
         if ts_end > self.current_trial_end_ts:
             # Trial is over.  Process new data and set up for next trial.
             self.current_trial_end_ts = ts_end

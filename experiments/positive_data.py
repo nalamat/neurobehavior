@@ -34,10 +34,11 @@ LOG_DTYPE = [('timestamp', 'i'), ('name', 'S64'), ('value', 'S128'), ]
 #
 # V2.0 - 110315 - Fixed bug in par_info where fa_frac and hit_frac columns were
 # swapped.  Script migrate_positive_data_v1_v2 will correct this bug.
+# V2.1 - 110330 - Added TO_TTL and TO_safe_TTL
 class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
     # VERSION is a reserved keyword in HDF5 files, so I avoid using it here.
-    OBJECT_VERSION = Float(2.0, store='attribute')
+    OBJECT_VERSION = Float(2.1, store='attribute')
 
     def get_data(self, name):
         return getattr(self, name)
@@ -62,6 +63,10 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
             store='channel', store_path='contact/reaction_TTL')
     reward_TTL = Instance(FileChannel,
             store='channel', store_path='contact/reward_TTL')
+    TO_TTL = Instance(FileChannel,
+            store='channel', store_path='contact/TO_TTL')
+    TO_safe_TTL = Instance(FileChannel,
+            store='channel', store_path='contact/TO_safe_TTL')
 
     trial_start_timestamp = Instance('cns.channel.Timeseries', ())
     trial_end_timestamp = Instance('cns.channel.Timeseries', ())
@@ -95,6 +100,12 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
     def _reward_TTL_default(self):
         return self._create_channel('reward_TTL', np.bool)
+
+    def _TO_TTL_default(self):
+        return self._create_channel('TO_TTL', np.bool)
+
+    def _TO_safe_TTL_default(self):
+        return self._create_channel('TO_safe_TTL', np.bool)
 
     TRIAL_DTYPE = [('parameter', 'f'), ('ts_start', 'i'), ('ts_end', 'i'),
                    ('type', 'S4'), ('response', 'S16'), ('reaction_time', 'f')]
