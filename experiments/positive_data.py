@@ -161,6 +161,24 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
         self.trial_log.append(data)
 
     def compute_response(self, ts_start, ts_end):
+        '''
+        Response array
+        --------------
+        * spout
+        * poke
+        * no withdraw
+        * no response
+
+        Early response array (boolean)
+        Trial type array (GO | NOGO)
+
+        Default method for computing scores
+        HIT - go & spout & !early
+        MISS - go & (poke | no_response) & !early
+
+        FA - (nogo & spout) | (early & spout)
+        CR - (nogo | early) & !spout
+        '''
         ts_start = int(ts_start)
         ts_end = int(ts_end)
         poke_data = self.poke_TTL.get_range_index(ts_start, ts_end)
@@ -214,6 +232,8 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
     par_nogo_mask = Property(List(Array('b')), depends_on='trial_log')
     par_spout_mask = Property(List(Array('b')), depends_on='trial_log')
     par_poke_mask = Property(List(Array('b')), depends_on='trial_log')
+    par_no_response_mask = Property(List(Array('b')), depends_on='trial_log')
+    par_no_withdraw_mask = Property(List(Array('b')), depends_on='trial_log')
 
     par_go_count = Property(List(Int), depends_on='trial_log')
     par_nogo_count = Property(List(Int), depends_on='trial_log')
