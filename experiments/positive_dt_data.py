@@ -13,12 +13,13 @@ class PositiveDTData(PositiveData):
             ('ts_end', 'i'),
             ('type', 'S4'), 
             ('response', 'S16'), 
+            ('response_time', 'f'),
             ('reaction_time', 'f'),
             ]
 
     trial_log = List(Tuple(
                         Tuple(Float, Float), 
-                        Int, Int, Str, Str, Float
+                        Int, Int, Str, Str, Float, Float
                         ),
                      store='table', dtype=TRIAL_DTYPE)
 

@@ -27,15 +27,6 @@ from cns.chaco.helpers import add_default_grids, add_time_axis
 from enthought.traits.ui.api import TableEditor, ObjectColumn, VGroup, Item
 from enthought.traits.ui.qt4.extra.bounds_editor import BoundsEditor
 
-monitor_editor = TableEditor(
-        show_row_labels=True,
-        sortable=False,
-        columns=[
-            ObjectColumn(name='number'),
-            ObjectColumn(name='gain'),
-            ]
-        )
-
 colors = {'light green': '#98FB98',
           'dark green': '#2E8B57',
           'light red': '#FFC8CB',
@@ -69,14 +60,16 @@ class TrialTypeColumn(ListColumn):
 class TrialResponseColumn(ListColumn):
 
     MAP = {
-         ('GO',   'spout')       : colors['light green'],
-         ('GO',   'poke')        : colors['gray'],
-         ('NOGO', 'spout')       : colors['gray'],
-         ('NOGO', 'poke')        : colors['light red'],
-         ('GO',   'no response') : '#FFFFFF',
-         ('NOGO', 'no response') : '#FFFFFF',
-         ('GO',   'no withdraw') : '#FFFFFF',
-         ('NOGO', 'no withdraw') : '#FFFFFF', 
+         ('GO',   'spout')          : colors['light green'],
+         ('GO',   'poke')           : colors['gray'],
+         ('NOGO', 'spout')          : colors['gray'],
+         ('NOGO', 'poke')           : colors['light red'],
+         ('GO',   'no response')    : '#DDDDDD',
+         ('NOGO', 'no response')    : '#DDDDDD',
+         ('GO',   'no withdraw')    : '#FFFFFF',
+         ('NOGO', 'no withdraw')    : '#FFFFFF', 
+         ('GO',   'early withdraw') : '#AAAAAA',
+         ('NOGO', 'early withdraw') : '#AAAAAA', 
          }
 
     def get_cell_color(self, object):
@@ -92,8 +85,9 @@ trial_log_table = TableEditor(
             TrialTypeColumn(index=1, label='start'),
             TrialTypeColumn(index=0, label='parameter'),
             TrialResponseColumn(index=4, label='response'),
-            TrialTypeColumn(index=5, label='reaction time'),
-            TrialTypeColumn(index=6, label='modulation delay'),
+            TrialTypeColumn(index=5, label='response time'),
+            TrialTypeColumn(index=6, label='reaction time'),
+            #TrialTypeColumn(index=7, label='modulation delay'),
             ]
         )
 
@@ -176,14 +170,14 @@ class AbstractPositiveExperiment(AbstractExperiment):
         plot = TTLPlot(channel=self.data.TO_TTL, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(1, 0, 0, 0.5), line_color=(1, 0, 0, 1),
-                line_width=1, rect_height=0.1, rect_center=0.05)
+                line_width=1, rect_height=0.1, rect_center=0.125)
         container.add(plot)
         plots["Timeout Window"] = plot
 
         plot = TTLPlot(channel=self.data.TO_safe_TTL, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(0, 0.5, 0, 0.25), line_color=(0, 0.5, 0, 1),
-                line_width=1, rect_height=0.1, rect_center=0.05)
+                line_width=1, rect_height=0.1, rect_center=0.125)
         container.add(plot)
         plots["Timeout Safe Window"] = plot
 
@@ -323,12 +317,43 @@ class AbstractPositiveExperiment(AbstractExperiment):
 
     experiment_group = VGroup(
             VGroup(
-                Item('object.data.go_trial_count',
-                     label='Number of GO trials'),
-                Item('object.data.nogo_trial_count',
-                     label='Number of NOGO trials'),
-                Item('object.data.global_fa_frac',
-                     label='Global FA fraction'),
+                VGroup(
+                    Item('object.data.go_trial_count',
+                         label='Number of GO trials'),
+                    Item('object.data.nogo_trial_count',
+                         label='Number of NOGO trials'),
+                    Item('object.data.global_fa_frac',
+                         label='Global FA fraction'),
+                    show_border=True,
+                    ),
+                VGroup(
+                    Item('object.data.mean_reaction_time',
+                         label='Mean'),
+                    Item('object.data.median_reaction_time',
+                         label='Median'),
+                    Item('object.data.var_reaction_time',
+                         label='Variance'),
+                    label='Reaction Time',
+                    show_border=True
+                    ),
+                VGroup(
+                    Item('object.data.mean_response_time',
+                         label='Mean'),
+                    Item('object.data.median_response_time',
+                         label='Median'),
+                    Item('object.data.var_response_time',
+                         label='Variance'),
+                    label='Response Time',
+                    show_border=True,
+                    ),
+                VGroup(
+                    Item('object.data.mean_react_to_resp_time',
+                         label='Mean'),
+                    Item('object.data.var_react_to_resp_time',
+                         label='Variance'),
+                    label='Response-Reaction Time',
+                    show_border=True,
+                    ),
                 label='Experiment summary',
                 show_border=True,
                 style='readonly',
