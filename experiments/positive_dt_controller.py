@@ -41,6 +41,7 @@ class PositiveDTController(AbstractPositiveController):
 
     def set_attenuation(self, value):
         self.iface_behavior.set_tag('att_A', value)
+        self.iface_behavior.set_tag('att_B', 120)
 
     def trigger_next(self):
         if self.current_trial == self.current_num_nogo + 1:
