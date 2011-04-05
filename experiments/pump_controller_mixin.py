@@ -42,7 +42,9 @@ class PumpControllerMixin(HasTraits):
     iface_pump   = Instance(PumpInterface, ())
 
     def monitor_pump(self):
-        self.model.data.log_water(self.get_ts(), self.iface_pump.infused)
+        infused = self.iface_pump.get_infused(unit='ml')
+        ts = self.get_ts()
+        self.model.data.log_water(ts, infused)
 
     def pump_override(self, info):
         if self.iface_pump.trigger == 'run_high':
@@ -51,27 +53,29 @@ class PumpControllerMixin(HasTraits):
             self.iface_pump.run_if_TTL(trigger='run_high')
 
     def pump_increase(self, info):
-        new_rate = self.iface_pump.rate + self.current_pump_rate_delta
-        self.model.paradigm.pump_rate = new_rate
+        rate = self.iface_pump.get_rate(unit='ml/min') 
+        rate += self.current_pump_rate_delta
+        self.model.paradigm.pump_rate = rate
         self.apply_change(self.model.paradigm, 'pump_rate', new_rate)
         del self.pending_changes[self.model.paradigm, 'pump_rate']
         del self.old_values[self.model.paradigm, 'pump_rate']
 
     def pump_decrease(self, info):
-        new_rate = self.iface_pump.rate - self.current_pump_rate_delta
+        rate = self.iface_pump.get_rate(unit='ml/min') 
+        rate -= self.current_pump_rate_delta
         self.model.paradigm.pump_rate = new_rate
         self.apply_change(self.model.paradigm, 'pump_rate', new_rate)
         del self.pending_changes[self.model.paradigm, 'pump_rate']
         del self.old_values[self.model.paradigm, 'pump_rate']
 
     def set_pump_volume(self, value):
-        raise NotImplementedError
+        self.iface_pump.set_volume(value, unit='ul')
 
     def set_pump_rate(self, value):
-        self.iface_pump.rate = value
+        self.iface_pump.set_rate(value, unit='ml/min')
 
     def set_pump_syringe_diameter(self, value):
-        self.iface_pump.diameter = value
+        self.iface_pump.set_diameter(value, unit='mm')
 
     def set_pump_rate_delta(self, value):
         self.current_pump_rate_delta = value

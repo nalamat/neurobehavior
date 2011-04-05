@@ -49,11 +49,10 @@ class AbstractPositiveController(AbstractExperimentController,
     # Override default implementation of toolbar used by AbstractExperiment
     toolbar = Instance(PositiveExperimentToolBar, (), toolbar=True)
 
-    water_infused = Float(0)
     status = Property(Str, depends_on='state, current_trial, current_num_nogo')
 
     def setup_experiment(self, info):
-        circuit = join(RCX_ROOT, 'positive-behavior')
+        circuit = join(RCX_ROOT, 'positive-behavior-v2')
         self.iface_behavior = self.process.load_circuit(circuit, 'RZ6')
 
         self.buffer_signal = self.iface_behavior.get_buffer('speaker', 'w')
@@ -90,6 +89,7 @@ class AbstractPositiveController(AbstractExperimentController,
 
     def start_experiment(self, info):
         self.init_paradigm(self.model.paradigm)
+        self.iface_pump.set_trigger(start='rising', stop=None)
 
         # Grab the current value of the timestamp from the circuit when it is
         # first loaded
@@ -317,8 +317,8 @@ class AbstractPositiveController(AbstractExperimentController,
     def set_response_window_duration(self, value):
         self.iface_behavior.cset_tag('resp_dur_n', value, 's', 'n')
 
-    def set_reward_duration(self, value):
-        self.iface_behavior.cset_tag('reward_dur_n', value, 's', 'n')
+    #def set_reward_duration(self, value):
+    #    self.iface_behavior.cset_tag('reward_dur_n', value, 's', 'n')
 
     def set_signal_offset_delay(self, value):
         self.iface_behavior.cset_tag('sig_offset_del_n', value, 's', 'n')
@@ -349,6 +349,7 @@ class AbstractPositiveController(AbstractExperimentController,
         self.iface_behavior.cset_tag('to_dur_n', value, 's', 'n')
 
     def set_timeout_grace_period(self, value):
+        return
         self.iface_behavior.cset_tag('to_safe_n', value, 's', 'n')
 
     def get_trial_running(self):
@@ -362,6 +363,9 @@ class AbstractPositiveController(AbstractExperimentController,
 
     def set_nogo_parameter(self, value):
         self.current_nogo_parameter = value
+
+    def set_reward_volume(self, value):
+        self.set_pump_volume(value)
 
     def select_speaker(self):
         if self.current_speaker_mode in ('primary', 'secondary', 'both'):
