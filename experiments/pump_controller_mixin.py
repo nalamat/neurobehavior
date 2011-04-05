@@ -64,6 +64,9 @@ class PumpControllerMixin(HasTraits):
         del self.pending_changes[self.model.paradigm, 'pump_rate']
         del self.old_values[self.model.paradigm, 'pump_rate']
 
+    def set_pump_volume(self, value):
+        raise NotImplementedError
+
     def set_pump_rate(self, value):
         self.iface_pump.rate = value
 
