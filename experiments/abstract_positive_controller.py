@@ -43,7 +43,8 @@ class PositiveExperimentToolBar(ExperimentToolBar):
             kind='subpanel',
             )
 
-class AbstractPositiveController(AbstractExperimentController, PumpControllerMixin):
+class AbstractPositiveController(AbstractExperimentController,
+        PumpControllerMixin):
 
     # Override default implementation of toolbar used by AbstractExperiment
     toolbar = Instance(PositiveExperimentToolBar, (), toolbar=True)
@@ -89,11 +90,17 @@ class AbstractPositiveController(AbstractExperimentController, PumpControllerMix
 
     def start_experiment(self, info):
         self.init_paradigm(self.model.paradigm)
+
+        # Grab the current value of the timestamp from the circuit when it is
+        # first loaded
         self.current_trial_end_ts = self.get_trial_end_ts()
+        self.current_poke_end_ts = self.get_poke_end_ts()
 
         self.state = 'running'
         self.trigger_next()
         self.iface_behavior.trigger('A', 'high')
+
+        # Add tasks to the queue
         self.tasks.append((self.monitor_behavior, 1))
         self.tasks.append((self.monitor_pump, 5))
         self.tasks.append((self.monitor_timeout, 5))
@@ -148,11 +155,32 @@ class AbstractPositiveController(AbstractExperimentController, PumpControllerMix
     def monitor_timeout(self):
         self.model.data.timeout_start_timestamp.send(self.buffer_to_start_TS.read())
         self.model.data.timeout_end_timestamp.send(self.buffer_to_end_TS.read())
+
+    def update_reward_settings(self, wait_time):
+        # By default we do nothing
+        return
     
     def monitor_behavior(self):
         ts_end = self.get_trial_end_ts()
         self.pipeline_TTL1.send(self.buffer_TTL1.read())
         self.pipeline_TTL2.send(self.buffer_TTL2.read())
+
+        ts_poke_end = self.get_poke_end_ts()
+        if ts_poke_end > self.current_poke_end_ts:
+            # If poke_end has changed, we know that the subject has withdrawn
+            # from the nose poke during a trial.  
+            self.current_poke_end_ts = ts_poke_end
+            ts_start = self.get_trial_start_ts()
+
+            # dt is the time, in seconds, the subject took to withdraw from the
+            # nose-poke relative to the beginning of the trial.  Since ts_start
+            # and ts_poke_end are stored in multiples of the contact sampling
+            # frequency, we can convert the timestaps to seconds by dividing by
+            # the contact sampling frequency (stored in self.buffer_TTL1.fs)
+            dt = (ts_poke_end-ts_start) / self.buffer_TTL1.fs
+            wait_time = dt-self.current_reaction_window_delay
+            self.update_reward_settings(wait_time)
+
         if ts_end > self.current_trial_end_ts:
             # Trial is over.  Process new data and set up for next trial.
             self.current_trial_end_ts = ts_end
@@ -301,6 +329,9 @@ class AbstractPositiveController(AbstractExperimentController, PumpControllerMix
     def get_ts(self, req_unit=None):
         return self.iface_behavior.get_tag('zTime')
 
+    def get_poke_end_ts(self):
+        return self.iface_behavior.get_tag('poke\\')
+
     def get_trial_end_ts(self):
         return self.iface_behavior.get_tag('trial\\')
 
@@ -323,8 +354,8 @@ class AbstractPositiveController(AbstractExperimentController, PumpControllerMix
     def get_trial_running(self):
         return self.iface_behavior.get_tag('trial_running')
 
-    def trigger_next(self):
-        raise NotImplementedError
+    #def trigger_next(self):
+    #    raise NotImplementedError
 
     def set_pause_state(self, value):
         self.iface_behavior.set_tag('pause_state', value)
