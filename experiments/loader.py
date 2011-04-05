@@ -243,14 +243,14 @@ EXPERIMENTS = {
             'experiment_class': AbstractPositiveExperiment, 
             'paradigm_class': PositiveAMNoiseParadigm,
             'controller_class': PositiveAMNoiseController, 
-            'data_class': PositiveAMNoiseData,
+            'data_class': PositiveData,
             'node_name': 'PositiveAMNoiseExperiment',
             },
         'positive_dt': {
             'experiment_class': PositiveDTExperiment, 
             'paradigm_class': PositiveDTParadigm,
             'controller_class': PositiveDTController, 
-            'data_class': PositiveDTData,
+            'data_class': PositiveData,
             'node_name': 'PositiveDTExperiment',
             },
         'aversive_fm': {

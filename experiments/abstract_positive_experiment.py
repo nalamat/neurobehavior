@@ -2,7 +2,7 @@ from __future__ import division
 
 import numpy as np
 from enthought.traits.api import HasTraits, Any, Instance, DelegatesTo, \
-        Int, Float, Property, on_trait_change
+        Int, Float, Property, on_trait_change, cached_property
 from enthought.traits.ui.api import View, Item, VGroup, HGroup, InstanceEditor,\
     VSplit, HSplit, TabularEditor, Group, Include, Tabbed
 
@@ -24,8 +24,7 @@ from cns.chaco.timeseries_plot import TimeseriesPlot
 from cns.chaco.dynamic_bar_plot import DynamicBarPlot, DynamicBarplotAxis
 from cns.chaco.helpers import add_default_grids, add_time_axis
 
-from enthought.traits.ui.api import TableEditor, ObjectColumn, VGroup, Item
-from enthought.traits.ui.qt4.extra.bounds_editor import BoundsEditor
+from enthought.traits.ui.api import VGroup, Item
 
 colors = {'light green': '#98FB98',
           'dark green': '#2E8B57',
@@ -35,74 +34,105 @@ colors = {'light green': '#98FB98',
           'light blue': '#ADD8E6',
           }
 
-from enthought.traits.ui.api import TableEditor, ListColumn, ObjectColumn
+from enthought.traits.ui.api import TabularEditor
+from enthought.traits.ui.tabular_adapter import TabularAdapter
 
-class TrialTypeColumn(ListColumn):
+from enthought.traits.api import *
 
-    def get_cell_color(self, object):
-        if object[3] == 'GO':
+class ParInfoAdapter(TabularAdapter):
+
+    mean_std_fmt = u"{:.2} \u00B1 {:.2}"
+
+    columns = [ ('Par', 'par'),
+                ('Hit %', 'hit_frac'), 
+                ('FA %', 'fa_frac'),
+                ('d', 'd'),
+                ('Reaction (s)', 'reaction'),
+                ('Response (s)', 'response'),
+                ]
+
+    width = Float(50)
+    reaction_width = Float(75)
+    response_width = Float(75)
+
+    reaction_text = Property
+    response_text = Property
+
+    def _get_reaction_text(self):
+        return self.mean_std_fmt.format(self.item['mean_react'],
+                self.item['std_react'])
+
+    def _get_response_text(self):
+        return self.mean_std_fmt.format(self.item['mean_resp'],
+                self.item['std_resp'])
+
+    def _get_bg_color(self):
+        if self.item['d'] < 1:
+            return colors['light red']
+        else:
+            return colors['light green']
+
+par_info_editor = TabularEditor(editable=False, adapter=ParInfoAdapter())
+
+class TrialLogAdapter(TabularAdapter):
+
+    # List of tuples (column_name, field )
+    columns = [ ('Start', 'start'),
+                ('', 'early_response'),
+                ('Response', 'response'), 
+                ('Reaction time', 'reaction_time'),
+                ('Response time', 'response_time')
+                ]
+
+    early_response_width = Float(20)
+    start_width = Float(50)
+    response_width = Float(100)
+    reaction_time_width = Float(75)
+    response_time_width = Float(75)
+    response_image = Property
+    early_response_image = Property
+
+    def _get_bg_color(self):
+        if self.item['ttype'] == 'GO':
             return colors['light green']
         else:
             return colors['light red']
 
-    def get_value(self, object):
-        try:
-            value = object[self.index]
-            if type(value) in (list, tuple):
-                # Default Python formatting for a tuple or list is a bit ugly, so
-                # let's handle it ourselves.
-                return ", ".join([str(e) for e in value])
-            else:
-                return str(value)
-        except IndexError:
-            return "NA"
+    def _get_early_response_image(self):
+        if self.item['early_response']:
+            return '@icons:array_node'
+        else:
+            return '@icons:tuple_node'
 
-class TrialResponseColumn(ListColumn):
+    def _get_response_image(self):
+        # Note that these are references to some icons included in ETS
+        # (Enthought Tool Suite).  The icons can be found in
+        # enthought/traits/ui/image/library/icons.zip under site-packages.  I
+        # hand-picked a few that seemed to work for our purposes (mainly based
+        # on the colors).  I wanted a spout response to have a green icon
+        # associated with it (so that green on green means HIT, red on green
+        # means MISS), etc.
+        if self.item['response'] == 'spout':
+            return '@icons:tuple_node'  # a green icon
+        elif self.item['response'] == 'poke':
+            return '@icons:dict_node'   # a red icon
+        else:
+            return '@icons:none_node'   # a gray icon
 
-    MAP = {
-         ('GO',   'spout')          : colors['light green'],
-         ('GO',   'poke')           : colors['gray'],
-         ('NOGO', 'spout')          : colors['gray'],
-         ('NOGO', 'poke')           : colors['light red'],
-         ('GO',   'no response')    : '#DDDDDD',
-         ('NOGO', 'no response')    : '#DDDDDD',
-         ('GO',   'no withdraw')    : '#FFFFFF',
-         ('NOGO', 'no withdraw')    : '#FFFFFF', 
-         ('GO',   'early withdraw') : '#AAAAAA',
-         ('NOGO', 'early withdraw') : '#AAAAAA', 
-         }
-
-    def get_cell_color(self, object):
-        response = object[4]
-        ttype = object[3]
-        return self.MAP[(ttype, response)]
-
-trial_log_table = TableEditor(
-        editable=False,
-        sort_model=False,
-        reverse=True,
-        columns=[
-            TrialTypeColumn(index=1, label='start'),
-            TrialTypeColumn(index=0, label='parameter'),
-            TrialResponseColumn(index=4, label='response'),
-            TrialTypeColumn(index=5, label='response time'),
-            TrialTypeColumn(index=6, label='reaction time'),
-            #TrialTypeColumn(index=7, label='modulation delay'),
-            ]
-        )
+trial_log_editor = TabularEditor(editable=False, adapter=TrialLogAdapter())
 
 class AbstractPositiveExperiment(AbstractExperiment):
 
     trial_log_view = Property(depends_on='data.trial_log',
-            editor=trial_log_table)
+            editor=trial_log_editor)
 
+    @cached_property
     def _get_trial_log_view(self):
-        trial_log = np.array(self.data.trial_log, dtype=object)
-        if len(trial_log) > 0:
-            trial_log[:,4] /= self.data.contact_fs
-            return list(trial_log)
-        else:
-            return list(trial_log)
+        # Allows us to ensure that last trial always appears at the top of
+        # the list (otherwise we constantly need to scroll down to see the
+        # latest trial).  Eventually we can add per-column sorting back in, but
+        # that is a very low priority.
+        return self.data.trial_log[::-1]
 
     experiment_plot = Instance(Component)
     par_count_plot  = Instance(Component)
@@ -315,50 +345,53 @@ class AbstractPositiveExperiment(AbstractExperiment):
                 ),
             )
 
-    experiment_group = VGroup(
-            VGroup(
-                VGroup(
-                    Item('object.data.go_trial_count',
-                         label='Number of GO trials'),
-                    Item('object.data.nogo_trial_count',
-                         label='Number of NOGO trials'),
-                    Item('object.data.global_fa_frac',
-                         label='Global FA fraction'),
-                    show_border=True,
-                    ),
-                VGroup(
-                    Item('object.data.mean_reaction_time',
-                         label='Mean'),
-                    Item('object.data.median_reaction_time',
-                         label='Median'),
-                    Item('object.data.var_reaction_time',
-                         label='Variance'),
-                    label='Reaction Time',
-                    show_border=True
-                    ),
-                VGroup(
-                    Item('object.data.mean_response_time',
-                         label='Mean'),
-                    Item('object.data.median_response_time',
-                         label='Median'),
-                    Item('object.data.var_response_time',
-                         label='Variance'),
-                    label='Response Time',
-                    show_border=True,
-                    ),
-                VGroup(
-                    Item('object.data.mean_react_to_resp_time',
-                         label='Mean'),
-                    Item('object.data.var_react_to_resp_time',
-                         label='Variance'),
-                    label='Response-Reaction Time',
-                    show_border=True,
-                    ),
-                label='Experiment summary',
-                show_border=True,
-                style='readonly',
-                ),
-            Item('object.data.trial_log', editor=trial_log_table),
+    experiment_group = VSplit(
+            #VGroup(
+            #    VGroup(
+            #        Item('object.data.go_trial_count',
+            #             label='Number of GO trials'),
+            #        Item('object.data.nogo_trial_count',
+            #             label='Number of NOGO trials'),
+            #        Item('object.data.global_fa_frac',
+            #             label='Global FA fraction'),
+            #        show_border=True,
+            #        ),
+            #    VGroup(
+            #        Item('object.data.mean_reaction_time',
+            #             label='Mean'),
+            #        Item('object.data.median_reaction_time',
+            #             label='Median'),
+            #        Item('object.data.var_reaction_time',
+            #             label='Variance'),
+            #        label='Reaction Time',
+            #        show_border=True
+            #        ),
+            #    VGroup(
+            #        Item('object.data.mean_response_time',
+            #             label='Mean'),
+            #        Item('object.data.median_response_time',
+            #             label='Median'),
+            #        Item('object.data.var_response_time',
+            #             label='Variance'),
+            #        label='Response Time',
+            #        show_border=True,
+            #        ),
+            #    VGroup(
+            #        Item('object.data.mean_react_to_resp_time',
+            #             label='Mean'),
+            #        Item('object.data.var_react_to_resp_time',
+            #             label='Variance'),
+            #        label='Response-Reaction Time',
+            #        show_border=True,
+            #        ),
+            #    label='Experiment summary',
+            #    show_border=True,
+            #    style='readonly',
+            #    ),
+            #Item('trial_log_view', editor=trial_log_table),
+            Item('object.data.par_info', editor=par_info_editor, height=150),
+            Item('trial_log_view'),
+            #Item('object.data.trial_log', editor=trial_log_table),
             show_labels=False,
             )
 
