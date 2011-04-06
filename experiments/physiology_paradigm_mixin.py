@@ -29,6 +29,9 @@ channel_editor = TableEditor(
 
 class PhysiologyParadigmMixin(HasTraits):
 
+    # Width of buttons in GUI
+    WIDTH = -40
+
     # These are convenience buttons for quickly setting the differentials of
     # each channel.
     diff_none       = Button('None')
@@ -60,16 +63,16 @@ class PhysiologyParadigmMixin(HasTraits):
             channel.set(True, differential=value)
 
     def _diff_all_fired(self):
-        for channel in self.channel-settings:
+        for channel in self.channel_settings:
             value = self._get_diff_group(channel.number, 16)
             channel.set(True, differential=value)
 
     diff_group = HGroup(
-            Item('diff_bundle'),
-            Item('diff_sagittal'),
-            Item('diff_coronal'),
-            Item('diff_all'),
-            Item('diff_none'),
+            Item('diff_bundle', width=WIDTH),
+            Item('diff_sagittal', width=WIDTH),
+            Item('diff_coronal', width=WIDTH),
+            Item('diff_all', width=WIDTH),
+            Item('diff_none', width=WIDTH),
             show_labels=False,
             )
 
@@ -91,16 +94,16 @@ class PhysiologyParadigmMixin(HasTraits):
     none    = Button(label='None')
 
     visible_group = HGroup(
-            Item('ch_14'),
-            Item('ch_24'),
-            Item('ch_34'),
-            Item('ch_44'),
+            Item('ch_14', width=WIDTH),
+            Item('ch_24', width=WIDTH),
+            Item('ch_34', width=WIDTH),
+            Item('ch_44', width=WIDTH),
             '_',
-            Item('ch_18'),
-            Item('ch_28'),
+            Item('ch_18', width=WIDTH),
+            Item('ch_28', width=WIDTH),
             '_',
-            Item('all'),
-            Item('none'),
+            Item('all', width=WIDTH),
+            Item('none', width=WIDTH),
             show_labels=False,
             )
 
@@ -177,6 +180,7 @@ class PhysiologyParadigmMixin(HasTraits):
                 sf = -1.0/len(channels)
                 for d in channels:
                     map[channel.number-1, d-1] = sf
+            map[channel.number-1, channel.number-1] = 1
         return map
 
     monitor_group = HGroup(
