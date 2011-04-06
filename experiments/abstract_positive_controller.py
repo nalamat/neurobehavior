@@ -300,6 +300,9 @@ class AbstractPositiveController(AbstractExperimentController,
 
     def set_reaction_window_delay(self, value):
         self.current_reaction_window_delay = value
+        self.update_reaction_window_delay(value)
+
+    def update_reaction_window_delay(self, value):
         if value is not None:
             self.iface_behavior.cset_tag('react_del_n', value, 's', 'n')
             # Check to see if the conversion of s to n resulted in a value of 0.
@@ -308,11 +311,11 @@ class AbstractPositiveController(AbstractExperimentController,
             if self.iface_behavior.get_tag('react_del_n') == 0:
                 self.iface_behavior.set_tag('react_del_n', 1)
 
-    def set_reaction_window_duration(self, value):
+    def set_reaction_window_duration(self, value, offset=0):
         self.current_reaction_window_duration = value
         delay = self.current_reaction_window_delay
         if value is not None and delay is not None:
-            self.iface_behavior.cset_tag('react_end_n', delay+value, 's', 'n')
+            self.iface_behavior.cset_tag('react_end_n', delay+value+offset, 's', 'n')
 
     def set_response_window_duration(self, value):
         self.iface_behavior.cset_tag('resp_dur_n', value, 's', 'n')

@@ -59,20 +59,24 @@ class PositiveAMNoiseController(AbstractPositiveController):
     def set_nogo_parameter(self, value):
         self.current_nogo_parameter = value
 
+    def set_reaction_window_delay(self, value):
+        self.current_reaction_window_delay = value
+
     def _recompute_delay(self):
         # Draw a single value from the range [current_lb, current_ub)
         onset = uniform(self.current_lb, self.current_ub, 1)[0]
         # The logic for setting the modulation onset is defined in set_delay
         self.set_delay(onset)
         self.current_onset = onset
-        self.set_reaction_window_delay(onset)
+        self.update_reaction_window_delay(onset+self.current_reaction_window_delay)
         
         # We need to update the reaction_window_duration as well because it
         # is implemented as the sum of the delay and duration in the RPvds
         # circuit (this is really a poorly-named variable since the RPvds
         # wants the start time and end time of the reaction window, not the
         # delay and duration values).
-        self.set_reaction_window_duration(self.current_reaction_window_duration)
+        self.set_reaction_window_duration(self.current_reaction_window_duration,
+                onset)
 
     def trigger_next(self):
         self._recompute_delay()

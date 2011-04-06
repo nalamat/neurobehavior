@@ -44,6 +44,12 @@ class AbstractAversiveController(AbstractExperimentController,
 
     def start_experiment(self, info):
         self.init_paradigm(self.model.paradigm)
+        # Pump will halt when it has infused the requested volume.  To allow it
+        # to infuse continuously, we set the volume to 0.
+        self.iface_pump.set_volume(0)
+        # Pump will start on a rising edge (e.g. the subject touches the spout)
+        # and stop on a falling edge (e.g. the subject leaves the spout).
+        self.iface_pump.set_trigger(start='rising', stop='falling')
 
         # Ensure that sampling frequencies are stored properly
         self.model.data.contact_digital.fs = self.buffer_TTL.fs
