@@ -106,4 +106,5 @@ class PositiveAMNoiseController(AbstractPositiveController):
         if onset is None:
             onset = 0
         self.model.data.log_trial(ts_start=ts_start, ts_end=ts_end,
-                ttype=last_ttype, parameter=parameter, modulation_onset=onset)
+                ttype=last_ttype, depth=parameter, modulation_onset=onset,
+                speaker=self.current_speaker)

@@ -41,30 +41,53 @@ from enthought.traits.api import *
 
 class ParInfoAdapter(TabularAdapter):
 
-    mean_std_fmt = u"{:.2} \u00B1 {:.2}"
+    parameters = List(['parameter'])
 
-    columns = [ ('Par', 'par'),
+    # \u00B1 is +/- symbol
+    timing_fmt = u"x\u0304 {:.2}, x\u0303 {:.2}, \u03C3\u2093 {:.2}"
+
+    columns = [ ('P', 'parameter'),
                 ('Hit %', 'hit_frac'), 
                 ('FA %', 'fa_frac'),
+                ('GO/NOGO', 'go_nogo_ratio'),
+                ('GO #', 'go'),
+                ('NOGO #', 'nogo'),
+                ('HIT #', 'hit'),
+                ('MISS #', 'miss'),
+                ('FA #', 'fa'),
+                ('CR #', 'cr'),
                 ('d', 'd'),
-                ('Reaction (s)', 'reaction'),
-                ('Response (s)', 'response'),
+                (u'WD x\u0304', 'mean_react'),
+                (u'WD x\u0303', 'median_react'),
+                (u'WD \u03C3\u2093', 'std_react'),
+                (u'RS x\u0304', 'mean_resp'),
+                (u'RS x\u0303', 'median_resp'),
+                (u'RS \u03C3\u2093', 'std_resp'),
                 ]
 
-    width = Float(50)
-    reaction_width = Float(75)
-    response_width = Float(75)
+    parameter_text = Property
 
-    reaction_text = Property
-    response_text = Property
+    def _get_parameter_text(self):
+        return ', '.join('{}'.format(self.item[p]) for p in self.parameters)
 
-    def _get_reaction_text(self):
-        return self.mean_std_fmt.format(self.item['mean_react'],
-                self.item['std_react'])
+    #width = Float(50)
+    #reaction_width = Float(100)
+    #response_width = Float(100)
 
-    def _get_response_text(self):
-        return self.mean_std_fmt.format(self.item['mean_resp'],
-                self.item['std_resp'])
+    #reaction_text = Property
+    #response_text = Property
+
+    #def _get_reaction_text(self):
+    #    return self.timing_fmt.format(
+    #            self.item['mean_react'],
+    #            self.item['median_react'],
+    #            self.item['std_react'])
+
+    #def _get_response_text(self):
+    #    return self.timing_fmt.format(
+    #            self.item['mean_resp'],
+    #            self.item['median_resp'],
+    #            self.item['std_resp'])
 
     def _get_bg_color(self):
         if self.item['d'] < 1:
@@ -72,25 +95,39 @@ class ParInfoAdapter(TabularAdapter):
         else:
             return colors['light green']
 
-par_info_editor = TabularEditor(editable=False, adapter=ParInfoAdapter())
 
 class TrialLogAdapter(TabularAdapter):
 
+    parameters = List(['parameter'])
+
     # List of tuples (column_name, field )
-    columns = [ ('Start', 'start'),
-                ('', 'early_response'),
-                ('Response', 'response'), 
+    columns = [ ('P', 'parameter'),
+                ('S', 'speaker'),
+                ('Start', 'start'),
+                ('E', 'early_response'),
+                ('R', 'response'), 
                 ('Reaction time', 'reaction_time'),
                 ('Response time', 'response_time')
                 ]
 
-    early_response_width = Float(20)
+    parameter_width = Float(75)
+    early_response_width = Float(25)
+    response_width = Float(25)
+    speaker_width = Float(25)
     start_width = Float(50)
-    response_width = Float(100)
     reaction_time_width = Float(75)
     response_time_width = Float(75)
     response_image = Property
     early_response_image = Property
+
+    parameter_text = Property
+    speaker_text = Property
+
+    def _get_parameter_text(self):
+        return ', '.join('{}'.format(self.item[p]) for p in self.parameters)
+
+    def _get_speaker_text(self):
+        return self.item['speaker'][0].upper()
 
     def _get_bg_color(self):
         if self.item['ttype'] == 'GO':
@@ -119,19 +156,33 @@ class TrialLogAdapter(TabularAdapter):
         else:
             return '@icons:none_node'   # a gray icon
 
-trial_log_editor = TabularEditor(editable=False, adapter=TrialLogAdapter())
+class ParameterAdapter(TabularAdapter):
+
+    columns = [('Value', 'value')]
+
+    value_text = Property
+
+    def _get_value_text(self):
+        return self.item
 
 class AbstractPositiveExperiment(AbstractExperiment):
 
-    trial_log_view = Property(depends_on='data.trial_log',
-            editor=trial_log_editor)
+    par_info_adapter    = ParInfoAdapter()
+    par_info_editor     = TabularEditor(editable=False,
+                                        adapter=par_info_adapter)
+
+    trial_log_adapter   = TrialLogAdapter()
+    trial_log_editor    = TabularEditor(editable=False,
+                                        adapter=trial_log_adapter)
+    trial_log_view      = Property(depends_on='data.trial_log',
+                                   editor=trial_log_editor)
 
     @cached_property
     def _get_trial_log_view(self):
-        # Allows us to ensure that last trial always appears at the top of
-        # the list (otherwise we constantly need to scroll down to see the
-        # latest trial).  Eventually we can add per-column sorting back in, but
-        # that is a very low priority.
+        # Allows us to ensure that last trial always appears at the top of the
+        # list (otherwise we constantly need to scroll down to see the latest
+        # trial).  Eventually we can add per-column sorting back in, but that is
+        # a very low priority.
         return self.data.trial_log[::-1]
 
     experiment_plot = Instance(Component)
@@ -210,26 +261,6 @@ class AbstractPositiveExperiment(AbstractExperiment):
                 line_width=1, rect_height=0.1, rect_center=0.125)
         container.add(plot)
         plots["Timeout Safe Window"] = plot
-
-        #plot = TimeseriesPlot(series=self.data.trial_start_timestamp,
-        #        index_mapper=index_mapper, value_mapper=value_mapper,
-        #        line_color='black', line_width=2, label="Start Trial")
-        #container.add(plot)
-
-        #plot = TimeseriesPlot(series=self.data.trial_end_timestamp,
-        #        index_mapper=index_mapper, value_mapper=value_mapper,
-        #        line_color='black', line_width=2, label="End Trial")
-        #container.add(plot)
-
-        #plot = TimeseriesPlot(series=self.data.timeout_start_timestamp,
-        #        index_mapper=index_mapper, value_mapper=value_mapper,
-        #        line_color='red', line_width=2, label="Start TIMEOUT")
-        #container.add(plot)
-
-        #plot = TimeseriesPlot(series=self.data.timeout_end_timestamp,
-        #        index_mapper=index_mapper, value_mapper=value_mapper,
-        #        line_color='red', line_width=2, label="End TIMEOUT")
-        #container.add(plot)
 
         self.experiment_plot = container
 
@@ -332,66 +363,20 @@ class AbstractPositiveExperiment(AbstractExperiment):
             show_border=True,
             )
 
-    plots_group = VGroup(
+    plots_group = VSplit(
             Item('experiment_plot', editor=ComponentEditor(),
-                show_label=False, width=1000, height=400),
+                show_label=False, width=1000, height=300),
             HGroup(
                 Item('par_count_plot', editor=ComponentEditor(),
-                    show_label=False, width=150, height=150),
+                    show_label=False, width=150, height=400),
                 Item('par_score_plot', editor=ComponentEditor(),
-                    show_label=False, width=150, height=150),
+                    show_label=False, width=150, height=400),
                 Item('par_dprime_plot', editor=ComponentEditor(),
-                    show_label=False, width=150, height=150)
+                    show_label=False, width=150, height=400),
+                label='Plots',
                 ),
-            )
-
-    experiment_group = VSplit(
-            #VGroup(
-            #    VGroup(
-            #        Item('object.data.go_trial_count',
-            #             label='Number of GO trials'),
-            #        Item('object.data.nogo_trial_count',
-            #             label='Number of NOGO trials'),
-            #        Item('object.data.global_fa_frac',
-            #             label='Global FA fraction'),
-            #        show_border=True,
-            #        ),
-            #    VGroup(
-            #        Item('object.data.mean_reaction_time',
-            #             label='Mean'),
-            #        Item('object.data.median_reaction_time',
-            #             label='Median'),
-            #        Item('object.data.var_reaction_time',
-            #             label='Variance'),
-            #        label='Reaction Time',
-            #        show_border=True
-            #        ),
-            #    VGroup(
-            #        Item('object.data.mean_response_time',
-            #             label='Mean'),
-            #        Item('object.data.median_response_time',
-            #             label='Median'),
-            #        Item('object.data.var_response_time',
-            #             label='Variance'),
-            #        label='Response Time',
-            #        show_border=True,
-            #        ),
-            #    VGroup(
-            #        Item('object.data.mean_react_to_resp_time',
-            #             label='Mean'),
-            #        Item('object.data.var_react_to_resp_time',
-            #             label='Variance'),
-            #        label='Response-Reaction Time',
-            #        show_border=True,
-            #        ),
-            #    label='Experiment summary',
-            #    show_border=True,
-            #    style='readonly',
-            #    ),
-            #Item('trial_log_view', editor=trial_log_table),
-            Item('object.data.par_info', editor=par_info_editor, height=150),
-            Item('trial_log_view'),
-            #Item('object.data.trial_log', editor=trial_log_table),
+            Item('object.data.par_info', editor=par_info_editor,
+                label='Performance Statistics'),
             show_labels=False,
             )
 
@@ -404,6 +389,6 @@ class AbstractPositiveExperiment(AbstractExperiment):
                 show_labels=False,
             ),
             Include('plots_group'),
-            Include('experiment_group'),
+            Item('trial_log_view'),
             show_labels=False,
         )
