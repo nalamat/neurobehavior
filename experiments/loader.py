@@ -71,10 +71,10 @@ class ExperimentCohortView(CohortView):
 
 class ExperimentLauncher(CohortViewHandler):
 
-    experiment_class    = Any
-    paradigm_class      = Any
-    controller_class    = Any
-    data_class          = Any
+    experiment          = Any
+    paradigm            = Any
+    controller          = Any
+    data                = Any
     node_name           = Str
     spool_physiology    = Bool(True)
 
@@ -134,6 +134,11 @@ class ExperimentLauncher(CohortViewHandler):
                 
             exp_node = append_date_node(store_node, self.node_name + '_')
             data_node = append_node(exp_node, 'data')
+
+            experiment_class, experiment_args = self.experiment
+            data_class, data_args = self.data
+            paradigm_class, paradigm_args = self.paradigm
+            controller_class, controller_args = self.controller
 
             model = self.experiment_class(
                     store_node=store_node, 
@@ -203,15 +208,22 @@ def test_experiment(etype, spool_physiology):
     exp_node = append_date_node(store_node, pre)
     data_node = append_node(exp_node, 'data')
 
-    model = e['experiment_class'](
+    experiment_class, experiment_args = e['experiment']
+    data_class, data_args = e['data']
+    paradigm_class, paradigm_args = e['paradigm']
+    controller_class, controller_args = e['controller']
+
+    model = experiment_class(
             store_node=store_node, 
             exp_node=exp_node,
             data_node=data_node, 
-            data=e['data_class'](store_node=data_node),
-            paradigm=e['paradigm_class'](),
+            data=data_class(store_node=data_node, **data_args),
+            paradigm=paradigm_class(**paradigm_args),
             spool_physiology=spool_physiology,
+            **experiment_args
             )
-    model.configure_traits(handler=e['controller_class']())
+    controller = controller_class(**controller_args)
+    model.configure_traits(handler=controller)
 
 def profile_experiment(etype, spool_physiology=False):
     from cns import TEMP_ROOT
@@ -230,48 +242,50 @@ def launch_experiment(etype, spool_physiology=False, profile=False):
             **EXPERIMENTS[etype])
     ExperimentCohortView().configure_traits(handler=handler)
 
-# Define the classes required for each experiment
+# Define the classes required for each experiment.
 EXPERIMENTS = {
         'basic_characterization': {
-            'experiment_class': AbstractExperiment, 
-            'paradigm_class': BasicCharacterizationParadigm,
-            'controller_class': BasicCharacterizationController, 
-            'data_class': AbstractExperimentData,
-            'node_name': 'BasicCharacterizationExperiment',
+            'experiment':   (AbstractExperiment, {}), 
+            'paradigm':     (BasicCharacterizationParadigm, {}),
+            'controller':   (BasicCharacterizationController, {}), 
+            'data':         (AbstractExperimentData, {}),
+            'node_name':    'BasicCharacterizationExperiment',
             },
         'positive_am_noise': {
-            'experiment_class': AbstractPositiveExperiment, 
-            'paradigm_class': PositiveAMNoiseParadigm,
-            'controller_class': PositiveAMNoiseController, 
-            'data_class': PositiveAMNoiseData,
-            'node_name': 'PositiveAMNoiseExperiment',
+            'experiment':   (AbstractPositiveExperiment, {}), 
+            'paradigm':     (PositiveAMNoiseParadigm, {}), 
+            'controller':   (PositiveAMNoiseController, {}), 
+            'data':         (PositiveData, 
+                             {'parameters': ['depth']}),
+            'node_name':    'PositiveAMNoiseExperiment',
             },
         'positive_dt': {
-            'experiment_class': PositiveDTExperiment, 
-            'paradigm_class': PositiveDTParadigm,
-            'controller_class': PositiveDTController, 
-            'data_class': PositiveDTData,
-            'node_name': 'PositiveDTExperiment',
+            'experiment':   (PositiveDTExperiment, {}), 
+            'paradigm':     (PositiveDTParadigm, {}),
+            'controller':   (PositiveDTController, {}), 
+            'data':         (PositiveData,
+                             {'parameters': ['duration', 'attenuation']}),
+            'node_name':    'PositiveDTExperiment',
             },
         'aversive_fm': {
-            'experiment_class': AbstractAversiveExperiment, 
-            'paradigm_class': AversiveFMParadigm,
-            'controller_class': AversiveFMController, 
-            'data_class': AversiveData,
-            'node_name': 'AversiveFMExperiment',
+            'experiment':   (AbstractAversiveExperiment, {}), 
+            'paradigm':     (AversiveFMParadigm, {}),
+            'controller':   (AversiveFMController, {}), 
+            'data':         (AversiveData, {}),
+            'node_name':    'AversiveFMExperiment',
             },
         'aversive_am_noise': {
-            'experiment_class': AbstractAversiveExperiment, 
-            'paradigm_class': AversiveAMNoiseParadigm,
-            'controller_class': AversiveAMNoiseController, 
-            'data_class': AversiveData,
-            'node_name': 'AversiveAMNoiseExperiment',
+            'experiment':   (AbstractAversiveExperiment, {}), 
+            'paradigm':     (AversiveAMNoiseParadigm, {}),
+            'controller':   (AversiveAMNoiseController, {}), 
+            'data':         (AversiveData, {}),
+            'node_name':    'AversiveAMNoiseExperiment',
             },
         'aversive_noise_masking': {
-            'experiment_class': AbstractAversiveExperiment, 
-            'paradigm_class': AversiveNoiseMaskingParadigm,
-            'controller_class': AversiveNoiseMaskingController, 
-            'data_class': AversiveData,
-            'node_name': 'AversiveNoiseMaskingExperiment',
+            'experiment':   (AbstractAversiveExperiment, {}), 
+            'paradigm':     (AversiveNoiseMaskingParadigm, {}),
+            'controller':   (AversiveNoiseMaskingController, {}), 
+            'data':         (AversiveData, {}),
+            'node_name':    'AversiveNoiseMaskingExperiment',
             },
         }

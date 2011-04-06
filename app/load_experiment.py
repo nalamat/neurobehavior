@@ -43,6 +43,8 @@ if __name__ == '__main__':
                 default=False)
         parser.add_argument('-s', '--subprocess', dest='subprocess',
                 action='store_true', help='Run TDT IO in a subprocess')
+        parser.add_argument('-v', '--variables', dest='variables',
+                help='Vary these parameters')
         args = parser.parse_args()
 
     import cns

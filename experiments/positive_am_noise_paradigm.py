@@ -10,8 +10,8 @@ class PositiveAMNoiseParadigm(AbstractPositiveParadigm):
     fm = Float(5, store='attribute', init=True)
     attenuation = Range(0.0, 120.0, 30.0, store='attribute', init=True)
     seed = Int(-1, store='attribute', init=True)
-    lb_modulation_onset = Float(0.1, store='attribute', init=True)
-    ub_modulation_onset = Float(0.2, store='attribute', init=True)
+    lb_modulation_onset = Float(0.5, store='attribute', init=True)
+    ub_modulation_onset = Float(1.0, store='attribute', init=True)
 
     signal_group = VGroup(
             Item('speaker_mode', label='Speaker'),
