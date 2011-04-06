@@ -110,20 +110,3 @@ class PositiveDTExperiment(AbstractPositiveExperiment):
         value_range = DataRange1D(low_setting=-1, high_setting=3)
         self.plot_range['par_dprime'] = value_range
         self.par_dprime_plot = container
-
-    traits_view = View(
-            HSplit(
-                VGroup(
-                    Item('handler.toolbar', style='custom'),
-                    Include('pump_group'),
-                    Include('status_group'),
-                    Item('paradigm', style='custom', editor=InstanceEditor()),
-                    show_labels=False,
-                ),
-                Include('plots_group'),
-                Include('experiment_group'),
-                show_labels=False,
-                ),
-            resizable=True,
-            kind='live',
-            handler=PositiveDTController)

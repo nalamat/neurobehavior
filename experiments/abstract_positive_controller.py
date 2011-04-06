@@ -51,6 +51,11 @@ class AbstractPositiveController(AbstractExperimentController,
 
     status = Property(Str, depends_on='state, current_trial, current_num_nogo')
 
+    @on_trait_change('model.data.parameters')
+    def update_adapter(self, value):
+        self.model.trial_log_adapter.parameters = value
+        self.model.par_info_adapter.parameters = value
+
     def setup_experiment(self, info):
         circuit = join(RCX_ROOT, 'positive-behavior-v2')
         self.iface_behavior = self.process.load_circuit(circuit, 'RZ6')
@@ -148,9 +153,9 @@ class AbstractPositiveController(AbstractExperimentController,
     ############################################################################
     # Master controller
     ############################################################################
-    def log_trial(self, ts_start, ts_end, last_ttype):
-        parameter = self.current_setting_go.parameter
-        self.model.data.log_trial(ts_start, ts_end, last_ttype, parameter)
+    #def log_trial(self, ts_start, ts_end, last_ttype):
+    #    parameter = self.current_setting_go.parameter
+    #    self.model.data.log_trial(ts_start, ts_end, last_ttype, parameter)
 
     def monitor_timeout(self):
         self.model.data.timeout_start_timestamp.send(self.buffer_to_start_TS.read())
@@ -373,11 +378,6 @@ class AbstractPositiveController(AbstractExperimentController,
     def select_speaker(self):
         if self.current_speaker_mode in ('primary', 'secondary', 'both'):
             return self.current_speaker_mode
-        #elif self.current_speaker_output == 'alternate':
-        #    if self.current_speaker == 'primary':
-        #        return 'secondary'
-        #    else:
-        #        return 'primary'
         else:
             toss = np.random.uniform()
             if toss < 0.5:
