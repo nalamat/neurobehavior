@@ -159,7 +159,6 @@ class PumpInterface(object):
 
     REV_VOL_UNIT = dict((v, k) for k, v in VOL_UNIT.items())
 
-
     # The response from the pump always includes a status flag which indicates
     # the pump state (or error).  Response is in the format
     # <STX><address><status>[<data>]<ETX>
@@ -352,6 +351,11 @@ class PumpInterface(object):
             if last == self.ETX or last == '':
                 break
         return ''.join(result)
+
+    def xmit_sequence(self, commands):
+        return [self.xmit(cmd) for cmd in commands]
+        for cmd in cmds:
+            self.xmit(cmd)
 
     def xmit(self, cmd):
         '''
