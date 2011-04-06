@@ -83,7 +83,7 @@ class PhysiologyExperimentMixin(HasTraits):
     physiology_view = View(
             HSplit(
                 Include('physiology_settings_group'),
-                Item('physiology_plot', editor=ComponentEditor(), width=1400,
+                Item('physiology_plot', editor=ComponentEditor(), width=1800,
                     resizable=True),
                 show_labels=False,
                 ),
