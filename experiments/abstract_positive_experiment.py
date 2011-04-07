@@ -56,7 +56,8 @@ class ParInfoAdapter(TabularAdapter):
                 ('MISS #', 'miss'),
                 ('FA #', 'fa'),
                 ('CR #', 'cr'),
-                ('d', 'd'),
+                ('d\'', 'd'),
+                ('C', 'criterion'),
                 (u'WD x\u0304', 'mean_react'),
                 (u'WD x\u0303', 'median_react'),
                 (u'WD \u03C3\u2093', 'std_react'),
@@ -94,7 +95,6 @@ class ParInfoAdapter(TabularAdapter):
             return colors['light red']
         else:
             return colors['light green']
-
 
 class TrialLogAdapter(TabularAdapter):
 

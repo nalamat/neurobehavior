@@ -232,6 +232,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
                 'hit_frac':      self.par_hit_frac,
                 'fa_frac':       self.par_fa_frac,
                 'd':             self.par_dprime,
+                'criterion':     self.par_criterion,
                 'go':            self.par_go_count,
                 'nogo':          self.par_nogo_count,
                 'go_nogo_ratio': self.par_go_nogo_ratio,
@@ -248,7 +249,6 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
                 }
         for i, parameter in enumerate(self.parameters):
             data[parameter] = [p[i] for p in self.pars]
-        print data
         return np.rec.fromarrays(data.values(), names=data.keys())
 
     # Splits trial_log into individual elements as needed
