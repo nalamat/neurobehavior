@@ -140,16 +140,16 @@ class ExperimentLauncher(CohortViewHandler):
             paradigm_class, paradigm_args = self.paradigm
             controller_class, controller_args = self.controller
 
-            model = self.experiment_class(
+            model = experiment_class(
                     store_node=store_node, 
                     exp_node=exp_node,
                     data_node=data_node, 
-                    animal=item,
-                    data=self.data_class(store_node=data_node),
-                    paradigm=self.paradigm_class(),
+                    data=data_class(store_node=data_node, **data_args),
+                    paradigm=paradigm_class(**paradigm_args),
                     spool_physiology=self.spool_physiology,
+                    **experiment_args
                     )
-            
+
             try:
                 if paradigm is not None:
                     log.debug('Using paradigm from last time this animal was run')
@@ -161,8 +161,9 @@ class ExperimentLauncher(CohortViewHandler):
             except TraitError:
                 log.debug('Prior paradigm is not compatible with experiment')
     
+            controller = controller_class(**controller_args)
             ui = model.edit_traits(parent=info.ui.control, kind='livemodal',
-                    handler=self.controller_class())
+                    handler=controller)
 
             if ui.result:
                 persistence.add_or_update_object(model.paradigm, paradigm_node,

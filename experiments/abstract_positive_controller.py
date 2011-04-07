@@ -66,11 +66,6 @@ class AbstractPositiveController(AbstractExperimentController,
         self.buffer_TTL2 = self.iface_behavior.get_buffer('TTL2', 'r',
                 src_type=np.int8, dest_type=np.int8, block_size=24)
 
-        self.buffer_to_start_TS = self.iface_behavior.get_buffer('TO/', 'r',
-                src_type=np.int32, block_size=1)
-        self.buffer_to_end_TS = self.iface_behavior.get_buffer('TO\\', 'r',
-                src_type=np.int32, block_size=1)
-
         self.model.data.trial_start_timestamp.fs = self.buffer_TTL1.fs
         self.model.data.trial_end_timestamp.fs = self.buffer_TTL1.fs
         self.model.data.timeout_start_timestamp.fs = self.buffer_TTL1.fs
@@ -108,7 +103,7 @@ class AbstractPositiveController(AbstractExperimentController,
         # Add tasks to the queue
         self.tasks.append((self.monitor_behavior, 1))
         self.tasks.append((self.monitor_pump, 5))
-        self.tasks.append((self.monitor_timeout, 5))
+        #self.tasks.append((self.monitor_timeout, 5))
 
     def _get_status(self):
         if self.state == 'disconnected':
@@ -153,14 +148,6 @@ class AbstractPositiveController(AbstractExperimentController,
     ############################################################################
     # Master controller
     ############################################################################
-    #def log_trial(self, ts_start, ts_end, last_ttype):
-    #    parameter = self.current_setting_go.parameter
-    #    self.model.data.log_trial(ts_start, ts_end, last_ttype, parameter)
-
-    def monitor_timeout(self):
-        self.model.data.timeout_start_timestamp.send(self.buffer_to_start_TS.read())
-        self.model.data.timeout_end_timestamp.send(self.buffer_to_end_TS.read())
-
     def update_reward_settings(self, wait_time):
         # By default we do nothing
         return
@@ -325,9 +312,6 @@ class AbstractPositiveController(AbstractExperimentController,
     def set_response_window_duration(self, value):
         self.iface_behavior.cset_tag('resp_dur_n', value, 's', 'n')
 
-    #def set_reward_duration(self, value):
-    #    self.iface_behavior.cset_tag('reward_dur_n', value, 's', 'n')
-
     def set_signal_offset_delay(self, value):
         self.iface_behavior.cset_tag('sig_offset_del_n', value, 's', 'n')
 
@@ -385,9 +369,8 @@ class AbstractPositiveController(AbstractExperimentController,
             else:
                 return 'secondary'
         
-    def update_attenuation(self):
+    def update_attenuation(self, attenuation):
         self.current_speaker = self.select_speaker()
-        attenuation = self.current_attenuation
         speaker = self.current_speaker
 
         if speaker == 'primary':

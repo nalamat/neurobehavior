@@ -3,7 +3,7 @@ from enthought.traits.api import HasTraits, Enum
 class AbstractExperimentParadigm(HasTraits):
 
     speaker_mode = Enum('primary', 'secondary', 'both', 'random',
-            store='attribute', init=True)
+                        store='attribute', init=True)
 
     def is_valid(self):
         for trait in self.trait_names(error=True):
