@@ -84,10 +84,10 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
     TO_safe_TTL = Instance(FileChannel,
             store='channel', store_path='contact/TO_safe_TTL')
 
-    trial_start_timestamp = Instance('cns.channel.Timeseries', ())
-    trial_end_timestamp = Instance('cns.channel.Timeseries', ())
+    trial_start_timestamp   = Instance('cns.channel.Timeseries', ())
+    trial_end_timestamp     = Instance('cns.channel.Timeseries', ())
     timeout_start_timestamp = Instance('cns.channel.Timeseries', ())
-    timeout_end_timestamp = Instance('cns.channel.Timeseries', ())
+    timeout_end_timestamp   = Instance('cns.channel.Timeseries', ())
 
     def _create_channel(self, name, dtype):
         contact_node = get_or_append_node(self.store_node, 'contact')
