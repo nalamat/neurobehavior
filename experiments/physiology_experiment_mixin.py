@@ -1,5 +1,5 @@
 from enthought.enable.api import Component, ComponentEditor
-from enthought.chaco.api import LinearMapper, DataRange1D
+from enthought.chaco.api import LinearMapper, DataRange1D, OverlayPlotContainer
 from enthought.traits.ui.api import VGroup, HGroup, Item, Include, View, \
         InstanceEditor, RangeEditor, HSplit
 from enthought.traits.api import Instance, HasTraits, Float, DelegatesTo, \
@@ -9,6 +9,7 @@ from physiology_paradigm_mixin import PhysiologyParadigmMixin
 
 from cns.chaco.helpers import add_default_grids, add_time_axis
 from cns.chaco.channel_data_range import ChannelDataRange
+from cns.chaco.timeseries_plot import TimeseriesPlot
 from cns.chaco.extremes_channel_plot import ExtremesChannelPlot
 
 class PhysiologyExperimentMixin(HasTraits):
@@ -17,6 +18,7 @@ class PhysiologyExperimentMixin(HasTraits):
     spool_physiology        = Bool(False)
     physiology_settings     = Instance(PhysiologyParadigmMixin, ())
 
+    physiology_container    = Instance(Component)
     physiology_plot         = Instance(Component)
     physiology_index_range  = Instance(ChannelDataRange)
     physiology_value_range  = Instance(DataRange1D, ())
@@ -39,6 +41,8 @@ class PhysiologyExperimentMixin(HasTraits):
 
     @on_trait_change('data')
     def _generate_physiology_plot(self):
+        container = OverlayPlotContainer()
+
         self.physiology_index_range = ChannelDataRange(span=5, trig_delay=1,
                 timeseries=self.data.physiology_ts,
                 sources=[self.data.physiology_processed])
@@ -48,10 +52,19 @@ class PhysiologyExperimentMixin(HasTraits):
         plot = ExtremesChannelPlot(channel=self.data.physiology_processed, 
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 padding=[20, 20, 50, 50], bgcolor='white')
-
         add_default_grids(plot, major_index=1, minor_index=0.25)
         add_time_axis(plot)
+        container.add(plot)
         self.physiology_plot = plot
+
+        index_mapper = LinearMapper(range=self.physiology_index_range)
+        value_mapper = LinearMapper(range=DataRange1D())
+        plot = TimeseriesPlot(series=self.data.physiology_ts,
+                index_mapper=index_mapper, value_mapper=value_mapper,
+                line_color='red', line_width=5)
+        container.add(plot)
+
+        self.physiology_container = container
 
     physiology_settings_group = VGroup(
             Item('physiology_settings', style='custom',
@@ -83,7 +96,7 @@ class PhysiologyExperimentMixin(HasTraits):
     physiology_view = View(
             HSplit(
                 Include('physiology_settings_group'),
-                Item('physiology_plot', editor=ComponentEditor(), width=1800,
+                Item('physiology_container', editor=ComponentEditor(), width=1800,
                     resizable=True),
                 show_labels=False,
                 ),

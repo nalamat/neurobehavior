@@ -5,7 +5,7 @@ from enthought.traits.api import Float, List, Instance, Enum
 class ChannelDataRange(DataRange1D):
 
     sources         = List(Instance('cns.channel.Channel'))
-    timeseries      = Instance('cns.channel.Channel')
+    timeseries      = Instance('cns.channel.Timeseries')
     span            = Float(20)
     trig_delay      = Float(5)
     update_mode     = Enum('auto', 'triggered')
