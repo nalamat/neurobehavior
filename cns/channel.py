@@ -39,11 +39,17 @@ class Timeseries(HasTraits):
         mask = (timestamps>=lb)&(timestamps<ub)
         return timestamps[mask]
 
+    #def latest(self):
+    #    if self.get_size() > 0:
+    #        return self.signal[-1]/self.fs
+    #    else:
+    #        return self.t0
+
     def latest(self):
         if len(self.buffer) > 0:
             return self.buffer[-1]/self.fs
         else:
-            return np.nan
+            return self.t0
 
 class Channel(HasTraits):
     '''
