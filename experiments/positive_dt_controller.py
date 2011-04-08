@@ -41,18 +41,21 @@ class PositiveDTController(AbstractPositiveController):
     def set_bandwidth(self, value):
         self.carrier.bandwidth = value
 
-    def trigger_next(self):
+    def get_sf(self, attenuation):
+        delta = self.current_attenuation-attenuation
+        return 10**(delta/20.0)
 
+    def trigger_next(self):
         if self.current_trial == self.current_num_nogo + 1:
             par = self.current_setting_go.parameter
             self.iface_behavior.set_tag('go?', 1)
-            waveform = self._compute_signal(par)
+            sf = self.get_sf(self.current_setting_go.attenuation)
+            waveform = sf*self._compute_signal(par)
             self.buffer_signal.set(waveform)
-            self.update_attenuation(self.current_setting_go.attenuation)
+
             self.iface_behavior.set_tag('signal_dur_n', len(waveform))
         else:
             self.iface_behavior.set_tag('go?', 0)
-            self.update_attenuation(120)
 
             # TODO: this is a bug!
             #self.buffer_signal.clear()

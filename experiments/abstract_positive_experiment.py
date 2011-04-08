@@ -41,6 +41,7 @@ from enthought.traits.api import *
 
 class ParInfoAdapter(TabularAdapter):
 
+    color_map  = Dict
     parameters = List(['parameter'])
 
     # \u00B1 is +/- symbol
@@ -69,7 +70,10 @@ class ParInfoAdapter(TabularAdapter):
     parameter_text = Property
 
     def _get_parameter_text(self):
-        return ', '.join('{}'.format(self.item[p]) for p in self.parameters)
+        return ', '.join('{}'.format(p) for p in self._get_parameters())
+
+    def _get_parameters(self):
+        return [self.item[p] for p in self.parameters]
 
     #width = Float(50)
     #reaction_width = Float(100)
@@ -91,10 +95,11 @@ class ParInfoAdapter(TabularAdapter):
     #            self.item['std_resp'])
 
     def _get_bg_color(self):
-        if self.item['d'] < 1:
-            return colors['light red']
-        else:
-            return colors['light green']
+        try:
+            key = ', '.join('{}'.format(p) for p in self._get_parameters()[1:])
+            return self.color_map[key]
+        except:
+            return
 
 class TrialLogAdapter(TabularAdapter):
 
@@ -103,31 +108,36 @@ class TrialLogAdapter(TabularAdapter):
     # List of tuples (column_name, field )
     columns = [ ('P', 'parameter'),
                 ('S', 'speaker'),
-                ('Start', 'start'),
+                ('Time', 'time'),
                 ('E', 'early_response'),
                 ('R', 'response'), 
-                ('Reaction time', 'reaction_time'),
-                ('Response time', 'response_time')
+                ('WD', 'reaction_time'),
+                ('RS', 'response_time')
                 ]
 
     parameter_width = Float(75)
     early_response_width = Float(25)
     response_width = Float(25)
     speaker_width = Float(25)
-    start_width = Float(50)
-    reaction_time_width = Float(75)
-    response_time_width = Float(75)
+    time_width = Float(65)
+    reaction_time_width = Float(65)
+    response_time_width = Float(65)
     response_image = Property
     early_response_image = Property
 
     parameter_text = Property
     speaker_text = Property
+    time_text = Property
 
     def _get_parameter_text(self):
         return ', '.join('{}'.format(self.item[p]) for p in self.parameters)
 
     def _get_speaker_text(self):
         return self.item['speaker'][0].upper()
+
+    def _get_time_text(self):
+        seconds = self.item['start']
+        return "{0}:{1:02}".format(*divmod(int(seconds), 60))
 
     def _get_bg_color(self):
         if self.item['ttype'] == 'GO':
@@ -167,6 +177,7 @@ class ParameterAdapter(TabularAdapter):
 
 class AbstractPositiveExperiment(AbstractExperiment):
 
+    index_range         = Any
     par_info_adapter    = ParInfoAdapter()
     par_info_editor     = TabularEditor(editable=False,
                                         adapter=par_info_adapter)
@@ -196,8 +207,9 @@ class AbstractPositiveExperiment(AbstractExperiment):
         index_range = ChannelDataRange()
         index_range.sources = [self.data.spout_TTL]
         index_mapper = LinearMapper(range=index_range)
+        self.index_range = index_range
 
-        container = OverlayPlotContainer(padding=[20, 20, 50, 50])
+        container = OverlayPlotContainer(padding=[20, 20, 20, 50])
 
         value_range = DataRange1D(low_setting=-0, high_setting=1)
         value_mapper = LinearMapper(range=value_range)
@@ -364,8 +376,11 @@ class AbstractPositiveExperiment(AbstractExperiment):
             )
 
     plots_group = VSplit(
-            Item('experiment_plot', editor=ComponentEditor(),
-                show_label=False, width=1000, height=300),
+            VGroup(
+                HGroup(HGroup('object.index_range.span')),
+                Item('experiment_plot', editor=ComponentEditor(),
+                    show_label=False, width=1000, height=300),
+                ),
             HGroup(
                 Item('par_count_plot', editor=ComponentEditor(),
                     show_label=False, width=150, height=400),

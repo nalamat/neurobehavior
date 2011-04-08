@@ -49,7 +49,8 @@ class AbstractPositiveController(AbstractExperimentController,
     # Override default implementation of toolbar used by AbstractExperiment
     toolbar = Instance(PositiveExperimentToolBar, (), toolbar=True)
 
-    status = Property(Str, depends_on='state, current_trial, current_num_nogo')
+    status = Property(Str, depends_on=['state', 'current_trial',
+        'current_num_nogo', 'current_setting_go'])
 
     @on_trait_change('model.data.parameters')
     def update_adapter(self, value):
@@ -112,10 +113,12 @@ class AbstractPositiveController(AbstractExperimentController,
             return 'System is halted'
 
         if self.current_trial <= self.current_num_nogo:
-            return 'NOGO %d of %d' % (self.current_trial,
-                    self.current_num_nogo)
+            result= 'NOGO %d of %d' % (self.current_trial,
+                                       self.current_num_nogo)
         else:
-            return 'GO'
+            result = 'GO'
+        #result += ' (%s)' % self.current_setting_go
+        return result
 
     def acquire_trial_lock(self):
         # Pause circuit and see if trial is running.  If trial is already
@@ -305,7 +308,7 @@ class AbstractPositiveController(AbstractExperimentController,
 
     def set_reaction_window_duration(self, value, offset=0):
         self.current_reaction_window_duration = value
-        delay = self.current_reaction_window_delay
+        delay = self.current_reaction_window_deloy
         if value is not None and delay is not None:
             self.iface_behavior.cset_tag('react_end_n', delay+value+offset, 's', 'n')
 
@@ -332,6 +335,7 @@ class AbstractPositiveController(AbstractExperimentController,
 
     def set_attenuation(self, value):
         self.current_attenuation = value
+        self.update_attenuation(value)
 
     def set_timeout_trigger(self, value):
         flag = 0 if value == 'FA only' else 1
