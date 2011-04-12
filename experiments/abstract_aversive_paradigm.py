@@ -15,7 +15,6 @@ class AbstractAversiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
     warn/safe signal, or a circuit that is specialized for a specific kind of
     signal (e.g. FM).
     '''
-
     # Trait defines a drop-down selector if you provide it with a list of
     # options
     order         = Trait('descending', choice.options, store='attribute',

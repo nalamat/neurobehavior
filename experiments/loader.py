@@ -20,7 +20,7 @@ from cns.data.ui.cohort import CohortEditor, CohortView, CohortViewHandler
 
 # Aversive
 from abstract_aversive_experiment import AbstractAversiveExperiment
-from aversive_data import RawAversiveData as AversiveData
+from aversive_data_v3 import RawAversiveData as AversiveData
 # Aversive FM
 from aversive_fm_paradigm import AversiveFMParadigm
 from aversive_fm_controller import AversiveFMController
@@ -198,13 +198,13 @@ class ExperimentLauncher(CohortViewHandler):
         if info.initialized:
             self.launch_experiment(info, info.object.selected)
 
-def test_experiment(etype, spool_physiology):
+def test_experiment(args):
     from cns import TEMP_ROOT
     filename = join(TEMP_ROOT, 'test_experiment.hd5')
     file = tables.openFile(filename, 'w')
     store_node = file.root
 
-    e = EXPERIMENTS[etype]
+    e = EXPERIMENTS[args.type]
     pre = e['node_name'] + '_'
     exp_node = append_date_node(store_node, pre)
     data_node = append_node(exp_node, 'data')
@@ -220,27 +220,27 @@ def test_experiment(etype, spool_physiology):
             data_node=data_node, 
             data=data_class(store_node=data_node, **data_args),
             paradigm=paradigm_class(**paradigm_args),
-            spool_physiology=spool_physiology,
+            spool_physiology=args.physiology,
             **experiment_args
             )
     controller = controller_class(**controller_args)
     model.configure_traits(handler=controller)
 
-def profile_experiment(etype, spool_physiology=False):
+def profile_experiment(args):
     from cns import TEMP_ROOT
     import cProfile
     profile_data_file = join(TEMP_ROOT, 'profile.dmp')
-    cProfile.run('test_experiment("%s", %s)' % (etype, spool_physiology),
-            profile_data_file)
+    cProfile.run('test_experiment("%s", %s)' % (args.type,
+        args.physiology), profile_data_file)
 
     # Once experiment is done, print out some statistics
     import pstats
     p = pstats.Stats(profile_data_file)
     p.strip_dirs().sort_stats('cumulative').print_stats(50)
 
-def launch_experiment(etype, spool_physiology=False, profile=False):
-    handler = ExperimentLauncher(spool_physiology=spool_physiology,
-            **EXPERIMENTS[etype])
+def launch_experiment(args):
+    handler = ExperimentLauncher(spool_physiology=args.physiology,
+        **EXPERIMENTS[args.type])
     ExperimentCohortView().configure_traits(handler=handler)
 
 # Define the classes required for each experiment.

@@ -33,6 +33,8 @@ if __name__ == '__main__':
         parser = argparse.ArgumentParser(description="Launch experiment")
         parser.add_argument('type', type=str, choices=EXPERIMENTS.keys(),
                 help='The type of experiment to launch')
+        parser.add_argument('parameters', type=str, help='Parameters to use',
+                nargs='+')
         group = parser.add_mutually_exclusive_group()
         group.add_argument('-p', '--profile', dest='mode', action='store_const',
                 const='profile', default='regular', help='Profile experiment') 
@@ -43,16 +45,27 @@ if __name__ == '__main__':
                 default=False)
         parser.add_argument('-s', '--subprocess', dest='subprocess',
                 action='store_true', help='Run TDT IO in a subprocess')
-        parser.add_argument('-v', '--variables', dest='variables',
-                help='Vary these parameters')
         args = parser.parse_args()
 
     import cns
     cns.RCX_USE_SUBPROCESS = args.subprocess
 
+    # We need to configure the TrialSetting object to contain the correct
+    # parameters
+    from experiments.trial_setting import TrialSetting, trial_setting_editor
+    from enthought.traits.api import Float
+    from enthought.traits.ui.api import ObjectColumn
+    columns = []
+    for parameter in args.parameters:
+        TrialSetting.add_class_trait(parameter, Float)
+        column = ObjectColumn(name=parameter, label=parameter, width=75)
+        columns.append(column)
+    TrialSetting.parameters = args.parameters
+    trial_setting_editor.columns = columns
+
     if args.mode == 'profile':
-        profile_experiment(args.type, args.physiology)
+        profile_experiment(args)
     elif args.mode == 'test':
-        test_experiment(args.type, args.physiology)
+        test_experiment(args)
     else:
-        launch_experiment(args.type, args.physiology)
+        launch_experiment(args)
