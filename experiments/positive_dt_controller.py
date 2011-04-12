@@ -12,7 +12,6 @@ class PositiveDTController(AbstractPositiveController):
     output      = Instance(blocks.Block)
 
     def log_trial(self, ts_start, ts_end, last_ttype):
-        print self.current_speaker
         duration = self.current_setting_go.parameter
         attenuation = self.current_setting_go.attenuation
         self.model.data.log_trial(ts_start=ts_start, ts_end=ts_end,

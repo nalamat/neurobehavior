@@ -351,9 +351,6 @@ class AbstractPositiveController(AbstractExperimentController,
     def get_trial_running(self):
         return self.iface_behavior.get_tag('trial_running')
 
-    #def trigger_next(self):
-    #    raise NotImplementedError
-
     def set_pause_state(self, value):
         self.iface_behavior.set_tag('pause_state', value)
 

@@ -27,26 +27,28 @@ class AversiveAMNoiseController(AbstractAversiveController):
     def set_modulation_frequency(self, value):
         self.modulator.frequency = value
 
-    def _compute_signal(self, depth):
+    def _compute_signal(self):
         direction = 'positive' if randint(0, 2) else 'negative'
-        self.modulator.depth = depth
         self.modulator.equalize_direction = direction
         fs = self.iface_behavior.fs
         return self.output.realize(fs, self.current_trial_duration)
 
     def update_remind(self):
-        waveform = self._compute_signal(self.current_remind.parameter)
+        self.set_experiment_parameters(self.current_remind)
+        waveform = self._compute_signal()
         self.buffer_trial.set(waveform)
 
     def update_warn(self):
-        waveform = self._compute_signal(self.current_warn.parameter)
+        self.set_experiment_parameters(self.current_warn)
+        waveform = self._compute_signal()
         self.buffer_trial.set(waveform)
 
     def update_safe(self):
         if self.buffer_int.total_samples_written == 0:
             # We have not yet initialized the buffer with data.  Let's fill it
             # all up in one shot.
-            self.modulator.depth = self.current_safe.parameter
+            self.set_experiment_parameters(self.current_safe)
+            #self.modulator.depth = self.current_safe.parameter
 
             # Let's freeze our safe signal and turn it into a generator.  This
             # will allow us to grab the next set of samples from the signal
@@ -65,6 +67,9 @@ class AversiveAMNoiseController(AbstractAversiveController):
             if pending > 0:
                 waveform = self.buffer_safe.send(pending)
                 self.buffer_int.write(waveform)
+
+    def set_modulation_depth(self, value):
+        self.modulator.depth = value
 
     def set_modulation_frequency(self, value):
         self.current_modulation_frequency = value
