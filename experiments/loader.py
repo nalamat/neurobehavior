@@ -20,7 +20,7 @@ from cns.data.ui.cohort import CohortEditor, CohortView, CohortViewHandler
 
 # Aversive
 from abstract_aversive_experiment import AbstractAversiveExperiment
-from aversive_data import RawAversiveData as AversiveData
+from aversive_data_v3 import RawAversiveData as AversiveData
 # Aversive FM
 from aversive_fm_paradigm import AversiveFMParadigm
 from aversive_fm_controller import AversiveFMController
@@ -71,10 +71,10 @@ class ExperimentCohortView(CohortView):
 
 class ExperimentLauncher(CohortViewHandler):
 
-    experiment_class    = Any
-    paradigm_class      = Any
-    controller_class    = Any
-    data_class          = Any
+    experiment          = Any
+    paradigm            = Any
+    controller          = Any
+    data                = Any
     node_name           = Str
     spool_physiology    = Bool(True)
 
@@ -135,16 +135,21 @@ class ExperimentLauncher(CohortViewHandler):
             exp_node = append_date_node(store_node, self.node_name + '_')
             data_node = append_node(exp_node, 'data')
 
-            model = self.experiment_class(
+            experiment_class, experiment_args = self.experiment
+            data_class, data_args = self.data
+            paradigm_class, paradigm_args = self.paradigm
+            controller_class, controller_args = self.controller
+
+            model = experiment_class(
                     store_node=store_node, 
                     exp_node=exp_node,
                     data_node=data_node, 
-                    animal=item,
-                    data=self.data_class(store_node=data_node),
-                    paradigm=self.paradigm_class(),
+                    data=data_class(store_node=data_node, **data_args),
+                    paradigm=paradigm_class(**paradigm_args),
                     spool_physiology=self.spool_physiology,
+                    **experiment_args
                     )
-            
+
             try:
                 if paradigm is not None:
                     log.debug('Using paradigm from last time this animal was run')
@@ -156,8 +161,9 @@ class ExperimentLauncher(CohortViewHandler):
             except TraitError:
                 log.debug('Prior paradigm is not compatible with experiment')
     
+            controller = controller_class(**controller_args)
             ui = model.edit_traits(parent=info.ui.control, kind='livemodal',
-                    handler=self.controller_class())
+                    handler=controller)
 
             if ui.result:
                 persistence.add_or_update_object(model.paradigm, paradigm_node,
@@ -192,86 +198,95 @@ class ExperimentLauncher(CohortViewHandler):
         if info.initialized:
             self.launch_experiment(info, info.object.selected)
 
-def test_experiment(etype, spool_physiology):
+def test_experiment(args):
     from cns import TEMP_ROOT
     filename = join(TEMP_ROOT, 'test_experiment.hd5')
     file = tables.openFile(filename, 'w')
     store_node = file.root
 
-    e = EXPERIMENTS[etype]
+    e = EXPERIMENTS[args.type]
     pre = e['node_name'] + '_'
     exp_node = append_date_node(store_node, pre)
     data_node = append_node(exp_node, 'data')
 
-    model = e['experiment_class'](
+    experiment_class, experiment_args = e['experiment']
+    data_class, data_args = e['data']
+    paradigm_class, paradigm_args = e['paradigm']
+    controller_class, controller_args = e['controller']
+
+    model = experiment_class(
             store_node=store_node, 
             exp_node=exp_node,
             data_node=data_node, 
-            data=e['data_class'](store_node=data_node),
-            paradigm=e['paradigm_class'](),
-            spool_physiology=spool_physiology,
+            data=data_class(store_node=data_node, **data_args),
+            paradigm=paradigm_class(**paradigm_args),
+            spool_physiology=args.physiology,
+            **experiment_args
             )
-    model.configure_traits(handler=e['controller_class']())
+    controller = controller_class(**controller_args)
+    model.configure_traits(handler=controller)
 
-def profile_experiment(etype, spool_physiology=False):
+def profile_experiment(args):
     from cns import TEMP_ROOT
     import cProfile
     profile_data_file = join(TEMP_ROOT, 'profile.dmp')
-    cProfile.run('test_experiment("%s", %s)' % (etype, spool_physiology),
-            profile_data_file)
+    cProfile.run('test_experiment("%s", %s)' % (args.type,
+        args.physiology), profile_data_file)
 
     # Once experiment is done, print out some statistics
     import pstats
     p = pstats.Stats(profile_data_file)
     p.strip_dirs().sort_stats('cumulative').print_stats(50)
 
-def launch_experiment(etype, spool_physiology=False, profile=False):
-    handler = ExperimentLauncher(spool_physiology=spool_physiology,
-            **EXPERIMENTS[etype])
+def launch_experiment(args):
+    handler = ExperimentLauncher(spool_physiology=args.physiology,
+        **EXPERIMENTS[args.type])
     ExperimentCohortView().configure_traits(handler=handler)
 
-# Define the classes required for each experiment
+# Define the classes required for each experiment.
 EXPERIMENTS = {
         'basic_characterization': {
-            'experiment_class': AbstractExperiment, 
-            'paradigm_class': BasicCharacterizationParadigm,
-            'controller_class': BasicCharacterizationController, 
-            'data_class': AbstractExperimentData,
-            'node_name': 'BasicCharacterizationExperiment',
+            'experiment':   (AbstractExperiment, {}), 
+            'paradigm':     (BasicCharacterizationParadigm, {}),
+            'controller':   (BasicCharacterizationController, {}), 
+            'data':         (AbstractExperimentData, {}),
+            'node_name':    'BasicCharacterizationExperiment',
             },
         'positive_am_noise': {
-            'experiment_class': AbstractPositiveExperiment, 
-            'paradigm_class': PositiveAMNoiseParadigm,
-            'controller_class': PositiveAMNoiseController, 
-            'data_class': PositiveAMNoiseData,
-            'node_name': 'PositiveAMNoiseExperiment',
+            'experiment':   (AbstractPositiveExperiment, {}), 
+            'paradigm':     (PositiveAMNoiseParadigm, {}), 
+            'controller':   (PositiveAMNoiseController, {}), 
+            'data':         (PositiveData, 
+                             {'parameters': ['depth']}),
+            'node_name':    'PositiveAMNoiseExperiment',
             },
         'positive_dt': {
-            'experiment_class': PositiveDTExperiment, 
-            'paradigm_class': PositiveDTParadigm,
-            'controller_class': PositiveDTController, 
-            'data_class': PositiveDTData,
-            'node_name': 'PositiveDTExperiment',
+            'experiment':   (PositiveDTExperiment, {}), 
+            'paradigm':     (PositiveDTParadigm, {}),
+            'controller':   (PositiveDTController, {}), 
+            'data':         (PositiveData,
+                             {'parameters': ['duration', 'attenuation']}),
+            'node_name':    'PositiveDTExperiment',
             },
         'aversive_fm': {
-            'experiment_class': AbstractAversiveExperiment, 
-            'paradigm_class': AversiveFMParadigm,
-            'controller_class': AversiveFMController, 
-            'data_class': AversiveData,
-            'node_name': 'AversiveFMExperiment',
+            'experiment':   (AbstractAversiveExperiment, {}), 
+            'paradigm':     (AversiveFMParadigm, {}),
+            'controller':   (AversiveFMController, {}), 
+            'data':         (AversiveData, {}),
+            'node_name':    'AversiveFMExperiment',
             },
         'aversive_am_noise': {
-            'experiment_class': AbstractAversiveExperiment, 
-            'paradigm_class': AversiveAMNoiseParadigm,
-            'controller_class': AversiveAMNoiseController, 
-            'data_class': AversiveData,
-            'node_name': 'AversiveAMNoiseExperiment',
+            'experiment':   (AbstractAversiveExperiment, {}), 
+            'paradigm':     (AversiveAMNoiseParadigm, {}),
+            'controller':   (AversiveAMNoiseController, {}), 
+            'data':         (AversiveData, {}),
+            'node_name':    'AversiveAMNoiseExperiment',
             },
         'aversive_noise_masking': {
-            'experiment_class': AbstractAversiveExperiment, 
-            'paradigm_class': AversiveNoiseMaskingParadigm,
-            'controller_class': AversiveNoiseMaskingController, 
-            'data_class': AversiveData,
-            'node_name': 'AversiveNoiseMaskingExperiment',
+            'experiment':   (AbstractAversiveExperiment, {}), 
+            'paradigm':     (AversiveNoiseMaskingParadigm, {}),
+            'controller':   (AversiveNoiseMaskingController, {}), 
+            'data':         (AversiveData, {}),
+            'node_name':    'AversiveNoiseMaskingExperiment',
             },
         }

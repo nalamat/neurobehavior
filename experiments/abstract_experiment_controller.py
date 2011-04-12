@@ -141,15 +141,15 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
     # experiment is done.  A good rule of thumb: if the parameter is used as a
     # placeholder for transient data (to compute variables needed for experiment
     # control), it should be left out of the "model". 
-    current_    = Any
-    choice_     = Any
+    current_    = Any(current=True)
+    choice_     = Any(choice=True)
 
     # iface_* and buffer_* are handles to hardware needed to run the experiment.
-    iface_      = Any
-    buffer_     = Any
+    iface_      = Any(iface=True)
+    buffer_     = Any(buffer=True)
 
-    data_       = Any
-    pipeline_   = Any
+    data_       = Any(data=True)
+    pipeline_   = Any(pipeline=True)
 
     # Hold information about the windows we have configured
     window_     = Any
@@ -494,3 +494,18 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
 
     def set_speaker_mode(self, value):
         self.current_speaker_mode = value
+
+    def get_current_settings(self):
+        settings = {}
+        for trait in self.trait_names(current=True):
+            settings[trait] = getattr(self, trait)
+        return settings
+
+    def set_experiment_parameters(self, setting):
+        '''
+        Setting must be an instance of Enthought's HasTraits class.  Each trait
+        reflects a different parameter.  For single-parameter settings, there
+        will only be one trait defined.
+        '''
+        for parameter, value in setting.parameter_dict().items():
+            getattr(self, 'set_' + parameter)(value)

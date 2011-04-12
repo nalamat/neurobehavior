@@ -12,10 +12,11 @@ class PositiveDTController(AbstractPositiveController):
     output      = Instance(blocks.Block)
 
     def log_trial(self, ts_start, ts_end, last_ttype):
-        parameter = self.current_setting_go.parameter
+        duration = self.current_setting_go.parameter
         attenuation = self.current_setting_go.attenuation
-        self.model.data.log_trial(ts_start, ts_end, last_ttype, 
-                                  (parameter, attenuation))
+        self.model.data.log_trial(ts_start=ts_start, ts_end=ts_end,
+                ttype=last_ttype, duration=duration, attenuation=attenuation,
+                speaker=self.current_speaker)
 
     def _carrier_default(self):
         return blocks.BandlimitedNoise(seed=-1)
@@ -39,22 +40,22 @@ class PositiveDTController(AbstractPositiveController):
     def set_bandwidth(self, value):
         self.carrier.bandwidth = value
 
-    def set_attenuation(self, value):
-        self.iface_behavior.set_tag('att_A', value)
-        self.iface_behavior.set_tag('att_B', 120)
+    def get_sf(self, attenuation):
+        delta = self.current_attenuation-attenuation
+        return 10**(delta/20.0)
 
     def trigger_next(self):
         if self.current_trial == self.current_num_nogo + 1:
             par = self.current_setting_go.parameter
             self.iface_behavior.set_tag('go?', 1)
-            waveform = self._compute_signal(par)
-            print waveform
+            sf = self.get_sf(self.current_setting_go.attenuation)
+            waveform = sf*self._compute_signal(par)
             self.buffer_signal.set(waveform)
-            self.set_attenuation(self.current_setting_go.attenuation)
+
             self.iface_behavior.set_tag('signal_dur_n', len(waveform))
         else:
             self.iface_behavior.set_tag('go?', 0)
-            self.set_attenuation(120)
+
             # TODO: this is a bug!
             #self.buffer_signal.clear()
             # If set to 0, then the signal will play "forever".  Need to look
