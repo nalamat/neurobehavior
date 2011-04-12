@@ -49,7 +49,13 @@ class AbstractPositiveController(AbstractExperimentController,
     # Override default implementation of toolbar used by AbstractExperiment
     toolbar = Instance(PositiveExperimentToolBar, (), toolbar=True)
 
-    status = Property(Str, depends_on='state, current_trial, current_num_nogo')
+    status = Property(Str, depends_on=['state', 'current_trial',
+        'current_num_nogo', 'current_setting_go'])
+
+    @on_trait_change('model.data.parameters')
+    def update_adapter(self, value):
+        self.model.trial_log_adapter.parameters = value
+        self.model.par_info_adapter.parameters = value
 
     def setup_experiment(self, info):
         circuit = join(RCX_ROOT, 'positive-behavior-v2')
@@ -60,11 +66,6 @@ class AbstractPositiveController(AbstractExperimentController,
                 src_type=np.int8, dest_type=np.int8, block_size=24)
         self.buffer_TTL2 = self.iface_behavior.get_buffer('TTL2', 'r',
                 src_type=np.int8, dest_type=np.int8, block_size=24)
-
-        self.buffer_to_start_TS = self.iface_behavior.get_buffer('TO/', 'r',
-                src_type=np.int32, block_size=1)
-        self.buffer_to_end_TS = self.iface_behavior.get_buffer('TO\\', 'r',
-                src_type=np.int32, block_size=1)
 
         self.model.data.trial_start_timestamp.fs = self.buffer_TTL1.fs
         self.model.data.trial_end_timestamp.fs = self.buffer_TTL1.fs
@@ -103,7 +104,7 @@ class AbstractPositiveController(AbstractExperimentController,
         # Add tasks to the queue
         self.tasks.append((self.monitor_behavior, 1))
         self.tasks.append((self.monitor_pump, 5))
-        self.tasks.append((self.monitor_timeout, 5))
+        #self.tasks.append((self.monitor_timeout, 5))
 
     def _get_status(self):
         if self.state == 'disconnected':
@@ -112,10 +113,12 @@ class AbstractPositiveController(AbstractExperimentController,
             return 'System is halted'
 
         if self.current_trial <= self.current_num_nogo:
-            return 'NOGO %d of %d' % (self.current_trial,
-                    self.current_num_nogo)
+            result= 'NOGO %d of %d' % (self.current_trial,
+                                       self.current_num_nogo)
         else:
-            return 'GO'
+            result = 'GO'
+        #result += ' (%s)' % self.current_setting_go
+        return result
 
     def acquire_trial_lock(self):
         # Pause circuit and see if trial is running.  If trial is already
@@ -148,14 +151,6 @@ class AbstractPositiveController(AbstractExperimentController,
     ############################################################################
     # Master controller
     ############################################################################
-    def log_trial(self, ts_start, ts_end, last_ttype):
-        parameter = self.current_setting_go.parameter
-        self.model.data.log_trial(ts_start, ts_end, last_ttype, parameter)
-
-    def monitor_timeout(self):
-        self.model.data.timeout_start_timestamp.send(self.buffer_to_start_TS.read())
-        self.model.data.timeout_end_timestamp.send(self.buffer_to_end_TS.read())
-
     def update_reward_settings(self, wait_time):
         # By default we do nothing
         return
@@ -313,15 +308,12 @@ class AbstractPositiveController(AbstractExperimentController,
 
     def set_reaction_window_duration(self, value, offset=0):
         self.current_reaction_window_duration = value
-        delay = self.current_reaction_window_delay
+        delay = self.current_reaction_window_deloy
         if value is not None and delay is not None:
             self.iface_behavior.cset_tag('react_end_n', delay+value+offset, 's', 'n')
 
     def set_response_window_duration(self, value):
         self.iface_behavior.cset_tag('resp_dur_n', value, 's', 'n')
-
-    #def set_reward_duration(self, value):
-    #    self.iface_behavior.cset_tag('reward_dur_n', value, 's', 'n')
 
     def set_signal_offset_delay(self, value):
         self.iface_behavior.cset_tag('sig_offset_del_n', value, 's', 'n')
@@ -343,6 +335,7 @@ class AbstractPositiveController(AbstractExperimentController,
 
     def set_attenuation(self, value):
         self.current_attenuation = value
+        self.update_attenuation(value)
 
     def set_timeout_trigger(self, value):
         flag = 0 if value == 'FA only' else 1
@@ -358,9 +351,6 @@ class AbstractPositiveController(AbstractExperimentController,
     def get_trial_running(self):
         return self.iface_behavior.get_tag('trial_running')
 
-    #def trigger_next(self):
-    #    raise NotImplementedError
-
     def set_pause_state(self, value):
         self.iface_behavior.set_tag('pause_state', value)
 
@@ -373,11 +363,6 @@ class AbstractPositiveController(AbstractExperimentController,
     def select_speaker(self):
         if self.current_speaker_mode in ('primary', 'secondary', 'both'):
             return self.current_speaker_mode
-        #elif self.current_speaker_output == 'alternate':
-        #    if self.current_speaker == 'primary':
-        #        return 'secondary'
-        #    else:
-        #        return 'primary'
         else:
             toss = np.random.uniform()
             if toss < 0.5:
@@ -385,9 +370,8 @@ class AbstractPositiveController(AbstractExperimentController,
             else:
                 return 'secondary'
         
-    def update_attenuation(self):
+    def update_attenuation(self, attenuation):
         self.current_speaker = self.select_speaker()
-        attenuation = self.current_attenuation
         speaker = self.current_speaker
 
         if speaker == 'primary':

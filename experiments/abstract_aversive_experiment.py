@@ -6,8 +6,7 @@ from enthought.enable.api import Component, ComponentEditor
 from enthought.chaco.api import DataRange1D, LinearMapper, PlotLabel, \
         VPlotContainer, PlotAxis, OverlayPlotContainer, Legend, ToolTip
 
-from aversive_data import RawAversiveData as AversiveData
-from aversive_data import AnalyzedAversiveData
+from aversive_data_v3 import AnalyzedAversiveData
 
 from cns.chaco.channel_data_range import ChannelDataRange
 from cns.chaco.channel_plot import ChannelPlot
