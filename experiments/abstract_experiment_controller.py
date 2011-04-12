@@ -507,6 +507,5 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
         reflects a different parameter.  For single-parameter settings, there
         will only be one trait defined.
         '''
-        for parameter in setting.editable_traits():
-            value = getattr(setting, parameter)
+        for parameter, value in setting.parameter_dict().items():
             getattr(self, 'set_' + parameter)(value)
