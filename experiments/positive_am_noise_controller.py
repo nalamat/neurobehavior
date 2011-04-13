@@ -69,6 +69,7 @@ class PositiveAMNoiseController(AbstractPositiveController):
         self.set_delay(onset)
         self.current_onset = onset
         self.update_reaction_window_delay(onset+self.current_reaction_window_delay)
+        #self.update_reaction_window_delay(onset)
         
         # We need to update the reaction_window_duration as well because it
         # is implemented as the sum of the delay and duration in the RPvds

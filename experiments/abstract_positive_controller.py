@@ -309,7 +309,7 @@ class AbstractPositiveController(AbstractExperimentController,
 
     def set_reaction_window_duration(self, value, offset=0):
         self.current_reaction_window_duration = value
-        delay = self.current_reaction_window_deloy
+        delay = self.current_reaction_window_delay
         if value is not None and delay is not None:
             self.iface_behavior.cset_tag('react_end_n', delay+value+offset, 's', 'n')
 
