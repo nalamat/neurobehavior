@@ -47,6 +47,11 @@ def apply_mask(fun, masks, values):
 # the column order of the trial_log table.  You will have to explicitly
 # query the columns to get the information you need out of the table rather than
 # relying on a pre-specified index.
+# V2.4 - 110415 - Switch to a volume-based reward made detection of gerbil on
+# spout slightly problematic.  Made scoring more robust.  pump_TTL data is now
+# being spooled again; however, this is simply an indicator of whether a trigger
+# was sent to the pump rather than an indicator of how long the pump was running
+# for.
 class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
     '''
     trial_log is essentially a list of the trials, along with the parameters
@@ -57,7 +62,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
         return getattr(self, name)
 
     # VERSION is a reserved keyword in HDF5 files, so I avoid using it here.
-    OBJECT_VERSION = Float(2.3, store='attribute')
+    OBJECT_VERSION = Float(2.4, store='attribute')
 
     store_node = Any
 
@@ -176,6 +181,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
         CR
             (nogo | early) & ~spout
         '''
+        print "computing"
         poke_data = self.poke_TTL.get_range_index(ts_start, ts_end)
         spout_data = self.spout_TTL.get_range_index(ts_start, ts_end)
         react_data = self.reaction_TTL.get_range_index(ts_start, ts_end)
@@ -185,7 +191,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
         # Regardless of whether or not the subject reacted early, what was his
         # answer?
-        if poke_data.all():
+        if poke_data[react_data].all():
             response = 'no withdraw'
         elif spout_data.any():
             response = 'spout'
@@ -193,6 +199,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
             response = 'poke'
         else:
             response = 'no response'
+        print response
 
         # How quickly did he react?
         try:
@@ -468,6 +475,21 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
         fa_mask = nogo_resp == 'spout'
         fa_count = np.sum(fa_mask)
         return float(fa_count)/float(nogo_count)
+
+    max_reaction_time = Property(depends_on='trial_log', store='attribute')
+    max_response_time = Property(depends_on='trial_log', store='attribute')
+
+    @cached_property
+    def _get_max_reaction_time(self):
+        if len(self.par_mean_reaction_time) == 0:
+            return np.nan
+        return np.max(self.par_mean_reaction_time)
+
+    @cached_property
+    def _get_max_response_time(self):
+        if len(self.par_mean_response_time) == 0:
+            return np.nan
+        return np.max(self.par_mean_response_time)
 
     @cached_property
     def _get_go_trial_count(self):

@@ -54,6 +54,7 @@ class PositiveDTParadigm(AbstractPositiveParadigm):
             )
 
     signal_group = VGroup(
+            Item('speaker_mode', label='Speaker'),
             Item('rise_fall_time', label='Rise/fall time (s)'),
             Item('fc', label='Center frequency (Hz)'),
             Item('bandwidth', label='Bandwidth (Hz)'),

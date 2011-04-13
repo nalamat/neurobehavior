@@ -75,25 +75,6 @@ class ParInfoAdapter(TabularAdapter):
     def _get_parameters(self):
         return [self.item[p] for p in self.parameters]
 
-    #width = Float(50)
-    #reaction_width = Float(100)
-    #response_width = Float(100)
-
-    #reaction_text = Property
-    #response_text = Property
-
-    #def _get_reaction_text(self):
-    #    return self.timing_fmt.format(
-    #            self.item['mean_react'],
-    #            self.item['median_react'],
-    #            self.item['std_react'])
-
-    #def _get_response_text(self):
-    #    return self.timing_fmt.format(
-    #            self.item['mean_resp'],
-    #            self.item['median_resp'],
-    #            self.item['std_resp'])
-
     def _get_bg_color(self):
         try:
             key = ', '.join('{}'.format(p) for p in self._get_parameters()[1:])
@@ -404,6 +385,21 @@ class AbstractPositiveExperiment(AbstractExperiment):
                 show_labels=False,
             ),
             Include('plots_group'),
-            Item('trial_log_view'),
+            VGroup(
+                VGroup(
+                    Item('object.data.global_fa_frac', label='Mean FA (frac)'),
+                    Item('object.data.go_trial_count', label='Total GO'),
+                    Item('object.data.nogo_trial_count', label='Total GO'),
+                    Item('object.data.max_reaction_time', 
+                        label='Slowest Mean Reaction Time (s)'),
+                    Item('object.data.max_response_time', 
+                        label='Slowest Mean Response Time (s)'),
+                    label='Statistics Summary',
+                    style='readonly',
+                    show_border=True,
+                    ),
+                Item('trial_log_view'),
+                show_labels=False,
+                ),
             show_labels=False,
         )

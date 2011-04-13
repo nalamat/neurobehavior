@@ -91,6 +91,7 @@ class AbstractPositiveController(AbstractExperimentController,
     def start_experiment(self, info):
         self.init_paradigm(self.model.paradigm)
         self.iface_pump.set_trigger(start='rising', stop=None)
+        self.iface_pump.set_direction('infuse')
 
         # Grab the current value of the timestamp from the circuit when it is
         # first loaded
@@ -350,9 +351,6 @@ class AbstractPositiveController(AbstractExperimentController,
 
     def get_trial_running(self):
         return self.iface_behavior.get_tag('trial_running')
-
-    #def trigger_next(self):
-    #    raise NotImplementedError
 
     def set_pause_state(self, value):
         self.iface_behavior.set_tag('pause_state', value)

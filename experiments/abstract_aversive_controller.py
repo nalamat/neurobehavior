@@ -50,6 +50,7 @@ class AbstractAversiveController(AbstractExperimentController,
         # Pump will start on a rising edge (e.g. the subject touches the spout)
         # and stop on a falling edge (e.g. the subject leaves the spout).
         self.iface_pump.set_trigger(start='rising', stop='falling')
+        self.iface_pump.set_direction('infuse')
 
         # Ensure that sampling frequencies are stored properly
         self.model.data.contact_digital.fs = self.buffer_TTL.fs
