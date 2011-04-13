@@ -414,17 +414,8 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
         '''
         Applies an individual change
         '''
-        ts = self.get_ts()
-        try:
-            log.debug("Apply: setting %s:%s to %r", instance, name, value)
-            getattr(self, 'set_'+name)(value)
-            self.log_event(ts, name, value)
-        except AttributeError:
-            mesg = "Can't set %s to %r" % (name, value)
-            # Notify the user
-            error(info.ui.control, mesg)
-            # Set paradigm value back to "old" value
-            setattr(instance, name, value)
+        self.current_parameters[name] = value
+        self.log_event(self.get_ts(), name, value)
 
     def apply(self, info=None):
         '''
@@ -509,3 +500,10 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
         '''
         for parameter, value in setting.parameter_dict().items():
             getattr(self, 'set_' + parameter)(value)
+
+    def update_context(self):
+        context = evaluate_parameters(self.current_parameters)
+        for parameter, value in context.items():
+            if self.current_context[parameter] != value:
+                getattr(self, 'set_' + parameter)(value)
+                self.current_context[parameter] = value
