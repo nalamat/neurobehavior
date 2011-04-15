@@ -14,25 +14,7 @@ from signals import signal_options
 from enthought.traits.ui.table_column import ObjectColumn
 from enthought.traits.ui.api import TableEditor, TextEditor
 
-class TrialSetting(HasTraits):
-
-    parameter       = Float(1.0, store='attribute')
-
-    def __cmp__(self, other):
-        return cmp(self.parameter, other.parameter)
-
-    def __str__(self):
-        return "{0}".format(self.parameter)
-
-table_editor = TableEditor(
-        editable=True,
-        deletable=True,
-        show_toolbar=True,
-        row_factory=TrialSetting,
-        columns=[
-            ObjectColumn(name='parameter', label='Parameter', width=75),
-            ]
-        )
+from trial_setting import TrialSetting, trial_setting_editor
 
 class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
 
@@ -85,7 +67,7 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
     parameter_view = VGroup(
             Item('nogo_parameter'),
             VGroup(Item('parameter_order', label='Order')),
-            Item('parameters', editor=table_editor,
+            Item('parameters', editor=trial_setting_editor,
                  show_label=False),
             label='Trial Sequence',
             show_border=True,

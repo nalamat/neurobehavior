@@ -11,6 +11,9 @@ from os.path import join
 
 from enthought.traits.api import Any, Trait, TraitError, Bool, Str
 from enthought.traits.ui.api import View, Item, VGroup, HGroup, Spring
+from experiments.trial_setting import TrialSetting, trial_setting_editor
+from enthought.traits.api import Float
+from enthought.traits.ui.api import ObjectColumn
 
 import logging
 log = logging.getLogger(__name__)
@@ -71,13 +74,7 @@ class ExperimentCohortView(CohortView):
 
 class ExperimentLauncher(CohortViewHandler):
 
-    experiment          = Any
-    paradigm            = Any
-    controller          = Any
-    data                = Any
-    node_name           = Str
-    spool_physiology    = Bool(True)
-
+    args            = Any
     last_paradigm   = Trait(None, Any)
 
     def init(self, info):
@@ -108,7 +105,7 @@ class ExperimentLauncher(CohortViewHandler):
             store_node = get_or_append_node(animal_node, 'experiments')
             paradigm_node = get_or_append_node(store_node, 'last_paradigm')
             #paradigm_name = self.experiment.__name__
-            paradigm_name = self.node_name
+            paradigm_name = EXPERIMENTS[self.args.type]['node_name']
             paradigm = None
             try:
                 paradigm = persistence.load_object(paradigm_node, paradigm_name)
@@ -131,24 +128,8 @@ class ExperimentLauncher(CohortViewHandler):
                 log.debug(mesg)
                 log.exception(e)
                 error(info.ui.control, mesg)
-                
-            exp_node = append_date_node(store_node, self.node_name + '_')
-            data_node = append_node(exp_node, 'data')
 
-            experiment_class, experiment_args = self.experiment
-            data_class, data_args = self.data
-            paradigm_class, paradigm_args = self.paradigm
-            controller_class, controller_args = self.controller
-
-            model = experiment_class(
-                    store_node=store_node, 
-                    exp_node=exp_node,
-                    data_node=data_node, 
-                    data=data_class(store_node=data_node, **data_args),
-                    paradigm=paradigm_class(**paradigm_args),
-                    spool_physiology=self.spool_physiology,
-                    **experiment_args
-                    )
+            model, controller = prepare_experiment(self.args)
 
             try:
                 if paradigm is not None:
@@ -161,7 +142,6 @@ class ExperimentLauncher(CohortViewHandler):
             except TraitError:
                 log.debug('Prior paradigm is not compatible with experiment')
     
-            controller = controller_class(**controller_args)
             ui = model.edit_traits(parent=info.ui.control, kind='livemodal',
                     handler=controller)
 
@@ -198,15 +178,10 @@ class ExperimentLauncher(CohortViewHandler):
         if info.initialized:
             self.launch_experiment(info, info.object.selected)
 
-def test_experiment(args):
-    from cns import TEMP_ROOT
-    filename = join(TEMP_ROOT, 'test_experiment.hd5')
-    file = tables.openFile(filename, 'w')
-    store_node = file.root
-
+def prepare_experiment(args, store_node):
+    # Load the experiment classes
     e = EXPERIMENTS[args.type]
-    pre = e['node_name'] + '_'
-    exp_node = append_date_node(store_node, pre)
+    exp_node = append_date_node(store_node, e['node_name'] + '_')
     data_node = append_node(exp_node, 'data')
 
     experiment_class, experiment_args = e['experiment']
@@ -214,16 +189,38 @@ def test_experiment(args):
     paradigm_class, paradigm_args = e['paradigm']
     controller_class, controller_args = e['controller']
 
+    # Configure the TrialSetting/trial_setting_editor objects to contain the
+    # parameters we wish to control in the experiment
+    columns = []
+    for parameter in args.rove:
+        label = paradigm_class.class_traits()[parameter].label
+        TrialSetting.add_class_trait(parameter, Float)
+        column = ObjectColumn(name=parameter, label=label, width=75)
+        columns.append(column)
+    TrialSetting.parameters = args.rove
+    trial_setting_editor.columns = columns
+
+    # Prepare the classes
+    data = data_class(store_node=data_node, parameters=args.analyze,
+                      **data_args)
+    paradigm = paradigm_class(**paradigm_args)
     model = experiment_class(
             store_node=store_node, 
             exp_node=exp_node,
             data_node=data_node, 
-            data=data_class(store_node=data_node, **data_args),
-            paradigm=paradigm_class(**paradigm_args),
+            data=data,
+            paradigm=paradigm,
             spool_physiology=args.physiology,
             **experiment_args
             )
     controller = controller_class(**controller_args)
+    return model, controller
+
+def test_experiment(args):
+    from cns import TEMP_ROOT
+    filename = join(TEMP_ROOT, 'test_experiment.hd5')
+    file = tables.openFile(filename, 'w')
+    model, controller = prepare_experiment(args, file.root)
     model.configure_traits(handler=controller)
 
 def profile_experiment(args):
@@ -239,9 +236,37 @@ def profile_experiment(args):
     p.strip_dirs().sort_stats('cumulative').print_stats(50)
 
 def launch_experiment(args):
-    handler = ExperimentLauncher(spool_physiology=args.physiology,
-        **EXPERIMENTS[args.type])
+    handler = ExperimentLauncher(args=args)
     ExperimentCohortView().configure_traits(handler=handler)
+
+def inspect_experiment(args):
+    '''
+    Print out parameters available for requested paradigm
+    '''
+    e = EXPERIMENTS[args.type]
+    p = e['paradigm'][0]()
+    parameters = [(n, p.trait(n).label) for n in p.editable_traits()]
+
+    # Determine the padding we need for the columns
+    col_paddings = []
+    for i in range(len(parameters[0])):
+        sizes = [len(row[i]) if row[i] != None else 0 for row in parameters]
+        col_paddings.append(max(sizes))
+
+    # Pretty print the list
+    for row in parameters:
+        print row[0].rjust(col_paddings[0]+2),
+        if row[1] is not None:
+            print row[1].ljust(col_paddings[1]+2)
+        else:
+            print ''
+
+def get_invalid_parameters(args):
+    parameters = set(args.rove)
+    parameters.update(args.analyze)
+    paradigm = EXPERIMENTS[args.type]['paradigm'][0]()
+    valid_parameters = paradigm.editable_traits()
+    return [p for p in parameters if p not in valid_parameters]
 
 # Define the classes required for each experiment.
 EXPERIMENTS = {
@@ -256,16 +281,14 @@ EXPERIMENTS = {
             'experiment':   (AbstractPositiveExperiment, {}), 
             'paradigm':     (PositiveAMNoiseParadigm, {}), 
             'controller':   (PositiveAMNoiseController, {}), 
-            'data':         (PositiveData, 
-                             {'parameters': ['depth']}),
+            'data':         (PositiveData,  {}),
             'node_name':    'PositiveAMNoiseExperiment',
             },
         'positive_dt': {
             'experiment':   (PositiveDTExperiment, {}), 
             'paradigm':     (PositiveDTParadigm, {}),
             'controller':   (PositiveDTController, {}), 
-            'data':         (PositiveData,
-                             {'parameters': ['duration', 'attenuation']}),
+            'data':         (PositiveData, {}),
             'node_name':    'PositiveDTExperiment',
             },
         'aversive_fm': {
