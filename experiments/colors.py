@@ -1,5 +1,15 @@
 # See http://geography.uoregon.edu/datagraphics/color_scales.htm 
 
+color_names = {
+    'light green': '#98FB98',
+    'dark green': '#2E8B57',
+    'light red': '#FFC8CB',
+    'dark red': '#FA8072',
+    'gray': '#D3D3D3',
+    'light blue': '#ADD8E6',
+          }
+
+
 def dec_to_255(colors):
     return [tuple(c*255.0 for c in color) for color in colors]
 
