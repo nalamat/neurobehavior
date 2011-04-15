@@ -217,12 +217,16 @@ class PumpInterface(object):
             # Raised when it cannot find the global name 'SERIAL' (which
             # typically indicates a problem connecting to COM1).  Let's
             # translate this to a human-understandable error.
-            print e
             log.exception(e)
             raise PumpCommError('SER')
 
     def disconnect(self):
-        self.ser.close()
+        try:
+            self.stop()
+        except:
+            pass
+        finally:
+            self.ser.close()
 
     def run(self):
         self.start()
@@ -263,11 +267,15 @@ class PumpInterface(object):
         cmd = self.REV_TRIG_MODE[start, stop]
         self.xmit('TRG %s' % cmd)
 
+    def get_trigger(self):
+        value = self.xmit('TRG')
+        return self.TRIG_MODE[value]
+
     def get_direction(self):
         value = self.xmit('DIR')
-        return self.REV_DIR_MODE[value]
+        return self.DIR_MODE[value]
 
-    def set_direction(self):
+    def set_direction(self, direction):
         arg = self.REV_DIR_MODE[direction]
         self.xmit('DIR %s' % arg)
 
@@ -337,7 +345,6 @@ class PumpInterface(object):
     #####################################################################
     # RS232 functions
     #####################################################################
-
     def readline(self):
         # PySerial v2.5 no longer supports the eol parameter, so we manually
         # read byte by byte until we reach the line-end character.  Timeout
@@ -354,8 +361,6 @@ class PumpInterface(object):
 
     def xmit_sequence(self, commands):
         return [self.xmit(cmd) for cmd in commands]
-        for cmd in cmds:
-            self.xmit(cmd)
 
     def xmit(self, cmd):
         '''
@@ -382,17 +387,4 @@ class PumpInterface(object):
 if __name__ == "__main__":
     import time
     pi = PumpInterface(volume_unit='ul', rate_unit='ml/min')
-    print pi.set_volume(4)
-    print pi.get_volume()
-    print pi.set_rate(0.3)
-    print pi.get_rate()
-    print pi.get_rate(unit='ul/min')
-    print pi.get_rate(unit='ul/h')
-    pi.run()
-    time.sleep(1)
-    print pi.get_infused()
-    print pi.get_infused(unit='ml')
-    #pi.run()
-    #time.sleep(1)
-    #print pi.get_infused()
-    #print pi.get_withdrawn()
+    print pi.get_trigger()

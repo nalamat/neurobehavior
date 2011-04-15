@@ -51,7 +51,6 @@ class PositiveDTController(AbstractPositiveController):
             sf = self.get_sf(self.current_setting_go.attenuation)
             waveform = sf*self._compute_signal(par)
             self.buffer_signal.set(waveform)
-
             self.iface_behavior.set_tag('signal_dur_n', len(waveform))
         else:
             self.iface_behavior.set_tag('go?', 0)
