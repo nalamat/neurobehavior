@@ -7,6 +7,7 @@ from cns.channel import FileChannel
 from enthought.traits.api import Instance, List, CFloat, Int, Float, Any, \
     Range, DelegatesTo, cached_property, on_trait_change, Array, Event, \
     Property, Undefined, Callable, Str, Enum, Bool, Int, Str, Tuple, CList
+from enthought.traits.ui.api import SetEditor
 from datetime import datetime
 import numpy as np
 from cns.data.h5_utils import append_node, get_or_append_node
@@ -232,7 +233,9 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
     par_info = Property(store='table', depends_on='par_dprime')
 
-    parameters = List(['parameter'])
+    parameters = List(editor=SetEditor(name='trial_log_columns',
+                                       can_move_all=False,
+                                       ordered=True))
 
     @cached_property
     def _get_par_info(self):
@@ -260,7 +263,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
             data[parameter] = [p[i] for p in self.pars]
         return np.rec.fromarrays(data.values(), names=data.keys())
 
-    # Splits trial_log into individual elements as needed
+    # Splits trial_log into individual sequences as needed
     ts_seq          = Property(Array('i'), depends_on='trial_log')
     par_seq         = Property(Array('f'), depends_on='trial_log')
     ttype_seq       = Property(Array('S'), depends_on='trial_log')

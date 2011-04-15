@@ -372,6 +372,10 @@ class AbstractPositiveExperiment(AbstractExperiment):
             show_labels=False,
             )
 
+    from enthought.traits.ui.api import SetEditor
+    PAR_EDITOR = SetEditor(name='object.data.trial_log_columns',
+            can_move_all=False, ordered=True)
+
     traits_group = HSplit(
             VGroup(
                 Item('handler.toolbar', style='custom'),
@@ -394,7 +398,12 @@ class AbstractPositiveExperiment(AbstractExperiment):
                     style='readonly',
                     show_border=True,
                     ),
-                Item('trial_log_view'),
+                Tabbed(
+                    Item('object.data.parameters', editor=PAR_EDITOR,
+                         label='Analysis'),
+                    Item('trial_log_view', label='Trial log'),
+                    show_labels=False,
+                    ),
                 show_labels=False,
                 ),
             show_labels=False,
