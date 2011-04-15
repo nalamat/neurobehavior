@@ -99,10 +99,13 @@ def node_match(n, filter):
     '''Checks for match against each keyword.  If an attribute is missing or
     any match fails, returns False.
 
-    Filter must be a dictionary
+    Filter can be a dictionary or list of tuples.  If the order in which the
+    filters are applied is important, then provide a list of tuples.
     '''
+    if type(filter) == type({}):
+        filter = tuple((k, v) for k, v in filter.items())
 
-    for extended_attr, criterion in filter.items():
+    for extended_attr, criterion in filter:
         try:
             value = rgetattr_or_none(n, extended_attr)
             if not criterion(value):
@@ -115,41 +118,83 @@ def node_match(n, filter):
     return True
 
 def _walk(where, filter, mode):
-    '''Recursively returns all nodes hanging off of the starting node that match
-    the given criteria.
+    '''
+    Starting at the specifide node, `_walk` visits each node in the hierarchy,
+    returning a list of all nodes that match the filter criteria.
 
-    Criteria can be specified as keyword arguments where the keyword indicates
-    the attribute.  The keyword can either be one of the node's special
-    attributes (e.g. _v_pathname or _v_name) or a user-set attribute.  The value
-    may be a regular expression as well.
+    Filters are specified as a sequence of tuples, (attribute, filter).  As
+    each node is visited, each filter is called with the corresponding value of
+    its attribute.  The node is discarded if it is missing one or more of the
+    filter attributes.
 
-    Hint, to limit to a given depth, use the _v_depth attribute (you may have to
-    account for the starting depth, not sure as I have never used this feature).
-    Obviously this is a moot point with the non-recursive version.
+    Each filter may be a callable that returns a value or raises an exception.
+    If the filter raises an exception or returns an object whose truth value
+    is Fales, the node is discarded.
 
-    Returns
-    -------
-    iterable
+    Attributes may be specified relative to the nodes of interest using the '.'
+    separator.
 
-    For a non-recursive version, see :func:`list_nodes`.  Use the non-recursive
-    version where possible (e.g. when you are interested only in the immediate
-    children) as it will be much faster. 
+    Attribute examples:
+
+        _v_name
+            Name of the current node
+        ._v_name
+            Name of the parent node
+        .._v_name
+            Name of the grandparent node
+        paradigm.bandwidth
+            Value of the bandwidth attribute on the child node named 'paradigm'
+        .paradigm.bandwidth
+            Value of the bandwidth attribute on the sibling node named
+            'paradigm' (i.e. check to see if the parent of the current node has
+            a child node named 'paradigm' and get the value of bandwidth
+            attribute on this child node).
+
+    If you have ever worked with pathnames via the command line, you may
+    recognize the '.' separator as a homologue of the directory separator '../'.
+    Using this analogy, '..paradigm.bandwidth' translates to
+    '../../paradigm/bandwidth' and '._v_name' translates to '../_v_name'.
+
+    Filter examples:
+
+        ('_v_name', re.compile('^\d+.*').match) 
+        Matches all nodes whose name begins with a sequence of numbers
+
+        ('_v_name', 'par_info')
+        Matches all nodes whose name is exactly 'par_info'
+
+        ('..start_time', lambda x: (strptime(x).date()-date.today()).days <= 7)
+        Matches all nodes whose grandparent (two levels up) contains an
+        attribute, start_time, that evaluates to a date that is within the last
+        week.  Useful for restricting your analysis to data collected recently.
+
+    Valuable node attributes:
+
+        _v_name
+            Name of the node
+        _v_pathname
+            HDF5 pathname of the node
+        _v_depth
+            Depth of the node relative to the root node (root node depth is 0)
+
+    If all of the attributes are found for the given node and the attribute
+    values meet the filter criterion, the node is added to the list.
 
     To return all nodes with the attribute klass='Animal'
     >>> fh = tables.openFile('example_data.h5', 'r')
-    >>> animal_nodes = list(walk_nodes(fh.root, {'_v_attrs.klass': 'Animal'}))
+    >>> animal_nodes = list(walk_nodes(fh.root, ('_v_attrs.klass', 'Animal')))
 
-    To return all nodes who have a subnode, data, with the attribute
-    klass='RawAversiveData*'
+    To return all nodes who have a subnode, data, with the attribute 'klass'
+    whose value is a string beginning with 'RawAversiveData'.
     >>> fh = tables.openFile('example_data.h5', 'r')
     >>> base_node = fh.root.Cohort_0.animals.Animal_0.experiments
-    >>> filter = {'data.klass: 'RawAversiveData*'}
-    >>> experiment_nodes = [n for n in walk_nodes(base_node, filter)]
+    >>> filter = ('data.klass, re.compile('RawAversiveData.*').match)
+    >>> experiment_nodes = list(walk_nodes(base_node, filter))
 
     To return all nodes whose name matches a given pattern
     >>> fh = tables.openFile('example_data.h5', 'r')
-    >>> filter = {'_v_name': '^Animal_\d+'}
-    >>> animal_nodes = [n for n in walk_nodes(fh.root, filter)]
+    >>> filter = ('_v_name': re.compile('^Animal_\d+').match)
+    >>> animal_nodes = list(walk_nodes(fh.root, filter))
     '''
     for node in getattr(where, mode)():
         if node_match(node, filter):
@@ -161,6 +206,150 @@ walk_nodes = partial(_walk, mode='_f_walkNodes')
 iter_nodes = partial(_walk, mode='_f_iterNodes')
 
 def extract_data(input_files, filters, fields=None):
+    '''
+    Extracts the data you want into a record array, flattening the HDF5
+    hierarchy in the process.  This results in what is, essentially, a
+    denormalized table. 
+
+    Parameters
+    ----------
+    input_files : list
+        A list of HDF5 files to extract data from
+    filters : sequence of tuples
+        Each tuple contains two elements, an attribute name and a filter. The
+        value of the attribute is extracted from the node being in.  The filter
+        must be sufficiently strict that it only matches one object type or
+        table type.  Don't try to "merge" par_info with trial_log.  It won't
+        work.  The tables that match the filter are then concatenated.
+    fields : 
+        Extra metadata to append (as columns) to the tables extracted by the
+        filter.
+
+    Typical HDF5 file structure
+    ---------------------------
+    Cohort_{number}
+        _v_attrs
+            description
+        animals
+            Animal_{number}
+                _v_attrs
+                    nyu_id
+                    identifier (e.g. tail, fluffy)
+                    parents
+                    birth
+                    sex
+                experiments
+                    PositiveDTExperiment_{date_time}
+                        _v_attrs
+                            start_time
+                            stop_time
+                            date
+                            duration
+                        data
+                            _v_attrs
+                                clip
+                                nogo_trial_count
+                                go_trial_count
+                                OBJECT_VERSION (incremented when format changes)
+                            contact
+                                poke_TTL
+                                    _v_attrs
+                                        fs (sampling frequency)
+                                spout_TTL
+                                    _v_attrs
+                                        fs (sampling frequency)
+                                {et cetera}
+                            par_info
+                            trial_log
+                            water_log
+                            {et cetera}
+                        paradigm
+                            _v_attrs
+                                {list of all relevant paradigm attributes}
+
+    For convenience, '_v_attrs' is typically implied (e.g. if the node does not
+    have a child with the given name, _v_attrs is checked to see if it contains
+    the requested attribute name).  If the node has both a child and an
+    attribute with the same name, then you need to prepend the attribute name
+    with '_v_attrs.' when you want to obtain the attribute name.
+
+    Given the following hierarchy
+
+        experiment
+            _v_attrs
+                start_date
+                start_time
+                data
+            data
+
+    When requesting 'start_date', '_v_attrs.start_date' is returned since the
+    experiment node does not have a child node named 'start_date'.  However,
+    requesting 'data' returns the child node, data.  If you want the data
+    attribute, you must explicitly request '_v_attrs.data'.
+    
+    Give the following arugments:
+
+        filters = (('_v_name', 'trial_log'),)
+        fields  = (('....identifier', 'id'),
+                   ('....sex', 'sex'))
+
+    With a HDF5 file containing following structure:
+
+        Animal_0
+            _v_attrs
+                identifier = Fluffy
+                sex = M
+            experiments
+                Experiment
+                    _v_attrs
+                        start_time
+                        end_time
+                        duration
+                        
+                    data
+                        trial_log (parameter, trial_type, response)
+                            parameter_1, trial_type_1, response_1
+                            parameter_2, trial_type_2, response_2
+                            parameter_3, trial_type_3, response_3
+                            parameter_4, trial_type_4, response_4
+                            parameter_5, trial_type_5, response_5
+        Animal_1
+            _v_attrs
+                identifier = Tail
+                sex = F
+            experiments
+                Experiment
+                    _v_attrs
+                        start_time
+                        end_time
+                        duration
+                        
+                    data
+                        trial_log (parameter, trial_type, response)
+                            parameter_1, trial_type_1, response_1
+                            parameter_2, trial_type_2, response_2
+                            parameter_3, trial_type_3, response_3
+                            parameter_4, trial_type_4, response_4
+                            parameter_5, trial_type_5, response_5
+
+    The result will be a record array containing the following named columns:
+
+        id,         sex, parameter,     trial_type,   response
+
+    With the following records:
+
+        Fluffy,     M,   parameter_1,   trial_type_1, response_1
+        Fluffy,     M,   parameter_2,   trial_type_2, response_2
+        Fluffy,     M,   parameter_3,   trial_type_3, response_3
+        Fluffy,     M,   parameter_4,   trial_type_4, response_4
+        Fluffy,     M,   parameter_5,   trial_type_5, response_5
+        Tail,       F,   parameter_1,   trial_type_1, response_1
+        Tail,       F,   parameter_2,   trial_type_2, response_2
+        Tail,       F,   parameter_3,   trial_type_3, response_3
+        Tail,       F,   parameter_4,   trial_type_4, response_4
+        Tail,       F,   parameter_5,   trial_type_5, response_5
+    '''
+
     # Gather all the data nodes by looking for the nodes in the HDF5 tree that
     # match our filter.  Nodes are HDF5 objects (e.g. either a group containing
     # children objects (Animal.experiments contains multiple experiments) or a
