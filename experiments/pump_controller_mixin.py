@@ -1,7 +1,7 @@
 from cns.widgets.toolbar import ToolBar
 from enthought.etsconfig.api import ETSConfig
 from enthought.traits.ui.api import View, HGroup, Item, Controller, VGroup
-from enthought.traits.api import Instance, Bool, HasTraits, Button
+from enthought.traits.api import Instance, Bool, HasTraits, Button, Tuple, Float
 from enthought.savage.traits.ui.svg_button import SVGButton
 from cns.widgets import icons
 
@@ -38,8 +38,11 @@ class PumpToolBar(ToolBar):
 
 class PumpControllerMixin(HasTraits):
 
-    pump_toolbar = Instance(PumpToolBar, (), toolbar=True)
-    iface_pump   = Instance(PumpInterface, ())
+    pump_toolbar        = Instance(PumpToolBar, (), toolbar=True)
+    iface_pump          = Instance(PumpInterface, ())
+    pump_toggle         = Bool(False)
+    pump_trigger_cache  = Tuple
+    pump_volume_cache   = Float
 
     def monitor_pump(self):
         infused = self.iface_pump.get_infused(unit='ml')
@@ -47,10 +50,18 @@ class PumpControllerMixin(HasTraits):
         self.model.data.log_water(ts, infused)
 
     def pump_override(self, info):
-        if self.iface_pump.trigger == 'run_high':
-            self.iface_pump.run(trigger='start')
+        if not self.pump_toggle:
+            self.pump_trigger_cache = self.iface_pump.get_trigger()
+            self.pump_volume_cache = self.iface_pump.get_volume()
+            self.iface_pump.set_volume(0)
+            self.iface_pump.set_trigger('rising', None)
+            self.iface_pump.run()
+            self.pump_toggle = True
         else:
-            self.iface_pump.run_if_TTL(trigger='run_high')
+            self.iface_pump.stop()
+            self.iface_pump.set_trigger(*self.pump_trigger_cache)
+            self.iface_pump.set_volume(self.pump_volume_cache)
+            self.pump_toggle = False
 
     def pump_increase(self, info):
         rate = self.iface_pump.get_rate(unit='ml/min') 

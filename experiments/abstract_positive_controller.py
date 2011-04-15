@@ -67,10 +67,10 @@ class AbstractPositiveController(AbstractExperimentController,
         self.buffer_TTL2 = self.iface_behavior.get_buffer('TTL2', 'r',
                 src_type=np.int8, dest_type=np.int8, block_size=24)
 
-        self.model.data.trial_start_timestamp.fs = self.buffer_TTL1.fs
-        self.model.data.trial_end_timestamp.fs = self.buffer_TTL1.fs
-        self.model.data.timeout_start_timestamp.fs = self.buffer_TTL1.fs
-        self.model.data.timeout_end_timestamp.fs = self.buffer_TTL1.fs
+        #self.model.data.trial_start_timestamp.fs = self.buffer_TTL1.fs
+        #self.model.data.trial_end_timestamp.fs = self.buffer_TTL1.fs
+        #self.model.data.timeout_start_timestamp.fs = self.buffer_TTL1.fs
+        #self.model.data.timeout_end_timestamp.fs = self.buffer_TTL1.fs
         self.model.data.spout_TTL.fs = self.buffer_TTL1.fs
         self.model.data.poke_TTL.fs = self.buffer_TTL1.fs
         self.model.data.signal_TTL.fs = self.buffer_TTL1.fs
@@ -91,6 +91,7 @@ class AbstractPositiveController(AbstractExperimentController,
     def start_experiment(self, info):
         self.init_paradigm(self.model.paradigm)
         self.iface_pump.set_trigger(start='rising', stop=None)
+        self.iface_pump.set_direction('infuse')
 
         # Grab the current value of the timestamp from the circuit when it is
         # first loaded
@@ -303,12 +304,12 @@ class AbstractPositiveController(AbstractExperimentController,
             # Check to see if the conversion of s to n resulted in a value of 0.
             # If so, set the delay to 1 sample (0 means that the reaction window
             # never triggers due to the nature of the RPvds component)
-            if self.iface_behavior.get_tag('react_del_n') == 0:
-                self.iface_behavior.set_tag('react_del_n', 1)
+            if self.iface_behavior.get_tag('react_del_n') < 2:
+                self.iface_behavior.set_tag('react_del_n', 2)
 
     def set_reaction_window_duration(self, value, offset=0):
         self.current_reaction_window_duration = value
-        delay = self.current_reaction_window_deloy
+        delay = self.current_reaction_window_delay
         if value is not None and delay is not None:
             self.iface_behavior.cset_tag('react_end_n', delay+value+offset, 's', 'n')
 
