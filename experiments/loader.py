@@ -200,15 +200,18 @@ def prepare_experiment(args, store_node):
     TrialSetting.parameters = args.rove
     trial_setting_editor.columns = columns
 
-    # Prepare the classes
-    data = data_class(store_node=data_node, parameters=args.analyze,
-                      **data_args)
+    # Prepare the classes.  This really is a lot of boilerplate to link up
+    # parameters with paradigms, etc, to facilitate analysis
+
     paradigm = paradigm_class(**paradigm_args)
+    data = data_class(store_node=data_node, **data_args)
     model = experiment_class(
             store_node=store_node, 
             exp_node=exp_node,
             data_node=data_node, 
             data=data,
+            plot_index=args.analyze[0],
+            plot_group=args.analyze[1:],
             paradigm=paradigm,
             spool_physiology=args.physiology,
             **experiment_args

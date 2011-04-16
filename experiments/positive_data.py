@@ -7,7 +7,7 @@ from cns.channel import FileChannel
 from enthought.traits.api import Instance, List, CFloat, Int, Float, Any, \
     Range, DelegatesTo, cached_property, on_trait_change, Array, Event, \
     Property, Undefined, Callable, Str, Enum, Bool, Int, Str, Tuple, CList
-from enthought.traits.ui.api import SetEditor
+from enthought.traits.ui.api import EnumEditor, VGroup, Item, View
 from datetime import datetime
 import numpy as np
 from cns.data.h5_utils import append_node, get_or_append_node
@@ -89,11 +89,6 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
             store='channel', store_path='contact/TO_TTL')
     TO_safe_TTL = Instance(FileChannel,
             store='channel', store_path='contact/TO_safe_TTL')
-
-    #trial_start_timestamp   = Instance('cns.channel.Timeseries', ())
-    #trial_end_timestamp     = Instance('cns.channel.Timeseries', ())
-    #timeout_start_timestamp = Instance('cns.channel.Timeseries', ())
-    #timeout_end_timestamp   = Instance('cns.channel.Timeseries', ())
 
     def _create_channel(self, name, dtype):
         contact_node = get_or_append_node(self.store_node, 'contact')
@@ -233,9 +228,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
     par_info = Property(store='table', depends_on='par_dprime')
 
-    parameters = List(editor=SetEditor(name='trial_log_columns',
-                                       can_move_all=False,
-                                       ordered=True))
+    parameters = List
 
     @cached_property
     def _get_par_info(self):
@@ -280,6 +273,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
         try:
             arr = np.empty(len(self.trial_log), dtype=object)
             arr[:] = zip(*[self.trial_log[p] for p in self.parameters])
+            print arr
             return arr
         except:
             return np.array([])
@@ -555,6 +549,53 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
     def _get_par_std_response_time(self):
         return apply_mask(stats.nanstd, self.par_go_mask, self.resp_time_seq)
+
+    available_statistics = Property
+
+    def _get_available_statistics(self):
+        return {'par_cr_count': 'Correct rejects',
+                'par_fa_count': 'False alarms',
+                'par_hit_count': 'Hits',
+                'par_miss_count': 'Misses',
+                'par_go_count': 'GO trials',
+                'par_nogo_count': 'NOGO trials',
+                'par_dprime': 'd\'',
+                'par_criterion': 'C',
+                'par_hit_frac': 'Hit fraction',
+                'par_fa_frac': 'False alarm fraction',
+                'par_mean_reaction_time': 'Mean reaction time',
+                'par_mean_response_time': 'Mean response time',
+                }
+
+    PLOT_RANGE_HINTS = {
+                'par_cr_count'      : {'low_setting': 0, 'high_setting': 'auto'},
+                'par_fa_count'      : {'low_setting': 0, 'high_setting': 'auto'},
+                'par_hit_count'     : {'low_setting': 0, 'high_setting': 'auto'},
+                'par_miss_count'    : {'low_setting': 0, 'high_setting': 'auto'},
+                'par_go_count'      : {'low_setting': 0, 'high_setting': 'auto'},
+                'par_nogo_count'    : {'low_setting': 0, 'high_setting': 'auto'},
+                'par_dprime'        : {'low_setting': -1, 'high_setting': 3},
+                'par_criterion'     : {},
+                'par_hit_frac'      : {'low_setting': 0, 'high_setting': 1},
+                'par_fa_frac'       : {'low_setting': 0, 'high_setting': 1},
+                'par_mean_reaction_time': {},
+                'par_mean_response_time': {},
+                }
+
+    PLOT_GRID_HINTS = {
+                'par_cr_count'      : {'major_value': 5, 'minor_value': 1},
+                'par_fa_count'      : {'major_value': 5, 'minor_value': 1},
+                'par_hit_count'     : {'major_value': 5, 'minor_value': 1},
+                'par_miss_count'    : {'major_value': 5, 'minor_value': 1},
+                'par_go_count'      : {'major_value': 5, 'minor_value': 1},
+                'par_nogo_count'    : {'major_value': 5, 'minor_value': 1},
+                'par_dprime'        : {'major_value': 1, 'minor_value': 0.25},
+                'par_criterion'     : {},
+                'par_hit_frac'      : {'major_value': 0.2, 'minor_value': 0.05},
+                'par_fa_frac'       : {'major_value': 0.2, 'minor_value': 0.05},
+                'par_mean_reaction_time': {'major_value': 1, 'minor_value': 0.025},
+                'par_mean_response_time': {'major_value': 1, 'minor_value': 0.025},
+                }
 
 PositiveData = PositiveData_0_1
 

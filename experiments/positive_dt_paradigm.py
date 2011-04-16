@@ -11,8 +11,10 @@ class PositiveDTParadigm(AbstractPositiveParadigm):
                                 label='Center frequency (Hz)')
     bandwidth           = Float(5e3, store='attribute', init=True,
                                 label='Bandwidth (Hz)')
-    attenuation         = Enum(0, 20, 40, 60, store='attribute', init=True,
+    attenuation         = Float(20, store='attribute', init=True,
                                 label='Attenuation (dB)')
+    tdt_attenuation     = Enum(0, 20, 40, 60, store='attribute', init=True,
+                                label='TDT attenuation (dB)')
     duration            = Float(0.512, store='attribute', init=True,
                                 label='Duration (s)')
 
@@ -22,6 +24,6 @@ class PositiveDTParadigm(AbstractPositiveParadigm):
             'rise_fall_time',
             'fc',
             'bandwidth',
-            'attenuation',
+            'tdt_attenuation',
             label='Signal'
             )

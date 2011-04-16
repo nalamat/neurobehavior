@@ -71,7 +71,7 @@ class ParInfoAdapter(TabularAdapter):
 
     def _get_bg_color(self):
         try:
-            key = ', '.join('{}'.format(p) for p in self._get_parameters()[1:])
+            key = ', '.join('{}'.format(p) for p in self._get_parameters()[:-1])
             return self.color_map[key]
         except:
             return
@@ -174,9 +174,9 @@ class AbstractPositiveExperiment(AbstractExperiment):
         return self.data.trial_log[::-1]
 
     experiment_plot = Instance(Component)
-    par_count_plot  = Instance(Component)
-    par_score_plot  = Instance(Component)
-    par_dprime_plot = Instance(Component)
+    plot_1 = Instance(Component)
+    plot_2 = Instance(Component)
+    plot_3 = Instance(Component)
 
     @on_trait_change('data')
     def _generate_experiment_plot(self):
@@ -359,11 +359,11 @@ class AbstractPositiveExperiment(AbstractExperiment):
                     show_label=False, width=1000, height=300),
                 ),
             HGroup(
-                Item('par_count_plot', editor=ComponentEditor(),
+                Item('plot_1', editor=ComponentEditor(),
                     show_label=False, width=150, height=400),
-                Item('par_score_plot', editor=ComponentEditor(),
+                Item('plot_2', editor=ComponentEditor(),
                     show_label=False, width=150, height=400),
-                Item('par_dprime_plot', editor=ComponentEditor(),
+                Item('plot_3', editor=ComponentEditor(),
                     show_label=False, width=150, height=400),
                 label='Plots',
                 ),
@@ -372,9 +372,6 @@ class AbstractPositiveExperiment(AbstractExperiment):
             show_labels=False,
             )
 
-    from enthought.traits.ui.api import SetEditor
-    PAR_EDITOR = SetEditor(name='object.data.trial_log_columns',
-            can_move_all=False, ordered=True)
 
     traits_group = HSplit(
             VGroup(
@@ -399,8 +396,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
                     show_border=True,
                     ),
                 Tabbed(
-                    Item('object.data.parameters', editor=PAR_EDITOR,
-                         label='Analysis'),
+                    Include('analysis_group'),
                     Item('trial_log_view', label='Trial log'),
                     show_labels=False,
                     ),

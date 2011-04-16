@@ -42,6 +42,9 @@ class PositiveDTController(AbstractPositiveController):
         delta = self.current_attenuation-attenuation
         return 10**(delta/20.0)
 
+    def set_tdt_attenuation(self, value):
+        self.iface_behavior.set_tag('att_A', value)
+
     def set_duration(self, value):
         self.current_duration = value
 

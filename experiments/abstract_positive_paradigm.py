@@ -27,9 +27,12 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
                             init=True)
     nogo_parameter  = Float(store='attribute', init=True)
 
-    reward_duration = Float(1.0, store='attribute', ignore=True)
-    pump_rate       = Float(1.5, store='attribute', init=True)
-    reward_volume   = Float(25, store='attribute', init=True)
+    reward_duration = Float(1.0, store='attribute', ignore=True, 
+                            label='Reward duration (s)')
+    pump_rate       = Float(1.5, store='attribute', init=True, 
+                            label='Pump rate (ml/min)')
+    reward_volume   = Float(25, store='attribute', init=True, 
+                            label=u'Reward volume (ul)')
 
     def _reward_duration_changed(self, value):
         # ul = ml/m * (s/60) * 1000 ul/ml
@@ -105,9 +108,9 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
                     label='Timing',
                     ),
                 VGroup(
-                    Item('reward_duration', label='Reward duration (s)'),
-                    Item('pump_rate', label='Pump rate (mL/m)'),
-                    Item('reward_volume', label='Reward volume (ul)'),
+                    'reward_duration',
+                    'pump_rate',
+                    'reward_volume',
                     label='Reward',
                     ),
                 ),
