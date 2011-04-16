@@ -1,8 +1,8 @@
 import numpy as np
 from enthought.traits.api import Instance, Int, on_trait_change, \
-        Dict, HasTraits, Any, List, Str, Enum
+        Dict, HasTraits, Any, List, Str, Enum, Property
 from enthought.traits.ui.api import View, Include, VSplit, HSplit, \
-        VGroup, Item, InstanceEditor
+        VGroup, Item, InstanceEditor, EnumEditor, SetEditor
 
 from abstract_positive_experiment import AbstractPositiveExperiment
 from positive_dt_paradigm import PositiveDTParadigm
@@ -16,7 +16,6 @@ from enthought.chaco.api import Plot, DataRange1D, LinearMapper, \
         PlotAxis, ArrayPlotData, Legend, LogMapper, ArrayDataSource, \
         OverlayPlotContainer, LinePlot, ScatterPlot, BarPlot, \
         VPlotContainer
-from enthought.chaco.tools.api import ScatterInspector, DataPrinter
 
 from colors import paired_colors, paired_colors_255
 
@@ -30,16 +29,72 @@ class PositiveDTExperiment(AbstractPositiveExperiment):
 
     group_mode          = Enum('overlay', 'stack')
 
+    # Plotting and analysis options
+    available_group     = Property(depends_on='paradigm.parameters, plot_index')
+    plot_index          = Str()
+    plot_group          = List([])
+    index_scale         = Enum('log', 'linear', plot_setting=True)
+    plot_1_value        = Str('par_go_count', plot_setting=True)
+    plot_2_value        = Str('par_hit_frac', plot_setting=True)
+    plot_3_value        = Str('par_dprime', plot_setting=True)
+
+    @on_trait_change('plot_index, plot_group')
+    def _update_analysis_parameters(self):
+        parameters = self.plot_group[:]
+        parameters.append(self.plot_index)
+        self.data.parameters = parameters
+        self._generate_summary_plots()
+
+    PLOT_VALUE_EDITOR   = EnumEditor(name='object.data.available_statistics')
+    PLOT_INDEX_EDITOR   = EnumEditor(name='object.paradigm.parameter_info')
+    PLOT_GROUP_EDITOR   = SetEditor(name='available_group',
+                                    left_column_title='Available',
+                                    right_column_title='Selected',
+                                    can_move_all=False,
+                                    ordered=True,
+                                    )
+
+    analysis_group = VGroup(
+            VGroup(
+                Item('plot_index', editor=PLOT_INDEX_EDITOR),
+                Item('index_scale'),
+                Item('plot_1_value', editor=PLOT_VALUE_EDITOR),
+                Item('plot_2_value', editor=PLOT_VALUE_EDITOR),
+                Item('plot_3_value', editor=PLOT_VALUE_EDITOR),
+                label='Plot options',
+                show_border=True,
+                ),
+            VGroup(
+                Item('plot_group', editor=PLOT_GROUP_EDITOR, show_label=False),
+                label='Category options',
+                show_border=True,
+                ),
+            label='Analysis options',
+            )
+
+    def _plot_index_changed(self, new):
+        if new in self.plot_group:
+            self.plot_group.remove(new)
+
+    def _get_available_group(self):
+        info = self.paradigm.parameter_info
+        try:
+            del info[self.plot_index]
+        except:
+            pass
+        return info
+
     def _update_data_categories(self, index_name, value_name, component):
         plot_name = index_name+value_name
         index = self.data.get_data(index_name)
         value = self.data.get_data(value_name)
-        categories = [p[1:] for p in index]
+        categories = [p[:-1] for p in index]
+        unique_categories = sorted(set(categories))
 
-        for category in sorted(set(categories)):
-            mask = np.equal(categories, category)
+        for category in unique_categories:
+            mask = np.array([c==category for c in categories])
             mask = np.flatnonzero(mask)
-            category_index = np.take([p[0] for p in index], mask)
+            category_index = [p[-1] for p in np.take(index, mask)]
             category_value = np.take(value, mask)
             if type(category) in (tuple, list):
                 category_name = ', '.join([str(e) for e in category])
@@ -71,7 +126,10 @@ class PositiveDTExperiment(AbstractPositiveExperiment):
                 value_range = self.plot_range[value_name]
                 value_range.add(value_data)
 
-                index_mapper = LogMapper(range=index_range)
+                if self.index_scale == 'log':
+                    index_mapper = LogMapper(range=index_range)
+                else:
+                    index_mapper = LinearMapper(range=index_range)
                 value_mapper = LinearMapper(range=value_range)
 
                 # Create the line plot
@@ -104,53 +162,45 @@ class PositiveDTExperiment(AbstractPositiveExperiment):
                     # Note that for each category, we add 2 components (the line
                     # and scatter).
                     if len(component.components) == 2:
-                        axis = PlotAxis(p, orientation='left')
-                        p.overlays.append(axis)
-                        axis = PlotAxis(p, orientation='bottom')
-                        p.overlays.append(axis)
-                        if value_name == 'par_go_count':
-                            add_default_grids(p, major_value=5, minor_value=1)
-                        elif value_name == 'par_hit_frac':
-                            add_default_grids(p, major_value=0.2,
-                                    minor_value=0.05)
-                        elif value_name == 'par_dprime':
-                            add_default_grids(p, major_value=1,
-                                    minor_value=0.25)
+                        self._add_default_axes_and_grids(p, value_name)
 
     @on_trait_change('data.trial_log')
     def _update(self):
-        self._update_data_categories('pars', 'par_go_count',
-                self.par_count_plot)
-        self._update_data_categories('pars', 'par_hit_frac',
-                self.par_score_plot)
-        self._update_data_categories('pars', 'par_dprime',
-                self.par_dprime_plot)
+        self._update_data_categories('pars', self.plot_1_value, self.plot_1)
+        self._update_data_categories('pars', self.plot_2_value, self.plot_2)
+        self._update_data_categories('pars', self.plot_3_value, self.plot_3)
 
-    @on_trait_change('data')
+    @on_trait_change('+plot_setting')
     def _generate_summary_plots(self):
+        # Clear the plot data
+        self.color_index = 0
+        self.color_map = {}
+        self.plot_data = {}
+        self.plot_range = { 'pars': DataRange1D() }
+
+        self.plot_1 = self._create_plot_container(self.plot_1_value)
+        self.plot_2 = self._create_plot_container(self.plot_2_value)
+        self.plot_3 = self._create_plot_container(self.plot_3_value)
+        self._update()
+
+    def _create_plot_container(self, value):
         if self.group_mode == 'stack':
             container_class = VPlotContainer
         else:
             container_class = OverlayPlotContainer
 
-        container_kw = dict(padding=(25, 5, 5, 25), spacing=10,
-                            bgcolor='white')
-        # COUNT
-        container = container_class(**container_kw)
-        index_range = DataRange1D()
-        self.plot_range['pars'] = index_range
-        value_range = DataRange1D(low_setting=0, high_setting='auto')
-        self.plot_range['par_go_count'] = value_range
-        self.par_count_plot = container
+        container_kw = dict(padding=(25, 5, 5, 25), spacing=10, bgcolor='white')
 
-        # HIT RATE
-        container = container_class(**container_kw)
-        value_range = DataRange1D(low_setting=0, high_setting=1)
-        self.plot_range['par_hit_frac'] = value_range
-        self.par_score_plot = container
+        range_hint = self.data.PLOT_RANGE_HINTS.get(value, {})
+        value_range = DataRange1D(**range_hint)
+        self.plot_range[value] = value_range
+        return container_class(**container_kw)
 
-        # D'
-        container = container_class(**container_kw)
-        value_range = DataRange1D(low_setting=-1, high_setting=3)
-        self.plot_range['par_dprime'] = value_range
-        self.par_dprime_plot = container
+    def _add_default_axes_and_grids(self, plot, value):
+        axis = PlotAxis(plot, orientation='left')
+        plot.overlays.append(axis)
+        axis = PlotAxis(plot, orientation='bottom')
+        plot.overlays.append(axis)
+
+        grid_kw = self.data.PLOT_GRID_HINTS.get(value, {})
+        add_default_grids(plot, **grid_kw)
