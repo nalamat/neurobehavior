@@ -61,16 +61,15 @@ class AbstractPositiveController(AbstractExperimentController,
         circuit = join(RCX_ROOT, 'positive-behavior-v2')
         self.iface_behavior = self.process.load_circuit(circuit, 'RZ6')
 
-        self.buffer_signal = self.iface_behavior.get_buffer('speaker', 'w')
+        # primary speaker
+        self.buffer_out1 = self.iface_behavior.get_buffer('out1', 'w')
+        # secondary speaker
+        self.buffer_out2 = self.iface_behavior.get_buffer('out2', 'w')
         self.buffer_TTL1 = self.iface_behavior.get_buffer('TTL', 'r',
                 src_type=np.int8, dest_type=np.int8, block_size=24)
         self.buffer_TTL2 = self.iface_behavior.get_buffer('TTL2', 'r',
                 src_type=np.int8, dest_type=np.int8, block_size=24)
 
-        #self.model.data.trial_start_timestamp.fs = self.buffer_TTL1.fs
-        #self.model.data.trial_end_timestamp.fs = self.buffer_TTL1.fs
-        #self.model.data.timeout_start_timestamp.fs = self.buffer_TTL1.fs
-        #self.model.data.timeout_end_timestamp.fs = self.buffer_TTL1.fs
         self.model.data.spout_TTL.fs = self.buffer_TTL1.fs
         self.model.data.poke_TTL.fs = self.buffer_TTL1.fs
         self.model.data.signal_TTL.fs = self.buffer_TTL1.fs
@@ -105,7 +104,6 @@ class AbstractPositiveController(AbstractExperimentController,
         # Add tasks to the queue
         self.tasks.append((self.monitor_behavior, 1))
         self.tasks.append((self.monitor_pump, 5))
-        #self.tasks.append((self.monitor_timeout, 5))
 
     def _get_status(self):
         if self.state == 'disconnected':
@@ -118,7 +116,6 @@ class AbstractPositiveController(AbstractExperimentController,
                                        self.current_num_nogo)
         else:
             result = 'GO'
-        #result += ' (%s)' % self.current_setting_go
         return result
 
     def acquire_trial_lock(self):
@@ -336,7 +333,9 @@ class AbstractPositiveController(AbstractExperimentController,
 
     def set_attenuation(self, value):
         self.current_attenuation = value
-        self.update_attenuation(value)
+
+    def set_timeout_grace_period(self, value):
+        pass
 
     def set_timeout_trigger(self, value):
         flag = 0 if value == 'FA only' else 1
@@ -344,10 +343,6 @@ class AbstractPositiveController(AbstractExperimentController,
 
     def set_timeout_duration(self, value):
         self.iface_behavior.cset_tag('to_dur_n', value, 's', 'n')
-
-    def set_timeout_grace_period(self, value):
-        return
-        self.iface_behavior.cset_tag('to_safe_n', value, 's', 'n')
 
     def get_trial_running(self):
         return self.iface_behavior.get_tag('trial_running')
@@ -361,26 +356,29 @@ class AbstractPositiveController(AbstractExperimentController,
     def set_reward_volume(self, value):
         self.set_pump_volume(value)
 
+    def set_primary_attenuation(self, value):
+        self.iface_behavior.set_tag('att1', value)
+
+    def set_secondary_attenuation(self, value):
+        self.iface_behavior.set_tag('att2', value)
+
+    def set_waveform(self, speaker, signal):
+        silence = np.zeros(len(signal))
+        if speaker == 'primary':
+            self.buffer_out1.set(signal)
+            self.buffer_out2.set(silence)
+        elif speaker == 'secondary':
+            self.buffer_out1.set(silence)
+            self.buffer_out2.set(signal)
+        else:
+            self.buffer_out1.set(signal)
+            self.buffer_out2.set(signal)
+
     def select_speaker(self):
         if self.current_speaker_mode in ('primary', 'secondary', 'both'):
             return self.current_speaker_mode
         else:
-            toss = np.random.uniform()
-            if toss < 0.5:
-                return 'primary'
-            else:
-                return 'secondary'
-        
-    def update_attenuation(self, attenuation):
-        self.current_speaker = self.select_speaker()
-        speaker = self.current_speaker
+            return 'primary' if np.random.uniform(0, 1) < 0.5 else 'secondary'
 
-        if speaker == 'primary':
-            self.iface_behavior.set_tag('att_A', attenuation)
-            self.iface_behavior.set_tag('att_B', 120)
-        elif speaker == 'secondary':
-            self.iface_behavior.set_tag('att_A', 120)
-            self.iface_behavior.set_tag('att_B', attenuation)
-        elif speaker == 'both':
-            self.iface_behavior.set_tag('att_A', attenuation)
-            self.iface_behavior.set_tag('att_B', attenuation)
+    def set_fa_puff_duration(self, value):
+        self.iface_behavior.cset_tag('puff_dur_n', value, 's', 'n')

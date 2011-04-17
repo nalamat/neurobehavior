@@ -1,6 +1,7 @@
 from enthought.traits.api import Instance
 from abstract_positive_controller import AbstractPositiveController
 import neurogen.block_definitions as blocks
+import numpy as np
 
 import logging
 log = logging.getLogger(__name__)
@@ -42,27 +43,19 @@ class PositiveDTController(AbstractPositiveController):
         delta = self.current_attenuation-attenuation
         return 10**(delta/20.0)
 
-    def set_tdt_attenuation(self, value):
-        self.iface_behavior.set_tag('att_A', value)
-
     def set_duration(self, value):
         self.current_duration = value
 
     def trigger_next(self):
-        if self.current_trial == self.current_num_nogo + 1:
+        if self.is_go():
+            speaker = self.select_speaker()
             self.set_experiment_parameters(self.current_setting_go)
             self.iface_behavior.set_tag('go?', 1)
             sf = self.get_sf(self.current_setting_go.attenuation)
-            waveform = sf*self._compute_signal(self.current_duration)
-            self.buffer_signal.set(waveform)
-            self.iface_behavior.set_tag('signal_dur_n', len(waveform))
+            signal = sf*self._compute_signal(self.current_duration)
+            self.iface_behavior.set_tag('signal_dur_n', len(signal))
         else:
             self.iface_behavior.set_tag('go?', 0)
-
-            # TODO: this is a bug!
-            #self.buffer_signal.clear()
-            # If set to 0, then the signal will play "forever".  Need to look
-            # into how to fix this in the rcx file.
             self.iface_behavior.set_tag('signal_dur_n', 1)
 
         # Update settings

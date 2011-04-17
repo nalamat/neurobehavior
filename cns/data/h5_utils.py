@@ -96,8 +96,9 @@ def rgetattr(obj, extended_attr, strict=False):
         return _v_getattr(obj, extended_attr, strict)
 
 def node_match(n, filter):
-    '''Checks for match against each keyword.  If an attribute is missing or
-    any match fails, returns False.
+    '''
+    Checks for match against each keyword.  If an attribute is missing or any
+    match fails, returns False.
 
     Filter can be a dictionary or list of tuples.  If the order in which the
     filters are applied is important, then provide a list of tuples.
@@ -119,8 +120,8 @@ def node_match(n, filter):
 
 def _walk(where, filter, mode):
     '''
-    Starting at the specifide node, `_walk` visits each node in the hierarchy,
-    returning a list of all nodes that match the filter criteria.
+    Starting at the specifide node, `walk_nodes` visits each node in the
+    hierarchy, returning a list of all nodes that match the filter criteria.
 
     Filters are specified as a sequence of tuples, (attribute, filter).  As
     each node is visited, each filter is called with the corresponding value of
@@ -188,12 +189,12 @@ def _walk(where, filter, mode):
     whose value is a string beginning with 'RawAversiveData'.
     >>> fh = tables.openFile('example_data.h5', 'r')
     >>> base_node = fh.root.Cohort_0.animals.Animal_0.experiments
-    >>> filter = ('data.klass, re.compile('RawAversiveData.*').match)
+    >>> filter = ('data.klass', re.compile('RawAversiveData.*').match)
     >>> experiment_nodes = list(walk_nodes(base_node, filter))
 
     To return all nodes whose name matches a given pattern
     >>> fh = tables.openFile('example_data.h5', 'r')
-    >>> filter = ('_v_name': re.compile('^Animal_\d+').match)
+    >>> filter = ('_v_name', re.compile('^Animal_\d+').match)
     >>> animal_nodes = list(walk_nodes(fh.root, filter))
     '''
     for node in getattr(where, mode)():
@@ -270,8 +271,8 @@ def extract_data(input_files, filters, fields=None):
     For convenience, '_v_attrs' is typically implied (e.g. if the node does not
     have a child with the given name, _v_attrs is checked to see if it contains
     the requested attribute name).  If the node has both a child and an
-    attribute with the same name, then you need to prepend the attribute name
-    with '_v_attrs.' when you want to obtain the attribute name.
+    attribute with the same name (rare), then you need to prepend the attribute
+    name with '_v_attrs.' when you want to obtain the attribute name.
 
     Given the following hierarchy
 
@@ -281,6 +282,7 @@ def extract_data(input_files, filters, fields=None):
                 start_time
                 data
             data
+            paradigm
 
     When requesting 'start_date', '_v_attrs.start_date' is returned since the
     experiment node does not have a child node named 'start_date'.  However,
@@ -305,7 +307,6 @@ def extract_data(input_files, filters, fields=None):
                         start_time
                         end_time
                         duration
-                        
                     data
                         trial_log (parameter, trial_type, response)
                             parameter_1, trial_type_1, response_1
@@ -313,6 +314,11 @@ def extract_data(input_files, filters, fields=None):
                             parameter_3, trial_type_3, response_3
                             parameter_4, trial_type_4, response_4
                             parameter_5, trial_type_5, response_5
+                        contact
+                            poke_TTL
+                            spout_TTL
+                            ...
+                    paradigm
         Animal_1
             _v_attrs
                 identifier = Tail
@@ -323,7 +329,6 @@ def extract_data(input_files, filters, fields=None):
                         start_time
                         end_time
                         duration
-                        
                     data
                         trial_log (parameter, trial_type, response)
                             parameter_1, trial_type_1, response_1
@@ -331,6 +336,11 @@ def extract_data(input_files, filters, fields=None):
                             parameter_3, trial_type_3, response_3
                             parameter_4, trial_type_4, response_4
                             parameter_5, trial_type_5, response_5
+                        contact
+                            poke_TTL
+                            spout_TTL
+                            ...
+                    paradigm
 
     The result will be a record array containing the following named columns:
 
@@ -348,6 +358,19 @@ def extract_data(input_files, filters, fields=None):
         Tail,       F,   parameter_3,   trial_type_3, response_3
         Tail,       F,   parameter_4,   trial_type_4, response_4
         Tail,       F,   parameter_5,   trial_type_5, response_5
+
+    Once extracted, these records can be indexed by column name and row:
+
+    >>> print data['sex']
+    ['M', 'M', 'M', 'M', 'M', 'F', 'F', 'F', 'F', 'F']
+
+    >>> print data[:3]['parameter']
+    [parameter_1, parameter_2, parameter_3]
+
+    >>> mask = data['parameter'] == parameter_1
+    >>> print data[mask][['id', 'trial_type']]
+    [['Fluffy', trial_type_1],
+     ['Tail',   trial_type_1]]
     '''
 
     # Gather all the data nodes by looking for the nodes in the HDF5 tree that

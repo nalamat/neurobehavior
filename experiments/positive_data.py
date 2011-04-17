@@ -258,7 +258,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
     # Splits trial_log into individual sequences as needed
     ts_seq          = Property(Array('i'), depends_on='trial_log')
-    par_seq         = Property(Array('f'), depends_on='trial_log')
+    par_seq         = Property(Array('f'), depends_on='trial_log, parameters')
     ttype_seq       = Property(Array('S'), depends_on='trial_log')
     resp_seq        = Property(Array('S'), depends_on='trial_log')
     resp_time_seq   = Property(Array('f'), depends_on='trial_log')
@@ -383,7 +383,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
     def _get_nogo_indices(self):
         return self._get_indices('NOGO')
 
-    par_mask = Property(depends_on='trial_log')
+    par_mask = Property(depends_on='trial_log, parameters')
 
     @cached_property
     def _get_par_mask(self):
@@ -400,15 +400,15 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
             result.append(m)
         return result
 
-    par_go_mask     = Property(depends_on='trial_log')
+    par_go_mask     = Property(depends_on='trial_log, parameters')
 
     @cached_property
     def _get_par_go_mask(self):
         return [self.go_seq & m for m in self.par_mask]
 
     # MY NEW STUFF
-    par_go_count    = Property(depends_on='trial_log')
-    par_nogo_count  = Property(depends_on='trial_log')
+    par_go_count    = Property(depends_on='trial_log, parameters')
+    par_nogo_count  = Property(depends_on='trial_log, parameters')
 
     @cached_property
     def _get_par_go_count(self):
@@ -419,13 +419,13 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
         return self.par_fa_count+self.par_cr_count
 
     hit_seq         = Property(depends_on='trial_log')
-    par_hit_count   = Property(depends_on='trial_log')
+    par_hit_count   = Property(depends_on='trial_log, parameters')
     miss_seq        = Property(depends_on='trial_log')
-    par_miss_count  = Property(depends_on='trial_log')
+    par_miss_count  = Property(depends_on='trial_log, parameters')
     fa_seq          = Property(depends_on='trial_log')
-    par_fa_count    = Property(depends_on='trial_log')
+    par_fa_count    = Property(depends_on='trial_log, parameters')
     cr_seq          = Property(depends_on='trial_log')
-    par_cr_count    = Property(depends_on='trial_log')
+    par_cr_count    = Property(depends_on='trial_log, parameters')
 
     @cached_property
     def _get_hit_seq(self):
@@ -467,8 +467,8 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
         # go was presented).
         return np.unique(self.par_seq)
 
-    par_hit_frac = Property(List(Float), depends_on='trial_log')
-    par_fa_frac = Property(List(Float), depends_on='trial_log')
+    par_hit_frac = Property(List(Float), depends_on='trial_log, parameters')
+    par_fa_frac = Property(List(Float), depends_on='trial_log, parameters')
     global_fa_frac = Property(Float, depends_on='trial_log')
 
     @cached_property
@@ -492,21 +492,6 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
         fa_count = np.sum(fa_mask)
         return float(fa_count)/float(nogo_count)
 
-    max_reaction_time = Property(depends_on='trial_log', store='attribute')
-    max_response_time = Property(depends_on='trial_log', store='attribute')
-
-    @cached_property
-    def _get_max_reaction_time(self):
-        if len(self.par_mean_reaction_time) == 0:
-            return np.nan
-        return np.max(self.par_mean_reaction_time)
-
-    @cached_property
-    def _get_max_response_time(self):
-        if len(self.par_mean_response_time) == 0:
-            return np.nan
-        return np.max(self.par_mean_response_time)
-
     @cached_property
     def _get_go_trial_count(self):
         return np.sum(self.go_seq)
@@ -519,18 +504,18 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
     def fire_data_changed(self):
         self.data_changed = True
 
-    par_go_nogo_ratio = Property(depends_on='trial_log')
+    par_go_nogo_ratio = Property(depends_on='trial_log, parameters')
 
     @cached_property
     def _get_par_go_nogo_ratio(self):
         return self.par_go_count/self.par_nogo_count
 
-    par_mean_reaction_time      = Property(depends_on='trial_log')
-    par_mean_response_time      = Property(depends_on='trial_log')
-    par_median_reaction_time    = Property(depends_on='trial_log')
-    par_median_response_time    = Property(depends_on='trial_log')
-    par_std_reaction_time       = Property(depends_on='trial_log')
-    par_std_response_time       = Property(depends_on='trial_log')
+    par_mean_reaction_time      = Property(depends_on='trial_log, parameters')
+    par_mean_response_time      = Property(depends_on='trial_log, parameters')
+    par_median_reaction_time    = Property(depends_on='trial_log, parameters')
+    par_median_response_time    = Property(depends_on='trial_log, parameters')
+    par_std_reaction_time       = Property(depends_on='trial_log, parameters')
+    par_std_response_time       = Property(depends_on='trial_log, parameters')
 
     def _get_par_mean_reaction_time(self):
         return apply_mask(stats.nanmean, self.par_go_mask, self.react_time_seq)
@@ -575,11 +560,11 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
                 'par_go_count'      : {'low_setting': 0, 'high_setting': 'auto'},
                 'par_nogo_count'    : {'low_setting': 0, 'high_setting': 'auto'},
                 'par_dprime'        : {'low_setting': -1, 'high_setting': 3},
-                'par_criterion'     : {},
+                'par_criterion'     : {'low_setting': -2, 'high_setting': 2},
                 'par_hit_frac'      : {'low_setting': 0, 'high_setting': 1},
                 'par_fa_frac'       : {'low_setting': 0, 'high_setting': 1},
-                'par_mean_reaction_time': {},
-                'par_mean_response_time': {},
+                'par_mean_reaction_time': {'low_setting': 0, 'high_setting': 'auto'},
+                'par_mean_response_time': {'low_setting': 0, 'high_setting': 'auto'},
                 }
 
     PLOT_GRID_HINTS = {
