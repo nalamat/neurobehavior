@@ -3,60 +3,27 @@ from enthought.traits.ui.api import *
 
 from abstract_positive_paradigm import AbstractPositiveParadigm
 
-class TrialSetting(HasTraits):
-
-    parameter           = Float(1.0, store='attribute')
-    attenuation         = Float(30.0, store='attribute')
-
-    def __cmp__(self, other):
-        return cmp((self.parameter, self.attenuation), 
-                   (other.parameter, other.attenuation))
-
-    def __str__(self):
-        mesg = "{parameter} s {attenuation} dB"
-        return mesg.format(parameter=self.parameter,
-                           attenuation=self.attenuation)
-
-table_editor = TableEditor(
-        editable=True,
-        deletable=True,
-        show_toolbar=True,
-        row_factory=TrialSetting,
-        columns=[
-            ObjectColumn(name='parameter', label='Duration', width=50),
-            ObjectColumn(name='attenuation', label='Attenuation', width=50),
-            ]
-        )
-
 class PositiveDTParadigm(AbstractPositiveParadigm):
 
-    parameters          = List(Instance(TrialSetting), [], store='child',
-                               init=True)
-    rise_fall_time      = Float(0.0025, store='attribute', init=True)
-    fc                  = Float(15e3, store='attribute', init=True)
-    bandwidth           = Float(5e3, store='attribute', init=True)
-    attenuation         = Enum(0, 20, 40, 60, store='attribute', init=True)
-
-    def _parameters_default(self):
-        return [TrialSetting(parameter=4.0, attenuation=10),
-                #TrialSetting(parameter=0.064, attenuation=10),
-                #TrialSetting(parameter=0.256, attenuation=10),
-                #TrialSetting(parameter=0.256, attenuation=30),
-                #TrialSetting(parameter=0.064, attenuation=30),
-                TrialSetting(parameter=4.0, attenuation=40),]
-
-    parameter_view = VGroup(
-            VGroup(Item('parameter_order', label='Order')),
-            Item('parameters', editor=table_editor,
-                 show_label=False),
-            label='Trial',
-            show_border=True,
-            )
+    rise_fall_time      = Float(0.0025, store='attribute', init=True,
+                                label='Rise/fall time (s)')
+    fc                  = Float(15e3, store='attribute', init=True,
+                                label='Center frequency (Hz)')
+    bandwidth           = Float(5e3, store='attribute', init=True,
+                                label='Bandwidth (Hz)')
+    attenuation         = Float(20, store='attribute', init=True,
+                                label='Attenuation (dB)')
+    tdt_attenuation     = Enum(0, 20, 40, 60, store='attribute', init=True,
+                                label='TDT attenuation (dB)')
+    duration            = Float(0.512, store='attribute', init=True,
+                                label='Duration (s)')
 
     signal_group = VGroup(
-            Item('rise_fall_time', label='Rise/fall time (s)'),
-            Item('fc', label='Center frequency (Hz)'),
-            Item('bandwidth', label='Bandwidth (Hz)'),
-            Item('attenuation', label='Attenuation'),
-            label='Signal',
+            'speaker_mode',
+            'duration',
+            'rise_fall_time',
+            'fc',
+            'bandwidth',
+            'tdt_attenuation',
+            label='Signal'
             )

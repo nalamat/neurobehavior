@@ -7,6 +7,7 @@ from cns.channel import FileChannel
 from enthought.traits.api import Instance, List, CFloat, Int, Float, Any, \
     Range, DelegatesTo, cached_property, on_trait_change, Array, Event, \
     Property, Undefined, Callable, Str, Enum, Bool, Int, Str, Tuple, CList
+from enthought.traits.ui.api import EnumEditor, VGroup, Item, View
 from datetime import datetime
 import numpy as np
 from cns.data.h5_utils import append_node, get_or_append_node
@@ -47,6 +48,11 @@ def apply_mask(fun, masks, values):
 # the column order of the trial_log table.  You will have to explicitly
 # query the columns to get the information you need out of the table rather than
 # relying on a pre-specified index.
+# V2.4 - 110415 - Switch to a volume-based reward made detection of gerbil on
+# spout slightly problematic.  Made scoring more robust.  pump_TTL data is now
+# being spooled again; however, this is simply an indicator of whether a trigger
+# was sent to the pump rather than an indicator of how long the pump was running
+# for.
 class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
     '''
     trial_log is essentially a list of the trials, along with the parameters
@@ -57,7 +63,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
         return getattr(self, name)
 
     # VERSION is a reserved keyword in HDF5 files, so I avoid using it here.
-    OBJECT_VERSION = Float(2.3, store='attribute')
+    OBJECT_VERSION = Float(2.4, store='attribute')
 
     store_node = Any
 
@@ -83,11 +89,6 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
             store='channel', store_path='contact/TO_TTL')
     TO_safe_TTL = Instance(FileChannel,
             store='channel', store_path='contact/TO_safe_TTL')
-
-    trial_start_timestamp   = Instance('cns.channel.Timeseries', ())
-    trial_end_timestamp     = Instance('cns.channel.Timeseries', ())
-    timeout_start_timestamp = Instance('cns.channel.Timeseries', ())
-    timeout_end_timestamp   = Instance('cns.channel.Timeseries', ())
 
     def _create_channel(self, name, dtype):
         contact_node = get_or_append_node(self.store_node, 'contact')
@@ -180,14 +181,18 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
         spout_data = self.spout_TTL.get_range_index(ts_start, ts_end)
         react_data = self.reaction_TTL.get_range_index(ts_start, ts_end)
 
-        # Did subject withdraw from nose-poke before he was allowed to react?
-        early = ~react_data.any()
+        # Did subject withdraw from nose-poke before or after he was allowed to
+        # react?
+        if ~react_data.any():
+            reaction = 'early'
+        elif poke_data[react_data].all():
+            reaction = 'late'
+        else:
+            reaction = 'normal'
 
         # Regardless of whether or not the subject reacted early, what was his
-        # answer?
-        if poke_data.all():
-            response = 'no withdraw'
-        elif spout_data.any():
+        # response?
+        if spout_data.any():
             response = 'spout'
         elif poke_data[-1] == 1:
             response = 'poke'
@@ -211,7 +216,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
         except:
             response_time = np.nan
 
-        return dict(early_response=early, response=response,
+        return dict(reaction=reaction, response=response,
                 response_time=response_time, reaction_time=reaction_time)
 
     go_indices   = Property(Array('i'), depends_on='ttype_seq')
@@ -223,7 +228,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
     par_info = Property(store='table', depends_on='par_dprime')
 
-    parameters = List(['parameter'])
+    parameters = List
 
     @cached_property
     def _get_par_info(self):
@@ -251,20 +256,24 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
             data[parameter] = [p[i] for p in self.pars]
         return np.rec.fromarrays(data.values(), names=data.keys())
 
-    # Splits trial_log into individual elements as needed
+    # Splits trial_log into individual sequences as needed
     ts_seq          = Property(Array('i'), depends_on='trial_log')
     par_seq         = Property(Array('f'), depends_on='trial_log')
     ttype_seq       = Property(Array('S'), depends_on='trial_log')
     resp_seq        = Property(Array('S'), depends_on='trial_log')
     resp_time_seq   = Property(Array('f'), depends_on='trial_log')
     react_time_seq  = Property(Array('f'), depends_on='trial_log')
-    early_seq       = Property(Array('bool'), depends_on='trial_log')
+    react_seq       = Property(Array('S'), depends_on='trial_log')
+
+    # The following sequences need to handle the edge case where the trial log
+    # is initially empty (and has no known record fields to speak of).
 
     @cached_property
     def _get_par_seq(self):
         try:
             arr = np.empty(len(self.trial_log), dtype=object)
             arr[:] = zip(*[self.trial_log[p] for p in self.parameters])
+            print arr
             return arr
         except:
             return np.array([])
@@ -305,20 +314,27 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
             return np.array([])
 
     @cached_property
-    def _get_early_seq(self):
+    def _get_react_seq(self):
         try:
-            return self.trial_log['early_response']
+            return self.trial_log['reaction']
         except:
             return np.array([])
 
     # Sequences of boolean indicating trial type and subject's response.
 
-    go_seq = Property(List(Array('b')), depends_on='trial_log')
-    nogo_seq = Property(List(Array('b')), depends_on='trial_log')
-    spout_seq = Property(List(Array('b')), depends_on='trial_log')
-    poke_seq = Property(List(Array('b')), depends_on='trial_log')
-    no_resp_seq = Property(List(Array('b')), depends_on='trial_log')
-    no_withdraw_seq = Property(List(Array('b')), depends_on='trial_log')
+    # Trial type sequences
+    go_seq      = Property(Array('b'), depends_on='trial_log')
+    nogo_seq    = Property(Array('b'), depends_on='trial_log')
+
+    # Response sequences
+    spout_seq   = Property(Array('b'), depends_on='trial_log')
+    poke_seq    = Property(Array('b'), depends_on='trial_log')
+    nr_seq      = Property(Array('b'), depends_on='trial_log')
+
+    # Reaction sequences
+    late_seq    = Property(Array('b'), depends_on='trial_log')
+    early_seq   = Property(Array('b'), depends_on='trial_log')
+    normal_seq  = Property(Array('b'), depends_on='trial_log')
 
     @cached_property
     def _get_go_seq(self):
@@ -337,12 +353,20 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
         return self.resp_seq == 'spout'
 
     @cached_property
-    def _get_no_withdraw_seq(self):
-        return self.resp_seq == 'no withdraw'
+    def _get_nr_seq(self):
+        return self.resp_seq == 'no response'
 
     @cached_property
-    def _get_no_resp_seq(self):
-        return self.resp_seq == 'no response'
+    def _get_late_seq(self):
+        return self.react_seq == 'late'
+
+    @cached_property
+    def _get_early_seq(self):
+        return self.react_seq == 'early'
+
+    @cached_property
+    def _get_normal_seq(self):
+        return self.react_seq == 'normal'
 
     def _get_indices(self, ttype):
         if len(self.ttype_seq):
@@ -405,7 +429,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
     @cached_property
     def _get_hit_seq(self):
-        return self.go_seq & self.spout_seq & ~self.early_seq
+        return self.go_seq & self.normal_seq & self.spout_seq
 
     @cached_property
     def _get_par_hit_count(self):
@@ -413,8 +437,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
     @cached_property
     def _get_miss_seq(self):
-        return self.go_seq & (self.poke_seq | self.no_resp_seq) & \
-                ~self.early_seq
+        return self.go_seq & (self.poke_seq | self.nr_seq) & self.normal_seq
 
     @cached_property
     def _get_par_miss_count(self):
@@ -422,8 +445,8 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
     @cached_property
     def _get_fa_seq(self):
-        return (self.nogo_seq & self.spout_seq) | \
-               (self.early_seq & self.spout_seq)
+        return (self.early_seq & self.spout_seq) | \
+               (self.nogo_seq & self.normal_seq & self.spout_seq)
 
     @cached_property
     def _get_par_fa_count(self):
@@ -431,7 +454,8 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
     @cached_property
     def _get_cr_seq(self):
-        return (self.nogo_seq | self.early_seq) & ~self.spout_seq
+        return ((self.nogo_seq & self.normal_seq) | self.early_seq) & \
+                ~self.spout_seq
 
     @cached_property
     def _get_par_cr_count(self):
@@ -441,8 +465,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
     def _get_pars(self):
         # We only want to return pars for complete trials (e.g. ones for which a
         # go was presented).
-        seq = np.take(self.par_seq, self.go_indices, axis=0)
-        return np.unique(seq)
+        return np.unique(self.par_seq)
 
     par_hit_frac = Property(List(Float), depends_on='trial_log')
     par_fa_frac = Property(List(Float), depends_on='trial_log')
@@ -468,6 +491,21 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
         fa_mask = nogo_resp == 'spout'
         fa_count = np.sum(fa_mask)
         return float(fa_count)/float(nogo_count)
+
+    max_reaction_time = Property(depends_on='trial_log', store='attribute')
+    max_response_time = Property(depends_on='trial_log', store='attribute')
+
+    @cached_property
+    def _get_max_reaction_time(self):
+        if len(self.par_mean_reaction_time) == 0:
+            return np.nan
+        return np.max(self.par_mean_reaction_time)
+
+    @cached_property
+    def _get_max_response_time(self):
+        if len(self.par_mean_response_time) == 0:
+            return np.nan
+        return np.max(self.par_mean_response_time)
 
     @cached_property
     def _get_go_trial_count(self):
@@ -511,6 +549,53 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
     def _get_par_std_response_time(self):
         return apply_mask(stats.nanstd, self.par_go_mask, self.resp_time_seq)
+
+    available_statistics = Property
+
+    def _get_available_statistics(self):
+        return {'par_cr_count': 'Correct rejects',
+                'par_fa_count': 'False alarms',
+                'par_hit_count': 'Hits',
+                'par_miss_count': 'Misses',
+                'par_go_count': 'GO trials',
+                'par_nogo_count': 'NOGO trials',
+                'par_dprime': 'd\'',
+                'par_criterion': 'C',
+                'par_hit_frac': 'Hit fraction',
+                'par_fa_frac': 'False alarm fraction',
+                'par_mean_reaction_time': 'Mean reaction time',
+                'par_mean_response_time': 'Mean response time',
+                }
+
+    PLOT_RANGE_HINTS = {
+                'par_cr_count'      : {'low_setting': 0, 'high_setting': 'auto'},
+                'par_fa_count'      : {'low_setting': 0, 'high_setting': 'auto'},
+                'par_hit_count'     : {'low_setting': 0, 'high_setting': 'auto'},
+                'par_miss_count'    : {'low_setting': 0, 'high_setting': 'auto'},
+                'par_go_count'      : {'low_setting': 0, 'high_setting': 'auto'},
+                'par_nogo_count'    : {'low_setting': 0, 'high_setting': 'auto'},
+                'par_dprime'        : {'low_setting': -1, 'high_setting': 3},
+                'par_criterion'     : {},
+                'par_hit_frac'      : {'low_setting': 0, 'high_setting': 1},
+                'par_fa_frac'       : {'low_setting': 0, 'high_setting': 1},
+                'par_mean_reaction_time': {},
+                'par_mean_response_time': {},
+                }
+
+    PLOT_GRID_HINTS = {
+                'par_cr_count'      : {'major_value': 5, 'minor_value': 1},
+                'par_fa_count'      : {'major_value': 5, 'minor_value': 1},
+                'par_hit_count'     : {'major_value': 5, 'minor_value': 1},
+                'par_miss_count'    : {'major_value': 5, 'minor_value': 1},
+                'par_go_count'      : {'major_value': 5, 'minor_value': 1},
+                'par_nogo_count'    : {'major_value': 5, 'minor_value': 1},
+                'par_dprime'        : {'major_value': 1, 'minor_value': 0.25},
+                'par_criterion'     : {},
+                'par_hit_frac'      : {'major_value': 0.2, 'minor_value': 0.05},
+                'par_fa_frac'       : {'major_value': 0.2, 'minor_value': 0.05},
+                'par_mean_reaction_time': {'major_value': 1, 'minor_value': 0.025},
+                'par_mean_response_time': {'major_value': 1, 'minor_value': 0.025},
+                }
 
 PositiveData = PositiveData_0_1
 

@@ -34,4 +34,4 @@ class SDTDataMixin(HasTraits):
         return norm.ppf(global_fa_frac)
 
     def _get_par_criterion(self):
-        return (self.par_z_hit+self.z_fa)/2.0
+        return -0.5*(self.par_z_hit+self.z_fa)
