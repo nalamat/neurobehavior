@@ -14,25 +14,7 @@ from signals import signal_options
 from enthought.traits.ui.table_column import ObjectColumn
 from enthought.traits.ui.api import TableEditor, TextEditor
 
-class TrialSetting(HasTraits):
-
-    parameter       = Float(1.0, store='attribute')
-
-    def __cmp__(self, other):
-        return cmp(self.parameter, other.parameter)
-
-    def __str__(self):
-        return "{0}".format(self.parameter)
-
-table_editor = TableEditor(
-        editable=True,
-        deletable=True,
-        show_toolbar=True,
-        row_factory=TrialSetting,
-        columns=[
-            ObjectColumn(name='parameter', label='Parameter', width=75),
-            ]
-        )
+from trial_setting import TrialSetting, trial_setting_editor
 
 class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
 
@@ -45,9 +27,12 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
                             init=True)
     nogo_parameter  = Float(store='attribute', init=True)
 
-    reward_duration = Float(1.0, store='attribute', ignore=True)
-    pump_rate       = Float(1.5, store='attribute', init=True)
-    reward_volume   = Float(25, store='attribute', init=True)
+    reward_duration = Float(1.0, store='attribute', ignore=True, 
+                            label='Reward duration (s)')
+    pump_rate       = Float(1.5, store='attribute', init=True, 
+                            label='Pump rate (ml/min)')
+    reward_volume   = Float(25, store='attribute', init=True, 
+                            label=u'Reward volume (ul)')
 
     def _reward_duration_changed(self, value):
         # ul = ml/m * (s/60) * 1000 ul/ml
@@ -85,7 +70,7 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
     parameter_view = VGroup(
             Item('nogo_parameter'),
             VGroup(Item('parameter_order', label='Order')),
-            Item('parameters', editor=table_editor,
+            Item('parameters', editor=trial_setting_editor,
                  show_label=False),
             label='Trial Sequence',
             show_border=True,
@@ -123,9 +108,9 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
                     label='Timing',
                     ),
                 VGroup(
-                    Item('reward_duration', label='Reward duration (s)'),
-                    Item('pump_rate', label='Pump rate (mL/m)'),
-                    Item('reward_volume', label='Reward volume (ul)'),
+                    'reward_duration',
+                    'pump_rate',
+                    'reward_volume',
                     label='Reward',
                     ),
                 ),

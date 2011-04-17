@@ -69,6 +69,7 @@ class PositiveAMNoiseController(AbstractPositiveController):
         self.set_delay(onset)
         self.current_onset = onset
         self.update_reaction_window_delay(onset+self.current_reaction_window_delay)
+        #self.update_reaction_window_delay(onset)
         
         # We need to update the reaction_window_duration as well because it
         # is implemented as the sum of the delay and duration in the RPvds
@@ -90,7 +91,7 @@ class PositiveAMNoiseController(AbstractPositiveController):
             par = self.current_nogo_parameter
             self.iface_behavior.set_tag('go?', 0)
 
-        self.update_attenuation()
+        self.update_attenuation(self.current_attenuation)
 
         # Prepare next signal
         waveform = self._compute_signal(par)

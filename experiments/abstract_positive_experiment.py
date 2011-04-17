@@ -26,18 +26,12 @@ from cns.chaco.helpers import add_default_grids, add_time_axis
 
 from enthought.traits.ui.api import VGroup, Item
 
-colors = {'light green': '#98FB98',
-          'dark green': '#2E8B57',
-          'light red': '#FFC8CB',
-          'dark red': '#FA8072',
-          'gray': '#D3D3D3',
-          'light blue': '#ADD8E6',
-          }
-
 from enthought.traits.ui.api import TabularEditor
 from enthought.traits.ui.tabular_adapter import TabularAdapter
 
 from enthought.traits.api import *
+
+from colors import color_names
 
 class ParInfoAdapter(TabularAdapter):
 
@@ -75,28 +69,9 @@ class ParInfoAdapter(TabularAdapter):
     def _get_parameters(self):
         return [self.item[p] for p in self.parameters]
 
-    #width = Float(50)
-    #reaction_width = Float(100)
-    #response_width = Float(100)
-
-    #reaction_text = Property
-    #response_text = Property
-
-    #def _get_reaction_text(self):
-    #    return self.timing_fmt.format(
-    #            self.item['mean_react'],
-    #            self.item['median_react'],
-    #            self.item['std_react'])
-
-    #def _get_response_text(self):
-    #    return self.timing_fmt.format(
-    #            self.item['mean_resp'],
-    #            self.item['median_resp'],
-    #            self.item['std_resp'])
-
     def _get_bg_color(self):
         try:
-            key = ', '.join('{}'.format(p) for p in self._get_parameters()[1:])
+            key = ', '.join('{}'.format(p) for p in self._get_parameters()[:-1])
             return self.color_map[key]
         except:
             return
@@ -106,24 +81,24 @@ class TrialLogAdapter(TabularAdapter):
     parameters = List(['parameter'])
 
     # List of tuples (column_name, field )
-    columns = [ ('P', 'parameter'),
-                ('S', 'speaker'),
-                ('Time', 'time'),
-                ('E', 'early_response'),
-                ('R', 'response'), 
-                ('WD', 'reaction_time'),
-                ('RS', 'response_time')
+    columns = [ ('P',       'parameter'),
+                ('S',       'speaker'),
+                ('Time',    'time'),
+                ('WD',      'reaction'),
+                ('RS',      'response'), 
+                ('WD',      'reaction_time'),
+                ('RS',      'response_time')
                 ]
 
     parameter_width = Float(75)
-    early_response_width = Float(25)
+    reaction_width = Float(25)
     response_width = Float(25)
     speaker_width = Float(25)
     time_width = Float(65)
     reaction_time_width = Float(65)
     response_time_width = Float(65)
     response_image = Property
-    early_response_image = Property
+    reaction_image = Property
 
     parameter_text = Property
     speaker_text = Property
@@ -141,15 +116,17 @@ class TrialLogAdapter(TabularAdapter):
 
     def _get_bg_color(self):
         if self.item['ttype'] == 'GO':
-            return colors['light green']
+            return color_names['light green']
         else:
-            return colors['light red']
+            return color_names['light red']
 
-    def _get_early_response_image(self):
-        if self.item['early_response']:
+    def _get_reaction_image(self):
+        if self.item['reaction'] == 'early':
             return '@icons:array_node'
-        else:
+        elif self.item['reaction'] == 'normal':
             return '@icons:tuple_node'
+        else:
+            return '@icons:none_node'
 
     def _get_response_image(self):
         # Note that these are references to some icons included in ETS
@@ -197,9 +174,9 @@ class AbstractPositiveExperiment(AbstractExperiment):
         return self.data.trial_log[::-1]
 
     experiment_plot = Instance(Component)
-    par_count_plot  = Instance(Component)
-    par_score_plot  = Instance(Component)
-    par_dprime_plot = Instance(Component)
+    plot_1 = Instance(Component)
+    plot_2 = Instance(Component)
+    plot_3 = Instance(Component)
 
     @on_trait_change('data')
     def _generate_experiment_plot(self):
@@ -382,11 +359,11 @@ class AbstractPositiveExperiment(AbstractExperiment):
                     show_label=False, width=1000, height=300),
                 ),
             HGroup(
-                Item('par_count_plot', editor=ComponentEditor(),
+                Item('plot_1', editor=ComponentEditor(),
                     show_label=False, width=150, height=400),
-                Item('par_score_plot', editor=ComponentEditor(),
+                Item('plot_2', editor=ComponentEditor(),
                     show_label=False, width=150, height=400),
-                Item('par_dprime_plot', editor=ComponentEditor(),
+                Item('plot_3', editor=ComponentEditor(),
                     show_label=False, width=150, height=400),
                 label='Plots',
                 ),
@@ -394,6 +371,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
                 label='Performance Statistics'),
             show_labels=False,
             )
+
 
     traits_group = HSplit(
             VGroup(
@@ -404,6 +382,25 @@ class AbstractPositiveExperiment(AbstractExperiment):
                 show_labels=False,
             ),
             Include('plots_group'),
-            Item('trial_log_view'),
+            VGroup(
+                VGroup(
+                    Item('object.data.global_fa_frac', label='Mean FA (frac)'),
+                    Item('object.data.go_trial_count', label='Total GO'),
+                    Item('object.data.nogo_trial_count', label='Total NOGO'),
+                    Item('object.data.max_reaction_time', 
+                        label='Slowest Mean Reaction Time (s)'),
+                    Item('object.data.max_response_time', 
+                        label='Slowest Mean Response Time (s)'),
+                    label='Statistics Summary',
+                    style='readonly',
+                    show_border=True,
+                    ),
+                Tabbed(
+                    Include('analysis_group'),
+                    Item('trial_log_view', label='Trial log'),
+                    show_labels=False,
+                    ),
+                show_labels=False,
+                ),
             show_labels=False,
         )
