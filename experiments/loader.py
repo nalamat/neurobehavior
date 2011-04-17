@@ -129,7 +129,7 @@ class ExperimentLauncher(CohortViewHandler):
                 log.exception(e)
                 error(info.ui.control, mesg)
 
-            model, controller = prepare_experiment(self.args)
+            model, controller = prepare_experiment(self.args, store_node)
 
             try:
                 if paradigm is not None:
@@ -194,9 +194,12 @@ def prepare_experiment(args, store_node):
     columns = []
     for parameter in args.rove:
         label = paradigm_class.class_traits()[parameter].label
-        TrialSetting.add_class_trait(parameter, Float)
-        column = ObjectColumn(name=parameter, label=label, width=75)
-        columns.append(column)
+        try:
+            TrialSetting.add_class_trait(parameter, Float)
+            column = ObjectColumn(name=parameter, label=label, width=75)
+            columns.append(column)
+        except:
+            pass
     TrialSetting.parameters = args.rove
     trial_setting_editor.columns = columns
 
