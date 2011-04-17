@@ -19,8 +19,9 @@ from pylab import *
 
 common_nodes = {
     'paradigm': { '_v_name': 'paradigm' },
-    'par_info': { '.klass': 'PositiveDTData', '_v_name': 'par_info' },
-    'animals':  { 'klass': 'Animal' },
+    'par_info': { '_v_name': 'par_info' },
+    'trial_log': { '_v_name': 'trial_log'},
+    'animal': { 'klass': 'Animal' },
     }
 
 if __name__ == '__main__':

@@ -43,8 +43,10 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
         self.reward_duration = value*1e-3/self.pump_rate*60
 
     def _pump_rate_changed(self, value):
-        # ul = ml/m * (s/60) * 1000 ul/ml
-        self.reward_volume = value * (self.reward_duration/60.0) * 1e3
+        # ul = ml/m * (m/60s) * 1000 ul/ml
+        # s = ul / (ml/m * 1000 ul/ml) * 60s/m
+        #self.reward_volume = value * (self.reward_duration/60.0) * 1e3
+        self.reward_duration = self.reward_volume / (value*1e3) * 60.0
 
     min_nogo = Int(0, store='attribute', init=True)
     max_nogo = Int(0, store='attribute', init=True)
@@ -53,8 +55,11 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
     # rejected by Bool trait
     repeat_FA = CBool(store='attribute', init=True)
 
-    signal_offset_delay = Float(0.5, store='attribute', init=True)
-    intertrial_duration = Float(0.5, store='attribute', init=True)
+    signal_offset_delay = Float(0.5, store='attribute', init=True,
+                                label='Signal offset delay (s)')
+    intertrial_duration = Float(0.5, store='attribute', init=True,
+                                label='Minimum intertrial duration (s)')
+
     reaction_window_delay = Float(0, store='attribute', init=True)
     reaction_window_duration = Float(1.5, store='attribute', init=True)
 
@@ -63,6 +68,8 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
     timeout_trigger  = Enum('FA only', 'Anytime', store='attribute', init=True)
     timeout_duration = Float(5, store='attribute', init=True)
     timeout_grace_period = Float(2.5, store='attribute', init=True)
+    fa_puff_duration = Float(0.2, store='attribute', init=True, 
+                             label='FA puff duration (s)')
 
     poke_duration_lb = Float(0.1, store='attribute', init=True)
     poke_duration_ub = Float(0.5, store='attribute', init=True)
@@ -87,10 +94,8 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
                     label='Trial',
                     ),
                 VGroup(
-                    Item('signal_offset_delay',
-                         label='Signal offset delay (s)'),
-                    Item('intertrial_duration',
-                         label='Minimum intertrial duration (s)'),
+                    'signal_offset_delay',
+                    'intertrial_duration',
                     Item('reaction_window_delay',
                          label='Reaction window delay (s)'),
                     Item('reaction_window_duration',
@@ -101,16 +106,17 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
                          label='TO mode'),
                     Item('timeout_duration',
                          label='TO minimum duration (s)'),
-                    Item('timeout_grace_period', 
-                         label='TO grace period (s)'),
+                    'fa_puff_duration',
+                    #Item('timeout_grace_period', 
+                    #     label='TO grace period (s)'),
                     Item('poke_duration_lb', label='Min poke duration (s)'),
                     Item('poke_duration_ub', label='Max poke duration (s)'),
                     label='Timing',
                     ),
                 VGroup(
-                    'reward_duration',
                     'pump_rate',
                     'reward_volume',
+                    Item('reward_duration', style='readonly'),
                     label='Reward',
                     ),
                 ),
