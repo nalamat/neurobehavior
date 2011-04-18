@@ -3,7 +3,6 @@ from __future__ import division
 from scipy import stats
 from abstract_experiment_data import AbstractExperimentData
 from sdt_data_mixin import SDTDataMixin
-from cns.channel import FileChannel
 from enthought.traits.api import Instance, List, CFloat, Int, Float, Any, \
     Range, DelegatesTo, cached_property, on_trait_change, Array, Event, \
     Property, Undefined, Callable, Str, Enum, Bool, Int, Str, Tuple, CList
@@ -13,8 +12,7 @@ import numpy as np
 from cns.data.h5_utils import append_node, get_or_append_node
 from cns.pipeline import deinterleave, broadcast
 
-from cns.channel import Timeseries
-
+from cns.channel import Timeseries, FileChannel
 
 from enthought.traits.ui.api import CheckListEditor
 from enthought.chaco.api import AbstractPlotData
@@ -26,9 +24,6 @@ log = logging.getLogger(__name__)
 ts = lambda TTL: np.flatnonzero(TTL)
 edge_rising = lambda TTL: np.r_[0, np.diff(TTL.astype('i'))] == 1
 edge_falling = lambda TTL: np.r_[0, np.diff(TTL.astype('i'))] == -1
-
-def apply_mask(fun, masks, values):
-    return np.array([fun(values[m]) for m in masks])
 
 # Version log
 #
@@ -53,6 +48,9 @@ def apply_mask(fun, masks, values):
 # being spooled again; however, this is simply an indicator of whether a trigger
 # was sent to the pump rather than an indicator of how long the pump was running
 # for.
+# V2.5 - 110418 - Revised global FA fraction computation to be more consistent
+# with how we score the actual trials and compute FA for the individual
+# parameters.
 class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
     '''
     trial_log is essentially a list of the trials, along with the parameters
@@ -63,11 +61,9 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
         return getattr(self, name)
 
     # VERSION is a reserved keyword in HDF5 files, so I avoid using it here.
-    OBJECT_VERSION = Float(2.4, store='attribute')
+    OBJECT_VERSION = Float(2.5, store='attribute')
 
-    store_node = Any
-
-    contact_data = Any
+    #contact_data = Any
 
     poke_TTL = Instance(FileChannel, 
             store='channel', store_path='contact/poke_TTL')
@@ -89,10 +85,6 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
             store='channel', store_path='contact/TO_TTL')
     TO_safe_TTL = Instance(FileChannel,
             store='channel', store_path='contact/TO_safe_TTL')
-
-    def _create_channel(self, name, dtype):
-        contact_node = get_or_append_node(self.store_node, 'contact')
-        return FileChannel(node=contact_node, name=name, dtype=dtype)
 
     def _poke_TTL_default(self):
         return self._create_channel('poke_TTL', np.bool)
@@ -124,18 +116,6 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
     def _TO_safe_TTL_default(self):
         return self._create_channel('TO_safe_TTL', np.bool)
 
-    _trial_log = List
-    trial_log = Property(store='table', depends_on='_trial_log')
-    trial_log_columns = Tuple()
-
-    @cached_property
-    def _get_trial_log(self):
-        if len(self._trial_log) > 0:
-            return np.rec.fromrecords(self._trial_log,
-                    names=self.trial_log_columns)
-        else:
-            return []
-
     def log_trial(self, score=True, **kwargs):
         # Typically we want score to be True; however, for debugging purposes it
         # is convenient to set score to False that way we don't need to provide
@@ -146,17 +126,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
             kwargs.update(self.compute_response(ts_start, ts_end))
             kwargs['start'] = ts_start/self.poke_TTL.fs
             kwargs['end'] = ts_end/self.poke_TTL.fs
-
-        # Extract sorted list of values and keys from the dictionary that is to
-        # be added to trial_log
-        names, record = zip(*sorted(kwargs.items()))
-        if len(self.trial_log) == 0:
-            self.trial_log_columns = names
-            self._trial_log = [record]
-        elif names == self.trial_log_columns:
-            self._trial_log.append(record)
-        else:
-            raise ValueError, "Invalid log_trial attempt"
+        AbstractExperimentData.log_trial(self, **kwargs)
 
     def compute_response(self, ts_start, ts_end):
         '''
@@ -222,13 +192,10 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
     go_indices   = Property(Array('i'), depends_on='ttype_seq')
     nogo_indices = Property(Array('i'), depends_on='ttype_seq')
 
-    pars = Property(List(Int), depends_on='trial_log')
     go_trial_count = Property(Int, store='attribute', depends_on='trial_log')
     nogo_trial_count = Property(Int, store='attribute', depends_on='trial_log')
 
     par_info = Property(store='table', depends_on='par_dprime')
-
-    parameters = List
 
     @cached_property
     def _get_par_info(self):
@@ -258,7 +225,6 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
     # Splits trial_log into individual sequences as needed
     ts_seq          = Property(Array('i'), depends_on='trial_log')
-    par_seq         = Property(Array('f'), depends_on='trial_log, parameters')
     ttype_seq       = Property(Array('S'), depends_on='trial_log')
     resp_seq        = Property(Array('S'), depends_on='trial_log')
     resp_time_seq   = Property(Array('f'), depends_on='trial_log')
@@ -267,16 +233,6 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
     # The following sequences need to handle the edge case where the trial log
     # is initially empty (and has no known record fields to speak of).
-
-    @cached_property
-    def _get_par_seq(self):
-        try:
-            arr = np.empty(len(self.trial_log), dtype=object)
-            arr[:] = zip(*[self.trial_log[p] for p in self.parameters])
-            print arr
-            return arr
-        except:
-            return np.array([])
 
     @cached_property
     def _get_ts_seq(self):
@@ -383,23 +339,6 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
     def _get_nogo_indices(self):
         return self._get_indices('NOGO')
 
-    par_mask = Property(depends_on='trial_log, parameters')
-
-    @cached_property
-    def _get_par_mask(self):
-        result = []
-        # Numpy's equal function casts the argument on either side of the
-        # operator to an array.  Numpy's default handling of tuples is to
-        # convert it to an array where each element of the tuple is an element
-        # in the array.  We need to do the casting ourself (e.g. ensure that we
-        # have a single-element array where the element is a tuple).
-        cmp_array = np.empty(1, dtype=object)
-        for par in self.pars:
-            cmp_array[0] = par
-            m = self.par_seq == cmp_array
-            result.append(m)
-        return result
-
     par_go_mask     = Property(depends_on='trial_log, parameters')
 
     @cached_property
@@ -433,7 +372,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
     @cached_property
     def _get_par_hit_count(self):
-        return apply_mask(np.sum, self.par_mask, self.hit_seq)
+        return self.apply_par_mask(np.sum, self.hit_seq)
 
     @cached_property
     def _get_miss_seq(self):
@@ -441,7 +380,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
     @cached_property
     def _get_par_miss_count(self):
-        return apply_mask(np.sum, self.par_mask, self.miss_seq)
+        return self.apply_par_mask(np.sum, self.miss_seq)
 
     @cached_property
     def _get_fa_seq(self):
@@ -450,7 +389,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
     @cached_property
     def _get_par_fa_count(self):
-        return apply_mask(np.sum, self.par_mask, self.fa_seq)
+        return self.apply_par_mask(np.sum, self.fa_seq)
 
     @cached_property
     def _get_cr_seq(self):
@@ -459,13 +398,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
     @cached_property
     def _get_par_cr_count(self):
-        return apply_mask(np.sum, self.par_mask, self.cr_seq)
-
-    @cached_property
-    def _get_pars(self):
-        # We only want to return pars for complete trials (e.g. ones for which a
-        # go was presented).
-        return np.unique(self.par_seq)
+        return self.apply_par_mask(np.sum, self.cr_seq)
 
     par_hit_frac = Property(List(Float), depends_on='trial_log, parameters')
     par_fa_frac = Property(List(Float), depends_on='trial_log, parameters')
@@ -481,16 +414,22 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
     @cached_property
     def _get_global_fa_frac(self):
-        nogo_count = len(self.nogo_indices)
-        if nogo_count == 0:
-            return np.nan
-        nogo_resp = np.take(self.resp_seq, self.nogo_indices)
-        # fa_mask is a boolean array where 1 indicates the subject went to the
-        # spout.  We can simply compute the sum of this array to determien how
-        # many times the subject went to the spout (e.g. "false alarmed")
-        fa_mask = nogo_resp == 'spout'
-        fa_count = np.sum(fa_mask)
-        return float(fa_count)/float(nogo_count)
+        fa = np.sum(self.fa_seq)
+        cr = np.sum(self.cr_seq)
+        return fa/(fa+cr)
+
+    #@cached_property
+    #def _get_global_fa_frac(self):
+    #    nogo_count = len(self.nogo_indices)
+    #    if nogo_count == 0:
+    #        return np.nan
+    #    nogo_resp = np.take(self.resp_seq, self.nogo_indices)
+    #    # fa_mask is a boolean array where 1 indicates the subject went to the
+    #    # spout.  We can simply compute the sum of this array to determien how
+    #    # many times the subject went to the spout (e.g. "false alarmed")
+    #    fa_mask = nogo_resp == 'spout'
+    #    fa_count = np.sum(fa_mask)
+    #    return float(fa_count)/float(nogo_count)
 
     @cached_property
     def _get_go_trial_count(self):
@@ -518,22 +457,28 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
     par_std_response_time       = Property(depends_on='trial_log, parameters')
 
     def _get_par_mean_reaction_time(self):
-        return apply_mask(stats.nanmean, self.par_go_mask, self.react_time_seq)
+        return self.apply_mask(stats.nanmean, self.par_go_mask,
+                self.react_time_seq)
 
     def _get_par_mean_response_time(self):
-        return apply_mask(stats.nanmean, self.par_go_mask, self.resp_time_seq)
+        return self.apply_mask(stats.nanmean, self.par_go_mask,
+                self.resp_time_seq)
 
     def _get_par_median_reaction_time(self):
-        return apply_mask(stats.nanmedian, self.par_go_mask, self.react_time_seq)
+        return self.apply_mask(stats.nanmedian, self.par_go_mask,
+                self.react_time_seq)
 
     def _get_par_median_response_time(self):
-        return apply_mask(stats.nanmedian, self.par_go_mask, self.resp_time_seq)
+        return self.apply_mask(stats.nanmedian, self.par_go_mask,
+                self.resp_time_seq)
 
     def _get_par_std_reaction_time(self):
-        return apply_mask(stats.nanstd, self.par_go_mask, self.react_time_seq)
+        return self.apply_mask(stats.nanstd, self.par_go_mask,
+                self.react_time_seq)
 
     def _get_par_std_response_time(self):
-        return apply_mask(stats.nanstd, self.par_go_mask, self.resp_time_seq)
+        return self.apply_mask(stats.nanstd, self.par_go_mask,
+                self.resp_time_seq)
 
     available_statistics = Property
 

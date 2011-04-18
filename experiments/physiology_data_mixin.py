@@ -18,10 +18,6 @@ class PhysiologyDataMixin(HasTraits):
     physiology_processed = Instance(FileMultiChannel, store='channel',
             store_path='physiology/processed')
 
-    # The array of timestamps corresponding to stimulus onset
-    #physiology_ts = Instance(FileChannel, store='channel',
-            #store_path='physiology/ts')
-
     physiology_ts = Instance('cns.channel.Timeseries', ())
 
     def _physiology_ram_default(self):
@@ -36,8 +32,3 @@ class PhysiologyDataMixin(HasTraits):
         physiology_node = get_or_append_node(self.store_node, 'physiology')
         return FileMultiChannel(node=physiology_node, channels=16,
                 name='processed', dtype=np.float32)
-
-    #def _physiology_ts_default(self):
-    #    physiology_node = get_or_append_node(self.store_node, 'physiology')
-    #    return FileChannel(node=physiology_node, channels=1, name='ts',
-    #            dtype=np.int32)

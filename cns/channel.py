@@ -231,6 +231,33 @@ class Channel(HasTraits):
         # the data is within the visible region.  If not, no update is made.
         self.updated = lb/self.fs, ub/self.fs
 
+    def summarize(self, timestamps, offset, duration, fun):
+        if len(timestamps) == 0:
+            return np.array([])
+
+        # Channel.to_samples(time) converts time (in seconds) to the
+        # corresponding number of samples given the sampling frequency of the
+        # channel.  If the trial begins at sample n, then we want to analyze
+        # contact during the interval [n+lb_index, n+ub_index).
+        lb_index = self.to_samples(offset)
+        ub_index = self.to_samples(offset+duration)
+        result = []
+
+        # Variable ts is the sample number at which the trial began and is a
+        # multiple of the contact sampling frequency.
+        # Channel.get_range_index(lb_sample, ub_sample, reference_sample)
+        # will return the specified range relative to the reference sample.
+        # Since we are interested in extracting the range [contact_offset,
+        # contact_offset+contact_dur) relative to the timestamp, we need to
+        # first convert the range to the number of samples (which we did
+        # above where we have it as [lb_index, ub_index)).  Since our
+        # reference index (the timestamp) is already in the correct units,
+        # we don't need to convert it.
+        for ts in timestamps:
+            range = self.get_range_index(lb_index, ub_index, ts)
+            result.append(fun(range))
+        return np.array(result)
+
 class FileChannel(Channel):
     '''
     An implementation of `Channel` that streams acquired data to a HDF5_ EArray.

@@ -38,9 +38,6 @@ class ParInfoAdapter(TabularAdapter):
     color_map  = Dict
     parameters = List(['parameter'])
 
-    # \u00B1 is +/- symbol
-    timing_fmt = u"x\u0304 {:.2}, x\u0303 {:.2}, \u03C3\u2093 {:.2}"
-
     columns = [ ('P', 'parameter'),
                 ('Hit %', 'hit_frac'), 
                 ('FA %', 'fa_frac'),
@@ -155,7 +152,7 @@ class ParameterAdapter(TabularAdapter):
 class AbstractPositiveExperiment(AbstractExperiment):
 
     index_range         = Any
-    par_info_adapter    = ParInfoAdapter()
+    par_info_adapter    = TabularAdapter()
     par_info_editor     = TabularEditor(editable=False,
                                         adapter=par_info_adapter)
 
