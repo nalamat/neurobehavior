@@ -19,26 +19,26 @@ class AbstractAversiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
     '''
     # Trait defines a drop-down selector if you provide it with a list of
     # options
-    order         = Trait('descending', choice.options, store='attribute',
-                          init=True)
+    order         = Trait('descending', choice.options, store='attribute')
     warn_sequence = List(Instance(TrialSetting), minlen=1,
-                         store='child', init=True, editor=trial_setting_editor)
-    remind        = Instance(TrialSetting, (), store='child', init=True)
-    safe          = Instance(TrialSetting, (), store='child', init=True)
+                         store='child', editor=trial_setting_editor)
+    remind        = Instance(TrialSetting, (), store='child')
+    safe          = Instance(TrialSetting, (), store='child')
 
     def _warn_sequence_default(self):
         return [TrialSetting()]
 
-    prevent_disarm = Bool(True, store='attribute', init=True)
+    prevent_disarm = Bool(True, store='attribute', 
+            label='Prevent disarming of aversive stimulus?')
 
     # By default, Range provides a slider as the GUI widget.  Note that you can
     # override the default widget if desired.
-    lick_th = Range(0.0, 1.0, 0.75, store='attribute')
-    aversive_delay = ExpressionTrait(1)
-    aversive_duration = ExpressionTrait(0.3)
+    lick_th = ExpressionTrait(0.75, label='Contact threshold')
+    aversive_delay = ExpressionTrait(1, label='Aversive Stimulus Delay (s)')
+    aversive_duration = ExpressionTrait(0.3, label='Aversive Stimulus Duration (s)')
 
-    num_safe = ExpressionTrait('randint(2, 5)')
-    trial_duration = ExpressionTrait(1.0)
+    num_safe = ExpressionTrait('randint(2, 5)', label='Number of safes')
+    trial_duration = ExpressionTrait(1.0, label='Trial duration (s)') 
 
     #===========================================================================
     # The views available
@@ -65,13 +65,10 @@ class AbstractAversiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
 
     timing_group = VGroup(
             trial_group, 
-            Item('prevent_disarm',
-                 label='Prevent disarming of stimulus?'),
-            Item('aversive_delay', 
-                 label='Aversive stimulus delay (s)'),
-            Item('aversive_duration',
-                 label='Aversive stimulus duration (s)'),
-            Item('lick_th', label='Contact threshold'),
+            'prevent_disarm',
+            'aversive_delay',
+            'aversive_duration',
+            'lick_th',
             show_border=True, 
             label='Trial settings',
             )

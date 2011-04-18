@@ -10,22 +10,15 @@ class AversiveFMParadigm(AbstractAversiveParadigm):
     the appropriate DSP circuit.
     '''
 
-    def get_parameters(self):
-        filter = {
-                'editable': lambda x: x is not False,
-                'type':     lambda x: x != 'event',
-                'ignore':   lambda x: x is not True,
-                }
-        return sorted(self.trait_names(**filter))
-
-    modulation_depth        = ExpressionTrait(200)
-    carrier_frequency       = ExpressionTrait(4000)
-    modulation_frequency    = ExpressionTrait(5)
-    attenuation             = ExpressionTrait(0.0)
+    depth = ExpressionTrait(200, label='Modulation depth (Hz)')
+    cf = ExpressionTrait(4000, label='Carrier frequency (Hz)')
+    fm = ExpressionTrait(5, label='Modulation frequency (Hz)')
+    attenuation = ExpressionTrait(0.0, label='Attenuation (dB)')
 
     signal_group = VGroup(
-            Item('carrier_frequency', label='Carrier frequency (Hz)'),
-            Item('modulation_frequency', label='Modulation frequency (Hz)'),
-            Item('modulation_depth', label='Modulation depth (Hz)'),
-            Item('attenuation', label='Attenuation (dB)', style='text'),
-            show_border=True, label='FM parameters')
+            'cf',
+            'fm',
+            'depth',
+            'attenuation',
+            show_border=True, 
+            label='FM parameters')

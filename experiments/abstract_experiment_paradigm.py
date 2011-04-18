@@ -3,16 +3,18 @@ from enthought.traits.api import HasTraits, Enum, Property
 class AbstractExperimentParadigm(HasTraits):
 
     speaker_mode = Enum('primary', 'secondary', 'both', 'random',
-                        store='attribute', label='Speaker mode', init=True)
+                        store='attribute', label='Speaker mode')
 
-    parameter_names = Property
-    parameter_info = Property
+    def get_parameters(self):
+        filter = {
+                'editable': lambda x: x is not False,
+                'type':     lambda x: x != 'event',
+                'ignore':   lambda x: x is not True,
+                }
+        return sorted(self.trait_names(**filter))
 
-    def _get_parameter_names(self):
-        return self.editable_traits()
-
-    def _get_parameter_info(self):
-        return dict((n, self.trait(n).label) for n in self.editable_traits())
+    def get_parameter_info(self):
+        return dict((n, self.trait(n).label) for n in self.get_parameters())
 
     def is_valid(self):
         for trait in self.trait_names(error=True):

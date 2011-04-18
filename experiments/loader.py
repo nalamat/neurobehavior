@@ -253,7 +253,8 @@ def inspect_experiment(args):
     '''
     e = EXPERIMENTS[args.type]
     p = e['paradigm'][0]()
-    parameters = [(n, p.trait(n).label) for n in p.editable_traits()]
+    parameters = list(p.get_parameter_info().items())
+    parameters.sort()
 
     # Determine the padding we need for the columns
     col_paddings = []
@@ -273,7 +274,7 @@ def get_invalid_parameters(args):
     parameters = set(args.rove)
     parameters.update(args.analyze)
     paradigm = EXPERIMENTS[args.type]['paradigm'][0]()
-    valid_parameters = paradigm.editable_traits()
+    valid_parameters = paradigm.get_parameters()
     return [p for p in parameters if p not in valid_parameters]
 
 # Define the classes required for each experiment.

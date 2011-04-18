@@ -21,19 +21,21 @@ class AversiveFMController(AbstractAversiveController):
     # We are overriding the three signal update methods (remind, warn, safe) to
     # work with the specific circuit we constructed
     def update_remind(self):
-        self.set_experiment_parameters(self.current_remind)
+        pass
+        #self.set_experiment_parameters(self.current_remind)
 
     def update_warn(self):
-        self.set_experiment_parameters(self.current_warn)
+        pass
+        #self.set_experiment_parameters(self.current_warn)
 
     def update_safe(self):
         pass
 
-    def set_modulation_depth(self, value):
+    def set_depth(self, value):
         self.iface_behavior.set_tag('depth', value)
 
-    def set_carrier_frequency(self, value):
+    def set_cf(self, value):
         self.iface_behavior.set_tag('cf', value)
 
-    def set_modulation_frequency(self, value):
+    def set_fm(self, value):
         self.iface_behavior.set_tag('fm', value)

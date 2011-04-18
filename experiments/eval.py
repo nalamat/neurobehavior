@@ -3,12 +3,17 @@ from enthought.traits.ui.api import (TextEditor, View, Item, BooleanEditor,
         CompoundEditor)
 from enthought.traits.api import Callable, HasTraits, Instance
 
+def choice(sequence):
+    i = np.random.randint(0, len(sequence))
+    return sequence[i]
+
 class ParameterExpression(object):
 
     GLOBALS = {
             'arange':   np.arange,
             'randint':  np.random.randint,
             'uniform':  np.random.uniform,
+            'choice':   choice,
             }
 
     def __init__(self, string):
@@ -32,30 +37,30 @@ def evaluate_parameters(parameters, extra_context=None):
     context = {}
     if extra_context is not None:
         context.update(extra_context)
-    to_evaluate = list(parameters.items())
+    parameters = parameters.copy()
+    for key in context:
+        if key in parameters:
+            del parameters[key]
 
-    remaining = len(to_evaluate)
-
+    pending = list(parameters.items())
     while True:
-        pending = []
-        for parameter, expression in to_evaluate:
+        failed = []
+        num_pending = len(pending)
+        for parameter, expression in pending:
             if isinstance(expression, ParameterExpression):
                 try:
                     context[parameter] = expression.eval(context)
                 except NameError, e:
-                    # We're ok with NameErrors since the parameter likely requires
-                    # some context to evaluate properly
-                    pending.append((parameter, expression))
+                    failed.append((parameter, expression))
             else:
                 context[parameter] = expression
 
-        if len(pending) == 0:
+        if len(failed) == 0:
             return context
-        elif len(pending) == remaining:
+        elif len(failed) == num_pending:
             raise ValueError, "Circular dependency found"
         else:
-            to_evaluate = pending
-            pending = []
+            pending = failed
 
 class ExpressionEditor(TextEditor):
 
@@ -84,7 +89,7 @@ if __name__ == '__main__':
         expression = ExpressionTrait('randint(1, 2)')
         traits_view = View(Item('expression'))
     test = TestEditor()
-    test.configure_traits()
+    #test.configure_traits()
     print test.expression.eval()
 
     parameters = {
@@ -97,7 +102,8 @@ if __name__ == '__main__':
             'g':    ParameterExpression('range(a, b)'),
             'h':    ParameterExpression('randint(5, 6)'),
             'i':    ParameterExpression('uniform(1, 5)'),
-            'j':    32,
+            #'j':    ParameterExpression('l'),
+            'j':    57,
             'k':    65,
             'l':    ParameterExpression('j+k'),
             }
