@@ -224,9 +224,12 @@ class AbstractAversiveExperiment(AbstractExperiment):
         chart.add(plot)
         self.par_score_chart = chart
 
+    from abstract_experiment import context_editor
+
     traits_group = HSplit(
             VGroup(
                 Item('handler.toolbar', style='custom'),
+                Item('handler.current_context_list', editor=context_editor),
                 VGroup(
                     Item('animal', show_label=False),
                     Item('handler.status', label='Status'),

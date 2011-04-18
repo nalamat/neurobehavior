@@ -19,7 +19,10 @@ class TrialSetting(HasTraits):
     def __cmp__(self, other):
         # We want them to be sorted by the parameter, which is important for
         # controlling whether the sequence is ascending or descending.
-        return cmp(self.parameter_values(), other.parameter_values())
+        try:
+            return cmp(self.parameter_values(), other.parameter_values())
+        except AttributeError:
+            return -1
 
 trial_setting_editor = TableEditor(
         reorderable=True,

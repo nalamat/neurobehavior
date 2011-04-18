@@ -8,8 +8,9 @@ import cns
 from enthought.pyface.api import error, confirm, YES, ConfirmationDialog
 from enthought.pyface.timer.api import Timer
 from enthought.etsconfig.api import ETSConfig
-from enthought.traits.api import Any, Instance, Enum, Dict, on_trait_change, \
-        HasTraits, List, Button, Bool, Tuple, Callable, Int
+from enthought.traits.api import (Any, Instance, Enum, Dict, on_trait_change, 
+        HasTraits, List, Button, Bool, Tuple, Callable, Int, Property,
+        cached_property)
 from enthought.traits.ui.api import Controller, View, HGroup, Item, spring
 
 from cns.widgets.toolbar import ToolBar
@@ -17,6 +18,7 @@ from enthought.savage.traits.ui.svg_button import SVGButton
 from cns.widgets import icons
 
 from physiology_controller_mixin import PhysiologyControllerMixin
+from eval import evaluate_parameters
 
 import logging
 log = logging.getLogger(__name__)
@@ -382,17 +384,6 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
     pending_changes     = Dict({})
     old_values          = Dict({})
 
-    def init_paradigm(self, paradigm):
-        '''
-        Configuring the equipment based on initial values in the paradigm.  If
-        the trait has the metadata flag, 'init', set to True, then the
-        corresponding setter (set_trait_name) will be called with the initial
-        value of the trait.
-        '''
-        for trait_name in paradigm.class_trait_names(init=True):
-            value = getattr(paradigm, trait_name)
-            getattr(self, 'set_' + trait_name)(value)
-
     @on_trait_change('model.paradigm.-ignore')
     def queue_change(self, instance, name, old, new):
         if self.state <> 'halted':
@@ -414,17 +405,8 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
         '''
         Applies an individual change
         '''
-        ts = self.get_ts()
-        try:
-            log.debug("Apply: setting %s:%s to %r", instance, name, value)
-            getattr(self, 'set_'+name)(value)
-            self.log_event(ts, name, value)
-        except AttributeError:
-            mesg = "Can't set %s to %r" % (name, value)
-            # Notify the user
-            error(info.ui.control, mesg)
-            # Set paradigm value back to "old" value
-            setattr(instance, name, value)
+        self.current_parameters[name] = value
+        self.log_event(self.get_ts(), name, value)
 
     def apply(self, info=None):
         '''
@@ -509,3 +491,35 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
         '''
         for parameter, value in setting.parameter_dict().items():
             getattr(self, 'set_' + parameter)(value)
+            
+    current_parameters = Dict
+    current_context = Dict
+    current_context_list = Property(depends_on='current_context')
+
+    def init_context(self):
+        '''
+        Configuring the equipment based on initial values in the paradigm.  If
+        the trait has the metadata flag, 'init', set to True, then the
+        corresponding setter (set_trait_name) will be called with the initial
+        value of the trait.
+        '''
+        for parameter in self.model.paradigm.get_parameters():
+            value = getattr(self.model.paradigm, parameter)
+            self.current_parameters[parameter] = value
+        self.update_context()
+
+    def update_context(self):
+        context = evaluate_parameters(self.current_parameters)
+        for parameter, value in context.items():
+            if self.current_context.get(parameter, None) != value:
+                getattr(self, 'set_' + parameter)(value)
+                self.current_context[parameter] = value
+
+    @cached_property
+    def _get_current_context_list(self):
+        context = []
+        for k, v in self.current_context.items():
+            label = self.model.paradigm.trait(k).label
+            context.append((label, v))
+        context.sort()
+        return context
