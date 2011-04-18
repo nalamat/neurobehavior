@@ -113,7 +113,7 @@ class AbstractAversiveController(AbstractExperimentController,
         self.trigger_next()
 
     def stop_experiment(self, info=None):
-        self.model.analyzed.mask_mode = 'none'
+        self.model.data.mask_mode = 'none'
 
     def monitor_behavior(self):
         self.update_safe()

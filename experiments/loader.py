@@ -23,7 +23,7 @@ from cns.data.ui.cohort import CohortEditor, CohortView, CohortViewHandler
 
 # Aversive
 from abstract_aversive_experiment import AbstractAversiveExperiment
-from aversive_data_v3 import RawAversiveData as AversiveData
+from aversive_data import AversiveData
 # Aversive FM
 from aversive_fm_paradigm import AversiveFMParadigm
 from aversive_fm_controller import AversiveFMController
@@ -209,6 +209,7 @@ def prepare_experiment(args, store_node):
 
     paradigm = paradigm_class(**paradigm_args)
     data = data_class(store_node=data_node, **data_args)
+    data.parameters = args.analyze
     model = experiment_class(
             store_node=store_node, 
             exp_node=exp_node,

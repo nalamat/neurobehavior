@@ -6,8 +6,6 @@ from enthought.enable.api import Component, ComponentEditor
 from enthought.chaco.api import DataRange1D, LinearMapper, PlotLabel, \
         VPlotContainer, PlotAxis, OverlayPlotContainer, Legend, ToolTip
 
-from aversive_data_v3 import AnalyzedAversiveData
-
 from cns.chaco.channel_data_range import ChannelDataRange
 from cns.chaco.channel_plot import ChannelPlot
 from cns.chaco.ttl_plot import TTLPlot
@@ -21,18 +19,84 @@ from abstract_aversive_controller import AbstractAversiveController
 import logging
 log = logging.getLogger(__name__)
 
-class AbstractAversiveExperiment(AbstractExperiment):
+from enthought.traits.ui.api import TabularEditor
+from enthought.traits.ui.tabular_adapter import TabularAdapter
+from enthought.traits.api import *
 
-    analyzed            = Instance(AnalyzedAversiveData, store='child')
+from colors import color_names
+
+class TrialLogAdapter(TabularAdapter):
+    
+    #parameters = List(['modulation_depth'])
+
+    # List of tuples (column_name, field )
+    columns = [ ('P',       'parameter'),
+                #('S',       'speaker'),
+                ('Time',    'time'),
+                ('Score',   'contact_score'),
+                ]
+
+    parameter_width = Float(75)
+    reaction_width = Float(25)
+    response_width = Float(25)
+    speaker_width = Float(25)
+    time_width = Float(65)
+    contact_score_image = Property
+
+    parameter_text = Property
+    speaker_text = Property
+    time_text = Property
+
+    def _get_parameter_text(self):
+        return ', '.join('{}'.format(p) for p in self.item['parameter'])
+
+    def _get_speaker_text(self):
+        return self.item['speaker'][0].upper()
+
+    def _get_time_text(self):
+        seconds = self.item['start']
+        return "{0}:{1:02}".format(*divmod(int(seconds), 60))
+
+    def _get_bg_color(self):
+        if self.item['ttype'] == 'safe':
+            return color_names['light green']
+        elif self.item['ttype'] == 'remind':
+            return color_names['gray']
+        else:
+            return color_names['light red']
+
+    def _get_contact_score_image(self):
+        if self.item['on_spout']:
+            return '@icons:tuple_node'  # a green icon
+        else:
+            return '@icons:dict_node'   # a red icon
+
+class ParInfoAdapter(TabularAdapter):
+
+    color_map  = Dict
+
+    columns = [ ('P', 'parameter'),
+                ('Hit %', 'hit_frac'), 
+                ('FA %', 'fa_frac'),
+                ('Safe #', 'safe_count'),
+                ('Warn #', 'warn_count'),
+                ('Hit #', 'hit_count'),
+                ('FA #', 'fa_count'),
+                ('d\'', 'dprime'),
+                ('C', 'criterion'),
+                ]
+
+
+trial_log_editor = TabularEditor(editable=False, adapter=TrialLogAdapter())
+par_info_editor = TabularEditor(editable=False, adapter=ParInfoAdapter())
+
+class AbstractAversiveExperiment(AbstractExperiment):
 
     experiment_plot     = Instance(Component)
     par_score_chart     = Instance(Component)
     score_chart         = Instance(Component)
     par_count_chart     = Instance(Component)
     par_dprime_chart    = Instance(Component)
-
-    def _data_changed(self, new):
-        self.analyzed = AnalyzedAversiveData(data=new)
 
     @on_trait_change('data')
     def _update_experiment_plot(self):
@@ -81,52 +145,6 @@ class AbstractAversiveExperiment(AbstractExperiment):
         self.experiment_plot = container
 
     @on_trait_change('data')
-    def _update_score_chart(self):
-        preprocess = lambda x: clip(x, 0.2, 1.0)
-        bounds = lambda low, high, margin, tight: (low-0.5, high+0.5)
-
-        index_range = DataRange1D(low_setting='track', high_setting='auto',
-                tracking_amount=75, bounds_func=bounds)
-        value_range = DataRange1D(low_setting=0, high_setting=1)
-        index_mapper = LinearMapper(range=index_range)
-        value_mapper = LinearMapper(range=value_range)
-
-        view = OverlayPlotContainer(bgcolor='white', fill_padding=True,
-                padding=50)
-
-        plot = DynamicBarPlot(source=self.analyzed,
-                preprocess_values=preprocess,
-                index_trait='remind_indices', value_trait='remind_seq',
-                fill_color='lightgray', line_width=0.5, bar_width=1,
-                index_mapper=index_mapper, value_mapper=value_mapper)
-
-        axis = PlotAxis(component=plot, orientation='bottom',
-                ticks_visible=True, title='Trial Number')
-        plot.underlays.append(axis)
-        label = PlotLabel(component=plot, text='On spout?')
-        plot.underlays.append(label)
-        index_range.add(plot.index)
-        view.add(plot)
-
-        plot = DynamicBarPlot(source=self.analyzed,
-                preprocess_values=preprocess,
-                index_trait='safe_indices', value_trait='fa_seq',
-                fill_color=(0.41, 0.88, 0.25, 0.5), line_width=0.5, bar_width=1,
-                index_mapper=index_mapper, value_mapper=value_mapper, alpha=0.5)
-        index_range.add(plot.index)
-        view.add(plot)
-
-        plot = DynamicBarPlot(source=self.analyzed,
-                preprocess_values=preprocess,
-                index_trait='warn_indices', value_trait='hit_seq',
-                fill_color='red', line_width=0.5, bar_width=1,
-                index_mapper=index_mapper, value_mapper=value_mapper)
-        index_range.add(plot.index)
-        view.add(plot)
-
-        self.score_chart = view
-
-    @on_trait_change('data')
     def _update_plots(self):
         # dPrime
         bounds = lambda low, high, margin, tight: (low-0.5, high+0.5)
@@ -135,14 +153,14 @@ class AbstractAversiveExperiment(AbstractExperiment):
         value_range = DataRange1D(low_setting=-1, high_setting=4)
         value_mapper = LinearMapper(range=value_range)
 
-        plot = DynamicBarPlot(source=self.analyzed,
+        plot = DynamicBarPlot(source=self.data,
                 label_trait='pars', value_trait='par_dprime', bgcolor='white',
                 padding=50, fill_padding=True, bar_width=0.9,
                 value_mapper=value_mapper, index_mapper=index_mapper)
         index_range.add(plot.index)
         add_default_grids(plot, major_value=1)
         axis = DynamicBarplotAxis(plot, orientation='bottom',
-                source=self.analyzed, label_trait='pars', title='Parameter')
+                source=self.data, label_trait='pars', title='Parameter')
         plot.underlays.append(axis)
         plot.underlays.append(PlotAxis(plot, orientation='left', title="d'"))
         label = PlotLabel(component=plot, text="Sensitivity")
@@ -156,7 +174,7 @@ class AbstractAversiveExperiment(AbstractExperiment):
         value_range = DataRange1D(low_setting=0, high_setting='auto')
         value_mapper = LinearMapper(range=value_range)
 
-        plot = DynamicBarPlot(source=self.analyzed,
+        plot = DynamicBarPlot(source=self.data,
                 label_trait='pars', value_trait='par_warn_count', bgcolor='white',
                 padding=50, fill_padding=True, bar_width=0.9,
                 value_mapper=value_mapper, index_mapper=index_mapper)
@@ -164,7 +182,7 @@ class AbstractAversiveExperiment(AbstractExperiment):
         value_range.add(plot.value)
         add_default_grids(plot, major_value=5)
         axis = DynamicBarplotAxis(plot, orientation='bottom',
-                source=self.analyzed, label_trait='pars', title='Parameter')
+                source=self.data, label_trait='pars', title='Parameter')
         plot.underlays.append(axis)
         label = PlotLabel(component=plot, text="Trial Count")
         plot.underlays.append(label)
@@ -180,14 +198,14 @@ class AbstractAversiveExperiment(AbstractExperiment):
 
         chart = OverlayPlotContainer(bgcolor='white', fill_padding=True)
 
-        plot = DynamicBarPlot(source=self.analyzed, label_trait='pars',
+        plot = DynamicBarPlot(source=self.data, label_trait='pars',
                 value_trait='par_hit_frac', bgcolor='white', padding=50,
                 fill_padding=True, bar_width=0.5, index_mapper=index_mapper,
                 value_mapper=value_mapper, index_offset=-0.2, alpha=0.5)
         index_range.add(plot.index)
 
         axis = DynamicBarplotAxis(plot, orientation='bottom',
-                source=self.analyzed, label_trait='pars', title='Parameter')
+                source=self.data, label_trait='pars', title='Parameter')
         plot.underlays.append(axis)
         axis = PlotAxis(plot, orientation='left', title='Fraction')
         plot.underlays.append(axis)
@@ -197,7 +215,7 @@ class AbstractAversiveExperiment(AbstractExperiment):
         add_default_grids(plot, major_value=0.2)
         chart.add(plot)
 
-        plot = DynamicBarPlot(source=self.analyzed, label_trait='pars',
+        plot = DynamicBarPlot(source=self.data, label_trait='pars',
                 value_trait='par_fa_frac', bgcolor='white', padding=50,
                 fill_padding=True, bar_width=0.5, fill_color=(1, 0, 0),
                 index_mapper=index_mapper, value_mapper=value_mapper,
@@ -233,19 +251,19 @@ class AbstractAversiveExperiment(AbstractExperiment):
                    Item('paradigm', style='custom', show_label=False), 
                    VGroup(
                        VGroup(
-                           Item('object.analyzed.mask_mode'),
-                           Item('object.analyzed.include_last'), 
-                           Item('object.analyzed.exclude_first'),
-                           Item('object.analyzed.exclude_last'),
+                           Item('object.data.mask_mode'),
+                           Item('object.data.include_last'), 
+                           Item('object.data.exclude_first'),
+                           Item('object.data.exclude_last'),
                            label='Mask settings',
                            show_border=True,
                            ),
                        VGroup(
-                            Item('object.analyzed.contact_offset',
+                            Item('object.data.contact_offset',
                                 label='Contact offset (s)'),
-                            Item('object.analyzed.contact_dur', 
+                            Item('object.data.contact_dur', 
                                 label='Contact duration (s)'),
-                            Item('object.analyzed.contact_reference'),
+                            Item('object.data.contact_reference'),
                            label='Contact settings',
                            show_border=True,
                             ),
@@ -256,9 +274,7 @@ class AbstractAversiveExperiment(AbstractExperiment):
                 ),
             VGroup(
                 Item('experiment_plot', editor=ComponentEditor(),
-                    show_label=False, width=1200, height=150),
-                Item('score_chart', editor=ComponentEditor(),
-                    show_label=False, width=1200, height=150),
+                    show_label=False, width=1000, height=150),
                 HGroup(
                     Item('par_count_chart', show_label=False,
                         editor=ComponentEditor(), width=150, height=150),
@@ -267,39 +283,11 @@ class AbstractAversiveExperiment(AbstractExperiment):
                     Item('par_dprime_chart', editor=ComponentEditor(),
                         width=150, height=150, show_label=False),
                     ),
+                Item('object.data.par_info', editor=par_info_editor,
+                    label='Performance Statistics'),
+                show_labels=False,
                 ),
-           show_labels=False,
-           )
-
-if __name__ == "__main__":
-    import tables
-    store = tables.openFile('test.h5', 'w')
-    # Will use the default paradigm
-
-    if False:
-        # This is an alternate way to load your experiment.  Rather than
-        # subclassing AversiveExperiment (i.e. creating
-        # AversiveMaskingExperiment) you could just provide the correct values).
-        paradigm = AversiveMaskingParadigm()        # The masking paradigm
-        controller = AversiveMaskingController()    # The masking controller
-        experiment = AversiveExperiment(paradigm=paradigm, store_node=store.root)
-        
-        # Use configure_traits when launching program via command line.  edit_traits
-        # is designed to work with interactive shells such as iPython.
-        experiment.configure_traits(handler=controller)
-
-        # When you call configure_traits (or edit_traits):
-        # * GUI is created
-        # * Controller (i.e. the handler) is created and hooked up to the GUI and
-        # model (i.e. the experiment)
-    else:
-        # Log detailed information to file
-        import logging
-        from time import strftime
-        filename = 'C:/experiments/logs/%s neurobehavior' % strftime('%Y%m%d_%H%M')
-        file_handler = logging.FileHandler(filename)
-        fmt = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        file_handler.setFormatter(fmt)
-        file_handler.setLevel(logging.DEBUG)
-        logging.root.addHandler(file_handler)
-        AversiveExperiment(store_node=store.root).configure_traits()
+            Item('object.data.summary_trial_log', editor=trial_log_editor,
+                    width=200),
+            show_labels=False,
+            )
