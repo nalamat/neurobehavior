@@ -196,10 +196,11 @@ def prepare_experiment(args, store_node):
         label = paradigm_class.class_traits()[parameter].label
         try:
             TrialSetting.add_class_trait(parameter, Float)
+        except TraitError:
+            pass
+        finally:
             column = ObjectColumn(name=parameter, label=label, width=75)
             columns.append(column)
-        except:
-            pass
     TrialSetting.parameters = args.rove
     trial_setting_editor.columns = columns
 

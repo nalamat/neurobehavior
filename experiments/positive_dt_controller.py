@@ -39,8 +39,8 @@ class PositiveDTController(AbstractPositiveController):
     def set_bandwidth(self, value):
         self.carrier.bandwidth = value
 
-    def get_sf(self, attenuation):
-        delta = self.current_attenuation-attenuation
+    def get_sf(self, attenuation, hw_attenuation):
+        delta = hw_attenuation-attenuation
         return 10**(delta/20.0)
 
     def set_duration(self, value):
@@ -49,10 +49,18 @@ class PositiveDTController(AbstractPositiveController):
     def trigger_next(self):
         if self.is_go():
             speaker = self.select_speaker()
+            self.current_speaker = speaker
             self.set_experiment_parameters(self.current_setting_go)
             self.iface_behavior.set_tag('go?', 1)
-            sf = self.get_sf(self.current_setting_go.attenuation)
+
+            attenuation = self.current_setting_go.attenuation
+            if speaker == 'primary':
+                hw_attenuation = self.current_primary_attenuation
+            else:
+                hw_attenuation = self.current_secondary_attenuation
+            sf = self.get_sf(attenuation, hw_attenuation)
             signal = sf*self._compute_signal(self.current_duration)
+            self.set_waveform(speaker, signal)
             self.iface_behavior.set_tag('signal_dur_n', len(signal))
         else:
             self.iface_behavior.set_tag('go?', 0)
