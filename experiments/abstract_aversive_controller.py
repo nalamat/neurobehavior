@@ -142,14 +142,13 @@ class AbstractAversiveController(AbstractExperimentController,
                     # current_par, compute a new num_safe, and update the warn
                     # signal.
                     log.debug('processing warning trial')
-                    #par = self.current_warn.parameter
                     self.model.data.log_trial(ts_start=ts_start, ts_end=ts_end,
                             ttype='warn', **self.current_warn.parameter_dict())
-                    self.current_num_safe = self.choice_num_safe()
                     self.current_warn = self.choice_setting.next()
 
                     # If there are 3 safes, current trial will be 1, 2, 3, 4
                     # where 4 is the warn
+                    self.update_context(self.current_warn.parameter_dict())
                     self.current_trial = 1
                     log.debug('new num_safe %d, new setting %s',
                               self.current_num_safe, self.current_warn)

@@ -386,7 +386,8 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
 
     @on_trait_change('model.paradigm.-ignore')
     def queue_change(self, instance, name, old, new):
-        if self.state <> 'halted':
+        print instance, name, old, new
+        if self.state <> 'halted' and not name.endswith('_items'):
             trait = instance.trait(name)
             if trait.immediate == True:
                 self.apply_change(instance, name, new)
@@ -498,18 +499,23 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
 
     def init_context(self):
         '''
-        Configuring the equipment based on initial values in the paradigm.  If
-        the trait has the metadata flag, 'init', set to True, then the
-        corresponding setter (set_trait_name) will be called with the initial
-        value of the trait.
+        Configuring the equipment based on initial values in the paradigm.
         '''
         for parameter in self.model.paradigm.get_parameters():
             value = getattr(self.model.paradigm, parameter)
             self.current_parameters[parameter] = value
         self.update_context()
 
-    def update_context(self):
-        context = evaluate_parameters(self.current_parameters)
+    def update_context(self, extra_context=None):
+        '''
+        Revaluate all context-dependent variables
+
+        If extra_content is provided, it will be included in the local
+        namespace.  If extra_content defines the value of a parameter, that
+        value will take precedence.
+        '''
+        context = evaluate_parameters(self.current_parameters, extra_context)
+        print extra_context
         for parameter, value in context.items():
             if self.current_context.get(parameter, None) != value:
                 getattr(self, 'set_' + parameter)(value)
@@ -520,6 +526,6 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
         context = []
         for k, v in self.current_context.items():
             label = self.model.paradigm.trait(k).label
-            context.append((label, v))
+            context.append((label, v, k))
         context.sort()
         return context

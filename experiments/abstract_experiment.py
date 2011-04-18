@@ -20,7 +20,10 @@ from enthought.traits.ui.tabular_adapter import TabularAdapter
 
 class ContextAdapter(TabularAdapter):
 
-    columns = [('Parameter'), ('Value')]
+    columns = [('Parameter'), ('Value'), ('Variable')]
+
+    def get_width(self, object, trait, column):
+        return 100
 
 context_editor = TabularEditor(adapter=ContextAdapter(), editable=False)
 
@@ -54,7 +57,6 @@ class AbstractExperiment(PhysiologyExperimentMixin):
         KeyBinding(binding1='Ctrl-m', method_name='toggle_maximized'),
         KeyBinding(binding1='Ctrl-f', method_name='toggle_fullscreen'),
         KeyBinding(binding1='Ctrl-s', method_name='swap_screens'),
-        #KeyBinding(binding1='Ctrl-r', method_name='start'),
         )
 
     traits_group = VGroup(
