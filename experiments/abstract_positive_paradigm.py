@@ -16,6 +16,8 @@ from enthought.traits.ui.api import TableEditor, TextEditor
 
 from trial_setting import TrialSetting, trial_setting_editor
 
+from eval import ExpressionTrait
+
 class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
 
     parameters = List(Instance(TrialSetting), [], store='child', init=True)
@@ -27,10 +29,10 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
                             init=True)
     nogo_parameter  = Float(store='attribute', init=True)
 
-    reward_duration = Float(1.0, store='attribute', ignore=True, 
-                            label='Reward duration (s)')
-    pump_rate       = Float(1.5, store='attribute', init=True, 
-                            label='Pump rate (ml/min)')
+    reward_duration = ExpressionTrait(1.0, store='attribute', ignore=True)
+    reward_duration = ExpressionTrait(1.0, store='attribute', ignore=True)
+    pump_rate       = ExpressionTrait(1.5, store='attribute', init=True)
+    reward_volume   = ExpressionTrait(25, store='attribute', init=True)
     reward_volume   = Float(25, store='attribute', init=True, 
                             label=u'Reward volume (ul)')
 
@@ -48,31 +50,28 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
         #self.reward_volume = value * (self.reward_duration/60.0) * 1e3
         self.reward_duration = self.reward_volume / (value*1e3) * 60.0
 
-    min_nogo = Int(0, store='attribute', init=True)
-    max_nogo = Int(0, store='attribute', init=True)
+    nogo = ExpressionTrait('randint(2, 5)')
 
     # Needs to be CBool because Pytables returns numpy.bool_ type which gets
     # rejected by Bool trait
     repeat_FA = CBool(store='attribute', init=True)
 
-    signal_offset_delay = Float(0.5, store='attribute', init=True,
-                                label='Signal offset delay (s)')
-    intertrial_duration = Float(0.5, store='attribute', init=True,
-                                label='Minimum intertrial duration (s)')
+    signal_offset_delay = ExpressionTrait(0.5, store='attribute', init=True)
+    intertrial_duration = ExpressionTrait(0.5, store='attribute', init=True)
+    reaction_window_delay = ExpressionTrait(0, store='attribute', init=True)
+    reaction_window_duration = ExpressionTrait(1.5, store='attribute', init=True)
 
-    reaction_window_delay = Float(0, store='attribute', init=True)
-    reaction_window_duration = Float(1.5, store='attribute', init=True)
 
-    response_window_duration = Float(3, store='attribute', init=True)
+    response_window_duration = ExpressionTrait(3, store='attribute', init=True)
 
     timeout_trigger  = Enum('FA only', 'Anytime', store='attribute', init=True)
-    timeout_duration = Float(5, store='attribute', init=True)
-    timeout_grace_period = Float(2.5, store='attribute', init=True)
+    timeout_duration = ExpressionTrait(5, store='attribute', init=True)
+    timeout_grace_period = ExpressionTrait(2.5, store='attribute', init=True)
     fa_puff_duration = Float(0.2, store='attribute', init=True, 
                              label='FA puff duration (s)')
 
-    poke_duration_lb = Float(0.1, store='attribute', init=True)
-    poke_duration_ub = Float(0.5, store='attribute', init=True)
+    poke_duration = ExpressionTrait('uniform(0.1, 0.5)', store='attribute',
+            init=True)
 
     parameter_view = VGroup(
             Item('nogo_parameter'),
@@ -88,14 +87,15 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
                 Include('parameter_view'),
                 Include('signal_group'),
                 VGroup(
-                    Item('min_nogo', label='Minimum NOGO'),
-                    Item('max_nogo', label='Maximum NOGO'),
+                    Item('nogo', label='NOGO'),
                     Item('repeat_FA', label='Add a NOGO if false alarm?'),
                     label='Trial',
                     ),
                 VGroup(
-                    'signal_offset_delay',
-                    'intertrial_duration',
+                    Item('signal_offset_delay',
+                         label='Signal offset delay (s)'),
+                    Item('intertrial_duration',
+                         label='Minimum intertrial duration (s)'),
                     Item('reaction_window_delay',
                          label='Reaction window delay (s)'),
                     Item('reaction_window_duration',
@@ -108,9 +108,7 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
                          label='TO minimum duration (s)'),
                     'fa_puff_duration',
                     #Item('timeout_grace_period', 
-                    #     label='TO grace period (s)'),
-                    Item('poke_duration_lb', label='Min poke duration (s)'),
-                    Item('poke_duration_ub', label='Max poke duration (s)'),
+                    Item('poke_duration', label='Poke duration (s)'),
                     label='Timing',
                     ),
                 VGroup(
@@ -120,10 +118,10 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
                     label='Reward',
                     ),
                 ),
-            resizable=False,
+            resizable=True,
             title='Positive paradigm editor',
             width=100,
             )
 
 if __name__ == '__main__':
-    PositiveParadigm().configure_traits()
+    AbstractPositiveParadigm().configure_traits()
