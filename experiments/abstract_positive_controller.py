@@ -357,9 +357,11 @@ class AbstractPositiveController(AbstractExperimentController,
         self.set_pump_volume(value)
 
     def set_primary_attenuation(self, value):
+        self.current_primary_attenuation = value
         self.iface_behavior.set_tag('att1', value)
 
     def set_secondary_attenuation(self, value):
+        self.current_secondary_attenuation = value
         self.iface_behavior.set_tag('att2', value)
 
     def set_waveform(self, speaker, signal):
