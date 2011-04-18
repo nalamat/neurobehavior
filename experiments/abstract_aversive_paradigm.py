@@ -9,6 +9,8 @@ from trial_setting import TrialSetting, trial_setting_editor
 from abstract_experiment_paradigm import AbstractExperimentParadigm
 from pump_paradigm_mixin import PumpParadigmMixin
 
+from eval import ExpressionTrait
+
 class AbstractAversiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
     '''Defines an aversive paradigm, but not the signals that will be used.
     This allows us to use either a generic circuit with two buffers for the
@@ -31,27 +33,16 @@ class AbstractAversiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
 
     # By default, Range provides a slider as the GUI widget.  Note that you can
     # override the default widget if desired.
-    lick_th = Range(0.0, 1.0, 0.75, store='attribute', init=True)
-    aversive_delay = Float(1, store='attribute', init=True)
-    aversive_duration = Float(0.3, store='attribute', init=True)
+    lick_th = Range(0.0, 1.0, 0.75, store='attribute')
+    aversive_delay = ExpressionTrait(1)
+    aversive_duration = ExpressionTrait(0.3)
 
-    min_safe = Int(2, store='attribute', init=True)
-    max_safe = Int(4, store='attribute', init=True)
-    trial_duration = Float(1.0, store='attribute', init=True)
-
-    #===========================================================================
-    # Error checks
-    #===========================================================================
-    err_num_trials = Property(Bool, depends_on='min_safe, max_safe', error=True)
-    mesg_num_trials = 'Max trials must be >= min trials'
-
-    def _get_err_num_trials(self):
-        return self.min_safe > self.max_safe
+    num_safe = ExpressionTrait('randint(2, 5)')
+    trial_duration = ExpressionTrait(1.0)
 
     #===========================================================================
     # The views available
     #===========================================================================
-
     par_group = VGroup(
             # Use the attribute called 'par_remind' and give it a label of
             # 'Remind Parameter' in the GUI.  Create the appropriate widget for
@@ -68,10 +59,7 @@ class AbstractAversiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
             label='Signal Parameters')
 
     trial_group = VGroup(
-            Item('min_safe', label='Minimum safe trials',
-                 invalid='err_num_trials'),
-            Item('max_safe', label='Maximum safe trials',
-                 invalid='err_num_trials'),
+            Item('num_safe', label='Number of safe trials'),
             Item('trial_duration', label='Trial duration (s)'),
             )
 

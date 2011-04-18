@@ -44,7 +44,7 @@ class AbstractAversiveController(AbstractExperimentController,
                 src_type='int8', dest_type='float32', block_size=24)
 
     def start_experiment(self, info):
-        self.init_paradigm(self.model.paradigm)
+        self.init_context()
         # Pump will halt when it has infused the requested volume.  To allow it
         # to infuse continuously, we set the volume to 0.
         self.iface_pump.set_volume(0)
@@ -231,20 +231,9 @@ class AbstractAversiveController(AbstractExperimentController,
             if self.current_warn is None:
                 self.current_warn = self.choice_setting.next()
 
-    def set_min_safe(self, value):
-        self.current_min_safe = value
-        self.reset_safes()
-
-    def set_max_safe(self, value):
-        self.current_max_safe = value
-
-    def reset_safes(self):
-        lb = self.current_min_safe
-        ub = self.current_max_safe
-        if lb is not None and ub is not None:
-            self.choice_num_safe = partial(np.random.randint, lb, ub+1)
-            self.current_num_safe = self.choice_num_safe()
-
+    def set_num_safe(self, value):
+        self.current_num_safe = value
+         
     def set_safe(self, value):
         self.current_safe = deepcopy(value)
 

@@ -1,5 +1,6 @@
 import numpy as np
-from enthought.traits.ui.api import TextEditor, View, Item
+from enthought.traits.ui.api import (TextEditor, View, Item, BooleanEditor,
+        CompoundEditor)
 from enthought.traits.api import Callable, HasTraits, Instance
 
 class ParameterExpression(object):
@@ -10,19 +11,18 @@ class ParameterExpression(object):
             'uniform':  np.random.uniform,
             }
 
-
     def __init__(self, string):
-        self.string = string
-        self.code = compile(string, '<string>', 'eval')
+        self.string = str(string)
+        self.code = compile(self.string, '<string>', 'eval')
         try:
             # Do a quick check to see if any syntax errors pop out.  NameError
             # is going to be a common one (especially when we are making it
             # dependent on other modules).
-            self.eval({})
+            self.eval()
         except NameError:
             pass
 
-    def eval(self, context):
+    def eval(self, context=None):
         return eval(self.code, self.GLOBALS, context)
 
     def __str__(self):
@@ -32,26 +32,30 @@ def evaluate_parameters(parameters, extra_context=None):
     context = {}
     if extra_context is not None:
         context.update(extra_context)
-
     to_evaluate = list(parameters.items())
-    maxiter = len(to_evaluate) * 5
-    i = 0
 
-    while len(to_evaluate) > 0 and i < maxiter:
-        parameter, expression = to_evaluate.pop(0)
-        if isinstance(expression, ParameterExpression):
-            try:
-                context[parameter] = expression.eval(context)
-            except NameError, e:
-                to_evaluate.append((parameter, expression))
+    remaining = len(to_evaluate)
+
+    while True:
+        pending = []
+        for parameter, expression in to_evaluate:
+            if isinstance(expression, ParameterExpression):
+                try:
+                    context[parameter] = expression.eval(context)
+                except NameError, e:
+                    # We're ok with NameErrors since the parameter likely requires
+                    # some context to evaluate properly
+                    pending.append((parameter, expression))
+            else:
+                context[parameter] = expression
+
+        if len(pending) == 0:
+            return context
+        elif len(pending) == remaining:
+            raise ValueError, "Circular dependency found"
         else:
-            context[parameter] = expression
-            
-        i += 1
-    if len(to_evaluate) > 0:
-        raise ValueError, "Circular dependency found"
-    else:
-        return context
+            to_evaluate = pending
+            pending = []
 
 class ExpressionEditor(TextEditor):
 
@@ -61,6 +65,8 @@ from enthought.traits.api import TraitType
 
 class ExpressionTrait(TraitType):
 
+    store = 'attribute'
+
     def validate(self, object, name, value):
         if isinstance(value, ParameterExpression):
             return value
@@ -69,13 +75,17 @@ class ExpressionTrait(TraitType):
     def create_editor(self):
         return ExpressionEditor()
 
+    def init(self):
+        if not isinstance(self.default_value, ParameterExpression):
+            self.default_value = ParameterExpression(self.default_value)
+
 if __name__ == '__main__':
     class TestEditor(HasTraits):
-        expression = ExpressionTrait()
+        expression = ExpressionTrait('randint(1, 2)')
         traits_view = View(Item('expression'))
     test = TestEditor()
-    #test.configure_traits()
-    print test.expression
+    test.configure_traits()
+    print test.expression.eval()
 
     parameters = {
             'a':    ParameterExpression('5'),
@@ -87,5 +97,8 @@ if __name__ == '__main__':
             'g':    ParameterExpression('range(a, b)'),
             'h':    ParameterExpression('randint(5, 6)'),
             'i':    ParameterExpression('uniform(1, 5)'),
+            'j':    32,
+            'k':    65,
+            'l':    ParameterExpression('j+k'),
             }
     print evaluate_parameters(parameters)

@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from enthought.traits.api import HasTraits, Any, Instance, Property
-from enthought.traits.ui.api import View, Include, VGroup, Item
+from enthought.traits.ui.api import View, Include, VGroup, Item, Tabbed
 
 from cns.data.h5_utils import append_date_node, append_node
 
@@ -14,6 +14,15 @@ from enthought.traits.ui.key_bindings import KeyBinding, KeyBindings
 
 import logging
 log = logging.getLogger(__name__)
+
+from enthought.traits.ui.api import TabularEditor
+from enthought.traits.ui.tabular_adapter import TabularAdapter
+
+class ContextAdapter(TabularAdapter):
+
+    columns = [('Parameter'), ('Value')]
+
+context_editor = TabularEditor(adapter=ContextAdapter(), editable=False)
 
 class AbstractExperiment(PhysiologyExperimentMixin):
 
@@ -45,12 +54,16 @@ class AbstractExperiment(PhysiologyExperimentMixin):
         KeyBinding(binding1='Ctrl-m', method_name='toggle_maximized'),
         KeyBinding(binding1='Ctrl-f', method_name='toggle_fullscreen'),
         KeyBinding(binding1='Ctrl-s', method_name='swap_screens'),
-        KeyBinding(binding1='Ctrl-r', method_name='start'),
+        #KeyBinding(binding1='Ctrl-r', method_name='start'),
         )
 
     traits_group = VGroup(
             Item('handler.toolbar', style='custom'),
-            Item('paradigm', style='custom'),
+            Tabbed(
+                Item('paradigm', style='custom'),
+                Item('handler.current_context', editor=context_editor),
+                show_labels=False,
+                ),
             show_labels=False,
             )
 
