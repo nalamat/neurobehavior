@@ -181,11 +181,7 @@ class AbstractPositiveController(AbstractExperimentController,
 
             # In this context, current_trial reflects the trial that just
             # occured
-            if self.current_trial == self.current_num_nogo + 1:
-                last_ttype = 'GO'
-            else:
-                last_ttype = 'NOGO'
-
+            last_ttype = 'GO' if self.is_go() else 'NOGO'
             self.log_trial(ts_start, ts_end, last_ttype)
 
             # Increment num_nogo
@@ -245,45 +241,13 @@ class AbstractPositiveController(AbstractExperimentController,
                 self.current_trial = 1
                 self.current_setting_go = self.choice_parameter.next()
 
-    def set_poke_duration_lb(self, value):
+    def set_poke_duration(self, value):
         # Save requested value for parameter as an attribute because we need
         # this value so we can randomly select a number between the lb and ub
-        self.current_poke_duration_lb = value
-        self.reset_poke_duration()
+        self.current_poke_duration = value
 
-    def set_poke_duration_ub(self, value):
-        self.current_poke_duration_ub = value
-        self.reset_poke_duration()
-
-    def reset_poke_duration(self):
-        lb = self.current_poke_duration_lb
-        ub = self.current_poke_duration_ub
-
-        # Ensure that poke_duration is only reset after both lb and ub are set
-        if lb is not None and ub is not None:
-            self.choice_poke_dur = partial(np.random.uniform, lb, ub)
-            self.current_poke_dur = self.choice_poke_dur()
-            self.set_poke_duration(self.current_poke_dur)
-
-    def set_min_nogo(self, value):
-        self.current_min_nogo = value
-        self.reset_nogo()
-
-    def set_max_nogo(self, value):
-        self.current_max_nogo = value
-        self.reset_nogo()
-
-    def reset_nogo(self):
-        lb = self.current_min_nogo
-        ub = self.current_max_nogo
-
-        # Ensure that NOGO count is only reset after both lb and ub are set
-        if lb is not None and ub is not None:
-            self.choice_num_nogo = partial(np.random.randint, lb, ub+1)
-            # Don't update NOGO count unless this is the first time it has been
-            # called.
-            if self.current_num_nogo is None:
-                self.current_num_nogo = self.choice_num_nogo()
+    def set_num_nogo(self, value):
+        self.current_num_nogo = value
 
     def set_repeat_FA(self, value):
         self.current_repeat_FA = value
@@ -292,23 +256,17 @@ class AbstractPositiveController(AbstractExperimentController,
         self.iface_behavior.cset_tag('int_dur_n', value, 's', 'n')
 
     def set_reaction_window_delay(self, value):
+        self.iface_behavior.cset_tag('react_del_n', value, 's', 'n')
+        # Check to see if the conversion of s to n resulted in a value of 0.
+        # If so, set the delay to 1 sample (0 means that the reaction window
+        # never triggers due to the nature of the RPvds component)
+        if self.iface_behavior.get_tag('react_del_n') < 2:
+            self.iface_behavior.set_tag('react_del_n', 2)
         self.current_reaction_window_delay = value
-        self.update_reaction_window_delay(value)
 
-    def update_reaction_window_delay(self, value):
-        if value is not None:
-            self.iface_behavior.cset_tag('react_del_n', value, 's', 'n')
-            # Check to see if the conversion of s to n resulted in a value of 0.
-            # If so, set the delay to 1 sample (0 means that the reaction window
-            # never triggers due to the nature of the RPvds component)
-            if self.iface_behavior.get_tag('react_del_n') < 2:
-                self.iface_behavior.set_tag('react_del_n', 2)
-
-    def set_reaction_window_duration(self, value, offset=0):
-        self.current_reaction_window_duration = value
+    def set_reaction_window_duration(self, value):
         delay = self.current_reaction_window_delay
-        if value is not None and delay is not None:
-            self.iface_behavior.cset_tag('react_end_n', delay+value+offset, 's', 'n')
+        self.iface_behavior.cset_tag('react_end_n', delay+value, 's', 'n')
 
     def set_response_window_duration(self, value):
         self.iface_behavior.cset_tag('resp_dur_n', value, 's', 'n')
