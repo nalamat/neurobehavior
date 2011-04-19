@@ -5,7 +5,7 @@ from enthought.traits.api import Instance, Bool, HasTraits, Button, Tuple, Float
 from enthought.savage.traits.ui.svg_button import SVGButton
 from cns.widgets import icons
 
-from cns.equipment.new_era import PumpInterface
+from new_era import PumpInterface
 
 class PumpToolBar(ToolBar):
     '''
