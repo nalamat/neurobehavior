@@ -88,7 +88,9 @@ class AbstractPositiveController(AbstractExperimentController,
         self.pipeline_TTL2 = deinterleave_bits(targets2)
 
     def start_experiment(self, info):
-        self.init_paradigm(self.model.paradigm)
+        self.init_context()
+        self.update_context()
+
         self.iface_pump.set_trigger(start='rising', stop=None)
         self.iface_pump.set_direction('infuse')
 
@@ -193,11 +195,10 @@ class AbstractPositiveController(AbstractExperimentController,
             log.debug('Last trial: %d, NOGO count: %d', self.current_trial,
                       self.current_num_nogo)
 
-            if self.current_trial == self.current_num_nogo + 1:
+            if self.is_go():
                 # GO was just presented.  Set up for next block of trials.
-                self.current_num_nogo = self.choice_num_nogo()
                 self.current_setting_go = self.choice_parameter.next()
-                self.current_poke_dur = self.choice_poke_dur()
+                self.update_context(self.current_setting_go.parameter_dict())
                 self.current_trial = 1
             else:
                 self.current_trial += 1
@@ -224,7 +225,7 @@ class AbstractPositiveController(AbstractExperimentController,
                 self.current_parameters, self.model.paradigm.parameters)
 
     def set_parameters(self, value):
-        self.current_parameters = deepcopy(value)
+        self.current_go_parameters = deepcopy(value)
         self.reset_sequence()
 
     def set_parameter_order(self, value):
@@ -232,8 +233,9 @@ class AbstractPositiveController(AbstractExperimentController,
         self.reset_sequence()
 
     def reset_sequence(self):
+        print 'resetting sequence'
         order = self.current_order
-        parameters = self.current_parameters
+        parameters = self.current_go_parameters
         if order is not None and parameters is not None:
             self.choice_parameter = order(parameters)
             # Refresh experiment state
@@ -265,7 +267,7 @@ class AbstractPositiveController(AbstractExperimentController,
         self.current_reaction_window_delay = value
 
     def set_reaction_window_duration(self, value):
-        delay = self.current_reaction_window_delay
+        delay = self.current_context['reaction_window_delay']
         self.iface_behavior.cset_tag('react_end_n', delay+value, 's', 'n')
 
     def set_response_window_duration(self, value):

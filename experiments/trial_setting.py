@@ -16,6 +16,9 @@ class TrialSetting(HasTraits):
         pars = zip(self.parameters, self.parameter_values())
         return ', '.join('{}: {}'.format(n, v) for n, v in pars)
 
+    def __repr__(self):
+        return '<TrialSetting {}>'.format(str(self))
+
     def __cmp__(self, other):
         # We want them to be sorted by the parameter, which is important for
         # controlling whether the sequence is ascending or descending.

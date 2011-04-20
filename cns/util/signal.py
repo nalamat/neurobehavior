@@ -40,11 +40,12 @@ def get_rms_power_cr(fs, signal, freq, cr=27.5):
 def get_rms_power_conv(fs, signal, freq):
     # TODO: this does not appear to give us the right number for the pistonphone cal!
     t = np.arange(len(signal)) / fs
-    sin_component = np.sin(2 * np.pi * t * freq)
-    cos_component = np.cos(2 * np.pi * t * freq)
-    a = (signal * sin_component).mean()
-    b = (signal * cos_component).mean()
-    amplitude = (a ** 2 + b ** 2) ** 0.5
-    phi = np.arctan2(b, a)
-    return (amplitude ** 2) ** 0.5, phi
 
+    real_component = np.sin(2*np.pi*t*freq) * signal
+    imag_component = np.cos(2*np.pi*t*freq) * signal
+
+    real = real_component.mean()
+    imag = imag_component.mean()
+    vector = complex(real, imag)
+
+    return abs(vector), angle(vector)

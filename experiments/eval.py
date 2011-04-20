@@ -13,12 +13,14 @@ class ParameterExpression(object):
             'arange':   np.arange,
             'randint':  np.random.randint,
             'uniform':  np.random.uniform,
+            'exponential': np.random.exponential,
+            'clip': np.clip,
             'choice':   choice,
             }
 
     def __init__(self, string):
         self.string = str(string)
-        self.code = compile(self.string, '<string>', 'eval')
+        self._code = compile(self.string, '<string>', 'eval')
         try:
             # Do a quick check to see if any syntax errors pop out.  NameError
             # is going to be a common one (especially when we are making it
@@ -28,12 +30,24 @@ class ParameterExpression(object):
             pass
 
     def eval(self, context=None):
-        return eval(self.code, self.GLOBALS, context)
+        return eval(self._code, self.GLOBALS, context)
 
     def __str__(self):
         return self.string
 
-def evaluate_parameters(parameters, extra_context=None):
+    def __getstate__(self):
+        '''
+        Code objects cannot be pickled
+        '''
+        state = self.__dict__.copy()
+        del state['_code']
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self._code = compile(self.string, '<string>', 'eval')
+
+def eval_context(parameters, extra_context=None):
     context = {}
     if extra_context is not None:
         context.update(extra_context)
@@ -70,7 +84,7 @@ from enthought.traits.api import TraitType
 
 class ExpressionTrait(TraitType):
 
-    store = 'attribute'
+    metadata = { 'store': 'attribute' }
 
     def validate(self, object, name, value):
         if isinstance(value, ParameterExpression):

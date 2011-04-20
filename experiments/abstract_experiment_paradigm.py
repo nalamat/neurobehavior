@@ -5,15 +5,17 @@ class AbstractExperimentParadigm(HasTraits):
     speaker_mode = Enum('primary', 'secondary', 'both', 'random',
                         store='attribute', label='Speaker mode')
 
+    parameter_info = Property(ignore=True)
+
     def get_parameters(self):
         filter = {
                 'editable': lambda x: x is not False,
-                'type':     lambda x: x != 'event',
+                'type':     lambda x: x not in ('event', 'python'),
                 'ignore':   lambda x: x is not True,
                 }
         return sorted(self.trait_names(**filter))
 
-    def get_parameter_info(self):
+    def _get_parameter_info(self):
         return dict((n, self.trait(n).label) for n in self.get_parameters())
 
     def is_valid(self):

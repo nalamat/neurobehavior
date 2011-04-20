@@ -21,7 +21,6 @@ from colors import paired_colors, paired_colors_255
 
 class PositiveDTExperiment(AbstractPositiveExperiment):
 
-    paradigm            = Instance(PositiveDTParadigm, ())
     plot_data           = Dict(Str, Instance(ArrayDataSource))
     plot_range          = Dict(Str, Instance(DataRange1D))
     color_index         = Int(0)

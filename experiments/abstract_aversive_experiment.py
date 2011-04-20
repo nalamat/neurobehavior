@@ -1,7 +1,8 @@
 from numpy import clip
 
 from enthought.traits.api import Instance, on_trait_change
-from enthought.traits.ui.api import View, Item, VGroup, HGroup, HSplit, Tabbed
+from enthought.traits.ui.api import (View, Item, VGroup, HGroup, HSplit, Tabbed,
+    Include)
 from enthought.enable.api import Component, ComponentEditor
 from enthought.chaco.api import DataRange1D, LinearMapper, PlotLabel, \
         VPlotContainer, PlotAxis, OverlayPlotContainer, Legend, ToolTip
@@ -224,12 +225,9 @@ class AbstractAversiveExperiment(AbstractExperiment):
         chart.add(plot)
         self.par_score_chart = chart
 
-    from abstract_experiment import context_editor
-
     traits_group = HSplit(
             VGroup(
                 Item('handler.toolbar', style='custom'),
-                Item('handler.current_context_list', editor=context_editor),
                 VGroup(
                     Item('animal', show_label=False),
                     Item('handler.status', label='Status'),
@@ -272,6 +270,7 @@ class AbstractAversiveExperiment(AbstractExperiment):
                             ),
                        label='Analysis Parameters',
                        ),
+                    Include('context_group'), # defined in abstract_experiment
                    ),
                 show_labels=False,
                 ),

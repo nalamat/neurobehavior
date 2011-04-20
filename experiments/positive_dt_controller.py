@@ -13,6 +13,7 @@ class PositiveDTController(AbstractPositiveController):
     output      = Instance(blocks.Block)
 
     def log_trial(self, ts_start, ts_end, last_ttype):
+        print self.current_speaker
         self.model.data.log_trial(ts_start=ts_start, ts_end=ts_end,
                 ttype=last_ttype, speaker=self.current_speaker,
                 **self.current_context)
@@ -47,9 +48,10 @@ class PositiveDTController(AbstractPositiveController):
         self.current_duration = value
 
     def trigger_next(self):
+        speaker = self.select_speaker()
+        self.current_speaker = speaker
+
         if self.is_go():
-            speaker = self.select_speaker()
-            self.current_speaker = speaker
             self.set_experiment_parameters(self.current_setting_go)
             self.iface_behavior.set_tag('go?', 1)
 
@@ -65,9 +67,6 @@ class PositiveDTController(AbstractPositiveController):
         else:
             self.iface_behavior.set_tag('go?', 0)
             self.iface_behavior.set_tag('signal_dur_n', 1)
-
-        # Update settings
-        self.set_poke_duration(self.current_poke_dur)
 
         # Commence next trial
         self.iface_behavior.trigger(1)

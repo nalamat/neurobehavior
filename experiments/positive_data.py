@@ -120,6 +120,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
         # Typically we want score to be True; however, for debugging purposes it
         # is convenient to set score to False that way we don't need to provide
         # the "dummy" spout and poke data required for scoring.
+        del kwargs['parameters']
         if score:
             ts_start = kwargs['ts_start']
             ts_end = kwargs['ts_end']
@@ -417,19 +418,6 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
         fa = np.sum(self.fa_seq)
         cr = np.sum(self.cr_seq)
         return fa/(fa+cr)
-
-    #@cached_property
-    #def _get_global_fa_frac(self):
-    #    nogo_count = len(self.nogo_indices)
-    #    if nogo_count == 0:
-    #        return np.nan
-    #    nogo_resp = np.take(self.resp_seq, self.nogo_indices)
-    #    # fa_mask is a boolean array where 1 indicates the subject went to the
-    #    # spout.  We can simply compute the sum of this array to determien how
-    #    # many times the subject went to the spout (e.g. "false alarmed")
-    #    fa_mask = nogo_resp == 'spout'
-    #    fa_count = np.sum(fa_mask)
-    #    return float(fa_count)/float(nogo_count)
 
     @cached_property
     def _get_go_trial_count(self):
