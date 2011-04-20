@@ -1,5 +1,4 @@
-from enthought.etsconfig.api import ETSConfig
-ETSConfig.toolkit='qt4'
+import cPickle as pickle
 
 from enthought.pyface.api import error, information
 from cns.data.ui.cohort import CohortView, CohortViewHandler
@@ -104,7 +103,6 @@ class ExperimentLauncher(CohortViewHandler):
             # and fall back to the default settings.
             store_node = get_or_append_node(animal_node, 'experiments')
             paradigm_node = get_or_append_node(store_node, 'last_paradigm')
-            #paradigm_name = self.experiment.__name__
             paradigm_name = EXPERIMENTS[self.args.type]['node_name']
             paradigm = None
             try:
@@ -274,8 +272,7 @@ def get_invalid_parameters(args):
     parameters = set(args.rove)
     parameters.update(args.analyze)
     paradigm = EXPERIMENTS[args.type]['paradigm'][0]()
-    valid_parameters = paradigm.get_parameters()
-    return [p for p in parameters if p not in valid_parameters]
+    return [p for p in parameters if p not in paradigm.get_parameters()]
 
 # Define the classes required for each experiment.
 EXPERIMENTS = {

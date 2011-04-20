@@ -19,7 +19,6 @@ def next_id(element, name=''):
     return next_id
 
 def get_np_dtype(trait):
-    #types = ['object' if t.startswith('date') else t for t in trait.col_types]
     return dtype(zip(trait.col_names, trait.col_types))
 
 def get_traits(object, filter_readonly=False, filter_events=True, **metadata):
@@ -192,10 +191,9 @@ def add_or_update_object(object, node, name=None, as_subnode=True):
 
 def add_or_update_object_node(object, object_node):
     # Info that allows us to recreate the object later
+    log.debug('Saving %r to %r', object, object_node)
     object_node._f_setAttr('module', object.__class__.__module__)
     object_node._f_setAttr('klass', object.__class__.__name__)
-    #else: # We are supposed to use this node!
-        #object_node = node
 
     # Now we add the metadata for the object TODO: add support for deleted
     # metadata.  Right now this is unsupported because we don't need this use
@@ -207,10 +205,13 @@ def add_or_update_object_node(object, object_node):
                 )
 
     for mode, store in store_map:
-        log.debug('Storing %s data', mode.upper())
+        log.debug('Processing type %s for %r', mode.upper(), object)
         for name, trait in object.class_traits(store=mode).items():
-            log.debug('Storing %s %s', mode, name)
-            store(object_node, object, name, trait)
+            try:
+                log.debug('Storing %s %s', mode, name)
+                store(object_node, object, name, trait)
+            except BaseException, e:
+                log.exception(e)
 
     append_metadata(object, object_node)
     object_node._v_file.flush()
@@ -293,16 +294,6 @@ def switch_datetime_fmt(table, trait, parser):
 
         table = [tuple(row) for row in table]
         table = array(table, dtype=dtype)
-
-        #for cname, ctype in dtype:
-        #    if ctype.startswith('datetime'):
-        #        res = ctype[-2]
-        #        table[cname] = parser(table[cname], res)
-
-        # This is an ugly hack required by Numpy v1.3.  Once datetime support is
-        # included in Numpy (possibly v1.5) much of the work can be delegated to
-        # Numpy.  Possibly some of the other libraries that depend on numpy
-        # (e.g. PyTables) will support it better as well.
         return [tuple(e) for e in table.tolist()]
     else:
         return []

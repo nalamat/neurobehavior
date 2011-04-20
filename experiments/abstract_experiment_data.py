@@ -44,8 +44,8 @@ class AbstractExperimentData(PhysiologyDataMixin, PumpDataMixin):
     @cached_property
     def _get_trial_log(self):
         if len(self._trial_log) > 0:
-            return np.rec.fromrecords(self._trial_log,
-                    names=self._trial_log_columns)
+            col_names = self._trial_log_columns
+            return np.rec.fromrecords(self._trial_log, names=col_names)
         else:
             return []
 
@@ -91,7 +91,7 @@ class AbstractExperimentData(PhysiologyDataMixin, PumpDataMixin):
         cmp_array = np.empty(1, dtype=object)
         for par in self.pars:
             cmp_array[0] = par
-            m = self.par_seq == cmp_array
+            m = self.par_seq == cmp_array 
             result.append(m)
         return result
 
@@ -112,4 +112,3 @@ class AbstractExperimentData(PhysiologyDataMixin, PumpDataMixin):
             self._trial_log.append(record)
         else:
             raise ValueError, "Invalid log_trial attempt"
-

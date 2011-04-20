@@ -12,8 +12,6 @@ import cns
 
 from abstract_experiment import AbstractExperiment
 from positive_data import PositiveData
-from abstract_positive_paradigm import AbstractPositiveParadigm
-from abstract_positive_controller import AbstractPositiveController
 
 from enthought.chaco.api import DataRange1D, LinearMapper, PlotAxis, PlotGrid, \
         OverlayPlotContainer
@@ -36,7 +34,7 @@ from colors import color_names
 class ParInfoAdapter(TabularAdapter):
 
     color_map  = Dict
-    parameters = List(['parameter'])
+    parameters = List
 
     columns = [ ('P', 'parameter'),
                 ('Hit %', 'hit_frac'), 
@@ -152,7 +150,7 @@ class ParameterAdapter(TabularAdapter):
 class AbstractPositiveExperiment(AbstractExperiment):
 
     index_range         = Any
-    par_info_adapter    = TabularAdapter()
+    par_info_adapter    = ParInfoAdapter()
     par_info_editor     = TabularEditor(editable=False,
                                         adapter=par_info_adapter)
 
@@ -375,7 +373,11 @@ class AbstractPositiveExperiment(AbstractExperiment):
                 Item('handler.toolbar', style='custom'),
                 Include('pump_group'),
                 Include('status_group'),
-                Item('paradigm', style='custom', editor=InstanceEditor()),
+                Tabbed(
+                    Item('paradigm', style='custom', editor=InstanceEditor()),
+                    Include('context_group'),
+                    show_labels=False,
+                    ),
                 show_labels=False,
             ),
             Include('plots_group'),

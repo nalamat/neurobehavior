@@ -7,15 +7,15 @@ class PositiveDTParadigm(AbstractPositiveParadigm):
 
     rise_fall_time      = Float(0.0025, store='attribute', init=True,
                                 label='Rise/fall time (s)')
-    fc                  = Float(15e3, store='attribute', init=True,
+    fc                  = Float(12e3, store='attribute', init=True,
                                 label='Center frequency (Hz)')
-    bandwidth           = Float(5e3, store='attribute', init=True,
+    bandwidth           = Float(4e3, store='attribute', init=True,
                                 label='Bandwidth (Hz)')
     attenuation         = Float(20, store='attribute', init=True,
                                 label='Attenuation (dB)')
-    primary_attenuation = Enum(0, 20, 40, 60, store='attribute', init=True,
+    primary_attenuation = Enum(60, 0, 20, 40, 60, store='attribute', init=True,
                                 label='Primary attenuation (dB)')
-    secondary_attenuation = Enum(0, 20, 40, 60, store='attribute', init=True,
+    secondary_attenuation = Enum(60, 0, 20, 40, 60, store='attribute', init=True,
                                 label='Secondary attenuation (dB)')
     duration            = Float(0.512, store='attribute', init=True,
                                 label='Duration (s)')

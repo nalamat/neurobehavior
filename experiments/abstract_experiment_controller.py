@@ -1,4 +1,4 @@
-from copy import deepcopy
+from copy import deepcopy, copy
 from datetime import datetime, timedelta
 from cns.data.persistence import add_or_update_object_node
 
@@ -18,7 +18,7 @@ from enthought.savage.traits.ui.svg_button import SVGButton
 from cns.widgets import icons
 
 from physiology_controller_mixin import PhysiologyControllerMixin
-from eval import evaluate_parameters
+from eval import eval_context
 
 import logging
 log = logging.getLogger(__name__)
@@ -343,22 +343,26 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
             error(self.info.ui.control, str(e))
 
     def stop(self, info=None):
-        self.timer.stop()
-        self.process.stop()
         try:
-            self.stop_experiment(info)
-            self.model.stop_time = datetime.now()
-
+            self.timer.stop()
+            self.process.stop()
             self.pending_changes = {}
             self.old_values = {}
-
-            info.ui.view.close_result = True
-            self.state = 'complete'
-
-            add_or_update_object_node(self.model, self.model.exp_node)
         except BaseException, e:
             log.exception(e)
             error(self.info.ui.control, str(e))
+
+        try:
+            self.stop_experiment(info)
+            self.model.stop_time = datetime.now()
+            info.ui.view.close_result = True
+            self.state = 'complete'
+        except BaseException, e:
+            log.exception(e)
+            error(self.info.ui.control, str(e))
+        finally:
+            # Always attempt to save, no matter what!
+            add_or_update_object_node(self.model, self.model.exp_node)
 
     def run_tasks(self):
         for task, frequency in self.tasks:
@@ -386,7 +390,6 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
 
     @on_trait_change('model.paradigm.-ignore')
     def queue_change(self, instance, name, old, new):
-        print instance, name, old, new
         if self.state <> 'halted' and not name.endswith('_items'):
             trait = instance.trait(name)
             if trait.immediate == True:
@@ -406,7 +409,7 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
         '''
         Applies an individual change
         '''
-        self.current_parameters[name] = value
+        self.current_parameters[name] = deepcopy(value)
         self.log_event(self.get_ts(), name, value)
 
     def apply(self, info=None):
@@ -503,8 +506,7 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
         '''
         for parameter in self.model.paradigm.get_parameters():
             value = getattr(self.model.paradigm, parameter)
-            self.current_parameters[parameter] = value
-        self.update_context()
+            self.current_parameters[parameter] = deepcopy(value)
 
     def update_context(self, extra_context=None):
         '''
@@ -514,12 +516,16 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
         namespace.  If extra_content defines the value of a parameter, that
         value will take precedence.
         '''
-        context = evaluate_parameters(self.current_parameters, extra_context)
-        print extra_context
-        for parameter, value in context.items():
-            if self.current_context.get(parameter, None) != value:
+        old_context = self.current_context
+        new_context = eval_context(self.current_parameters, extra_context)
+        self.current_context = new_context
+        for parameter, value in self.current_context.items():
+            if parameter == 'parameters':
+                print parameter, value
+                print old_context.get(parameter, None)
+            if old_context.get(parameter, None) != value:
+                print parameter, value
                 getattr(self, 'set_' + parameter)(value)
-                self.current_context[parameter] = value
 
     @cached_property
     def _get_current_context_list(self):

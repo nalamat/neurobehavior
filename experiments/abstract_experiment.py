@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from enthought.traits.api import HasTraits, Any, Instance, Property
 from enthought.traits.ui.api import View, Include, VGroup, Item, Tabbed
@@ -34,8 +34,8 @@ class AbstractExperiment(PhysiologyExperimentMixin):
     exp_node            = Any
     data_node           = Any
 
-    data                = Instance(AbstractExperimentData, store='child')
     paradigm            = Instance(AbstractExperimentParadigm, store='child')
+    data                = Instance(AbstractExperimentData, store='child')
 
     start_time          = Instance(datetime, store='attribute')
     stop_time           = Instance(datetime, store='attribute')
@@ -43,11 +43,14 @@ class AbstractExperiment(PhysiologyExperimentMixin):
     date                = Property(store='attribute', depends_on='start_time')
 
     def _get_date(self):
-        return self.start_time.date()
+        if self.start_time is None:
+            return datetime.now()
+        else:
+            return self.start_time.date()
 
     def _get_duration(self):
-        if self.stop_time is None and self.start_time is None:
-            return datetime.timedelta()
+        if self.start_time is None:
+            return timedelta()
         elif self.stop_time is None:
             return datetime.now()-self.start_time
         else:
@@ -67,6 +70,12 @@ class AbstractExperiment(PhysiologyExperimentMixin):
                 show_labels=False,
                 ),
             show_labels=False,
+            )
+
+    context_group = VGroup(
+            Item('handler.current_context_list', editor=context_editor),
+            show_labels=False,
+            label='Current Context',
             )
 
     traits_view = View(

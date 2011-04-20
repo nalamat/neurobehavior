@@ -28,50 +28,43 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
     parameter_order = Trait('shuffled set', choice.options, store='attribute',
                             init=True)
     nogo_parameter  = Float(store='attribute', init=True)
+    pump_rate       = ExpressionTrait(1.5, label='Pump rate (ml/min)')
+    reward_volume   = ExpressionTrait(25, label='Reward volume (ul)')
 
-    reward_duration = ExpressionTrait(1.0, store='attribute', ignore=True)
-    reward_duration = ExpressionTrait(1.0, store='attribute', ignore=True)
-    pump_rate       = ExpressionTrait(1.5, store='attribute', init=True)
-    reward_volume   = ExpressionTrait(25, store='attribute', init=True)
-    reward_volume   = Float(25, store='attribute', init=True, 
-                            label=u'Reward volume (ul)')
+    #def _reward_duration_changed(self, value):
+    #    # ul = ml/m * (s/60) * 1000 ul/ml
+    #    self.reward_volume = self.pump_rate * (value/60.0) * 1e3
 
-    def _reward_duration_changed(self, value):
-        # ul = ml/m * (s/60) * 1000 ul/ml
-        self.reward_volume = self.pump_rate * (value/60.0) * 1e3
+    #def _reward_volume_changed(self, value):
+    #    # s = (1e-3 ml/ul / (ml/m)) * 60 s/m
+    #    self.reward_duration = value*1e-3/self.pump_rate*60
 
-    def _reward_volume_changed(self, value):
-        # s = (1e-3 ml/ul / (ml/m)) * 60 s/m
-        self.reward_duration = value*1e-3/self.pump_rate*60
+    #def _pump_rate_changed(self, value):
+    #    # ul = ml/m * (m/60s) * 1000 ul/ml
+    #    # s = ul / (ml/m * 1000 ul/ml) * 60s/m
+    #    #self.reward_volume = value * (self.reward_duration/60.0) * 1e3
+    #    self.reward_duration = self.reward_volume / (value*1e3) * 60.0
 
-    def _pump_rate_changed(self, value):
-        # ul = ml/m * (m/60s) * 1000 ul/ml
-        # s = ul / (ml/m * 1000 ul/ml) * 60s/m
-        #self.reward_volume = value * (self.reward_duration/60.0) * 1e3
-        self.reward_duration = self.reward_volume / (value*1e3) * 60.0
-
-    nogo = ExpressionTrait('randint(2, 5)')
+    #num_nogo = ExpressionTrait('randint(2, 5)', label='NOGO number')
+    num_nogo = ExpressionTrait('int(clip(exponential(2), 0, 5))', label='NOGO number')
 
     # Needs to be CBool because Pytables returns numpy.bool_ type which gets
     # rejected by Bool trait
     repeat_FA = CBool(store='attribute', init=True)
 
-    signal_offset_delay = ExpressionTrait(0.5, store='attribute', init=True)
-    intertrial_duration = ExpressionTrait(0.5, store='attribute', init=True)
-    reaction_window_delay = ExpressionTrait(0, store='attribute', init=True)
-    reaction_window_duration = ExpressionTrait(1.5, store='attribute', init=True)
+    signal_offset_delay = ExpressionTrait(0.5, label='Signal offset delay (s)')
+    intertrial_duration = ExpressionTrait(0.1, label='Intertrial duration (s)')
+    reaction_window_delay = ExpressionTrait(0, label='Withdraw delay (s)')
+    reaction_window_duration = ExpressionTrait(1.5, label='Withdraw duration (s)')
 
-
-    response_window_duration = ExpressionTrait(3, store='attribute', init=True)
+    response_window_duration = ExpressionTrait(3, label='Response duration (s)')
 
     timeout_trigger  = Enum('FA only', 'Anytime', store='attribute', init=True)
-    timeout_duration = ExpressionTrait(5, store='attribute', init=True)
+    timeout_duration = ExpressionTrait(15, label='TO duration (s)')
     timeout_grace_period = ExpressionTrait(2.5, store='attribute', init=True)
-    fa_puff_duration = Float(0.2, store='attribute', init=True, 
-                             label='FA puff duration (s)')
+    fa_puff_duration = ExpressionTrait(0.0, label='FA puff duration (s)')
 
-    poke_duration = ExpressionTrait('uniform(0.1, 0.5)', store='attribute',
-            init=True)
+    poke_duration = ExpressionTrait('uniform(0.1, 0.2)', label='Poke duration (s)')
 
     parameter_view = VGroup(
             Item('nogo_parameter'),
@@ -87,35 +80,20 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
                 Include('parameter_view'),
                 Include('signal_group'),
                 VGroup(
-                    Item('nogo', label='NOGO'),
-                    Item('repeat_FA', label='Add a NOGO if false alarm?'),
-                    label='Trial',
-                    ),
-                VGroup(
-                    Item('signal_offset_delay',
-                         label='Signal offset delay (s)'),
-                    Item('intertrial_duration',
-                         label='Minimum intertrial duration (s)'),
-                    Item('reaction_window_delay',
-                         label='Reaction window delay (s)'),
-                    Item('reaction_window_duration',
-                         label='Reaction window (s)'),
-                    Item('response_window_duration',
-                         label='Response window (s)'),
-                    Item('timeout_trigger',
-                         label='TO mode'),
-                    Item('timeout_duration',
-                         label='TO minimum duration (s)'),
+                    'signal_offset_delay',
+                    'intertrial_duration',
+                    'reaction_window_delay',
+                    'reaction_window_duration',
+                    'response_window_duration',
+                    'timeout_trigger',
+                    'timeout_duration',
                     'fa_puff_duration',
-                    #Item('timeout_grace_period', 
-                    Item('poke_duration', label='Poke duration (s)'),
-                    label='Timing',
-                    ),
-                VGroup(
+                    'poke_duration',
                     'pump_rate',
                     'reward_volume',
-                    Item('reward_duration', style='readonly'),
-                    label='Reward',
+                    Item('num_nogo', label='NOGO'),
+                    Item('repeat_FA', label='Add a NOGO if false alarm?'),
+                    label='Settings',
                     ),
                 ),
             resizable=True,
