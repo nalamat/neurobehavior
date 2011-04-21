@@ -1,5 +1,5 @@
-RP = actxcontrol('RPco.x', [5 5 26 26]);
-%RP = actxserver('RPco.x');
+%RP = actxcontrol('RPco.x', [5 5 26 26]);
+RP = actxserver('RPco.x');
 if RP.ConnectRZ6('GB', 1) == 0 disp 'connect error'; end
 if RP.LoadCOF('positive-behavior-BAD.rcx') == 0 disp 'load error'; end
 if RP.Run == 0 disp 'run error'; end

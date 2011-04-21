@@ -8,6 +8,10 @@ from enthought.traits.ui.api import View, Item, VGroup, HGroup, InstanceEditor,\
 
 from enthought.enable.api import Component, ComponentEditor
 
+
+from analysis_plot_mixin import AnalysisPlotMixin
+
+
 import cns
 
 from abstract_experiment import AbstractExperiment
@@ -147,7 +151,7 @@ class ParameterAdapter(TabularAdapter):
     def _get_value_text(self):
         return self.item
 
-class AbstractPositiveExperiment(AbstractExperiment):
+class AbstractPositiveExperiment(AbstractExperiment, AnalysisPlotMixin):
 
     index_range         = Any
     par_info_adapter    = ParInfoAdapter()
@@ -169,9 +173,6 @@ class AbstractPositiveExperiment(AbstractExperiment):
         return self.data.trial_log[::-1]
 
     experiment_plot = Instance(Component)
-    plot_1 = Instance(Component)
-    plot_2 = Instance(Component)
-    plot_3 = Instance(Component)
 
     @on_trait_change('data')
     def _generate_experiment_plot(self):
@@ -248,83 +249,6 @@ class AbstractPositiveExperiment(AbstractExperiment):
 
         self.experiment_plot = container
 
-    @on_trait_change('data')
-    def _generate_summary_plots(self):
-        bounds = lambda low, high, margin, tight: (low-0.5, high+0.5)
-        index_range = DataRange1D(bounds_func=bounds)
-        index_mapper = LinearMapper(range=index_range)
-        value_range = DataRange1D(low_setting=0, high_setting='auto')
-        value_mapper = LinearMapper(range=value_range)
-
-        plot = DynamicBarPlot(source=self.data,
-                label_trait='pars', value_trait='par_go_count', bgcolor='white',
-                padding=50, fill_padding=True, bar_width=0.9,
-                value_mapper=value_mapper, index_mapper=index_mapper)
-        index_range.add(plot.index)
-        value_range.add(plot.value)
-
-        add_default_grids(plot, major_value=5)
-        axis = DynamicBarplotAxis(plot, orientation='bottom',
-                source=self.data, label_trait='pars')
-        plot.underlays.append(axis)
-        plot.underlays.append(PlotAxis(plot, orientation='left'))
-        self.par_count_plot = plot
-
-        # FA and HIT
-        bounds = lambda low, high, margin, tight: (low-0.8, high+0.8)
-        index_range = DataRange1D(bounds_func=bounds)
-        index_mapper = LinearMapper(range=index_range)
-        value_range = DataRange1D(low_setting=0, high_setting=1)
-        value_mapper = LinearMapper(range=value_range)
-
-        self.par_score_plot = OverlayPlotContainer(bgcolor='white',
-                fill_padding=True)
-
-        plot = DynamicBarPlot(source=self.data, label_trait='pars',
-                value_trait='par_hit_frac', bgcolor='white', padding=50,
-                fill_padding=True, bar_width=0.5, index_mapper=index_mapper,
-                value_mapper=value_mapper, index_offset=-0.2, alpha=0.5)
-        index_range.add(plot.index)
-
-        axis = DynamicBarplotAxis(plot, orientation='bottom',
-                source=self.data, label_trait='pars')
-        plot.underlays.append(axis)
-        plot.underlays.append(PlotAxis(plot, orientation='left'))
-        
-        add_default_grids(plot, minor_value=0.2)
-        self.par_score_plot.add(plot)
-
-        plot = DynamicBarPlot(source=self.data, label_trait='pars',
-                value_trait='par_fa_frac', bgcolor='white', padding=50,
-                fill_padding=True, bar_width=0.5, fill_color=(1, 0, 0),
-                index_mapper=index_mapper, value_mapper=value_mapper,
-                index_offset=0.2, alpha=0.5)
-        index_range.add(plot.index)
-
-        self.par_score_plot.add(plot)
-
-        # DPRIME
-        bounds = lambda low, high, margin, tight: (low-0.5, high+0.5)
-        index_range = DataRange1D(bounds_func=bounds)
-        index_mapper = LinearMapper(range=index_range)
-        value_range = DataRange1D(low_setting=-1, high_setting=4)
-        value_mapper = LinearMapper(range=value_range)
-
-        plot = DynamicBarPlot(source=self.data,
-                label_trait='pars', value_trait='par_dprime', bgcolor='white',
-                padding=50, fill_padding=True, bar_width=0.9,
-                value_mapper=value_mapper, index_mapper=index_mapper)
-        index_range.add(plot.index)
-        grid = PlotGrid(mapper=plot.value_mapper, component=plot,
-                orientation='horizontal', line_color='lightgray',
-                line_style='dot', grid_interval=1)
-        plot.underlays.append(grid)
-        axis = DynamicBarplotAxis(plot, orientation='bottom',
-                source=self.data, label_trait='pars')
-        plot.underlays.append(axis)
-        plot.underlays.append(PlotAxis(plot, orientation='left'))
-        self.par_dprime_plot = plot
-
     pump_group = VGroup(
             Item('handler.pump_toolbar', style='custom',
                  show_label=False), 
@@ -351,22 +275,13 @@ class AbstractPositiveExperiment(AbstractExperiment):
             VGroup(
                 HGroup(HGroup('object.index_range.span')),
                 Item('experiment_plot', editor=ComponentEditor(),
-                    show_label=False, width=1000, height=300),
+                    show_label=False, width=1000, height=300)
                 ),
-            HGroup(
-                Item('plot_1', editor=ComponentEditor(),
-                    show_label=False, width=150, height=400),
-                Item('plot_2', editor=ComponentEditor(),
-                    show_label=False, width=150, height=400),
-                Item('plot_3', editor=ComponentEditor(),
-                    show_label=False, width=150, height=400),
-                label='Plots',
-                ),
+            Include('analysis_plot_group'),
             Item('object.data.par_info', editor=par_info_editor,
                 label='Performance Statistics'),
             show_labels=False,
             )
-
 
     traits_group = HSplit(
             VGroup(

@@ -21,31 +21,16 @@ from eval import ExpressionTrait
 class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
 
     parameters = List(Instance(TrialSetting), [], store='child', init=True)
+    nogo = Instance(TrialSetting, (), store='child', init=True)
 
     def _parameters_default(self):
         return [TrialSetting()]
 
     parameter_order = Trait('shuffled set', choice.options, store='attribute',
-                            init=True)
-    nogo_parameter  = Float(store='attribute', init=True)
+                            init=True, label='Parameter order')
     pump_rate       = ExpressionTrait(1.5, label='Pump rate (ml/min)')
     reward_volume   = ExpressionTrait(25, label='Reward volume (ul)')
 
-    #def _reward_duration_changed(self, value):
-    #    # ul = ml/m * (s/60) * 1000 ul/ml
-    #    self.reward_volume = self.pump_rate * (value/60.0) * 1e3
-
-    #def _reward_volume_changed(self, value):
-    #    # s = (1e-3 ml/ul / (ml/m)) * 60 s/m
-    #    self.reward_duration = value*1e-3/self.pump_rate*60
-
-    #def _pump_rate_changed(self, value):
-    #    # ul = ml/m * (m/60s) * 1000 ul/ml
-    #    # s = ul / (ml/m * 1000 ul/ml) * 60s/m
-    #    #self.reward_volume = value * (self.reward_duration/60.0) * 1e3
-    #    self.reward_duration = self.reward_volume / (value*1e3) * 60.0
-
-    #num_nogo = ExpressionTrait('randint(2, 5)', label='NOGO number')
     num_nogo = ExpressionTrait('int(clip(exponential(2), 0, 5))', label='NOGO number')
 
     # Needs to be CBool because Pytables returns numpy.bool_ type which gets
@@ -59,15 +44,15 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
 
     response_window_duration = ExpressionTrait(3, label='Response duration (s)')
 
-    timeout_trigger  = Enum('FA only', 'Anytime', store='attribute', init=True)
+    timeout_trigger  = Enum('FA only', 'Anytime', label='Timeout Mode')
     timeout_duration = ExpressionTrait(15, label='TO duration (s)')
-    timeout_grace_period = ExpressionTrait(2.5, store='attribute', init=True)
+    timeout_grace_period = ExpressionTrait(2.5, label='Timeout grace period (s)')
     fa_puff_duration = ExpressionTrait(0.0, label='FA puff duration (s)')
 
     poke_duration = ExpressionTrait('uniform(0.1, 0.2)', label='Poke duration (s)')
 
     parameter_view = VGroup(
-            Item('nogo_parameter'),
+            Item('nogo', style='custom'),
             VGroup(Item('parameter_order', label='Order')),
             Item('parameters', editor=trial_setting_editor,
                  show_label=False),

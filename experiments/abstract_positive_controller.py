@@ -310,8 +310,8 @@ class AbstractPositiveController(AbstractExperimentController,
     def set_pause_state(self, value):
         self.iface_behavior.set_tag('pause_state', value)
 
-    def set_nogo_parameter(self, value):
-        self.current_nogo_parameter = value
+    def set_nogo(self, value):
+        self.current_nogo = deepcopy(value)
 
     def set_reward_volume(self, value):
         self.set_pump_volume(value)
@@ -344,3 +344,8 @@ class AbstractPositiveController(AbstractExperimentController,
 
     def set_fa_puff_duration(self, value):
         self.iface_behavior.cset_tag('puff_dur_n', value, 's', 'n')
+
+    def log_trial(self, ts_start, ts_end, last_ttype):
+        self.model.data.log_trial(ts_start=ts_start, ts_end=ts_end,
+                ttype=last_ttype, speaker=self.current_speaker,
+                **self.current_context)

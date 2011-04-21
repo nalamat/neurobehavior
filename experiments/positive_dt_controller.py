@@ -12,12 +12,6 @@ class PositiveDTController(AbstractPositiveController):
     envelope    = Instance(blocks.Block)
     output      = Instance(blocks.Block)
 
-    def log_trial(self, ts_start, ts_end, last_ttype):
-        print self.current_speaker
-        self.model.data.log_trial(ts_start=ts_start, ts_end=ts_end,
-                ttype=last_ttype, speaker=self.current_speaker,
-                **self.current_context)
-
     def _carrier_default(self):
         return blocks.BandlimitedNoise(seed=-1)
 
