@@ -20,6 +20,8 @@ from cns.widgets import icons
 from physiology_controller_mixin import PhysiologyControllerMixin
 from eval import eval_context
 
+from PyQt4 import QtGui
+
 import logging
 log = logging.getLogger(__name__)
 
@@ -175,6 +177,8 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
     # required shared memory resources).
     process         = Any
 
+    system_tray     = Any
+
     def init(self, info):
         try:
             self.model = info.object
@@ -221,6 +225,10 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
             log.exception(e)
             self.state = 'disconnected'
             error(info.ui.control, str(e))
+
+        self.system_tray = QtGui.QSystemTrayIcon(info.ui.control)
+        self.system_tray.messageClicked.connect(self.message_clicked)
+        self.system_tray.setVisible(True)
 
     # GUI commands to toggle between window modes
 
@@ -373,14 +381,21 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
                     # Display an error message to the user
                     log.exception(e)
                     mesg = "The following exception occured in the program:" + \
-                            "\n\n%s\n\nContinue or stop experiment and save" + \
-                            " data?"
+                            "\n\n%s"
                     mesg = mesg % str(e)
-                    dialog = ConfirmationDialog(message=mesg, yes_label='Stop',
-                            no_label='Continue')
-                    if dialog.open() == YES:
-                        self.stop(self.info)
+                    self.system_tray.showMessage("Error running task", mesg)
+                    #dialog = ConfirmationDialog(message=mesg, yes_label='Stop',
+                    #        no_label='Continue')
+                    #if dialog.open() == YES:
+                    #    self.stop(self.info)
         self.tick_count += 1
+
+    def message_clicked(self):
+        mesg = "An exception occured in the program.  What should we do?"
+        dialog = ConfirmationDialog(message=mesg, yes_label='Stop',
+                no_label='Continue')
+        if dialog.open() == YES:
+            self.stop(self.info)
 
     ############################################################################
     # Apply/Revert code
