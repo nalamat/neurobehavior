@@ -519,12 +519,10 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
         old_context = self.current_context
         new_context = eval_context(self.current_parameters, extra_context)
         self.current_context = new_context
+        #print self.current_context
         for parameter, value in self.current_context.items():
-            if parameter == 'parameters':
-                print parameter, value
-                print old_context.get(parameter, None)
             if old_context.get(parameter, None) != value:
-                print parameter, value
+                #print parameter, value
                 getattr(self, 'set_' + parameter)(value)
 
     @cached_property

@@ -10,12 +10,13 @@ def choice(sequence):
 class ParameterExpression(object):
 
     GLOBALS = {
-            'arange':   np.arange,
-            'randint':  np.random.randint,
-            'uniform':  np.random.uniform,
-            'exponential': np.random.exponential,
-            'clip': np.clip,
-            'choice':   choice,
+            'random':       np.random,
+            'arange':       np.arange,
+            'randint':      np.random.randint,
+            'uniform':      np.random.uniform,
+            'exponential':  np.random.exponential,
+            'clip':         np.clip,
+            'choice':       choice,
             }
 
     def __init__(self, string):

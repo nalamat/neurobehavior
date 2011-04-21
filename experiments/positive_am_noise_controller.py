@@ -34,12 +34,10 @@ class PositiveAMNoiseController(AbstractPositiveController):
     def _output_default(self):
         return blocks.Output(token=self.envelope)
 
-    def _compute_signal(self, parameter):
-        self.modulator.depth = parameter
-        return self.output.realize(self.buffer_signal.fs,
-                                   self.current_duration)
+    def _compute_signal(self):
+        return self.output.realize(self.buffer_out1.fs, self.current_duration)
 
-    def set_delay(self, value):
+    def set_modulation_onset(self, value):
         if value == 0:
             self.modulator.equalize_phase = False
         else:
@@ -48,6 +46,9 @@ class PositiveAMNoiseController(AbstractPositiveController):
 
     def set_rise_fall_time(self, value):
         self.envelope.rise_time = value
+
+    def set_modulation_depth(self, value):
+        self.modulator.depth = value
 
     def set_duration(self, value):
         self.envelope.duration = value
@@ -59,57 +60,19 @@ class PositiveAMNoiseController(AbstractPositiveController):
     def set_nogo_parameter(self, value):
         self.current_nogo_parameter = value
 
-    def set_reaction_window_delay(self, value):
-        self.current_reaction_window_delay = value
-
-    def _recompute_delay(self):
-        # Draw a single value from the range [current_lb, current_ub)
-        onset = uniform(self.current_lb, self.current_ub, 1)[0]
-        # The logic for setting the modulation onset is defined in set_delay
-        self.set_delay(onset)
-        self.current_onset = onset
-        self.update_reaction_window_delay(onset+self.current_reaction_window_delay)
-        #self.update_reaction_window_delay(onset)
-        
-        # We need to update the reaction_window_duration as well because it
-        # is implemented as the sum of the delay and duration in the RPvds
-        # circuit (this is really a poorly-named variable since the RPvds
-        # wants the start time and end time of the reaction window, not the
-        # delay and duration values).
-        self.set_reaction_window_duration(self.current_reaction_window_duration,
-                onset)
-
     def trigger_next(self):
-        self._recompute_delay()
+        speaker = self.select_speaker()
+        self.current_speaker = speaker
 
         if self.is_go():
-            # Next trial should be a GO trial
-            par = self.current_setting_go.parameter
+            self.set_experiment_parameters(self.current_setting_go)
             self.iface_behavior.set_tag('go?', 1)
         else:
-            # Next trial should be a NOGO trial
-            par = self.current_nogo_parameter
+            self.set_experiment_parameters(self.current_nogo)
             self.iface_behavior.set_tag('go?', 0)
 
-        self.update_attenuation(self.current_attenuation)
-
         # Prepare next signal
-        waveform = self._compute_signal(par)
-        # Upload signal to hardware
-        self.buffer_signal.set(waveform)
+        waveform = self._compute_signal()
+        self.buffer_out1.set(waveform)
         self.iface_behavior.set_tag('signal_dur_n', len(waveform))
-        # Set poke duration for next trial
-        self.set_poke_duration(self.current_poke_dur)
         self.iface_behavior.trigger(1)
-
-    def log_trial(self, ts_start, ts_end, last_ttype):
-        if self.is_go():
-            parameter = self.current_setting_go.parameter
-        else:
-            parameter = self.current_nogo_parameter
-        onset = self.current_onset
-        if onset is None:
-            onset = 0
-        self.model.data.log_trial(ts_start=ts_start, ts_end=ts_end,
-                ttype=last_ttype, depth=parameter, modulation_onset=onset,
-                speaker=self.current_speaker)

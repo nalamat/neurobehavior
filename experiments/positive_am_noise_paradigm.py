@@ -1,28 +1,34 @@
 from enthought.traits.api import Float, Range, Int
 from enthought.traits.ui.api import VGroup, Item
 
+from eval import ExpressionTrait
+
 from abstract_positive_paradigm import AbstractPositiveParadigm
 
 class PositiveAMNoiseParadigm(AbstractPositiveParadigm):
 
-    duration = Float(1, store='attribute', init=True)
-    rise_fall_time = Float(0.0025, store='attribute', init=True)
-    fm = Float(5, store='attribute', init=True)
-    attenuation = Range(0.0, 120.0, 30.0, store='attribute', init=True)
+    duration = ExpressionTrait(1, label='Signal duration (s)')
+    rise_fall_time = ExpressionTrait(0.0025, label='Ramp time (s)')
+    fm = ExpressionTrait(5, label='Modulation frequency (Hz)')
+    attenuation = ExpressionTrait(30.0, label='Attenuation (dB)')
     seed = Int(-1, store='attribute', init=True)
-    lb_modulation_onset = Float(0.5, store='attribute', init=True)
-    ub_modulation_onset = Float(1.0, store='attribute', init=True)
+    modulation_onset = ExpressionTrait('uniform(0.5, 1.0)', 
+            label='Modulation onset (s)')
+    modulation_depth = ExpressionTrait(1.0, label='Modulation depth (frac)')
+
+    reaction_window_delay = ExpressionTrait("modulation_onset+0.25",
+            label='Reaction window delay (s)')
 
     signal_group = VGroup(
-            Item('speaker_mode', label='Speaker'),
-            Item('attenuation', style='custom', 
-                 label='Signal attenuation (dB)'),
-            Item('duration', label='Signal duration (s)'),
-            Item('rise_fall_time', label='Rise/fall time (s)'),
-            Item('fm', label='Modulation frequency (Hz)'),
-            Item('lb_modulation_onset', label='lb modulation onset (s)'),
-            Item('ub_modulation_onset', label='ub modulation onset (s)'),
-            Item('seed', label='Random seed (-1=nonfrozen)'),
+            'speaker_mode',
+            'attenuation',
+            'duration',
+            'rise_fall_time',
+            'fm',
+            'modulation_depth',
+            'modulation_onset',
+            'seed',
             label='Signal',
             show_border=True,
             )
+

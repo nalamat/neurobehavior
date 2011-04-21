@@ -251,7 +251,8 @@ def inspect_experiment(args):
     '''
     e = EXPERIMENTS[args.type]
     p = e['paradigm'][0]()
-    parameters = list(p.get_parameter_info().items())
+    #parameters = list(p.get_parameter_info().items())
+    parameters = list(p.parameter_info.items())
     parameters.sort()
 
     # Determine the padding we need for the columns
