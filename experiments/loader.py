@@ -40,7 +40,6 @@ from positive_am_noise_paradigm import PositiveAMNoiseParadigm
 from positive_am_noise_controller import PositiveAMNoiseController
 from positive_am_noise_data import PositiveAMNoiseData
 # Positive DT
-from positive_dt_experiment import PositiveDTExperiment
 from positive_dt_paradigm import PositiveDTParadigm
 from positive_dt_controller import PositiveDTController
 from positive_dt_data import PositiveDTData
@@ -292,7 +291,7 @@ EXPERIMENTS = {
             'node_name':    'PositiveAMNoiseExperiment',
             },
         'positive_dt': {
-            'experiment':   (PositiveDTExperiment, {}), 
+            'experiment':   (AbstractPositiveExperiment, {}), 
             'paradigm':     (PositiveDTParadigm, {}),
             'controller':   (PositiveDTController, {}), 
             'data':         (PositiveData, {}),
