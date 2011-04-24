@@ -3,7 +3,7 @@ from os.path import dirname, join, abspath
 
 BASE_DIRECTORIES = {
         'REGINA'        : 'E:/',            # In 1016
-        'DFNKWCH1'      : 'C:/EXPERIMENTS', # In 1012
+        'PC'            : 'F:/',            # In 1012
         'SEMPLE'        : None,             # Placeholder for Mal's computer
         'ROSENLAB'      : 'C:/EXPERIMENTS', # Merri's NEOUCOM computer
         'PHOENIX-NYU'   : 'C:/users/brad/workspace/neurobehavior_base',
