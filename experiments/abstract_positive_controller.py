@@ -49,8 +49,7 @@ class AbstractPositiveController(AbstractExperimentController,
     # Override default implementation of toolbar used by AbstractExperiment
     toolbar = Instance(PositiveExperimentToolBar, (), toolbar=True)
 
-    status = Property(Str, depends_on=['state', 'current_trial',
-        'current_num_nogo', 'current_setting_go'])
+    status = Property(Str, depends_on='state, current_trial, current_num_nogo')
 
     @on_trait_change('model.data.parameters')
     def update_adapter(self, value):
@@ -113,9 +112,8 @@ class AbstractPositiveController(AbstractExperimentController,
         elif self.state == 'halted':
             return 'System is halted'
 
-        if self.current_trial <= self.current_num_nogo:
-            result= 'NOGO %d of %d' % (self.current_trial,
-                                       self.current_num_nogo)
+        if not self.is_go():
+            result= 'NOGO %d of %d' % (self.current_trial, self.current_num_nogo)
         else:
             result = 'GO'
         return result
@@ -142,6 +140,7 @@ class AbstractPositiveController(AbstractExperimentController,
         if self.acquire_trial_lock():
             self.current_trial = 1
             self.current_num_nogo = 0
+            self.current_context['num_nogo'] = 0
             self.trigger_next()
             self.current_go_requested = False
             self.release_trial_lock()
@@ -187,10 +186,10 @@ class AbstractPositiveController(AbstractExperimentController,
             self.log_trial(ts_start, ts_end, last_ttype)
 
             # Increment num_nogo
-            if last_ttype == 'NOGO' and self.current_repeat_FA:
+            if last_ttype == 'NOGO' and self.current_context['repeat_FA']:
                 if self.model.data.resp_seq[-1] == 'spout':
                     log.debug("FA detected, adding a NOGO trial")
-                    self.current_num_nogo += 1
+                    self.current_context['num_nogo'] += 1
 
             log.debug('Last trial: %d, NOGO count: %d', self.current_trial,
                       self.current_num_nogo)
@@ -291,9 +290,6 @@ class AbstractPositiveController(AbstractExperimentController,
     def get_trial_start_ts(self):
         return self.iface_behavior.get_tag('trial/')
 
-    def set_attenuation(self, value):
-        self.current_attenuation = value
-
     def set_timeout_grace_period(self, value):
         pass
 
@@ -315,6 +311,11 @@ class AbstractPositiveController(AbstractExperimentController,
 
     def set_reward_volume(self, value):
         self.set_pump_volume(value)
+
+    def set_attenuation(self, value):
+        self.current_attenuation = value
+        self.set_primary_attenuation(value)
+        self.set_secondary_attenuation(value)
 
     def set_primary_attenuation(self, value):
         self.current_primary_attenuation = value

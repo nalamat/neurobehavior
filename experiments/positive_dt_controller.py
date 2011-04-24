@@ -41,6 +41,9 @@ class PositiveDTController(AbstractPositiveController):
     def set_duration(self, value):
         self.current_duration = value
 
+    def set_attenuation(self, value):
+        self.current_attenuation = value
+
     def trigger_next(self):
         speaker = self.select_speaker()
         self.current_speaker = speaker
@@ -49,7 +52,7 @@ class PositiveDTController(AbstractPositiveController):
             self.set_experiment_parameters(self.current_setting_go)
             self.iface_behavior.set_tag('go?', 1)
 
-            attenuation = self.current_setting_go.attenuation
+            attenuation = self.current_attenuation
             if speaker == 'primary':
                 hw_attenuation = self.current_primary_attenuation
             else:

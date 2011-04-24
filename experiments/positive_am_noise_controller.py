@@ -73,6 +73,7 @@ class PositiveAMNoiseController(AbstractPositiveController):
 
         # Prepare next signal
         waveform = self._compute_signal()
-        self.buffer_out1.set(waveform)
+        self.set_waveform(speaker, waveform)
+        #self.buffer_out1.set(waveform)
         self.iface_behavior.set_tag('signal_dur_n', len(waveform))
         self.iface_behavior.trigger(1)
