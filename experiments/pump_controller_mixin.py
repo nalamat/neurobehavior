@@ -80,9 +80,13 @@ class PumpControllerMixin(HasTraits):
         del self.old_values[self.model.paradigm, 'pump_rate']
 
     def set_pump_volume(self, value):
+        while self.iface_pump.get_status() != 'halted':
+            pass
         self.iface_pump.set_volume(value, unit='ul')
 
     def set_pump_rate(self, value):
+        while self.iface_pump.get_status() != 'halted':
+            pass
         self.iface_pump.set_rate(value, unit='ml/min')
 
     def set_pump_syringe_diameter(self, value):
