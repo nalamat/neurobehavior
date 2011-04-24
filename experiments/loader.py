@@ -26,6 +26,9 @@ from aversive_data import AversiveData
 # Aversive FM
 from aversive_fm_paradigm import AversiveFMParadigm
 from aversive_fm_controller import AversiveFMController
+# Aversive DT
+from aversive_dt_paradigm import AversiveDTParadigm
+from aversive_dt_controller import AversiveDTController
 # Aversive AM Noise
 from aversive_am_noise_paradigm import AversiveAMNoiseParadigm
 from aversive_am_noise_controller import AversiveAMNoiseController
@@ -38,11 +41,9 @@ from positive_data import PositiveData
 # Positive AM Noise
 from positive_am_noise_paradigm import PositiveAMNoiseParadigm
 from positive_am_noise_controller import PositiveAMNoiseController
-from positive_am_noise_data import PositiveAMNoiseData
 # Positive DT
 from positive_dt_paradigm import PositiveDTParadigm
 from positive_dt_controller import PositiveDTController
-from positive_dt_data import PositiveDTData
 # Basic Characterization
 from abstract_experiment import AbstractExperiment
 from basic_characterization_paradigm import BasicCharacterizationParadigm
@@ -232,8 +233,8 @@ def profile_experiment(args):
     from cns import TEMP_ROOT
     import cProfile
     profile_data_file = join(TEMP_ROOT, 'profile.dmp')
-    cProfile.run('test_experiment("%s", %s)' % (args.type,
-        args.physiology), profile_data_file)
+    cProfile.runctx('test_experiment(args)', globals(), {'args': args},
+            filename=profile_data_file)
 
     # Once experiment is done, print out some statistics
     import pstats
@@ -303,6 +304,13 @@ EXPERIMENTS = {
             'controller':   (AversiveFMController, {}), 
             'data':         (AversiveData, {}),
             'node_name':    'AversiveFMExperiment',
+            },
+        'aversive_dt': {
+            'experiment':   (AbstractAversiveExperiment, {}), 
+            'paradigm':     (AversiveDTParadigm, {}),
+            'controller':   (AversiveDTController, {}), 
+            'data':         (AversiveData, {}),
+            'node_name':    'AversiveDTExperiment',
             },
         'aversive_am_noise': {
             'experiment':   (AbstractAversiveExperiment, {}), 
