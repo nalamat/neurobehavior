@@ -121,6 +121,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
         # is convenient to set score to False that way we don't need to provide
         # the "dummy" spout and poke data required for scoring.
         del kwargs['parameters']
+        del kwargs['nogo']
         if score:
             ts_start = kwargs['ts_start']
             ts_end = kwargs['ts_end']
