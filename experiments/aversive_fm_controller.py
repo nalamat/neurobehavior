@@ -21,12 +21,10 @@ class AversiveFMController(AbstractAversiveController):
     # We are overriding the three signal update methods (remind, warn, safe) to
     # work with the specific circuit we constructed
     def update_remind(self):
-        pass
-        #self.set_experiment_parameters(self.current_remind)
+        self.set_experiment_parameters(self.current_remind)
 
     def update_warn(self):
-        pass
-        #self.set_experiment_parameters(self.current_warn)
+        self.set_experiment_parameters(self.current_warn)
 
     def update_safe(self):
         pass
