@@ -36,6 +36,7 @@ class AbstractAversiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
     lick_th = ExpressionTrait(0.75, label='Contact threshold')
     aversive_delay = ExpressionTrait(1, label='Aversive Stimulus Delay (s)')
     aversive_duration = ExpressionTrait(0.3, label='Aversive Stimulus Duration (s)')
+    shock_level = ExpressionTrait(0.5, label='Shock level (mA)')
 
     num_safe = ExpressionTrait('randint(2, 5)', label='Number of safes')
     trial_duration = ExpressionTrait(1.0, label='Trial duration (s)') 
@@ -68,6 +69,7 @@ class AbstractAversiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
             'prevent_disarm',
             'aversive_delay',
             'aversive_duration',
+            'shock_level',
             'lick_th',
             show_border=True, 
             label='Trial settings',
