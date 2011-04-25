@@ -45,6 +45,7 @@ class AbstractAversiveController(AbstractExperimentController,
 
     def start_experiment(self, info):
         self.init_context()
+        self.update_context()
         # Pump will halt when it has infused the requested volume.  To allow it
         # to infuse continuously, we set the volume to 0.
         self.iface_pump.set_volume(0)
