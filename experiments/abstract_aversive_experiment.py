@@ -47,9 +47,12 @@ class TrialLogAdapter(TabularAdapter):
     parameter_text = Property
     speaker_text = Property
     time_text = Property
+    contact_score_text = Property
 
     def _get_parameter_text(self):
-        return ', '.join('{}'.format(p) for p in self.item['parameter'])
+        #print self.object.par_seq[self.row]
+        return str(self.object.par_seq[self.row])
+        #return ', '.join('{}'.format(p) for p in self.item['parameter'])
 
     def _get_speaker_text(self):
         return self.item['speaker'][0].upper()
@@ -67,10 +70,13 @@ class TrialLogAdapter(TabularAdapter):
             return color_names['light red']
 
     def _get_contact_score_image(self):
-        if self.item['on_spout']:
+        if self.object.on_spout_seq[self.row]:
             return '@icons:tuple_node'  # a green icon
         else:
             return '@icons:dict_node'   # a red icon
+
+    def _get_contact_score_text(self):
+        return str(self.object.contact_scores[self.row])
 
 class ParInfoAdapter(TabularAdapter):
 
