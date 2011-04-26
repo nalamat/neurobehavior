@@ -17,6 +17,7 @@ class AversiveFMController(AbstractAversiveController):
                 src_type='int8', dest_type='int8', block_size=24)
         self.buffer_contact = self.iface_behavior.get_buffer('contact', 'r',
                 src_type='int8', dest_type='float32', block_size=24)
+        self.setup_shock(info)
 
     # We are overriding the three signal update methods (remind, warn, safe) to
     # work with the specific circuit we constructed
