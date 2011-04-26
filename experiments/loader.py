@@ -193,7 +193,8 @@ def prepare_experiment(args, store_node):
     for parameter in args.rove:
         label = paradigm_class.class_traits()[parameter].label
         try:
-            TrialSetting.add_class_trait(parameter, Float)
+            trait = Float(label=label, store='attribute')
+            TrialSetting.add_class_trait(parameter, trait)
         except TraitError:
             pass
         finally:
@@ -254,6 +255,8 @@ def inspect_experiment(args):
     #parameters = list(p.get_parameter_info().items())
     parameters = list(p.parameter_info.items())
     parameters.sort()
+    parameters.insert(0, ('Variable Name', 'Label'))
+    parameters.insert(1, ('-------------', '-----'))
 
     # Determine the padding we need for the columns
     col_paddings = []
@@ -262,8 +265,11 @@ def inspect_experiment(args):
         col_paddings.append(max(sizes))
 
     # Pretty print the list
-    for row in parameters:
-        print row[0].rjust(col_paddings[0]+2),
+    print '\n'
+    for i, row in enumerate(parameters):
+        #fillchar = '.' if (i%3==0) else ' '
+        #print row[0].ljust(col_paddings[0]+2, fillchar),
+        print row[0].rjust(col_paddings[0]+2) + ' ',
         if row[1] is not None:
             print row[1].ljust(col_paddings[1]+2)
         else:
