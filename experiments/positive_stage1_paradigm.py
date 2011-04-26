@@ -9,7 +9,7 @@ class PositiveStage1Paradigm(AbstractExperimentParadigm, PumpParadigmMixin):
 
     attenuation = Range(0.0, 120.0, 40)
     signal = DelegatesTo('selector', store='child')
-    signal = Enum(signal_options.keys())
+    signal = Enum(signal_options.keys(), ignore=True)
 
     traits_view = View(
             VGroup(

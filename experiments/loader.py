@@ -20,37 +20,6 @@ log = logging.getLogger(__name__)
 # Import the experiments
 from cns.data.ui.cohort import CohortEditor, CohortView, CohortViewHandler
 
-# Aversive
-from abstract_aversive_experiment import AbstractAversiveExperiment
-from aversive_data import AversiveData
-# Aversive FM
-from aversive_fm_paradigm import AversiveFMParadigm
-from aversive_fm_controller import AversiveFMController
-# Aversive DT
-from aversive_dt_paradigm import AversiveDTParadigm
-from aversive_dt_controller import AversiveDTController
-# Aversive AM Noise
-from aversive_am_noise_paradigm import AversiveAMNoiseParadigm
-from aversive_am_noise_controller import AversiveAMNoiseController
-# Aversive Noise Masking
-from aversive_noise_masking_paradigm import AversiveNoiseMaskingParadigm
-from aversive_noise_masking_controller import AversiveNoiseMaskingController
-# Positive
-from abstract_positive_experiment import AbstractPositiveExperiment
-from positive_data import PositiveData
-# Positive AM Noise
-from positive_am_noise_paradigm import PositiveAMNoiseParadigm
-from positive_am_noise_controller import PositiveAMNoiseController
-# Positive DT
-from positive_dt_paradigm import PositiveDTParadigm
-from positive_dt_controller import PositiveDTController
-# Basic Characterization
-from abstract_experiment import AbstractExperiment
-from basic_characterization_paradigm import BasicCharacterizationParadigm
-from basic_characterization_controller import BasicCharacterizationController
-#from physiology_data_mixin import PhysiologyDataMixin
-from abstract_experiment_data import AbstractExperimentData
-
 from cns.data.h5_utils import append_node, append_date_node
 
 class ExperimentCohortView(CohortView):
@@ -103,7 +72,7 @@ class ExperimentLauncher(CohortViewHandler):
             # and fall back to the default settings.
             store_node = get_or_append_node(animal_node, 'experiments')
             paradigm_node = get_or_append_node(store_node, 'last_paradigm')
-            paradigm_name = EXPERIMENTS[self.args.type]['node_name']
+            paradigm_name = get_experiment(self.args.type)['node_name']
             paradigm = None
             try:
                 paradigm = persistence.load_object(paradigm_node, paradigm_name)
@@ -178,7 +147,7 @@ class ExperimentLauncher(CohortViewHandler):
 
 def prepare_experiment(args, store_node):
     # Load the experiment classes
-    e = EXPERIMENTS[args.type]
+    e = get_experiment(args.type)
     exp_node = append_date_node(store_node, e['node_name'] + '_')
     data_node = append_node(exp_node, 'data')
 
@@ -250,7 +219,7 @@ def inspect_experiment(args):
     '''
     Print out parameters available for requested paradigm
     '''
-    e = EXPERIMENTS[args.type]
+    e = get_experiment(args.type)
     p = e['paradigm'][0]()
     parameters = list(p.parameter_info.items())
     parameters.sort()
@@ -277,82 +246,85 @@ def inspect_experiment(args):
 def get_invalid_parameters(args):
     parameters = set(args.rove)
     parameters.update(args.analyze)
-    paradigm = EXPERIMENTS[args.type]['paradigm'][0]()
+    paradigm = get_experiment(args.type)['paradigm'][0]()
     return [p for p in parameters if p not in paradigm.get_parameters()]
 
 import re
+
+# Define the classes required for each experiment.
+EXPERIMENTS = {
+        'basic_characterization': {
+            'experiment':   ('AbstractExperiment', {}), 
+            'paradigm':     ('BasicCharacterizationParadigm', {}),
+            'controller':   ('BasicCharacterizationController', {}), 
+            'data':         ('AbstractExperimentData', {}),
+            'node_name':    'BasicCharacterizationExperiment',
+            },
+        'positive_training': {
+            'experiment':   ('PositiveStage1Experiment', {}),
+            'paradigm':     ('PositiveStage1Paradigm', {}),
+            'controller':   ('PositiveStage1Controller', {}),
+            'data':         ('PositiveStage1Data', {}),
+            'node_name':    'PositiveStage1Experiment',
+            },
+        'positive_am_noise': {
+            'experiment':   ('AbstractPositiveExperiment', {}), 
+            'paradigm':     ('PositiveAMNoiseParadigm', {}), 
+            'controller':   ('PositiveAMNoiseController', {}), 
+            'data':         ('PositiveData',  {}),
+            'node_name':    'PositiveAMNoiseExperiment',
+            },
+        'positive_dt': {
+            'experiment':   ('AbstractPositiveExperiment', {}), 
+            'paradigm':     ('PositiveDTParadigm', {}),
+            'controller':   ('PositiveDTController', {}), 
+            'data':         ('PositiveData', {}),
+            'node_name':    'PositiveDTExperiment',
+            },
+        'aversive_fm': {
+            'experiment':   ('AbstractAversiveExperiment', {}), 
+            'paradigm':     ('AversiveFMParadigm', {}),
+            'controller':   ('AversiveFMController', {}), 
+            'data':         ('AversiveData', {}),
+            'node_name':    'AversiveFMExperiment',
+            },
+        'aversive_dt': {
+            'experiment':   ('AbstractAversiveExperiment', {}), 
+            'paradigm':     ('AversiveDTParadigm', {}),
+            'controller':   ('AversiveDTController', {}), 
+            'data':         ('AversiveData', {}),
+            'node_name':    'AversiveDTExperiment',
+            },
+        'aversive_am_noise': {
+            'experiment':   ('AbstractAversiveExperiment', {}), 
+            'paradigm':     ('AversiveAMNoiseParadigm', {}),
+            'controller':   ('AversiveAMNoiseController', {}), 
+            'data':         ('AversiveData', {}),
+            'node_name':    'AversiveAMNoiseExperiment',
+            },
+        'aversive_noise_masking': {
+            'experiment':   ('AbstractAversiveExperiment', {}), 
+            'paradigm':     ('AversiveNoiseMaskingParadigm', {}),
+            'controller':   ('AversiveNoiseMaskingController', {}), 
+            'data':         ('AversiveData', {}),
+            'node_name':    'AversiveNoiseMaskingExperiment',
+            },
+        }
 
 def convert(name):
     s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
     return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
-# Define the classes required for each experiment.
-EXPERIMENTS = {
-        'basic_characterization': {
-            'experiment':   (AbstractExperiment, {}), 
-            'paradigm':     (BasicCharacterizationParadigm, {}),
-            'controller':   (BasicCharacterizationController, {}), 
-            'data':         (AbstractExperimentData, {}),
-            'node_name':    'BasicCharacterizationExperiment',
-            },
-        'positive_training': {
-            'experiment':   (PositiveStage1Experiment, {}),
-            'paradigm':     (PositiveStage1Paradigm, {}),
-            'controller':   (PositiveStage1Controller, {}),
-            'data':         (PositiveStage1Data, {}),
-            'node_name':    'PositiveStage1Experiment',
-            },
-        'positive_am_noise': {
-            'experiment':   (AbstractPositiveExperiment, {}), 
-            'paradigm':     (PositiveAMNoiseParadigm, {}), 
-            'controller':   (PositiveAMNoiseController, {}), 
-            'data':         (PositiveData,  {}),
-            'node_name':    'PositiveAMNoiseExperiment',
-            },
-        'positive_dt': {
-            'experiment':   (AbstractPositiveExperiment, {}), 
-            'paradigm':     (PositiveDTParadigm, {}),
-            'controller':   (PositiveDTController, {}), 
-            'data':         (PositiveData, {}),
-            'node_name':    'PositiveDTExperiment',
-            },
-        'aversive_fm': {
-            'experiment':   (AbstractAversiveExperiment, {}), 
-            'paradigm':     (AversiveFMParadigm, {}),
-            'controller':   (AversiveFMController, {}), 
-            'data':         (AversiveData, {}),
-            'node_name':    'AversiveFMExperiment',
-            },
-        'aversive_dt': {
-            'experiment':   (AbstractAversiveExperiment, {}), 
-            'paradigm':     (AversiveDTParadigm, {}),
-            'controller':   (AversiveDTController, {}), 
-            'data':         (AversiveData, {}),
-            'node_name':    'AversiveDTExperiment',
-            },
-        'aversive_am_noise': {
-            'experiment':   (AbstractAversiveExperiment, {}), 
-            'paradigm':     (AversiveAMNoiseParadigm, {}),
-            'controller':   (AversiveAMNoiseController, {}), 
-            'data':         (AversiveData, {}),
-            'node_name':    'AversiveAMNoiseExperiment',
-            },
-        'aversive_noise_masking': {
-            'experiment':   (AbstractAversiveExperiment, {}), 
-            'paradigm':     (AversiveNoiseMaskingParadigm, {}),
-            'controller':   (AversiveNoiseMaskingController, {}), 
-            'data':         (AversiveData, {}),
-            'node_name':    'AversiveNoiseMaskingExperiment',
-            },
-        }
-
-for experiment in EXPERIMENTS.values():
+def get_experiment(etype):
+    from importlib import import_module
+    experiment = EXPERIMENTS[etype].copy()
     for k, v in experiment.items():
-        if type(v[0]) == type(''):
+        if k != 'node_name' and type(v[0]) == type(''):
             try:
                 klass = __import__(v[0])
             except:
-                module = convert(v[0])
-                full_path = module + '.' + v[0]
-                klass = __import__(full_path)
+                module = '.' + convert(v[0])
+                module = import_module(module, package='experiments')
+                klass = getattr(module, v[0])
             experiment[k] = (klass, v[1])
+    return experiment
