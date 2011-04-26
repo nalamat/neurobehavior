@@ -188,11 +188,7 @@ class AbstractPositiveController(AbstractExperimentController,
             # Increment num_nogo
             print last_ttype
             if last_ttype == 'NOGO' and self.current_context['repeat_FA']:
-                print "checking response sequence"
                 if self.model.data.resp_seq[-1] == 'spout':
-                    print self.model.data.resp_seq[-1]
-                    print self.model.data.resp_seq[-10:]
-                    log.debug("FA detected, adding a NOGO trial")
                     self.current_context['num_nogo'] += 1
                     self.current_num_nogo += 1
 
