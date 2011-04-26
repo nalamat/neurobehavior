@@ -4,7 +4,7 @@ from physiology_data_mixin import PhysiologyDataMixin
 from pump_data_mixin import PumpDataMixin
 
 from enthought.traits.api import (List, Property, Tuple, cached_property, Any,
-        Array, Int)
+        Array, Int, Event)
 
 EVENT_DTYPE = [('timestamp', 'i'), ('name', 'S64'), ('value', 'S128'), ]
 
@@ -12,6 +12,8 @@ from cns.data.h5_utils import get_or_append_node
 from cns.channel import FileChannel
 
 class AbstractExperimentData(PhysiologyDataMixin, PumpDataMixin):
+
+    new_trial = Event
 
     def apply_mask(self, fun, masks, sequence):
         return np.array([fun(sequence[m]) for m in masks])
@@ -112,3 +114,4 @@ class AbstractExperimentData(PhysiologyDataMixin, PumpDataMixin):
             self._trial_log.append(record)
         else:
             raise ValueError, "Invalid log_trial attempt"
+        self.new_trial = kwargs
