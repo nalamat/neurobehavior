@@ -120,9 +120,14 @@ class Channel(HasTraits):
             Time of trigger to reference start and end to
         '''
         t0_index = int(self.t0*self.fs)
-        lb = max(0, start-t0_index+reference)
-        ub = max(0, end-t0_index+reference)
-        return self.signal[..., lb:ub]
+        #lb = np.max(0, start-t0_index+reference)
+        #ub = np.max(0, end-t0_index+reference)
+        lb = start-t0_index+reference
+        ub = end-t0_index+reference
+        if np.iterable(lb):
+            return [self.signal[lb:ub] for lb, ub in zip(lb, ub)]
+        else:
+            return self.signal[..., lb:ub]
 
     def get_index(self, index, reference=0):
         t0_index = int(self.t0*self.fs)
@@ -253,10 +258,16 @@ class Channel(HasTraits):
         # above where we have it as [lb_index, ub_index)).  Since our
         # reference index (the timestamp) is already in the correct units,
         # we don't need to convert it.
-        for ts in timestamps:
-            range = self.get_range_index(lb_index, ub_index, ts)
-            result.append(fun(range))
-        return np.array(result)
+        if np.iterable(timestamps):
+            range = self.get_range_index(lb_index, ub_index, timestamps)
+            return np.array([fun(r) for r in range])
+            #for ts in timestamps:
+            #    range = self.get_range_index(lb_index, ub_index, ts)
+            #    result.append(fun(range))
+            #return np.array(result)
+        else:
+            range = self.get_range_index(lb_index, ub_index, timestamps)
+            return fun(range)
 
 class FileChannel(Channel):
     '''

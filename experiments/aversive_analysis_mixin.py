@@ -88,6 +88,33 @@ class AversiveAnalysisMixin(SDTDataMixin):
     # Summary table containing most of the statistics
     par_info = Property(store='table', depends_on='trial_log')
 
+    #contact_scores = List
+
+    #@on_trait_change('new_trial')
+    #def compute_contact_score(self, trial_data):
+    #    contact = self.contact_digital
+    #    offset = self.contact_offset
+    #    dur = self.contact_dur
+    #    if self.contact_reference == 'trial start':
+    #        ts = trial_data['ts_start']
+    #    else:
+    #        ts = trial_data['ts_end']
+    #    score = contact.summarize(ts, offset, dur, np.mean)
+    #    self.contact_scores.append(score)
+
+    #@on_trait_change('contact_ddur, contact_offset')
+    #def compute_contact_scores(self):
+    #    contact = self.contact_digital
+    #    offset = self.contact_offset
+    #    dur = self.contact_dur
+    #    if self.contact_reference == 'trial start':
+    #        ts = trial_data['ts_start']
+    #    else:
+    #        ts = trial_data['ts_end']
+    #    score = contact.summarize(ts, offset, dur, np.mean)
+    #    self.contact_scores.append(score)
+
+
     @cached_property
     def _get_contact_scores(self):
         if self.contact_reference == 'trial start':
@@ -179,10 +206,11 @@ class AversiveAnalysisMixin(SDTDataMixin):
     summary_trial_log = Property(depends_on='trial_log')
 
     def _get_summary_trial_log(self):
-        try:
-            trial_log = mlab.rec_append_fields(self.trial_log, 
-                    ('parameter', 'contact_score', 'on_spout'), 
-                    (self.par_seq, self.contact_scores, self.on_spout_seq))
-            return trial_log[::-1]
-        except:
-            return np.array([])
+        return self.trial_log[::-1]
+        #try:
+        #    trial_log = mlab.rec_append_fields(self.trial_log, 
+        #            ('parameter', 'contact_score', 'on_spout'), 
+        #            (self.par_seq, self.contact_scores, self.on_spout_seq))
+        #    return trial_log[::-1]
+        #except:
+        #    return np.array([])

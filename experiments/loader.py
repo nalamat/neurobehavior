@@ -252,7 +252,6 @@ def inspect_experiment(args):
     '''
     e = EXPERIMENTS[args.type]
     p = e['paradigm'][0]()
-    #parameters = list(p.get_parameter_info().items())
     parameters = list(p.parameter_info.items())
     parameters.sort()
     parameters.insert(0, ('Variable Name', 'Label'))
@@ -281,6 +280,12 @@ def get_invalid_parameters(args):
     paradigm = EXPERIMENTS[args.type]['paradigm'][0]()
     return [p for p in parameters if p not in paradigm.get_parameters()]
 
+import re
+
+def convert(name):
+    s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+
 # Define the classes required for each experiment.
 EXPERIMENTS = {
         'basic_characterization': {
@@ -289,6 +294,13 @@ EXPERIMENTS = {
             'controller':   (BasicCharacterizationController, {}), 
             'data':         (AbstractExperimentData, {}),
             'node_name':    'BasicCharacterizationExperiment',
+            },
+        'positive_training': {
+            'experiment':   (PositiveStage1Experiment, {}),
+            'paradigm':     (PositiveStage1Paradigm, {}),
+            'controller':   (PositiveStage1Controller, {}),
+            'data':         (PositiveStage1Data, {}),
+            'node_name':    'PositiveStage1Experiment',
             },
         'positive_am_noise': {
             'experiment':   (AbstractPositiveExperiment, {}), 
@@ -333,3 +345,14 @@ EXPERIMENTS = {
             'node_name':    'AversiveNoiseMaskingExperiment',
             },
         }
+
+for experiment in EXPERIMENTS.values():
+    for k, v in experiment.items():
+        if type(v[0]) == type(''):
+            try:
+                klass = __import__(v[0])
+            except:
+                module = convert(v[0])
+                full_path = module + '.' + v[0]
+                klass = __import__(full_path)
+            experiment[k] = (klass, v[1])
