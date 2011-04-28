@@ -1,6 +1,9 @@
 from enthought.traits.api import Instance
 from abstract_positive_controller import AbstractPositiveController
-import neurogen.block_definitions as blocks
+import ng2work.block_definitions as blocks
+from ng2work.sink import Sink
+from ng2work.calibration import Calibration, equalized_data
+
 import numpy as np
 
 import logging
@@ -10,20 +13,22 @@ class PositiveDTController(AbstractPositiveController):
 
     carrier     = Instance(blocks.Block)
     envelope    = Instance(blocks.Block)
-    output      = Instance(blocks.Block)
+    output      = Instance(Sink)
 
     def _carrier_default(self):
-        return blocks.BandlimitedNoise(seed=-1)
+        return blocks.BandlimitedNoise(seed=-1, level=120)
 
     def _envelope_default(self):
-        return blocks.Cos2Envelope(token=self.carrier)
+        return blocks.Cos2Envelope(token=self.carrier.waveform)
 
     def _output_default(self):
-        return blocks.Output(token=self.envelope)
+        return Sink(token=self.envelope.waveform, fs=self.iface_behavior.fs,
+                calibration=Calibration(equalized_data))
 
     def _compute_signal(self, duration):
         self.envelope.duration = duration
-        return self.output.realize(self.iface_behavior.fs, duration)
+        self.output.duration = duration
+        return self.output.realize()
 
     def set_rise_fall_time(self, value):
         self.envelope.rise_time = value

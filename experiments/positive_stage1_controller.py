@@ -92,3 +92,4 @@ class PositiveStage1Controller(AbstractExperimentController,
 
     def set_attenuation(self, value):
         self.iface_behavior.set_tag('att_A', value)
+        self.iface_behavior.set_tag('att_B', value)
