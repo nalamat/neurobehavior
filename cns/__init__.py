@@ -44,10 +44,6 @@ SYRINGE_DATA = {
         }
 
 if __name__ == '__main__':
-    # When you first install Neurobehavior on a new computer, you need to create
-    # the appropriate folders for saving the data and related information.  To
-    # make this happen, type:
-    # >>> python -m cns.__init__
     from os import makedirs
     for path in (DATA_ROOT, TEMP_ROOT, LOG_ROOT):
         try:

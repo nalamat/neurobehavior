@@ -1,3 +1,5 @@
+#!python
+
 import sys
 import settings
 from experiments import loader
