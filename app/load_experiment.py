@@ -18,9 +18,9 @@ if __name__ == '__main__':
                         help='The type of experiment to launch')
 
     parser.add_argument('-r', '--rove', help='Parameter(s) to rove',
-                        nargs='+', action=VerifyUniqueParameters)
+                        nargs='+', action=VerifyUniqueParameters, default=[])
     parser.add_argument('-a', '--analyze', help='Parameter(s) to analyze',
-                        nargs='+', action=VerifyUniqueParameters)
+                        nargs='+', action=VerifyUniqueParameters, default=[])
 
     group = parser.add_mutually_exclusive_group()
     group.add_argument('-p', '--profile', dest='mode', action='store_const',
@@ -41,13 +41,10 @@ if __name__ == '__main__':
 
     import cns
     cns.RCX_USE_SUBPROCESS = args.subprocess
+    print args
 
     # Do some additional checking of argument list to make sure it is valid
     if args.mode != 'inspect': 
-        if args.rove is None:
-            sys.exit('Must provide roving (-r) and analysis (-a) parameters')
-        if args.analyze is None:
-            args.analyze = args.rove
         invalid = loader.get_invalid_parameters(args)
         if len(invalid) != 0:
             if len(invalid) == 1:

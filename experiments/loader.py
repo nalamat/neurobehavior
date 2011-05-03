@@ -183,12 +183,13 @@ def prepare_experiment(args, store_node):
             exp_node=exp_node,
             data_node=data_node, 
             data=data,
-            plot_index=args.analyze[0],
-            plot_group=args.analyze[1:],
             paradigm=paradigm,
             spool_physiology=args.physiology,
             **experiment_args
             )
+    if len(args.analyze) > 0:
+        model.plot_index = args.analyze[0]
+        model.plot_group=args.analyze[1:]
     controller = controller_class(**controller_args)
     return model, controller
 
