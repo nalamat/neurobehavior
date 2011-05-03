@@ -1,5 +1,5 @@
-from neurogen.blocks import load_dict
-from neurogen.trait_interface import block_view_factory
+from neurogen_old.blocks import load_dict
+from neurogen_old.trait_interface import block_view_factory
 
 am_noise = load_dict((
         'Output', {

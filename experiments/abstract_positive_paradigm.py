@@ -9,7 +9,6 @@ from enthought.traits.ui.api import View, spring, VGroup, Item, \
 from cns.traits.ui.api import ListAsStringEditor
 
 from pump_paradigm_mixin import PumpParadigmMixin
-from signals import signal_options
 
 from enthought.traits.ui.table_column import ObjectColumn
 from enthought.traits.ui.api import TableEditor, TextEditor

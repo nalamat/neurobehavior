@@ -190,6 +190,9 @@ def prepare_experiment(args, store_node):
     if len(args.analyze) > 0:
         model.plot_index = args.analyze[0]
         model.plot_group=args.analyze[1:]
+    elif len(args.rove) > 0:
+        model.plot_index = args.rove[0]
+        model.plot_group=args.rove[1:]
     controller = controller_class(**controller_args)
     return model, controller
 

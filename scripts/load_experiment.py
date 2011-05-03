@@ -1,9 +1,13 @@
 #!python
 
+import logging
+import os 
 import sys
 import settings
 from experiments import loader
 import argparse
+
+log = logging.getLogger()
 
 class VerifyUniqueParameters(argparse.Action):
 
@@ -41,26 +45,34 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    import cns
-    cns.RCX_USE_SUBPROCESS = args.subprocess
-    print args
+    try:
+        import cns
+        cns.RCX_USE_SUBPROCESS = args.subprocess
+        print args
 
-    # Do some additional checking of argument list to make sure it is valid
-    if args.mode != 'inspect': 
-        invalid = loader.get_invalid_parameters(args)
-        if len(invalid) != 0:
-            if len(invalid) == 1:
-                mesg = ' is an invalid parameter'
-            else:
-                mesg = ' are invalid parameters'
-            sys.exit(', '.join(invalid) + mesg)
+        # Do some additional checking of argument list to make sure it is valid
+        if args.mode != 'inspect': 
+            invalid = loader.get_invalid_parameters(args)
+            if len(invalid) != 0:
+                if len(invalid) == 1:
+                    mesg = ' is an invalid parameter'
+                else:
+                    mesg = ' are invalid parameters'
+                sys.exit(', '.join(invalid) + mesg)
 
-    # Finally, do the requested action
-    if args.mode == 'profile':
-        loader.profile_experiment(args)
-    elif args.mode == 'test':
-        loader.test_experiment(args)
-    elif args.mode == 'inspect':
-        loader.inspect_experiment(args)
-    else:
-        loader.launch_experiment(args)
+        # Finally, do the requested action
+        if args.mode == 'profile':
+            loader.profile_experiment(args)
+        elif args.mode == 'test':
+            loader.test_experiment(args)
+        elif args.mode == 'inspect':
+            loader.inspect_experiment(args)
+        else:
+            loader.launch_experiment(args)
+    except Exception, e:
+        log.exception(e)
+        # Now, if we are running from a terminal, don't exit until the user hits
+        # enter so they have time to read the error message.  Note that the
+        # error message will be properly logged as well.
+        if os.isatty(sys.stdout.fileno()):
+            raw_input("Hit enter to exit")

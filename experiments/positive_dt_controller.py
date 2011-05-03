@@ -1,8 +1,8 @@
 from enthought.traits.api import Instance
 from abstract_positive_controller import AbstractPositiveController
-import ng2work.block_definitions as blocks
-from ng2work.sink import Sink
-from ng2work.calibration import Calibration, equalized_data
+from neurogen import block_definitions as blocks
+from neurogen.sink import Sink
+from neurogen.calibration import Calibration, equalized_data
 
 import numpy as np
 
@@ -16,7 +16,8 @@ class PositiveDTController(AbstractPositiveController):
     output      = Instance(Sink)
 
     def _carrier_default(self):
-        return blocks.BandlimitedNoise(seed=-1, level=120)
+        #return blocks.BandlimitedNoise(seed=-1, level=120)
+        return blocks.Tone(frequency=2e3)
 
     def _envelope_default(self):
         return blocks.Cos2Envelope(token=self.carrier.waveform)
@@ -34,10 +35,11 @@ class PositiveDTController(AbstractPositiveController):
         self.envelope.rise_time = value
 
     def set_fc(self, value):
-        self.carrier.fc = value
+        self.carrier.frequency = value
 
     def set_bandwidth(self, value):
-        self.carrier.bandwidth = value
+        pass
+        #self.carrier.bandwidth = value
 
     def get_sf(self, attenuation, hw_attenuation):
         delta = hw_attenuation-attenuation

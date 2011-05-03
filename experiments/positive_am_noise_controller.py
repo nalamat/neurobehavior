@@ -2,6 +2,8 @@ from enthought.traits.api import Any
 from numpy.random import uniform
 from abstract_positive_controller import AbstractPositiveController
 import neurogen.block_definitions as blocks
+from neurogen.sink import Sink
+from neurogen.calibration import Calibration, equalized_data
 
 class PositiveAMNoiseController(AbstractPositiveController):
 
@@ -24,18 +26,20 @@ class PositiveAMNoiseController(AbstractPositiveController):
         return blocks.BroadbandNoise()
 
     def _modulator_default(self):
-        return blocks.SAM(token=self.carrier, 
-                          equalize_power=True,
-                          equalize_phase=False)
+        return blocks.SAM(token=self.carrier.waveform, equalize_power=True,
+                equalize_phase=False)
 
     def _envelope_default(self):
-        return blocks.Cos2Envelope(token=self.modulator)
+        return blocks.Cos2Envelope(token=self.modulator.waveform)
 
     def _output_default(self):
-        return blocks.Output(token=self.envelope)
+        return Sink(token=self.envelope.waveform, fs=self.iface_behavior.fs,
+                calibration=Calibration(equalized_data))
 
     def _compute_signal(self):
-        return self.output.realize(self.buffer_out1.fs, self.current_duration)
+        self.envelope.duration = self.current_duration
+        self.output.duration = self.current_duration
+        return self.output.realize()
 
     def set_modulation_onset(self, value):
         if value == 0:
