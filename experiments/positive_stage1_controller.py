@@ -29,6 +29,7 @@ class PositiveStage1Controller(AbstractExperimentController,
         self.update_context()
         self.iface_pump.set_trigger(start='rising', stop='falling')
         self.iface_pump.set_direction('infuse')
+        self.iface_pump.set_volume(0)
 
         # Set up data collection
         self.init_signal()
