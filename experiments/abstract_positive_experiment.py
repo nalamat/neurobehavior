@@ -8,7 +8,6 @@ from enthought.traits.ui.api import View, Item, VGroup, HGroup, InstanceEditor,\
 
 from enthought.enable.api import Component, ComponentEditor
 
-
 from analysis_plot_mixin import AnalysisPlotMixin
 
 

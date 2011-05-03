@@ -26,8 +26,8 @@ class AnalysisPlotMixin(HasTraits):
 
     # Plotting and analysis options
     available_group     = Property(depends_on='paradigm.parameters, plot_index')
-    plot_index          = Str()
-    plot_group          = List([])
+    plot_index          = Str(plot_setting=True)
+    plot_group          = List([], plot_setting=True)
     index_scale         = Enum('log', 'linear', plot_setting=True)
     plot_1_value        = Str('par_go_count', plot_setting=True)
     plot_2_value        = Str('par_hit_frac', plot_setting=True)

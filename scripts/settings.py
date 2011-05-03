@@ -56,5 +56,4 @@ logging_config = {
             'handlers': ['console', 'file'],
             },
         }
-
 logging.config.dictConfig(logging_config)
