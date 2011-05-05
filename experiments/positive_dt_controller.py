@@ -11,16 +11,19 @@ log = logging.getLogger(__name__)
 
 class PositiveDTController(AbstractPositiveController):
 
-    carrier     = Instance(blocks.Block)
-    envelope    = Instance(blocks.Block)
-    output      = Instance(Sink)
+    noise_carrier   = Instance(blocks.Block)
+    tone_carrier    = Instance(blocks.Block)
+    envelope        = Instance(blocks.Block)
+    output          = Instance(Sink)
 
-    def _carrier_default(self):
-        #return blocks.BandlimitedNoise(seed=-1, level=120)
+    def _tone_carrier_default(self):
         return blocks.Tone(frequency=2e3)
 
+    def _noise_carrier_default(self):
+        return blocks.BandlimitedNoise()
+
     def _envelope_default(self):
-        return blocks.Cos2Envelope(token=self.carrier.waveform)
+        return blocks.Cos2Envelope()
 
     def _output_default(self):
         return Sink(token=self.envelope.waveform, fs=self.iface_behavior.fs,
@@ -35,11 +38,15 @@ class PositiveDTController(AbstractPositiveController):
         self.envelope.rise_time = value
 
     def set_fc(self, value):
-        self.carrier.frequency = value
+        self.tone_carrier.frequency = value
+        self.noise_carrier.fc = value
 
     def set_bandwidth(self, value):
-        pass
-        #self.carrier.bandwidth = value
+        if value == 0:
+            self.envelope.token = self.tone_carrier.waveform
+        else:
+            self.envelope.token = self.noise_carrier.waveform
+            self.noise_carrier.bandwidth = value
 
     def get_sf(self, attenuation, hw_attenuation):
         delta = hw_attenuation-attenuation

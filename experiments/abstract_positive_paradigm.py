@@ -34,7 +34,7 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
 
     # Needs to be CBool because Pytables returns numpy.bool_ type which gets
     # rejected by Bool trait
-    repeat_FA = CBool(store='attribute', init=True)
+    repeat_FA = CBool(store='attribute', init=True, label='Repeat NOGO if FA')
 
     signal_offset_delay = ExpressionTrait(0.5, label='Signal offset delay (s)')
     intertrial_duration = ExpressionTrait(0.1, label='Intertrial duration (s)')

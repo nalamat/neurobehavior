@@ -141,15 +141,6 @@ class TrialLogAdapter(TabularAdapter):
         else:
             return '@icons:none_node'   # a gray icon
 
-class ParameterAdapter(TabularAdapter):
-
-    columns = [('Value', 'value')]
-
-    value_text = Property
-
-    def _get_value_text(self):
-        return self.item
-
 class AbstractPositiveExperiment(AbstractExperiment, AnalysisPlotMixin):
 
     index_range         = Any
@@ -261,6 +252,7 @@ class AbstractPositiveExperiment(AbstractExperiment, AnalysisPlotMixin):
             )
 
     status_group = VGroup(
+            Item('animal', style='readonly'),
             Item('handler.status', style='readonly'),
             Item('handler.current_poke_dur', 
                  label='Poke duration (s)', style='readonly'),

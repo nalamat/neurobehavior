@@ -179,6 +179,10 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
 
     system_tray     = Any
 
+    # Calibration
+    cal_primary     = Instance('neurogen.Calibration')
+    cal_secondary   = Instance('neurogen.Calibration')
+
     def init(self, info):
         try:
             self.model = info.object

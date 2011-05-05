@@ -19,10 +19,19 @@ log = logging.getLogger(__name__)
 
 # Import the experiments
 from cns.data.ui.cohort import CohortEditor, CohortView, CohortViewHandler
-
 from cns.data.h5_utils import append_node, append_date_node
 
+from scripts import settings
+
+#import imp
+#import os
+#settings_file = os.path.dirname(os.ENVIRON['NEUROBEHAVIOR_SETTINGS']) 
+#imp.find_module('settings', os.ENVIRON['NEUROBEHAVIOR_SETTINGS'])
+
 class ExperimentCohortView(CohortView):
+
+    #path = settings.COHORT_ROOT
+    #wildcard = settings.COHORT_WILDCARD
 
     traits_view = View(
         VGroup(
@@ -49,6 +58,19 @@ class ExperimentLauncher(CohortViewHandler):
         if not self.load_file(info):
             sys.exit()
 
+    def load_paradigm(self, info, paradigm_node, paradigm_hash):
+        try:
+            return persistence.load_object(paradigm_node, paradigm_hash)
+        except tables.NoSuchNodeError:
+            mesg = 'No prior paradigm found.  Creating new paradigm.'
+            log.debug(mesg)
+            information(info.ui.control, mesg)
+        except (TraitError, ImportError, persistence.PersistenceReadError), e:
+            mesg = 'Unable to load prior settings.  Creating new paradigm.'
+            log.debug(mesg)
+            log.exception(e)
+            error(info.ui.control, mesg)
+
     def launch_experiment(self, info, selected):
         '''
         Runs specified experiment type.  On successful completion of an
@@ -66,37 +88,23 @@ class ExperimentLauncher(CohortViewHandler):
                 file = tables.openFile(item.store_node_source, 'a',
                                        rootUEP=item.store_node_path)
                 animal_node = file.root
-            
+
+            # We need to call prepare_experiment prior to loading a saved
+            # paradigm.  prepare_experiment adds the roving parameters as traits
+            # on the TrialSetting object.  If a paradigm is loaded before the
+            # traits are added, wonky things may happen.
+            store_node = get_or_append_node(animal_node, 'experiments')
+            model, controller = prepare_experiment(self.args, store_node)
+            model.animal = item
+
             # Try to load settings from the last time the subject was run.  If
             # we cannot load the settings for whatever reason, notify the user
             # and fall back to the default settings.
-            store_node = get_or_append_node(animal_node, 'experiments')
             paradigm_node = get_or_append_node(store_node, 'last_paradigm')
             paradigm_name = get_experiment(self.args.type)['node_name']
-            paradigm = None
-            try:
-                paradigm = persistence.load_object(paradigm_node, paradigm_name)
-            except tables.NoSuchNodeError:
-                mesg = 'No prior paradigm found.  Creating new paradigm.'
-                log.debug(mesg)
-                information(info.ui.control, mesg)
-            except TraitError, e:
-                mesg = 'Unable to load prior settings.  Creating new paradigm.'
-                log.debug(mesg)
-                log.exception(e)
-                error(info.ui.control, mesg)
-            except ImportError, e:
-                mesg = 'Unable to load prior settings.  Creating new paradigm.'
-                log.debug(mesg)
-                log.exception(e)
-                error(info.ui.control, mesg)
-            except persistence.PersistenceReadError, e:
-                mesg = 'Unable to load prior settings.  Creating new paradigm.'
-                log.debug(mesg)
-                log.exception(e)
-                error(info.ui.control, mesg)
+            paradigm_hash = paradigm_name + '_' + '_'.join(self.args.rove)
 
-            model, controller = prepare_experiment(self.args, store_node)
+            paradigm = self.load_paradigm(info, paradigm_node, paradigm_hash)
 
             try:
                 if paradigm is not None:
@@ -114,7 +122,7 @@ class ExperimentLauncher(CohortViewHandler):
 
             if ui.result:
                 persistence.add_or_update_object(model.paradigm, paradigm_node,
-                        paradigm_name)
+                        paradigm_hash)
                 item.processed = True
                 self.last_paradigm = model.paradigm
             
@@ -148,7 +156,8 @@ class ExperimentLauncher(CohortViewHandler):
 def prepare_experiment(args, store_node):
     # Load the experiment classes
     e = get_experiment(args.type)
-    exp_node = append_date_node(store_node, e['node_name'] + '_')
+    node_name = e['node_name'] + '_' + '_'.join(args.rove)
+    exp_node = append_date_node(store_node, node_name + '_')
     data_node = append_node(exp_node, 'data')
 
     experiment_class, experiment_args = e['experiment']
@@ -172,9 +181,12 @@ def prepare_experiment(args, store_node):
     TrialSetting.parameters = args.rove
     trial_setting_editor.columns = columns
 
+    # Load the calibration data
+    controller_args['cal_primary'] = neurogen.load_mat_cal(settings.CAL_PRIMARY)
+    #controller_args['cal_secondary'] = neurogen.load_mat_cal(settings.CAL_SECONDARY)
+
     # Prepare the classes.  This really is a lot of boilerplate to link up
     # parameters with paradigms, etc, to facilitate analysis
-
     paradigm = paradigm_class(**paradigm_args)
     data = data_class(store_node=data_node, **data_args)
     data.parameters = args.analyze
@@ -197,16 +209,16 @@ def prepare_experiment(args, store_node):
     return model, controller
 
 def test_experiment(args):
-    from cns import TEMP_ROOT
-    filename = join(TEMP_ROOT, 'test_experiment.hd5')
+    #from cns import TEMP_ROOT
+    filename = join(settings.TEMP_ROOT, 'test_experiment.hd5')
     file = tables.openFile(filename, 'w')
     model, controller = prepare_experiment(args, file.root)
     model.configure_traits(handler=controller)
 
 def profile_experiment(args):
-    from cns import TEMP_ROOT
+    #from cns import TEMP_ROOT
     import cProfile
-    profile_data_file = join(TEMP_ROOT, 'profile.dmp')
+    profile_data_file = join(settings.TEMP_ROOT, 'profile.dmp')
     cProfile.runctx('test_experiment(args)', globals(), {'args': args},
             filename=profile_data_file)
 
