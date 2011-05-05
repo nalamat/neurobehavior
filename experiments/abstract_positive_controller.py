@@ -89,6 +89,7 @@ class AbstractPositiveController(AbstractExperimentController,
     def start_experiment(self, info):
         self.init_context()
         self.update_context()
+        self.update_context(self.current_setting_go.parameter_dict())
 
         self.iface_pump.set_trigger(start='rising', stop=None)
         self.iface_pump.set_direction('infuse')

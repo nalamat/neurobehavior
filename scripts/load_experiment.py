@@ -42,13 +42,16 @@ if __name__ == '__main__':
                         default=False)
     parser.add_argument('-s', '--subprocess', dest='subprocess',
                         action='store_true', help='Run TDT IO in a subprocess')
+    parser.add_argument('-c1', dest='calibration_1',
+                        help='Calibration data for primary speaker')
+    parser.add_argument('-c2', dest='calibration_2',
+                        help='Calibration data for secondary speaker')
 
     args = parser.parse_args()
 
     try:
         import cns
         cns.RCX_USE_SUBPROCESS = args.subprocess
-        print args
 
         # Do some additional checking of argument list to make sure it is valid
         if args.mode != 'inspect': 
