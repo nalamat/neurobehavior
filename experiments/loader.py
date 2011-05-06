@@ -182,7 +182,7 @@ def prepare_experiment(args, store_node):
     trial_setting_editor.columns = columns
 
     # Load the calibration data
-    controller_args['cal_primary'] = neurogen.load_mat_cal(settings.CAL_PRIMARY)
+    #controller_args['cal_primary'] = neurogen.load_mat_cal(settings.CAL_PRIMARY)
     #controller_args['cal_secondary'] = neurogen.load_mat_cal(settings.CAL_SECONDARY)
 
     # Prepare the classes.  This really is a lot of boilerplate to link up
