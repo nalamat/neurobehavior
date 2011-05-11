@@ -149,9 +149,13 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
         CR
             (nogo | early) & ~spout
         '''
-        poke_data = self.poke_TTL.get_range_index(ts_start, ts_end)
-        spout_data = self.spout_TTL.get_range_index(ts_start, ts_end)
-        react_data = self.reaction_TTL.get_range_index(ts_start, ts_end)
+        print ts_start, ts_end, len(self.poke_TTL.signal)
+        poke_data = self.poke_TTL.get_range_index(ts_start, ts_end,
+                check_bounds= True)
+        spout_data = self.spout_TTL.get_range_index(ts_start, ts_end,
+                check_bounds= True)
+        react_data = self.reaction_TTL.get_range_index(ts_start, ts_end,
+                check_bounds= True)
 
         # Did subject withdraw from nose-poke before or after he was allowed to
         # react?

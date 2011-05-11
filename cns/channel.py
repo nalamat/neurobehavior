@@ -104,7 +104,7 @@ class Channel(HasTraits):
         '''
         return int(time*self.fs)
 
-    def get_range_index(self, start, end, reference=0):
+    def get_range_index(self, start, end, reference=0, check_bounds=False):
         '''
         Returns a subset of the range specified in samples
 
@@ -118,12 +118,21 @@ class Channel(HasTraits):
             End index in samples
         reference : num samples (int), optional
             Time of trigger to reference start and end to
+        check_bounds : bool
+            Check that start and end fall within the valid data range
         '''
         t0_index = int(self.t0*self.fs)
         #lb = np.max(0, start-t0_index+reference)
         #ub = np.max(0, end-t0_index+reference)
         lb = start-t0_index+reference
         ub = end-t0_index+reference
+
+        if check_bounds:
+            if lb < 0:
+                raise ValueError, "start must be >= 0"
+            if ub >= len(self.signal):
+                raise ValueError, "end must be <= signal length"
+
         if np.iterable(lb):
             return [self.signal[lb:ub] for lb, ub in zip(lb, ub)]
         else:

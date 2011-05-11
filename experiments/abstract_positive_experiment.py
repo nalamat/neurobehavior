@@ -115,8 +115,10 @@ class TrialLogAdapter(TabularAdapter):
     def _get_bg_color(self):
         if self.item['ttype'] == 'GO':
             return color_names['light green']
-        else:
+        elif self.item['ttype'] == 'NOGO':
             return color_names['light red']
+        else:
+            return color_names['gray']
 
     def _get_reaction_image(self):
         if self.item['reaction'] == 'early':
