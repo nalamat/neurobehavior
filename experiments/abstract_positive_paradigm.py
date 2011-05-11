@@ -19,8 +19,9 @@ from eval import ExpressionTrait
 
 class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
 
-    parameters = List(Instance(TrialSetting), [], store='child', init=True)
-    nogo = Instance(TrialSetting, (), store='child', init=True)
+    parameters  = List(Instance(TrialSetting), [], store='child')
+    nogo        = Instance(TrialSetting, (), store='child')
+    remind      = Instance(TrialSetting, (), store='child')
 
     def _parameters_default(self):
         return [TrialSetting()]
@@ -52,6 +53,7 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
 
     parameter_view = VGroup(
             Item('nogo', style='custom'),
+            Item('remind', style='custom'),
             VGroup(Item('parameter_order', label='Order')),
             Item('parameters', editor=trial_setting_editor,
                  show_label=False),

@@ -32,7 +32,7 @@ class PositiveExperimentToolBar(ExperimentToolBar):
                         enabled_when="object.handler.state=='halted'",),
                    '_',
                    Item('remind',
-                        enabled_when="object.handler.state=='running'",),
+                        enabled_when="object.handler.state<>'halted'",),
                    Item('stop',
                         enabled_when="object.handler.state in " +\
                                      "['running', 'paused', 'manual']",),
@@ -117,6 +117,8 @@ class AbstractPositiveController(AbstractExperimentController,
             result= 'NOGO %d of %d' % (self.current_trial, self.current_num_nogo)
         else:
             result = 'GO'
+        if self.state == 'manual':
+            result += ' (manual)'
         return result
 
     def acquire_trial_lock(self):
@@ -124,21 +126,18 @@ class AbstractPositiveController(AbstractExperimentController,
         # running, it's too late and a lock cannot be acquired.  If trial is not
         # running, changes can be made.  A lock is returned (note this is not
         # thread-safe).
-        log.debug("Setting pause state to True")
-        self.set_pause_state(True)
-        if self.get_trial_running():
-            log.debug("Trial is running, let's try later")
-            self.set_pause_state(False) 
-            return False
-        else:
-            return True
+        self.request_pause()
+        return self.get_pause_state()
 
     def release_trial_lock(self):
         log.debug("Releasing trial lock")
-        self.set_pause_state(False)
+        self.request_resume()
 
     def remind(self, info=None):
         if self.acquire_trial_lock():
+            self.state = 'manual'
+            self.update_context(self.current_remind.parameter_dict())
+            #self.current_setting_go = self.current_remind
             self.current_trial = 1
             self.current_num_nogo = 0
             self.current_context['num_nogo'] = 0
@@ -146,6 +145,7 @@ class AbstractPositiveController(AbstractExperimentController,
             self.current_go_requested = False
             self.release_trial_lock()
         else:
+            log.debug("Trial is running, let's try later")
             self.current_go_requested = True
 
     ############################################################################
@@ -156,11 +156,11 @@ class AbstractPositiveController(AbstractExperimentController,
         return
     
     def monitor_behavior(self):
-        ts_end = self.get_trial_end_ts()
         self.pipeline_TTL1.send(self.buffer_TTL1.read())
         self.pipeline_TTL2.send(self.buffer_TTL2.read())
-
+        ts_end = self.get_trial_end_ts()
         ts_poke_end = self.get_poke_end_ts()
+
         if ts_poke_end > self.current_poke_end_ts:
             # If poke_end has changed, we know that the subject has withdrawn
             # from the nose poke during a trial.  
@@ -183,11 +183,25 @@ class AbstractPositiveController(AbstractExperimentController,
 
             # In this context, current_trial reflects the trial that just
             # occured
-            last_ttype = 'GO' if self.is_go() else 'NOGO'
-            self.log_trial(ts_start, ts_end, last_ttype)
+            if self.state == 'manual':
+                last_ttype = 'REMIND'
+            else:
+                last_ttype = 'GO' if self.is_go() else 'NOGO'
+            
+            while True:
+                try:
+                    # Since we are compressing 4 samples into a single buffer
+                    # slot, we may need to repeat the read twice so we have all
+                    # the information we need for the data analysis.
+                    self.pipeline_TTL1.send(self.buffer_TTL1.read_all()) 
+                    self.pipeline_TTL2.send(self.buffer_TTL2.read_all())
+                    self.log_trial(ts_start, ts_end, last_ttype)
+                    break
+                except ValueError:
+                    log.debug("Waiting for more data")
+                    pass
 
             # Increment num_nogo
-            print last_ttype
             if last_ttype == 'NOGO' and self.current_context['repeat_FA']:
                 if self.model.data.resp_seq[-1] == 'spout':
                     self.current_context['num_nogo'] += 1
@@ -196,7 +210,11 @@ class AbstractPositiveController(AbstractExperimentController,
             log.debug('Last trial: %d, NOGO count: %d', self.current_trial,
                       self.current_num_nogo)
 
-            if self.is_go():
+            if self.state == 'manual':
+                self.state = 'running'
+                self.update_context(self.current_setting_go.parameter_dict())
+                self.current_trial = 1
+            elif self.is_go():
                 # GO was just presented.  Set up for next block of trials.
                 self.current_setting_go = self.choice_parameter.next()
                 self.update_context(self.current_setting_go.parameter_dict())
@@ -219,6 +237,15 @@ class AbstractPositiveController(AbstractExperimentController,
     # to implement a new backend, you would subclass this and override the
     # appropriate set_* methods.
     ############################################################################
+    @on_trait_change('model.paradigm.remind.+')
+    def queue_parameter_change(self, object, name, old, new):
+        self.queue_change(self.model.paradigm, 'remind',
+                self.current_remind, self.model.paradigm.remind)
+
+    @on_trait_change('model.paradigm.nogo.+')
+    def queue_parameter_change(self, object, name, old, new):
+        self.queue_change(self.model.paradigm, 'nogo',
+                self.current_nogo, self.model.paradigm.nogo)
 
     @on_trait_change('model.paradigm.parameters.+')
     def queue_parameter_change(self, object, name, old, new):
@@ -305,11 +332,20 @@ class AbstractPositiveController(AbstractExperimentController,
     def get_trial_running(self):
         return self.iface_behavior.get_tag('trial_running')
 
-    def set_pause_state(self, value):
-        self.iface_behavior.set_tag('pause_state', value)
+    def get_pause_state(self):
+        return self.iface_behavior.get_tag('paused?')
+
+    def request_pause(self):
+        self.iface_behavior.trigger(2)
+
+    def request_resume(self):
+        self.iface_behavior.trigger(3)
 
     def set_nogo(self, value):
         self.current_nogo = deepcopy(value)
+
+    def set_remind(self, value):
+        self.current_remind = deepcopy(value)
 
     def set_reward_volume(self, value):
         self.set_pump_volume(value)

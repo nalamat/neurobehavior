@@ -337,7 +337,7 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
 
             if self.model.spool_physiology:
                 settings = self.model.physiology_settings
-                self.init_paradigm(settings)
+                #self.init_paradigm(settings)
                 settings.on_trait_change(self.queue_change, '+')
                 self.tasks.append((self.monitor_physiology, 1))
 
