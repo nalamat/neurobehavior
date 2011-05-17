@@ -56,6 +56,9 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
     trial_log is essentially a list of the trials, along with the parameters
     and some basic analysis.
     '''
+    c_nogo = Int(0, context=True)
+    c_hit = Int(0, context=True)
+    c_fa = Int(0, context=True)
 
     def get_data(self, name):
         return getattr(self, name)
@@ -128,7 +131,14 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
             kwargs.update(self.compute_response(ts_start, ts_end))
             kwargs['start'] = ts_start/self.poke_TTL.fs
             kwargs['end'] = ts_end/self.poke_TTL.fs
+
+        # Log the trial
         AbstractExperimentData.log_trial(self, **kwargs)
+
+        # Now, compute the context data
+        self.c_nogo = self.rcount(self.nogo_seq)
+        self.c_hit = self.rcount(self.hit_seq[self.go_seq | self.fa_seq])
+        self.c_fa = self.rcount(self.fa_seq[self.early_seq | self.nogo_seq])
 
     def compute_response(self, ts_start, ts_end):
         '''
@@ -149,13 +159,12 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
         CR
             (nogo | early) & ~spout
         '''
-        print ts_start, ts_end, len(self.poke_TTL.signal)
         poke_data = self.poke_TTL.get_range_index(ts_start, ts_end,
-                check_bounds= True)
+                check_bounds=True)
         spout_data = self.spout_TTL.get_range_index(ts_start, ts_end,
-                check_bounds= True)
+                check_bounds=True)
         react_data = self.reaction_TTL.get_range_index(ts_start, ts_end,
-                check_bounds= True)
+                check_bounds=True)
 
         # Did subject withdraw from nose-poke before or after he was allowed to
         # react?
