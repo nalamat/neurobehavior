@@ -382,7 +382,14 @@ class AbstractPositiveController(AbstractExperimentController,
             return 'primary' if np.random.uniform(0, 1) < 0.5 else 'secondary'
 
     def set_fa_puff_duration(self, value):
+        # The air puff is triggered off of a Schmitt2 component.  If nHi is set
+        # to 0, the first TTL to the input of the Schmitt2 will cause the
+        # Schmitt2 to go high for infinity.
         self.iface_behavior.cset_tag('puff_dur_n', value, 's', 'n')
+        # Check to see if the value of puff_dur_n is 0.  If so, bring it back
+        # within the allowed range of values for the Schmitt2 nHi parameter.
+        if self.iface_behavior.get_tag('puff_dur_n') == 0:
+            self.iface_behavior.set_tag('puff_dur_n', 1)
 
     def log_trial(self, ts_start, ts_end, last_ttype):
         self.model.data.log_trial(ts_start=ts_start, ts_end=ts_end,

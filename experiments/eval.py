@@ -3,6 +3,26 @@ from enthought.traits.ui.api import (TextEditor, View, Item, BooleanEditor,
         CompoundEditor)
 from enthought.traits.api import Callable, HasTraits, Instance
 
+'''
+Available attributes for evaluating experiment parameters.
+
+    random
+        Numpy's random module.  Provides access to all the functions and
+        distributions available within this module.
+    arange
+    randint(low, high)
+        Return random integer within the range [low, high]
+    uniform(low, high)
+        Draw sample from uniform distribution in the interval [low, high)
+    exponential(scale)
+        Draw sample from exponential distribution with scale parameter (i.e.
+        :math:`\\beta')
+    clip(value, lb, ub)
+        Ensure value falls within
+        
+    '''
+        
+
 def choice(sequence):
     i = np.random.randint(0, len(sequence))
     return sequence[i]
@@ -17,6 +37,7 @@ class ParameterExpression(object):
             'exponential':  np.random.exponential,
             'clip':         np.clip,
             'choice':       choice,
+            'toss':         lambda x: np.random.uniform() > x,
             }
 
     def __init__(self, string):
