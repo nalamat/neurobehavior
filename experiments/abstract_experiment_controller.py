@@ -546,7 +546,10 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
     def _get_current_context_list(self):
         context = []
         for k, v in self.current_context.items():
-            label = self.model.paradigm.trait(k).label
-            context.append((label, v, k))
+            try:
+                label = self.model.paradigm.trait(k).label
+                context.append((label, v, k))
+            except:
+                context.append(('', v, k))
         context.sort()
         return context
