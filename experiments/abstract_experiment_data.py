@@ -10,10 +10,14 @@ EVENT_DTYPE = [('timestamp', 'i'), ('name', 'S64'), ('value', 'S128'), ]
 
 from cns.data.h5_utils import get_or_append_node
 from cns.channel import FileChannel
+from cns.util.math import rcount
 
 class AbstractExperimentData(PhysiologyDataMixin, PumpDataMixin):
 
     new_trial = Event
+
+    def rcount(self, sequence):
+        return rcount(sequence)
 
     def apply_mask(self, fun, masks, sequence):
         return np.array([fun(sequence[m]) for m in masks])
@@ -24,6 +28,10 @@ class AbstractExperimentData(PhysiologyDataMixin, PumpDataMixin):
     def _create_channel(self, name, dtype):
         contact_node = get_or_append_node(self.store_node, 'contact')
         return FileChannel(node=contact_node, name=name, dtype=dtype)
+
+    def get_context(self):
+        context_names = self.trait_names(context=True)
+        return dict((t, getattr(self, t)) for t in context_names)
 
     # Node to store the data in
     store_node = Any
