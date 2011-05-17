@@ -5,6 +5,35 @@ from __future__ import division
 import numpy as np
 from scipy.stats import norm
 
+def rcount(sequence):
+    '''
+    Counts the number of consecutive True values starting from the end of the
+    sequence
+
+    >>> rcount([0, 1, 1, 1, 0, 1, 1, 1])
+    3
+    >>> rcount([0, 1, 1, 1, 0, 1, 1, 0])
+    0
+    >>> rcount([0, 1, 1, 1, 0, 0, 1, 1])
+    2
+    >>> rcount([0, 1, 1, 1, 0, 1, 0, 1])
+    1
+    >>> rcount([])
+    0
+    >>> rcount([1])
+    1
+    >>> rcount([0])
+    0
+    '''
+    i = 0
+    j = len(sequence)
+    while True:
+        j -=1
+        if j == -1: break
+        elif sequence[j]: i += 1
+        else: break
+    return i
+
 def d_prime(safe, warn, fa, hit, clip=0.01):
     '''Computes d' given number of safes, warns, false alarms and hits.
     Primarily a utility function for scripting.
@@ -86,3 +115,7 @@ def ensure_monotonic(x, idx):
         if x[i-1]>x[i]:
             x[i-1] = x[i]
     return x
+
+if __name__ == '__main__':
+    import doctest
+    doctest.testmod()
