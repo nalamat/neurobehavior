@@ -114,7 +114,7 @@ class AbstractPositiveController(AbstractExperimentController,
             return 'System is halted'
 
         if not self.is_go():
-            result= 'NOGO %d of %d' % (self.current_trial, self.current_num_nogo)
+            result= 'NOGO'
         else:
             result = 'GO'
         if self.state == 'manual':
@@ -137,10 +137,7 @@ class AbstractPositiveController(AbstractExperimentController,
         if self.acquire_trial_lock():
             self.state = 'manual'
             self.update_context(self.current_remind.parameter_dict())
-            #self.current_setting_go = self.current_remind
-            self.current_trial = 1
-            self.current_num_nogo = 0
-            self.current_context['num_nogo'] = 0
+            self.current_trial = 'GO'
             self.trigger_next()
             self.current_go_requested = False
             self.release_trial_lock()
@@ -152,7 +149,6 @@ class AbstractPositiveController(AbstractExperimentController,
     # Master controller
     ############################################################################
     def update_reward_settings(self, wait_time):
-        # By default we do nothing
         return
     
     def monitor_behavior(self):
@@ -199,38 +195,26 @@ class AbstractPositiveController(AbstractExperimentController,
                     break
                 except ValueError:
                     log.debug("Waiting for more data")
-                    pass
 
             # Increment num_nogo
-            if last_ttype == 'NOGO' and self.current_context['repeat_FA']:
-                if self.model.data.resp_seq[-1] == 'spout':
-                    self.current_context['num_nogo'] += 1
-                    self.current_num_nogo += 1
-
-            log.debug('Last trial: %d, NOGO count: %d', self.current_trial,
-                      self.current_num_nogo)
-
-            if self.state == 'manual':
-                self.state = 'running'
-                self.update_context(self.current_setting_go.parameter_dict())
-                self.current_trial = 1
-            elif self.is_go():
-                # GO was just presented.  Set up for next block of trials.
-                self.current_setting_go = self.choice_parameter.next()
-                self.update_context(self.current_setting_go.parameter_dict())
-                self.current_trial = 1
-            else:
-                self.current_trial += 1
-
-            if self.current_go_requested:
+            if self.current_context['repeat_FA'] and self.model.data.fa_seq[-1]:
+                next_trial = 'NOGO'
+            elif self.current_go_requested:
                 self.remind()
-
-            log.debug('Next trial: %d, NOGO count: %d', self.current_trial,
-                      self.current_num_nogo)
-            self.trigger_next()
+            else:
+                #pr_go = self.current_context['go_probability']
+                #if np.random.uniform() <= pr_go:
+                if self.current_context['go']:
+                    self.current_setting_go = self.choice_parameter.next()
+                    self.update_context(self.current_setting_go.parameter_dict())
+                    self.current_trial = 'GO'
+                else:
+                    self.current_trial = 'NOGO'
+                    self.update_context()
+                self.trigger_next()
 
     def is_go(self):
-        return self.current_trial == self.current_num_nogo + 1
+        return self.current_trial == 'GO'
 
     ############################################################################
     # Code to apply parameter changes.  This is backend-specific.  If you want
@@ -261,14 +245,12 @@ class AbstractPositiveController(AbstractExperimentController,
         self.reset_sequence()
 
     def reset_sequence(self):
-        print 'resetting sequence'
         order = self.current_order
         parameters = self.current_go_parameters
         if order is not None and parameters is not None:
             self.choice_parameter = order(parameters)
             # Refresh experiment state
             if self.current_trial is None:
-                self.current_trial = 1
                 self.current_setting_go = self.choice_parameter.next()
 
     def set_poke_duration(self, value):
@@ -390,6 +372,9 @@ class AbstractPositiveController(AbstractExperimentController,
         # within the allowed range of values for the Schmitt2 nHi parameter.
         if self.iface_behavior.get_tag('puff_dur_n') == 0:
             self.iface_behavior.set_tag('puff_dur_n', 1)
+
+    def set_go(self, value):
+        pass
 
     def log_trial(self, ts_start, ts_end, last_ttype):
         self.model.data.log_trial(ts_start=ts_start, ts_end=ts_end,

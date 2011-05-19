@@ -125,6 +125,8 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
         # the "dummy" spout and poke data required for scoring.
         del kwargs['parameters']
         del kwargs['nogo']
+        del kwargs['prior_parameters']
+        del kwargs['prior_nogo']
         if score:
             ts_start = kwargs['ts_start']
             ts_end = kwargs['ts_end']
@@ -206,10 +208,8 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
     go_indices   = Property(Array('i'), depends_on='ttype_seq')
     nogo_indices = Property(Array('i'), depends_on='ttype_seq')
-
     go_trial_count = Property(Int, store='attribute', depends_on='trial_log')
     nogo_trial_count = Property(Int, store='attribute', depends_on='trial_log')
-
     par_info = Property(store='table', depends_on='par_dprime')
 
     @cached_property

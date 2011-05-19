@@ -31,7 +31,8 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
     pump_rate       = ExpressionTrait(1.5, label='Pump rate (ml/min)')
     reward_volume   = ExpressionTrait(25, label='Reward volume (ul)')
 
-    num_nogo = ExpressionTrait('int(clip(exponential(2), 0, 5))', label='NOGO number')
+    #num_nogo = ExpressionTrait('int(clip(exponential(2), 0, 5))', label='NOGO number')
+    go = ExpressionTrait('toss(0.5) if c_nogo < 5 else True', label='Go?')
 
     # Needs to be CBool because Pytables returns numpy.bool_ type which gets
     # rejected by Bool trait
@@ -77,7 +78,7 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
                     'poke_duration',
                     'pump_rate',
                     'reward_volume',
-                    Item('num_nogo', label='NOGO'),
+                    'go_probability',
                     Item('repeat_FA', label='Add a NOGO if false alarm?'),
                     label='Settings',
                     ),

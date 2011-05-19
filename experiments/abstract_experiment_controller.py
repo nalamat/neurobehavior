@@ -535,12 +535,23 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
         namespace.  If extra_content defines the value of a parameter, that
         value will take precedence.
         '''
-        old_context = self.current_context
+        if extra_context is None:
+            extra_context = {}
+        data_context = self.model.data.get_context()
+
+        old_context = {}
+        for k, v in self.current_context.items():
+            if not k.startswith('prior_'):
+                old_context['prior_'+k] = v
+        extra_context.update(data_context)
+        extra_context.update(old_context)
+        
         new_context = eval_context(self.current_parameters, extra_context)
         self.current_context = new_context
         for parameter, value in self.current_context.items():
-            if old_context.get(parameter, None) != value:
-                getattr(self, 'set_' + parameter)(value)
+            if parameter not in data_context and parameter not in old_context: 
+                if old_context.get('prior_'+parameter, None) != value:
+                    getattr(self, 'set_' + parameter)(value)
 
     @cached_property
     def _get_current_context_list(self):
