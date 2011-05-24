@@ -32,7 +32,8 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
     reward_volume   = ExpressionTrait(25, label='Reward volume (ul)')
 
     #num_nogo = ExpressionTrait('int(clip(exponential(2), 0, 5))', label='NOGO number')
-    go = ExpressionTrait('toss(0.5) if c_nogo < 5 else True', label='Go?')
+    go_probability = ExpressionTrait('0.5 if c_nogo < 5 else 1.0', 
+            label='Probability of GO')
 
     # Needs to be CBool because Pytables returns numpy.bool_ type which gets
     # rejected by Bool trait
@@ -46,7 +47,7 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
     response_window_duration = ExpressionTrait(3, label='Response duration (s)')
 
     timeout_trigger  = Enum('FA only', 'Anytime', label='Timeout Mode')
-    timeout_duration = ExpressionTrait(15, label='TO duration (s)')
+    timeout_duration = ExpressionTrait(1, label='TO duration (s)')
     timeout_grace_period = ExpressionTrait(2.5, label='Timeout grace period (s)')
     fa_puff_duration = ExpressionTrait(0.0, label='FA puff duration (s)')
 

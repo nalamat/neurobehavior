@@ -59,6 +59,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
     c_nogo = Int(0, context=True)
     c_hit = Int(0, context=True)
     c_fa = Int(0, context=True)
+    c_fa_all = Int(0, context=True)
 
     def get_data(self, name):
         return getattr(self, name)
@@ -125,8 +126,8 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
         # the "dummy" spout and poke data required for scoring.
         del kwargs['parameters']
         del kwargs['nogo']
-        del kwargs['prior_parameters']
-        del kwargs['prior_nogo']
+        #del kwargs['prior_parameters']
+        #del kwargs['prior_nogo']
         if score:
             ts_start = kwargs['ts_start']
             ts_end = kwargs['ts_end']
@@ -141,6 +142,9 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
         self.c_nogo = self.rcount(self.nogo_seq)
         self.c_hit = self.rcount(self.hit_seq[self.go_seq | self.fa_seq])
         self.c_fa = self.rcount(self.fa_seq[self.early_seq | self.nogo_seq])
+
+        all_mask = self.early_seq | self.nogo_all_seq
+        self.c_fa_all = self.rcount(self.fa_all_seq[all_mask])
 
     def compute_response(self, ts_start, ts_end):
         '''
@@ -294,18 +298,22 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
     # Sequences of boolean indicating trial type and subject's response.
 
     # Trial type sequences
-    go_seq      = Property(Array('b'), depends_on='trial_log')
-    nogo_seq    = Property(Array('b'), depends_on='trial_log')
+    # Includes GO but not GO_REMIND
+    go_seq          = Property(Array('b'), depends_on='trial_log')
+    # Includes NOGO but not NOGO_REPEAT
+    nogo_seq        = Property(Array('b'), depends_on='trial_log')
+    # Includes NOGO and NOGO_REPEAT
+    nogo_all_seq    = Property(Array('b'), depends_on='trial_log')
 
     # Response sequences
-    spout_seq   = Property(Array('b'), depends_on='trial_log')
-    poke_seq    = Property(Array('b'), depends_on='trial_log')
-    nr_seq      = Property(Array('b'), depends_on='trial_log')
+    spout_seq       = Property(Array('b'), depends_on='trial_log')
+    poke_seq        = Property(Array('b'), depends_on='trial_log')
+    nr_seq          = Property(Array('b'), depends_on='trial_log')
 
     # Reaction sequences
-    late_seq    = Property(Array('b'), depends_on='trial_log')
-    early_seq   = Property(Array('b'), depends_on='trial_log')
-    normal_seq  = Property(Array('b'), depends_on='trial_log')
+    late_seq        = Property(Array('b'), depends_on='trial_log')
+    early_seq       = Property(Array('b'), depends_on='trial_log')
+    normal_seq      = Property(Array('b'), depends_on='trial_log')
 
     @cached_property
     def _get_go_seq(self):
@@ -314,6 +322,10 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
     @cached_property
     def _get_nogo_seq(self):
         return self.ttype_seq == 'NOGO'
+
+    @cached_property
+    def _get_nogo_all_seq(self):
+        return (self.ttype_seq == 'NOGO') | (self.ttype_seq == 'NOGO_REPEAT')
 
     @cached_property
     def _get_poke_seq(self):
@@ -377,6 +389,8 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
     miss_seq        = Property(depends_on='trial_log')
     par_miss_count  = Property(depends_on='trial_log, parameters')
     fa_seq          = Property(depends_on='trial_log')
+    # Include repeat NOGOs in this sequence
+    fa_all_seq      = Property(depends_on='trial_log')
     par_fa_count    = Property(depends_on='trial_log, parameters')
     cr_seq          = Property(depends_on='trial_log')
     par_cr_count    = Property(depends_on='trial_log, parameters')
@@ -401,6 +415,11 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
     def _get_fa_seq(self):
         return (self.early_seq & self.spout_seq) | \
                (self.nogo_seq & self.normal_seq & self.spout_seq)
+
+    @cached_property
+    def _get_fa_all_seq(self):
+        return (self.early_seq & self.spout_seq) | \
+               (self.nogo_all_seq & self.normal_seq & self.spout_seq)
 
     @cached_property
     def _get_par_fa_count(self):
