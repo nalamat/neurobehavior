@@ -34,16 +34,19 @@ class PhysiologyControllerMixin(HasTraits):
         self.model.data.physiology_ts.fs = self.buffer_physiology_ts.fs
 
     def monitor_physiology(self):
-        # Acquire spooled physiology data and send it to the HDF5 file
+        # Acquire raw physiology data
         waveform = self.buffer_physiology_raw.read()
         self.model.data.physiology_raw.send(waveform)
+
+        # Acquire filtered physiology data
         waveform = self.buffer_physiology_filt.read()
+        print waveform
         self.model.data.physiology_processed.send(waveform)
 
         # We also send the processed data to a memory buffer for display in the
         # plotting.  It's very slow when the plot has to re-extract the data
         # from the file and we'd like to avoid this.
-        self.model.data.physiology_ram.send(waveform)
+        # self.model.data.physiology_ram.send(waveform)
 
         # Get the timestamps
         ts = self.buffer_physiology_ts.read()

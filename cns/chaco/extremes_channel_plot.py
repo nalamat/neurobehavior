@@ -1,6 +1,6 @@
 import numpy as np
 from channel_plot import ChannelPlot
-from enthought.traits.api import List, Float
+from enthought.traits.api import List, Float, on_trait_change
 
 import logging
 log = logging.getLogger(__name__)
