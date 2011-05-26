@@ -40,7 +40,6 @@ class PhysiologyControllerMixin(HasTraits):
 
         # Acquire filtered physiology data
         waveform = self.buffer_physiology_filt.read()
-        print waveform
         self.model.data.physiology_processed.send(waveform)
 
         # We also send the processed data to a memory buffer for display in the
