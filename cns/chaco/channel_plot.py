@@ -114,9 +114,8 @@ class ChannelPlot(BaseXYPlot):
         # exact same picture.
         if self.index_range.mask_data(np.array(bounds)).any():
             self._new_bounds_cache = bounds
-            self.invalidate_draw()
             self._data_cache_valid = False
-            self.request_redraw()
+            self.invalidate_and_redraw()
 
     def _channel_changed(self, old, new):
         if old is not None:

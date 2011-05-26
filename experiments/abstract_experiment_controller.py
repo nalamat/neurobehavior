@@ -413,6 +413,9 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
             trait = instance.trait(name)
             if trait.immediate == True:
                 self.apply_change(instance, name, new)
+                set_func = 'set_' + name
+                if hasattr(self, set_func):
+                    getattr(self, set_func)(new)
             else:
                 key = instance, name
                 if key not in self.old_values:
@@ -444,7 +447,7 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
 
     def log_event(self, ts, name, value):
         self.model.data.log_event(ts, name, value)
-        log.debug("%d, %s, %r", ts, name, value)
+        log.debug("EVENT: %d, %s, %r", ts, name, value)
         
     def revert(self, info=None):
         '''Revert changes requested while experiment is running.'''

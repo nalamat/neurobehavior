@@ -32,7 +32,6 @@ class AbstractExperimentData(PhysiologyDataMixin, PumpDataMixin):
     def get_context(self):
         context_names = self.trait_names(context=True)
         context = dict((t, getattr(self, t)) for t in context_names)
-        print context_names, context, self.c_nogo
         return context
 
     # Node to store the data in
