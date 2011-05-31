@@ -124,8 +124,8 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
         # Typically we want score to be True; however, for debugging purposes it
         # is convenient to set score to False that way we don't need to provide
         # the "dummy" spout and poke data required for scoring.
-        del kwargs['parameters']
-        del kwargs['nogo']
+        #del kwargs['parameters']
+        #del kwargs['nogo']
         #del kwargs['prior_parameters']
         #del kwargs['prior_nogo']
         if score:
@@ -307,6 +307,8 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
     # Response sequences
     spout_seq       = Property(Array('b'), depends_on='trial_log')
+    # This is really an alias of spout_seq
+    yes_seq         = Property(Array('b'), depends_on='trial_log')
     poke_seq        = Property(Array('b'), depends_on='trial_log')
     nr_seq          = Property(Array('b'), depends_on='trial_log')
 
@@ -334,6 +336,9 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
     @cached_property
     def _get_spout_seq(self):
         return self.resp_seq == 'spout'
+
+    def _get_yes_seq(self):
+        return self.spout_seq
 
     @cached_property
     def _get_nr_seq(self):

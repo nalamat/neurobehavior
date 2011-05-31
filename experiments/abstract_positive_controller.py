@@ -14,6 +14,7 @@ from copy import deepcopy
 
 from cns import RCX_ROOT
 from os.path import join
+from maximum_likelihood_view import MaximumLikelihoodSelector
 
 import numpy as np
 
@@ -50,6 +51,7 @@ class AbstractPositiveController(AbstractExperimentController,
     toolbar = Instance(PositiveExperimentToolBar, (), toolbar=True)
 
     status = Property(Str, depends_on='state, current_ttype, current_num_nogo')
+    tracker = Instance(MaximumLikelihoodSelector, ())
 
     @on_trait_change('model.data.parameters')
     def update_adapter(self, value):
@@ -204,8 +206,9 @@ class AbstractPositiveController(AbstractExperimentController,
         if next_ttype == 'GO_REMIND':
             self.remind()
         elif next_ttype == 'GO':
-            self.current_setting_go = self.choice_parameter.next()
-            self.update_context(self.current_setting_go.parameter_dict())
+            #self.current_setting_go = self.choice_parameter.next()
+            result = self.select_next_parameter()
+            self.update_context(result)
             self.trigger_next()
         else:
             self.update_context()
@@ -213,6 +216,17 @@ class AbstractPositiveController(AbstractExperimentController,
 
     def is_go(self):
         return self.current_ttype.startswith('GO')
+
+    def select_next_parameter(self):
+        try:
+            last_parameter = self.model.data.par_seq[-1]
+            print 'sucs'
+            last_response = self.model.data.yes_seq[-1]
+            print 'yes'
+            return self.tracker.next(last_parameter, last_response)
+        except BaseException, e:
+            print e
+            return self.tracker.next()
 
     ############################################################################
     # Code to apply parameter changes.  This is backend-specific.  If you want
@@ -229,35 +243,35 @@ class AbstractPositiveController(AbstractExperimentController,
         self.queue_change(self.model.paradigm, 'nogo',
                 self.current_nogo, self.model.paradigm.nogo)
 
-    @on_trait_change('model.paradigm.parameters.+')
-    def queue_parameter_change(self, object, name, old, new):
-        self.queue_change(self.model.paradigm, 'parameters',
-                self.current_parameters, self.model.paradigm.parameters)
+    #@on_trait_change('model.paradigm.parameters.+')
+    #def queue_parameter_change(self, object, name, old, new):
+    #    self.queue_change(self.model.paradigm, 'parameters',
+    #            self.current_parameters, self.model.paradigm.parameters)
 
-    def set_parameters(self, value):
-        self.current_go_parameters = deepcopy(value)
-        self.reset_sequence()
+    #def set_parameters(self, value):
+    #    self.current_go_parameters = deepcopy(value)
+    #    self.reset_sequence()
 
-    def set_parameter_order(self, value):
-        self.current_order = self.model.paradigm.parameter_order_
-        self.reset_sequence()
+    #def set_parameter_order(self, value):
+    #    self.current_order = self.model.paradigm.parameter_order_
+    #    self.reset_sequence()
 
-    def reset_sequence(self):
-        order = self.current_order
-        parameters = self.current_go_parameters
-        if order is not None and parameters is not None:
-            self.choice_parameter = order(parameters)
-            # Refresh experiment state
-            if self.current_trial is None:
-                self.current_setting_go = self.choice_parameter.next()
+    #def reset_sequence(self):
+    #    order = self.current_order
+    #    parameters = self.current_go_parameters
+    #    if order is not None and parameters is not None:
+    #        self.choice_parameter = order(parameters)
+    #        # Refresh experiment state
+    #        if self.current_trial is None:
+    #            self.current_setting_go = self.choice_parameter.next()
 
     def set_poke_duration(self, value):
         # Save requested value for parameter as an attribute because we need
         # this value so we can randomly select a number between the lb and ub
         self.current_poke_duration = value
 
-    def set_num_nogo(self, value):
-        self.current_num_nogo = value
+    #def set_num_nogo(self, value):
+    #    self.current_num_nogo = value
 
     def set_repeat_FA(self, value):
         self.current_repeat_FA = value
