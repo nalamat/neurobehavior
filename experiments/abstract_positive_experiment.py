@@ -10,7 +10,6 @@ from enthought.enable.api import Component, ComponentEditor
 
 from analysis_plot_mixin import AnalysisPlotMixin
 
-
 import cns
 
 from abstract_experiment import AbstractExperiment
@@ -284,6 +283,7 @@ class AbstractPositiveExperiment(AbstractExperiment, AnalysisPlotMixin):
                 Include('pump_group'),
                 Include('status_group'),
                 Tabbed(
+                    Item('handler.tracker', style='custom'),
                     Item('paradigm', style='custom', editor=InstanceEditor()),
                     Include('context_group'),
                     show_labels=False,

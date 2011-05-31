@@ -251,8 +251,6 @@ def inspect_experiment(args):
     # Pretty print the list
     print '\n'
     for i, row in enumerate(parameters):
-        #fillchar = '.' if (i%3==0) else ' '
-        #print row[0].ljust(col_paddings[0]+2, fillchar),
         print row[0].rjust(col_paddings[0]+2) + ' ',
         if row[1] is not None:
             print row[1].ljust(col_paddings[1]+2)
