@@ -37,7 +37,7 @@ class ParameterExpression(object):
             'exponential':  np.random.exponential,
             'clip':         np.clip,
             'choice':       choice,
-            'toss':         lambda x: np.random.uniform() > x,
+            'toss':         lambda x: np.random.uniform() <= x,
             }
 
     def __init__(self, string):
