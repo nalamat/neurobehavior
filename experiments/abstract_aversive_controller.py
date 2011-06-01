@@ -3,9 +3,6 @@ from enthought.traits.api import Any, Property, Str, on_trait_change
 import numpy as np
 from tdt import DSPCircuit
 from cns.pipeline import deinterleave_bits
-from cns.data.h5_utils import append_node, append_date_node, \
-    get_or_append_node
-from cns.data.persistence import add_or_update_object
 from cns import choice
 from functools import partial
 from copy import deepcopy
@@ -129,6 +126,12 @@ class AbstractAversiveController(AbstractExperimentController,
 
     def stop_experiment(self, info=None):
         self.model.data.mask_mode = 'none'
+
+    def log_trial(self, ts_start, ts_end, ttype):
+        self.model.data.log_trial(ts_start=ts_start, ts_end=ts_end,
+                                  ttype=last_ttype,
+                                  speaker=self.current_speaker,
+                                  **self.current_context)
 
     def monitor_behavior(self):
         self.update_safe()

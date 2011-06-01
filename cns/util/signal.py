@@ -4,6 +4,18 @@ Created on Jun 16, 2010
 @author: admin_behavior
 '''
 import numpy as np
+from pylab import figure, show
+from scipy import signal
+
+def filter_response(b, a):
+    w, h = signal.freqz(b, a)
+    f = w*100e3/np.pi
+    fig = figure()
+    s = fig.add_subplot(211)
+    s.semilogx(w, 20*np.log10(np.abs(h)))
+    s = fig.add_subplot(212)
+    s.semilogx(w, np.unwrap(np.angle(h)))
+    show()
 
 def rfft(fs, signal):
     N = len(signal)

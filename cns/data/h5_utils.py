@@ -67,13 +67,18 @@ def append_node(node, name, type='group', *arg, **kw):
     return new_node
 
 time_fmt = '%Y_%m_%d_%H_%M_%S'
+time_pattern = re.compile(r'\d{4}_(\d{2}_?){5}')
 
-def extract_date_from_name(node, pre='date', post=''):
-    name = node._v_name
-    string = re.sub('^'+pre, '', name)
-    string = re.sub(post+'$', '', string)
-    return datetime.strptime(string, time_fmt)
-    
+def extract_date_from_string(string):
+    time_string = time_pattern.search(string).group()
+    return datetime.strptime(time_string, time_fmt)
+
+def extract_date_from_name(node, pre=None, post=None):
+    if pre is not None or post is not None:
+        raise DeprecationWarning, "pre and post are no longer used"
+    time_string = time_pattern.find(node._v_name).group()
+    return datetime.strptime(time_string, time_fmt)
+
 def append_date_node(node, pre='date', post='', type='group', *arg, **kw):
     name = pre + datetime.now().strftime(time_fmt) + post
     return append_node(node, name, type, *arg, **kw)
@@ -103,8 +108,15 @@ def node_match(n, filter):
     Filter can be a dictionary or list of tuples.  If the order in which the
     filters are applied is important, then provide a list of tuples.
     '''
+    # If filter is a dictionary, convert it to a sequence of tuples
     if type(filter) == type({}):
         filter = tuple((k, v) for k, v in filter.items())
+
+    # If user only provided one filter rather than a sequence of filters,
+    # convert it to a sequence of length 1 so the following loop can handle it
+    # better
+    if len(filter[0]) == 1:
+        filter = (filter,)
 
     for extended_attr, criterion in filter:
         try:
@@ -183,7 +195,9 @@ def _walk(where, filter, mode):
 
     To return all nodes with the attribute klass='Animal'
     >>> fh = tables.openFile('example_data.h5', 'r')
-    >>> animal_nodes = list(walk_nodes(fh.root, ('_v_attrs.klass', 'Animal')))
+    >>> filter = ('_v_attrs.klass', 'Animal')
+    >>> iterator = walk_nodes(fh.root, filter)
+    >>> animal_nodes = list(iterator)
 
     To return all nodes who have a subnode, data, with the attribute 'klass'
     whose value is a string beginning with 'RawAversiveData'.
@@ -382,8 +396,8 @@ def extract_data(input_files, filters, fields=None):
     # filter properties are returned.
     nodes = []
     for file_name in input_files:
-        file = tables.openFile(file_name, 'r')
-        nodes.extend(n for n in walk_nodes(file.root, filter=filters))
+        with tables.openFile(file_name, 'r') as file:
+            nodes.extend(n for n in walk_nodes(file.root, filter=filters))
 
     if fields is not None:
         # The user has requested that we add additional attributes to the data
@@ -415,6 +429,9 @@ def extract_data(input_files, filters, fields=None):
         # guaranteed that our new list has only unique items.
         fields = sorted(set(zip(new_attrs, new_names)))
         attrs, names = zip(*fields)
+
+    if len(nodes) == 0:
+        return []
 
     # Now that we have gathered the nodes, walk through them to extract the
     # information we need.
@@ -450,14 +467,12 @@ def extract_data(input_files, filters, fields=None):
             # coerces fields (i.e. columns) in the records to a common datatype
             # when creating the record array.  We extract a list of the records
             # in the array (using the tolist() function).  
-            for e in d.tolist():
-                print len(e)
             data_records.extend(d.tolist())
 
         # Now that we have a list of all the records, let's make the final
         # record array so we can easily run computations across the dataset.
 
-        return np.rec.fromrecords(data_records, names=d.dtype.names)
+        data = np.rec.fromrecords(data_records, names=d.dtype.names)
     else:
         # Since I sometimes add and remove items from the data structure, not
         # all nodes will have the exact same attributes.  Let's iterate through
@@ -486,5 +501,27 @@ def extract_data(input_files, filters, fields=None):
                 # the value to None if it is missing
                 value = rgetattr_or_none(node, attr)
                 arrs.setdefault(name, []).append(value)
-        return np.rec.fromarrays(arrs.values(), names=arrs.keys())
+        data = np.rec.fromarrays(arrs.values(), names=arrs.keys())
+    return data
 
+def create_date_filter(start, end, extract=False):
+    if extract:
+        return lambda d: start <= extract_date_from_string(d) < end
+    return lambda d: start <= d < end
+
+def find_ancestor(node, filter):
+    '''
+    Find the nearest ancestor that matches the given filter
+    '''
+    ancestor = node._v_parent
+    if node_match(ancestor, filter):
+        return ancestor
+    else:
+        return find_ancestor(ancestor, filter)
+
+def find_ancestor_attr(node, attr):
+    ancestor = node._v_parent
+    if attr in ancestor._v_attrs._f_list('user'):
+        return ancestor._v_attrs[attr]
+    else:
+        return find_ancestor_attr(ancestor, attr)

@@ -16,7 +16,7 @@ def flatten_recarray(r):
     flattened_dtype = flatten_dtype(r.dtype)
     return r.view(flattened_dtype)
 
-def cluster(r, groupby):
+def cluster(r, groupby, sort=None):
     rowd = dict()
     for i, row in enumerate(r):
         key = tuple([row[attr] for attr in groupby])
@@ -24,5 +24,16 @@ def cluster(r, groupby):
     keys = rowd.keys()
     keys.sort()
     subarrays = [r[rowd[k]] for k in keys]
+    for subarray in subarrays:
+        subarray.sort(order=sort)
     return zip(keys, subarrays)
 
+def unique_reduce(r, x, reduce):
+    elements = np.unique(r[x])
+    masks = [r[x]==e for e in elements]
+    result = [elements]
+    for func in reduce:
+        print func
+        values = [func(r[m]) for m in masks]
+        result.append(values)
+    return result

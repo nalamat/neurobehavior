@@ -34,7 +34,7 @@ def rcount(sequence):
         else: break
     return i
 
-def d_prime(safe, warn, fa, hit, clip=0.01):
+def dprime(n_nogo, n_go, n_fa, n_hit, clip=0.01):
     '''Computes d' given number of safes, warns, false alarms and hits.
     Primarily a utility function for scripting.
 
@@ -44,13 +44,13 @@ def d_prime(safe, warn, fa, hit, clip=0.01):
     
     Parameters
     ==========
-    safe
-        Number of safe (noise) trials
-    warn
-        Number of warn (signal) trials
-    fa
+    n_nogo
+        Number of nogo/safe/no (noise) trials
+    n_go
+        Number of go/warn/yes (signal) trials
+    n_fa
         Number of false alarms ("YES" responses to noise trials)
-    hit
+    n_hit
         Number of hits ("YES" responses to signal trials)
     clip
         Ensure that the false alarm and hit fractions to the range [clip,
@@ -62,12 +62,8 @@ def d_prime(safe, warn, fa, hit, clip=0.01):
 
     Returns
     =======
-    Tuple (d', C)
-    
     d'
         Discriminability index
-    C
-        Criterion used by the observer
 
     >>> d_prime(80, 80, 5, 67)
     2.518
@@ -79,8 +75,8 @@ def d_prime(safe, warn, fa, hit, clip=0.01):
     3.290
     '''
 
-    fa_frac = np.clip(fa/safe, clip, 1-clip)
-    hit_frac = np.clip(hit/warn, clip, 1-clip)
+    fa_frac = np.clip(n_fa/n_nogo, clip, 1-clip)
+    hit_frac = np.clip(n_hit/n_go, clip, 1-clip)
     z_hit = norm.ppf(hit_frac)
     z_fa = norm.ppf(fa_frac)
     d = z_hit-z_fa
@@ -105,16 +101,6 @@ def lcm(a, b):
     '''Returns least common multiple of a and b
     '''
     return a*b/gcd(a, b)
-
-def ensure_monotonic(x, idx):
-    raise NotImplementedError('there is a bug here')
-    for i in range(idx, len(x)):
-        if x[i]<x[i-1]:
-            x[i] = x[i-1]
-    for i in range(idx, 0, -1):
-        if x[i-1]>x[i]:
-            x[i-1] = x[i]
-    return x
 
 if __name__ == '__main__':
     import doctest
