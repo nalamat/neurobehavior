@@ -63,7 +63,6 @@ class PositiveDTController(AbstractPositiveController):
         self.current_speaker = speaker
 
         if self.is_go():
-            #self.set_experiment_parameters(self.current_setting_go)
             log.debug("Configuring GO trial")
             self.iface_behavior.set_tag('go?', 1)
 

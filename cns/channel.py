@@ -27,11 +27,10 @@ class Timeseries(HasTraits):
     fs = Float
     t0 = Float(0)
 
-    buffer = List([])
+    series = List([])
 
     def send(self, timestamps):
-        #timestamps = np.array(timestamps)/self.fs
-        self.buffer.extend(timestamps.ravel())
+        self.series.extend(timestamps.ravel())
         self.updated = timestamps
 
     def get_range(self, lb, ub):
@@ -39,17 +38,14 @@ class Timeseries(HasTraits):
         mask = (timestamps>=lb)&(timestamps<ub)
         return timestamps[mask]
 
-    #def latest(self):
-    #    if self.get_size() > 0:
-    #        return self.signal[-1]/self.fs
-    #    else:
-    #        return self.t0
-
     def latest(self):
-        if len(self.buffer) > 0:
-            return self.buffer[-1]/self.fs
+        if len(self.series) > 0:
+            return self.series[-1]/self.fs
         else:
             return self.t0
+
+    def __getitem__(self, s):
+        return self.series[s]/self.fs
 
 class Channel(HasTraits):
     '''

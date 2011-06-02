@@ -28,9 +28,9 @@ class ChannelPlot(BaseXYPlot):
 
     def __init__(self, **kwargs):
         super(ChannelPlot, self).__init__(**kwargs)
-        self.index_mapper.on_trait_change(self._index_range_updated, "updated")
+        self.index_mapper.on_trait_change(self._update_index_values, "updated")
 
-    def _index_range_updated(self):
+    def _update_index_values(self):
         '''
         Compute array of index values (i.e. the time of each sample that could
         be displayed in the visible range)
@@ -114,12 +114,13 @@ class ChannelPlot(BaseXYPlot):
         # exact same picture.
         if self.index_range.mask_data(np.array(bounds)).any():
             self._new_bounds_cache = bounds
-            self.invalidate_draw()
             self._data_cache_valid = False
-            self.request_redraw()
+            self.invalidate_and_redraw()
 
     def _channel_changed(self, old, new):
         if old is not None:
             old.on_trait_change(self._data_changed, "updated", remove=True)
+            old.on_trait_change(self._update_index_values, "fs", remove=True)
         if new is not None:
             new.on_trait_change(self._data_changed, "updated", dispatch="new")
+            new.on_trait_change(self._update_index_values, "fs", dispatch="new")
