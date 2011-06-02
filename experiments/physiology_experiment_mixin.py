@@ -13,6 +13,7 @@ from cns.chaco.channel_data_range import ChannelDataRange
 from cns.chaco.timeseries_plot import TimeseriesPlot
 from cns.chaco.extremes_channel_plot import ExtremesChannelPlot
 from cns.chaco.ttl_plot import TTLPlot
+from cns.chaco.channel_range_tool import MultiChannelRangeTool
 
 class PhysiologyExperimentMixin(HasTraits):
 
@@ -59,7 +60,6 @@ class PhysiologyExperimentMixin(HasTraits):
                 reference=0, fill_color=(0.25, 0.41, 0.88, 0.1),
                 line_color='transparent', rect_center=0.5, rect_height=1.0)
         add_default_grids(plot, major_index=1, minor_index=0.25)
-        add_time_axis(plot)
         container.add(plot)
 
         # Create the neural plots
@@ -69,8 +69,12 @@ class PhysiologyExperimentMixin(HasTraits):
                 index_mapper=index_mapper, value_mapper=value_mapper)
         container.add(plot)
         add_default_grids(plot, major_index=1, minor_index=0.25)
-        add_time_axis(plot)
+        add_time_axis(plot, 'bottom', fraction=True)
+        add_time_axis(plot, 'top', fraction=True)
         self.physiology_plot = plot
+
+        tool = MultiChannelRangeTool(component=plot)
+        plot.tools.append(tool)
 
         self.physiology_container = container
         self._physiology_value_range_update()
@@ -86,17 +90,13 @@ class PhysiologyExperimentMixin(HasTraits):
     physiology_view_settings_group = VGroup(
             Item('object.physiology_index_range.update_mode', 
                 label='Trigger mode'),
-            Item('object.physiology_index_range.span',
-                label='X span',
-                editor=RangeEditor(low=0.1, high=10.0)),
-            Item('object.physiology_index_range.trig_delay',
-                label='Trigger delay',
-                editor=RangeEditor(low=0.0, high=5.0)),
-            Item('physiology_channel_span', label='Y span',
-                editor=RangeEditor(low=0, high=5e-3)),
-            #Item('physiology_offset', label='Plot offset',
-            #    editor=RangeEditor(low=0, high=5e-3)),
-            #Item('physiology_spacing', label='Plot spacing',
+            #Item('object.physiology_index_range.span',
+            #    label='X span',
+            #    editor=RangeEditor(low=0.1, high=30.0)),
+            #Item('object.physiology_index_range.trig_delay',
+            #    label='Trigger delay',
+            #    editor=RangeEditor(low=0.0, high=10.0)),
+            #Item('physiology_channel_span', label='Y span',
             #    editor=RangeEditor(low=0, high=5e-3)),
             label='Plot Settings',
             show_border=True,
@@ -107,6 +107,7 @@ class PhysiologyExperimentMixin(HasTraits):
                 Include('physiology_settings_group'),
                 Item('physiology_container', 
                     editor=ComponentEditor(width=1500, height=800), 
+                    width=1500,
                     resizable=True),
                 show_labels=False,
                 ),

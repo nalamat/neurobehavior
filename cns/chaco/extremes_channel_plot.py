@@ -118,11 +118,9 @@ class ExtremesChannelPlot(ChannelPlot):
 
     def _render_channel_numbers(self, gc):
         gc.set_font(fonttools.Font(size=24, weight=10))
-        #x = self._cached_screen_index[0]
-        x = 0
         gc.set_fill_color((1.0, 0.0, 0.0, 1.0))
         for offset, number in zip(self._cached_offsets, self.channel_visible):
-            gc.set_text_position(int(x), int(offset))
+            gc.set_text_position(0, int(offset))
             gc.show_text(str(number+1))
 
     def _render(self, gc, points):
