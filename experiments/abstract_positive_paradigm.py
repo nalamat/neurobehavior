@@ -13,27 +13,25 @@ from pump_paradigm_mixin import PumpParadigmMixin
 from enthought.traits.ui.table_column import ObjectColumn
 from enthought.traits.ui.api import TableEditor, TextEditor
 
-from trial_setting import TrialSetting#, trial_setting_editor
+from trial_setting import TrialSetting, trial_setting_editor
 
 from eval import ExpressionTrait
 
 class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
 
-    #parameters  = List(Instance(TrialSetting), [], store='child')
+    parameters  = List(Instance(TrialSetting), [], store='child')
     nogo        = Instance(TrialSetting, (), store='child')
     remind      = Instance(TrialSetting, (), store='child')
 
-    #def _parameters_default(self):
-    #    return [TrialSetting()]
+    def _parameters_default(self):
+        return [TrialSetting()]
 
-    #parameter_order = Trait('shuffled set', choice.options, store='attribute',
-    #                        init=True, label='Parameter order')
+    parameter_order = Trait('shuffled set', choice.options, store='attribute',
+                            init=True, label='Parameter order')
     pump_rate       = ExpressionTrait(1.5, label='Pump rate (ml/min)')
     reward_volume   = ExpressionTrait(25, label='Reward volume (ul)')
 
-    #num_nogo = ExpressionTrait('int(clip(exponential(2), 0, 5))', label='NOGO number')
-    go_probability = ExpressionTrait('0.5 if c_nogo < 5 else 1.0', 
-            label='Probability of GO')
+    num_nogo = ExpressionTrait('int(clip(exponential(2), 0, 5))', label='NOGO number')
 
     # Needs to be CBool because Pytables returns numpy.bool_ type which gets
     # rejected by Bool trait
@@ -47,7 +45,7 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
     response_window_duration = ExpressionTrait(3, label='Response duration (s)')
 
     timeout_trigger  = Enum('FA only', 'Anytime', label='Timeout Mode')
-    timeout_duration = ExpressionTrait(1, label='TO duration (s)')
+    timeout_duration = ExpressionTrait(15, label='TO duration (s)')
     timeout_grace_period = ExpressionTrait(2.5, label='Timeout grace period (s)')
     fa_puff_duration = ExpressionTrait(0.0, label='FA puff duration (s)')
 
@@ -56,9 +54,9 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
     parameter_view = VGroup(
             Item('nogo', style='custom'),
             Item('remind', style='custom'),
-            #VGroup(Item('parameter_order', label='Order')),
-            #Item('parameters', editor=trial_setting_editor,
-                 #show_label=False),
+            VGroup(Item('parameter_order', label='Order')),
+            Item('parameters', editor=trial_setting_editor,
+                 show_label=False),
             label='Trial Sequence',
             show_border=True,
             )
@@ -79,7 +77,7 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
                     'poke_duration',
                     'pump_rate',
                     'reward_volume',
-                    'go_probability',
+                    Item('num_nogo', label='NOGO'),
                     Item('repeat_FA', label='Add a NOGO if false alarm?'),
                     label='Settings',
                     ),
