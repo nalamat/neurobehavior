@@ -1,6 +1,7 @@
 import numpy as np
 from channel_plot import ChannelPlot
 from enthought.traits.api import List, Float, on_trait_change
+from enthought.kiva import fonttools
 
 import logging
 log = logging.getLogger(__name__)
@@ -43,13 +44,13 @@ class ExtremesChannelPlot(ChannelPlot):
     '''
 
     # Offset of all channels along the value axis
-    offset  = Float(0.25e-3)
+    channel_offset  = Float(0.25e-3)
 
     # Distance between each channel along the value axis
-    spacing = Float(0.5e-3)
+    channel_spacing = Float(0.5e-3)
 
     # Which channels are visible?
-    visible = List([])
+    channel_visible = List([])
 
     # Offset, spacing and visible only affect the screen points, so we only
     # invalidate the screen cache.  The data cache is fine.
@@ -74,15 +75,26 @@ class ExtremesChannelPlot(ChannelPlot):
                 self._cached_screen_index = []
                 self._cached_screen_data = []
             else:
+                if len(self.channel_visible) == 0:
+                    self._cached_screen_data = []
+                    self._cached_screen_index = []
+                    self._screen_cache_valid = True
+                    return self._cached_screen_index, self._cached_screen_data
+                    
                 # Get the decimated data
                 decimation_factor = self._decimation_factor()
-                cached_data = self._cached_data[self.visible]
+                cached_data = self._cached_data[self.channel_visible]
                 values = decimate_extremes(cached_data, decimation_factor)
+
+                channels = len(self.channel_visible)
+                offsets = self.channel_spacing*np.arange(channels)[:,np.newaxis]
+                offsets = offsets[::-1] + self.channel_offset
+
+                text_offsets = offsets+self.channel_spacing/3.0
+                self._cached_offsets = self.value_mapper.map_screen(text_offsets)
 
                 if type(values) == type(()):
                     channels, samples = values[0].shape
-                    offsets = self.spacing*np.arange(channels)[:,np.newaxis]
-                    offsets += self.offset
 
                     mins = values[0] + offsets
                     s_val_min = self.value_mapper.map_screen(mins)
@@ -92,7 +104,6 @@ class ExtremesChannelPlot(ChannelPlot):
                     self._cached_screen_data = s_val_min, s_val_max
                 else:
                     channels, samples = values.shape
-                    offsets = self.offset*np.arange(channels)[:np.newaxis]
                     s_val_pts = self.value_mapper.map_screen(values)
                     s_val_pts = s_val_pts/channels + offsets
                     self._cached_screen_data = s_val_pts
@@ -104,6 +115,13 @@ class ExtremesChannelPlot(ChannelPlot):
                 self._screen_cache_valid = True
 
         return self._cached_screen_index, self._cached_screen_data
+
+    def _render_channel_numbers(self, gc):
+        gc.set_font(fonttools.Font(size=24, weight=10))
+        gc.set_fill_color((1.0, 0.0, 0.0, 1.0))
+        for offset, number in zip(self._cached_offsets, self.channel_visible):
+            gc.set_text_position(0, int(offset))
+            gc.show_text(str(number+1))
 
     def _render(self, gc, points):
         idx, val = points
@@ -130,5 +148,6 @@ class ExtremesChannelPlot(ChannelPlot):
             gc.lines(np.column_stack((idx, val)))
 
         gc.stroke_path()
+        self._render_channel_numbers(gc)
         self._draw_default_axes(gc)
         gc.restore_state()

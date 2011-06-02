@@ -39,13 +39,15 @@ class PhysiologyParadigmMixin(HasTraits):
     diff_sagittal   = Button('Sagittal')
     diff_coronal    = Button('Coronal')
     diff_all        = Button('All')
+    diff_visible    = Bool(True)
 
     def _get_diff_group(self, channel, group):
         ub = int(ceil(channel/group)*group + 1)
         lb = ub - group
         diff = range(lb, ub)
-        print lb, ub, diff, channel
         diff.remove(channel)
+        if self.diff_visible:
+            diff = [d for d in diff if self.channel_settings[d-1].visible]
         return ', '.join(str(ch) for ch in diff)
 
     def _diff_none_fired(self):
@@ -67,13 +69,16 @@ class PhysiologyParadigmMixin(HasTraits):
             value = self._get_diff_group(channel.number, 16)
             channel.set(True, differential=value)
 
-    diff_group = HGroup(
-            Item('diff_bundle', width=WIDTH),
-            Item('diff_sagittal', width=WIDTH),
-            Item('diff_coronal', width=WIDTH),
-            Item('diff_all', width=WIDTH),
-            Item('diff_none', width=WIDTH),
-            show_labels=False,
+    diff_group = VGroup(
+            HGroup(
+                Item('diff_bundle', width=WIDTH),
+                Item('diff_sagittal', width=WIDTH),
+                Item('diff_coronal', width=WIDTH),
+                Item('diff_all', width=WIDTH),
+                Item('diff_none', width=WIDTH),
+                Item('diff_visible', label='Only visible?', show_label=True),
+                show_labels=False,
+                ),
             )
 
     # These are convenience buttons for selecting subgroups of channels for
@@ -175,10 +180,10 @@ class PhysiologyParadigmMixin(HasTraits):
         n_chan = len(self.channel_settings)
         map = np.zeros((n_chan, n_chan))
         for channel in self.channel_settings:
-            channels = to_list(channel.differential)
-            if len(channels) != 0:
-                sf = -1.0/len(channels)
-                for d in channels:
+            diff = to_list(channel.differential)
+            if len(diff) != 0:
+                sf = -1.0/len(diff)
+                for d in diff:
                     map[channel.number-1, d-1] = sf
             map[channel.number-1, channel.number-1] = 1
         return map

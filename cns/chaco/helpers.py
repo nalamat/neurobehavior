@@ -34,8 +34,12 @@ def add_default_grids(plot,
                 grid_interval=minor_value)
         plot.underlays.append(grid)
 
-def add_time_axis(plot, orientation='bottom'):
-    tick_formatter = lambda s: "{0}:{1:02}".format(*divmod(int(s), 60))
-    axis = PlotAxis(component=plot, orientation='top', title="Time (min:sec)",
+def add_time_axis(plot, orientation='bottom', fraction=False):
+    if fraction:
+        tick_formatter = lambda s: "{0}:{1:02}".format(*divmod(s, 60))
+    else:
+        tick_formatter = lambda s: "{0}:{1:02}".format(*divmod(int(s), 60))
+    axis = PlotAxis(component=plot, orientation=orientation, 
+            title="Time (min:sec)",
             tick_label_formatter=tick_formatter)
     plot.underlays.append(axis)

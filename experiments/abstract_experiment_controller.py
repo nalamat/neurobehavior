@@ -337,7 +337,7 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
 
             if self.model.spool_physiology:
                 settings = self.model.physiology_settings
-                #self.init_paradigm(settings)
+                self.init_paradigm(settings)
                 settings.on_trait_change(self.queue_change, '+')
                 self.tasks.append((self.monitor_physiology, 1))
 
@@ -521,6 +521,11 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
     current_parameters = Dict
     current_context = Dict
     current_context_list = Property(depends_on='current_context')
+
+    def init_paradigm(self, paradigm):
+        for parameter in paradigm.trait_names(init=True):
+            value = getattr(paradigm, parameter)
+            getattr(self, 'set_'+parameter)(value)
 
     def init_context(self):
         '''
