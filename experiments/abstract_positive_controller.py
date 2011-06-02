@@ -44,14 +44,15 @@ class PositiveExperimentToolBar(ExperimentToolBar):
             kind='subpanel',
             )
 
+from maximum_likelihood_controller_mixin import MaximumLikelihoodController
+
 class AbstractPositiveController(AbstractExperimentController,
-        PumpControllerMixin):
+        PumpControllerMixin, MaximumLikelihoodControllerMixin):
 
     # Override default implementation of toolbar used by AbstractExperiment
     toolbar = Instance(PositiveExperimentToolBar, (), toolbar=True)
 
     status = Property(Str, depends_on='state, current_ttype, current_num_nogo')
-    tracker = Instance(MaximumLikelihoodSelector, ())
 
     @on_trait_change('model.data.parameters')
     def update_adapter(self, value):
@@ -89,6 +90,7 @@ class AbstractPositiveController(AbstractExperimentController,
         self.pipeline_TTL2 = deinterleave_bits(targets2)
 
     def start_experiment(self, info):
+        self.method_finalize()
         self.init_context()
         self.update_context()
         self.prepare_next()
@@ -122,25 +124,17 @@ class AbstractPositiveController(AbstractExperimentController,
         except:
             return self.current_ttype
 
-    def acquire_trial_lock(self):
+    def remind(self, info=None):
         # Pause circuit and see if trial is running.  If trial is already
         # running, it's too late and a lock cannot be acquired.  If trial is not
         # running, changes can be made.  A lock is returned (note this is not
         # thread-safe).
-        self.request_pause()
-        return self.get_pause_state()
-
-    def release_trial_lock(self):
-        log.debug("Releasing trial lock")
-        self.request_resume()
-
-    def remind(self, info=None):
-        if self.acquire_trial_lock():
+        if self.request_pause():
             self.update_context(self.current_remind.parameter_dict())
             self.current_ttype = 'GO_REMIND'
             self.trigger_next()
             self.current_go_requested = False
-            self.release_trial_lock()
+            self.request_resume()
         else:
             log.debug("Trial is running, let's try later")
             self.current_go_requested = True
@@ -216,17 +210,6 @@ class AbstractPositiveController(AbstractExperimentController,
 
     def is_go(self):
         return self.current_ttype.startswith('GO')
-
-    def select_next_parameter(self):
-        try:
-            last_parameter = self.model.data.par_seq[-1]
-            print 'sucs'
-            last_response = self.model.data.yes_seq[-1]
-            print 'yes'
-            return self.tracker.next(last_parameter, last_response)
-        except BaseException, e:
-            print e
-            return self.tracker.next()
 
     ############################################################################
     # Code to apply parameter changes.  This is backend-specific.  If you want
@@ -329,6 +312,7 @@ class AbstractPositiveController(AbstractExperimentController,
 
     def request_pause(self):
         self.iface_behavior.trigger(2)
+        return self.get_pause_state()
 
     def request_resume(self):
         self.iface_behavior.trigger(3)

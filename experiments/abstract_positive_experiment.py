@@ -283,7 +283,7 @@ class AbstractPositiveExperiment(AbstractExperiment, AnalysisPlotMixin):
                 Include('pump_group'),
                 Include('status_group'),
                 Tabbed(
-                    Item('handler.tracker', style='custom'),
+                    Item('handler', editor=InstanceEditor(view='method_view')),
                     Item('paradigm', style='custom', editor=InstanceEditor()),
                     Include('context_group'),
                     show_labels=False,
