@@ -65,7 +65,7 @@ class ChannelDataRange(DataRange1D):
                     index -= 1
             except IndexError:
                 high_value = self.timeseries.t0
-            low_value = high_value-self.span+self.trig_delay
+            low_value = high_value-self.span-self.trig_delay
 
         # Important!  Don't update the values unless they are different.
         # Needlessly updating these values results in excessive screen redraws,

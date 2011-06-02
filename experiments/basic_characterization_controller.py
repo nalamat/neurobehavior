@@ -79,5 +79,14 @@ class BasicCharacterizationController(AbstractExperimentController):
         self.iface_audio.set_tag('m_amplitude', amplitude)
         self.iface_audio.set_tag('m_shift', offset)
 
+    def set_commutator_inhibit(self, value):
+        self.iface_audio.set_tag('comm_inhibit', value)
+
+    def set_primary_attenuation(self, value):
+        self.iface_audio.set_tag('att_A', value)
+
+    def set_secondary_attenuation(self, value):
+        self.iface_audio.set_tag('att_B', value)
+
     def get_ts(self):
         return -1
