@@ -31,7 +31,8 @@ class AbstractExperimentData(PhysiologyDataMixin, PumpDataMixin):
 
     def get_context(self):
         context_names = self.trait_names(context=True)
-        return dict((t, getattr(self, t)) for t in context_names)
+        context = dict((t, getattr(self, t)) for t in context_names)
+        return context
 
     # Node to store the data in
     store_node = Any
@@ -121,5 +122,7 @@ class AbstractExperimentData(PhysiologyDataMixin, PumpDataMixin):
         elif names == self._trial_log_columns:
             self._trial_log.append(record)
         else:
+            print set(names).difference(self._trial_log_columns)
+            print set(self._trial_log_columns).difference(names)
             raise ValueError, "Invalid log_trial attempt"
         self.new_trial = kwargs

@@ -3,6 +3,7 @@ from enthought.traits.ui.api import HGroup, View, Item
 from tdt import DSPProcess
 from cns import RCX_ROOT
 from os.path import join
+from cns.pipeline import deinterleave_bits
 
 class PhysiologyControllerMixin(HasTraits):
 
@@ -13,6 +14,8 @@ class PhysiologyControllerMixin(HasTraits):
     buffer_physiology_raw   = Any
     buffer_physiology_proc  = Any
     buffer_physiology_ts    = Any
+    buffer_physiology_ttl   = Any
+    physiology_ttl_pipeline = Any
 
     def setup_physiology(self):
         # Load the circuit
@@ -26,24 +29,36 @@ class PhysiologyControllerMixin(HasTraits):
                 'r', src_type='int16', dest_type='float32', channels=16) 
         self.buffer_physiology_ts = self.iface_physiology.get_buffer('trig/',
                 'r', src_type='int32', dest_type='int32', block_size=1)
+        self.buffer_physiology_ttl = self.iface_physiology.get_buffer('TTL',
+                'r', src_type='int8', dest_type='int8', block_size=1)
 
         # Ensure that the data store has the correct sampling frequency
         self.model.data.physiology_raw.fs = self.buffer_physiology_raw.fs
         self.model.data.physiology_processed.fs = self.buffer_physiology_filt.fs
         self.model.data.physiology_ram.fs = self.buffer_physiology_raw.fs
         self.model.data.physiology_ts.fs = self.buffer_physiology_ts.fs
+        self.model.data.physiology_sweep.fs = self.buffer_physiology_ttl.fs
+
+        targets = [self.model.data.physiology_sweep]
+        self.physiology_ttl_pipeline = deinterleave_bits(targets)
 
     def monitor_physiology(self):
-        # Acquire spooled physiology data and send it to the HDF5 file
+        # Acquire raw physiology data
         waveform = self.buffer_physiology_raw.read()
         self.model.data.physiology_raw.send(waveform)
+
+        # Acquire filtered physiology data
         waveform = self.buffer_physiology_filt.read()
         self.model.data.physiology_processed.send(waveform)
+
+        # Acquire sweep data
+        ttl = self.buffer_physiology_ttl.read()
+        self.physiology_ttl_pipeline.send(ttl)
 
         # We also send the processed data to a memory buffer for display in the
         # plotting.  It's very slow when the plot has to re-extract the data
         # from the file and we'd like to avoid this.
-        self.model.data.physiology_ram.send(waveform)
+        # self.model.data.physiology_ram.send(waveform)
 
         # Get the timestamps
         ts = self.buffer_physiology_ts.read()
@@ -80,7 +95,7 @@ class PhysiologyControllerMixin(HasTraits):
         self.iface_physiology.set_tag('ch4_out_sf', value*1e3)
 
     def set_visible_channels(self, value):
-        self.model.physiology_plot.visible = value
+        self.model.physiology_plot.channel_visible = value
 
     def set_diff_matrix(self, value):
         self.iface_physiology.set_coefficients('diff_map', value.ravel())

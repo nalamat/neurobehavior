@@ -10,7 +10,6 @@ from enthought.enable.api import Component, ComponentEditor
 
 from analysis_plot_mixin import AnalysisPlotMixin
 
-
 import cns
 
 from abstract_experiment import AbstractExperiment
@@ -115,10 +114,12 @@ class TrialLogAdapter(TabularAdapter):
     def _get_bg_color(self):
         if self.item['ttype'] == 'GO':
             return color_names['light green']
+        elif self.item['ttype'] == 'GO_REMIND':
+            return color_names['dark green']
         elif self.item['ttype'] == 'NOGO':
             return color_names['light red']
-        else:
-            return color_names['gray']
+        elif self.item['ttype'] == 'NOGO_REPEAT':
+            return color_names['dark red']
 
     def _get_reaction_image(self):
         if self.item['reaction'] == 'early':
@@ -282,6 +283,7 @@ class AbstractPositiveExperiment(AbstractExperiment, AnalysisPlotMixin):
                 Include('pump_group'),
                 Include('status_group'),
                 Tabbed(
+                    Item('handler.tracker', style='custom'),
                     Item('paradigm', style='custom', editor=InstanceEditor()),
                     Include('context_group'),
                     show_labels=False,

@@ -337,7 +337,7 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
 
             if self.model.spool_physiology:
                 settings = self.model.physiology_settings
-                #self.init_paradigm(settings)
+                self.init_paradigm(settings)
                 settings.on_trait_change(self.queue_change, '+')
                 self.tasks.append((self.monitor_physiology, 1))
 
@@ -413,6 +413,9 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
             trait = instance.trait(name)
             if trait.immediate == True:
                 self.apply_change(instance, name, new)
+                set_func = 'set_' + name
+                if hasattr(self, set_func):
+                    getattr(self, set_func)(new)
             else:
                 key = instance, name
                 if key not in self.old_values:
@@ -444,7 +447,7 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
 
     def log_event(self, ts, name, value):
         self.model.data.log_event(ts, name, value)
-        log.debug("%d, %s, %r", ts, name, value)
+        log.debug("EVENT: %d, %s, %r", ts, name, value)
         
     def revert(self, info=None):
         '''Revert changes requested while experiment is running.'''
@@ -519,6 +522,11 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
     current_context = Dict
     current_context_list = Property(depends_on='current_context')
 
+    def init_paradigm(self, paradigm):
+        for parameter in paradigm.trait_names(init=True):
+            value = getattr(paradigm, parameter)
+            getattr(self, 'set_'+parameter)(value)
+
     def init_context(self):
         '''
         Configuring the equipment based on initial values in the paradigm.
@@ -535,12 +543,20 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
         namespace.  If extra_content defines the value of a parameter, that
         value will take precedence.
         '''
-        old_context = self.current_context
+        if extra_context is None:
+            extra_context = {}
+        data_context = self.model.data.get_context()
+
+        old_context = self.current_context.copy()
+        extra_context.update(data_context)
+        
         new_context = eval_context(self.current_parameters, extra_context)
         self.current_context = new_context
         for parameter, value in self.current_context.items():
             if old_context.get(parameter, None) != value:
-                getattr(self, 'set_' + parameter)(value)
+                set_func = 'set_' + parameter
+                if hasattr(self, set_func):
+                    getattr(self, set_func)(value)
 
     @cached_property
     def _get_current_context_list(self):
