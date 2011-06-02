@@ -10,15 +10,21 @@ class PhysiologyDataMixin(HasTraits):
     # file.
     physiology_ram = Instance(RAMMultiChannel)
 
-    # These are the actual data stores
+    # Raw physiology data
     physiology_raw = Instance(FileMultiChannel, store='channel',
             store_path='physiology/raw')
-
-    # These are the actual data stores
+    # Data after it has been referenced to a differential and band-pass filtered
     physiology_processed = Instance(FileMultiChannel, store='channel',
             store_path='physiology/processed')
+    # TTL indicating whether
+    physiology_sweep = Instance(FileChannel, store='channel',
+            store_path='physiology/sweep')
 
     physiology_ts = Instance('cns.channel.Timeseries', ())
+
+    def _physiology_sweep_default(self):
+        physiology_node = get_or_append_node(self.store_node, 'physiology')
+        return FileChannel(node=physiology_node, name='sweep', dtype=np.bool)
 
     def _physiology_ram_default(self):
         return RAMMultiChannel(channels=16, fs=25e3, window=5)
