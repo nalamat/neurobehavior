@@ -8,27 +8,6 @@ import numpy as np
 
 class MaximumLikelihoodSelector(HasTraits):
 
-    fa_rate = ExpressionTrait('arange(0, 0.4, .01)')
-    midpoint = ExpressionTrait('arange(0.1, 1, .1)')
-    slope = ExpressionTrait('arange(0.1, 0.9, .1)')
-
-    trait_view = View(
-            'fa_rate',
-            'midpoint',
-            'slope',
-            Item('track_plot', editor=ComponentEditor(height=200,  width=200)),
-            )
-
-    #experiment_view = View('track_view')
-
-    track = List(Float)
-    tracker = Instance(MaximumLikelihood)
-    finalized = Bool(False)
-
-    track_plot = Instance('enthought.enable.api.Component')
-    track_index = Instance(ArrayDataSource, ())
-    track_value = Instance(ArrayDataSource, ())
-
     def __init__(self, parameters=None):
         self.parameters = parameters
         self.finalize()
