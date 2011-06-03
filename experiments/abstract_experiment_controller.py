@@ -412,7 +412,7 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
         if self.state <> 'halted' and not name.endswith('_items'):
             trait = instance.trait(name)
             if trait.immediate == True:
-                self.apply_change(instance, name, new)
+                self.apply_change(instance, name, new, context=False)
                 set_func = 'set_' + name
                 if hasattr(self, set_func):
                     getattr(self, set_func)(new)
@@ -427,12 +427,13 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
                 else:
                     self.pending_changes[key] = new
 
-    def apply_change(self, instance, name, value, info=None):
+    def apply_change(self, instance, name, value, info=None, context=True):
         '''
         Applies an individual change
         '''
-        self.current_parameters[name] = deepcopy(value)
-        self.log_event(self.get_ts(), name, value)
+        if context:
+            self.current_parameters[name] = deepcopy(value)
+            self.log_event(self.get_ts(), name, value)
 
     def apply(self, info=None):
         '''

@@ -125,6 +125,14 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
         # the "dummy" spout and poke data required for scoring.
         del kwargs['parameters']
         del kwargs['nogo']
+        try:
+            del kwargs['diff_matrix']
+        except:
+            pass
+        try:
+            del kwargs['visible_channels']
+        except:
+            pass
         if score:
             ts_start = kwargs['ts_start']
             ts_end = kwargs['ts_end']
