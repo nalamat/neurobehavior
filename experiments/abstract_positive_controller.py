@@ -197,7 +197,8 @@ class AbstractPositiveController(AbstractExperimentController,
                     self.pipeline_TTL2.send(self.buffer_TTL2.read_all())
                     self.log_trial(ts_start, ts_end, last_ttype)
                     break
-                except ValueError:
+                except ValueError, e:
+                    log.exception(e)
                     log.debug("Waiting for more data")
                     pass
 
