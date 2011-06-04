@@ -118,8 +118,6 @@ class Channel(HasTraits):
             Check that start and end fall within the valid data range
         '''
         t0_index = int(self.t0*self.fs)
-        #lb = np.max(0, start-t0_index+reference)
-        #ub = np.max(0, end-t0_index+reference)
         lb = start-t0_index+reference
         ub = end-t0_index+reference
 
@@ -316,9 +314,14 @@ class FileChannel(Channel):
     Note that if compression_level is > 0 and compression_type is None,
     tables.Filter will raise an exception.
     '''
-    compression_level   = Int(9)
-    compression_type    = Enum('zlib', 'lzo', 'bzip', 'blosc', None)
+
+    # According to http://www.pytables.org/docs/manual-1.4/ch05.html the best
+    # compression method is LZO with a compression level of 1 and shuffling, but
+    # it really depends on the type of data we are collecting.
+    compression_level   = Int(0)
+    compression_type    = Enum(None, 'lzo', 'zlib', 'bzip', 'blosc')
     use_checksum        = Bool(False)
+    use_shuffle         = Bool(False)
     
     # It is important to implement dtype appropriately, otherwise it defaults to
     # float64 (double-precision float).
@@ -326,7 +329,10 @@ class FileChannel(Channel):
 
     node                = Instance(tables.group.Group)
     name                = String('FileChannel')
-    expected_duration   = Float(1800) # seconds
+    # Duration is in seconds.  The default corresponds to a 30 minute
+    # experiment, which we seem to have settled on as the "standard" for running
+    # appetitive experiments.
+    expected_duration   = Float(1800) 
     shape               = Property
     buffer              = Instance(tables.array.Array)
 
@@ -336,13 +342,13 @@ class FileChannel(Channel):
     def _buffer_default(self):
         atom = tables.Atom.from_dtype(np.dtype(self.dtype))
         filters = tables.Filters(complevel=self.compression_level,
-                complib=self.compression_type, fletcher32=self.use_checksum)
+                complib=self.compression_type, fletcher32=self.use_checksum,
+                shuffle=self.use_shuffle)
         buffer = append_node(self.node, self.name, 'EArray', atom, self.shape,
                 expectedrows=int(self.fs*self.expected_duration),
                 filters=filters)
         return buffer
 
-    #@on_trait_change('fs')
     def _fs_changed(self, new):
         self.buffer.setAttr('fs', self.fs)
 

@@ -62,8 +62,10 @@ class PhysiologyExperimentMixin(HasTraits):
         add_default_grids(plot, major_index=1, minor_index=0.25)
         container.add(plot)
 
+        self._add_behavior_plots(index_mapper, container)
+
         # Create the neural plots
-        index_mapper = LinearMapper(range=self.physiology_index_range)
+        #index_mapper = LinearMapper(range=self.physiology_index_range)
         value_mapper = LinearMapper(range=self.physiology_value_range)
         plot = ExtremesChannelPlot(channel=self.data.physiology_processed, 
                 index_mapper=index_mapper, value_mapper=value_mapper)
@@ -78,6 +80,9 @@ class PhysiologyExperimentMixin(HasTraits):
 
         self.physiology_container = container
         self._physiology_value_range_update()
+
+    def _add_behavior_plots(self, index_mapper, container):
+        pass
 
     physiology_settings_group = VGroup(
             Item('physiology_settings', style='custom',
