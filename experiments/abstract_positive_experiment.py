@@ -171,18 +171,18 @@ class AbstractPositiveExperiment(AbstractExperiment, AnalysisPlotMixin):
         value_mapper = LinearMapper(range=value_range)
         plot = TTLPlot(channel=self.data.spout_TTL, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
-                fill_color=(0.25, 0.41, 0.88, 0.5), rect_center=0.25,
-                rect_height=0.2)
+                fill_color=(0.25, 0.41, 0.88, 0.25), line_width=0,
+                rect_center=0.25, rect_height=0.2)
         container.add(plot)
         plot = TTLPlot(channel=self.data.signal_TTL, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(0, 0, 0, 0.25), line_color=(0, 0, 0, 0.75),
-                line_width=1, rect_height=0.3, rect_center=0.5)
+                line_width=0, rect_height=0.3, rect_center=0.5)
         container.add(plot)
         plot = TTLPlot(channel=self.data.poke_TTL, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
-                fill_color=(.17, .54, .34, 0.5), rect_center=0.75,
-                rect_height=0.2)
+                fill_color=(.17, .54, .34, 0.25), rect_center=0.75,
+                line_width=0, rect_height=0.2)
         container.add(plot)
         plot = TTLPlot(channel=self.data.reaction_TTL, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
@@ -198,6 +198,11 @@ class AbstractPositiveExperiment(AbstractExperiment, AnalysisPlotMixin):
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(0, 0, 1, 0.25), line_color=(0, 0, 1, 1),
                 line_width=1, rect_height=0.1, rect_center=0.4)
+        container.add(plot)
+        plot = TTLPlot(channel=self.data.comm_inhibit_TTL, reference=0,
+                index_mapper=index_mapper, value_mapper=value_mapper,
+                fill_color=(1, 1, 0, 0.25), line_color=(1, 1, 0, 1),
+                line_width=1, rect_height=0.1, rect_center=0.2)
         container.add(plot)
 
     @on_trait_change('data')

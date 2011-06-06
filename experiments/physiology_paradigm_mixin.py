@@ -29,6 +29,8 @@ channel_editor = TableEditor(
 
 class PhysiologyParadigmMixin(HasTraits):
 
+    commutator_inhibit      = Bool(False, init=True, immediate=True)
+
     # Width of buttons in GUI
     WIDTH = -40
 
@@ -220,6 +222,7 @@ class PhysiologyParadigmMixin(HasTraits):
 
     physiology_view = View(
             VGroup(
+                Item('commutator_inhibit'),
                 Include('filter_group'),
                 Include('monitor_group'),
                 Include('visible_group'),

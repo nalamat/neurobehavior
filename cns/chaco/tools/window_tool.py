@@ -46,6 +46,10 @@ class Window(HasTraits):
     def _get_points(self):
         return self._points
 
+    def get_hoop(self):
+        (x1, y1), (x2, y2) = self.points
+        return x1, (y1+y2)/2.0, abs(y1-y2)/2.0
+
     def _set_points(self, points):
         self._points = self._constrain_coords(points[0], points)
 
@@ -394,31 +398,24 @@ class WindowTool(AbstractOverlay):
     # Private methods
     #------------------------------------------------------------------------
     def _over_window(self, event, windows):
-        """ Return the index of a point in *points* that *event* is 'over'.
+        """
+        Return the index of a point in *points* that *event* is 'over'.
         Returns None if there is no such point.
         """
         for i, window in enumerate(windows):
             point = window._hittest(event)
             if point is not None:
                 return i, point
-        return None # If no _hittest passes
+        return None
 
-    def _finalize_selection(self):
-        """Abstract method called to take action after the line selection is complete
-        """
-        pass
+    #def _finalize_selection(self):
+    #    """Abstract method called to take action after the line selection is
+    #    complete
+    #    """
+    #    pass
     
-    #------------------------------------------------------------------------
-    # Trait event handlers
-    #------------------------------------------------------------------------
-    def _component_changed(self, old, new):
-        if new:
-            self.container = new
-        return
-    
-    #------------------------------------------------------------------------
-    # Trait event handlers
-    #------------------------------------------------------------------------
     def _get_coordinates(self):
         return [window.points for window in self.windows]
-    
+
+    def get_hoops(self):
+        return [w.get_hoop() for w in self.windows]

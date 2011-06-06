@@ -51,6 +51,8 @@ edge_falling = lambda TTL: np.r_[0, np.diff(TTL.astype('i'))] == -1
 # V2.5 - 110418 - Revised global FA fraction computation to be more consistent
 # with how we score the actual trials and compute FA for the individual
 # parameters.
+# V2.6 - 110605 - Added commutator inhibit TTL (comm_inhibit_TTL) to indicate
+# when commutator is being suppressed from spinning.
 class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
     '''
     trial_log is essentially a list of the trials, along with the parameters
@@ -64,7 +66,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
         return getattr(self, name)
 
     # VERSION is a reserved keyword in HDF5 files, so I avoid using it here.
-    OBJECT_VERSION = Float(2.5, store='attribute')
+    OBJECT_VERSION = Float(2.6, store='attribute')
 
     #contact_data = Any
 
@@ -88,6 +90,8 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
             store='channel', store_path='contact/TO_TTL')
     TO_safe_TTL = Instance(FileChannel,
             store='channel', store_path='contact/TO_safe_TTL')
+    comm_inhibit_TTL = Instance(FileChannel,
+            store='channel', store_path='contact/comm_inhibit_TTL')
 
     def _poke_TTL_default(self):
         return self._create_channel('poke_TTL', np.bool)
@@ -118,6 +122,9 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
     def _TO_safe_TTL_default(self):
         return self._create_channel('TO_safe_TTL', np.bool)
+
+    def _comm_inhibit_TTL_default(self):
+        return self._create_channel('comm_inhibit_TTL', np.bool)
 
     def log_trial(self, score=True, **kwargs):
         # Typically we want score to be True; however, for debugging purposes it

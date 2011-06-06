@@ -1,7 +1,7 @@
-from enthought.traits.api import HasTraits, Instance, Any
+from enthought.traits.api import HasTraits, Instance, Any, List
 from enthought.traits.ui.api import HGroup, View, Item
 from tdt import DSPProcess
-from cns import RCX_ROOT
+from cns import RCX_ROOT, PHYSIOLOGY_CHANNELS
 from os.path import join
 from cns.pipeline import deinterleave_bits
 
@@ -17,6 +17,8 @@ class PhysiologyControllerMixin(HasTraits):
     buffer_physiology_ttl   = Any
     physiology_ttl_pipeline = Any
 
+    buffer_spikes           = List(Any)
+
     def setup_physiology(self):
         # Load the circuit
         circuit = join(RCX_ROOT, 'physiology')
@@ -24,13 +26,22 @@ class PhysiologyControllerMixin(HasTraits):
 
         # Initialize the buffers that will be spooling the data
         self.buffer_physiology_raw = self.iface_physiology.get_buffer('craw',
-                'r', src_type='int16', dest_type='float32', channels=16) 
+                'r', src_type='int16', dest_type='float32',
+                channels=PHYSIOLOGY_CHANNELS) 
         self.buffer_physiology_filt = self.iface_physiology.get_buffer('cfilt',
-                'r', src_type='int16', dest_type='float32', channels=16) 
+                'r', src_type='int16', dest_type='float32',
+                channels=PHYSIOLOGY_CHANNELS) 
         self.buffer_physiology_ts = self.iface_physiology.get_buffer('trig/',
                 'r', src_type='int32', dest_type='int32', block_size=1)
         self.buffer_physiology_ttl = self.iface_physiology.get_buffer('TTL',
                 'r', src_type='int8', dest_type='int8', block_size=1)
+
+        self.iface_physiology.set_tag('spike1_a', 0.0001)
+        for i in range(PHYSIOLOGY_CHANNELS):
+            name = 'spike{}'.format(i+1)
+            buffer = self.iface_physiology.get_buffer(name, 'r', block_size=32)
+            self.buffer_spikes.append(buffer)
+            self.model.data.physiology_spikes[i].fs = buffer.fs
 
         # Ensure that the data store has the correct sampling frequency
         self.model.data.physiology_raw.fs = self.buffer_physiology_raw.fs
@@ -55,14 +66,22 @@ class PhysiologyControllerMixin(HasTraits):
         ttl = self.buffer_physiology_ttl.read()
         self.physiology_ttl_pipeline.send(ttl)
 
-        # We also send the processed data to a memory buffer for display in the
-        # plotting.  It's very slow when the plot has to re-extract the data
-        # from the file and we'd like to avoid this.
-        # self.model.data.physiology_ram.send(waveform)
-
         # Get the timestamps
         ts = self.buffer_physiology_ts.read()
         self.model.data.physiology_ts.send(ts)
+
+        # Get the spikes.  Each channel has a separate buffer for the spikes
+        # detected online.
+        for i in range(PHYSIOLOGY_CHANNELS):
+            data = self.buffer_spikes[i].read().reshape((-1, 32))
+
+            # First sample of each snippet is the timestamp (as a 32 bit
+            # integer) and last sample is the classifier (also as a 32 bit
+            # integer)
+            snip = data[:,1:-1]
+            ts = data[:,0].view('int32')
+            cl = data[:,-1].view('int32')
+            self.model.data.physiology_spikes[i].send(snip, ts, cl)
 
     def set_monitor_fc_highpass(self, value):
         self.iface_physiology.set_tag('FiltHP', value)
@@ -99,3 +118,6 @@ class PhysiologyControllerMixin(HasTraits):
 
     def set_diff_matrix(self, value):
         self.iface_physiology.set_coefficients('diff_map', value.ravel())
+
+    def set_commutator_inhibit(self, value):
+        self.iface_behavior.set_tag('comm_inhibit', value)

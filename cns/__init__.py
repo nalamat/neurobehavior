@@ -43,6 +43,8 @@ SYRINGE_DATA = {
         'B-D 10cc (glass)'      : 14.20,
         }
 
+PHYSIOLOGY_CHANNELS = 16
+
 if __name__ == '__main__':
     from os import makedirs
     for path in (DATA_ROOT, TEMP_ROOT, LOG_ROOT):

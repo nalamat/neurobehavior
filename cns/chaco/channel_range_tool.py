@@ -47,21 +47,24 @@ class MultiChannelRangeTool(ChannelRangeTool):
     value_span = Float(0.5e-3)
     value_factor = Float(1.1)
 
+    def get_value_zoom_factor(self, event):
+        return self.value_factor
+
     def normal_mouse_wheel(self, event):
         if event.mouse_wheel != 0:
             if event.control_down:
-                if event.mouse_wheel > 0:
-                    factor = self.index_factor*event.mouse_wheel
+                if event.mouse_wheel < 0:
+                    factor = self.get_value_zoom_factor(event)
                     self.zoom_in_index(factor)
                 else:
-                    factor = self.index_factor*abs(event.mouse_wheel)
+                    factor = self.get_value_zoom_factor(event)
                     self.zoom_out_index(factor)
             else:
-                if event.mouse_wheel > 0:
-                    factor = self.value_factor*event.mouse_wheel
+                if event.mouse_wheel < 0:
+                    factor = self.get_value_zoom_factor(event)
                     self.zoom_in_value(factor)
                 else:
-                    factor = self.value_factor*abs(event.mouse_wheel)
+                    factor = self.get_value_zoom_factor(event)
                     self.zoom_out_value(factor)
 
     def zoom_in_value(self, factor):
