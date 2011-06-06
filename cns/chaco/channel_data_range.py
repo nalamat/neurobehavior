@@ -33,21 +33,22 @@ class ChannelDataRange(DataRange1D):
         they use this data range, the assumption is that they've decided they
         want tracking.
         '''
+        span = self.span-self.trig_delay
         if self.update_mode == 'auto':
             # Update the bounds as soon as the data scrolls into the next span
-            spans = self.get_max_time()//self.span
-            high_value = (spans+1)*self.span
-            low_value = high_value-self.span-self.trig_delay
+            spans = self.get_max_time()//span
+            high_value = (spans+1)*span-self.trig_delay
+            low_value = high_value-span
         elif self.update_mode == 'auto full':
             # Don't update the bounds until we have a full span of data to display
-            spans = self.get_max_time()//self.span
-            high_value = spans*self.span
-            low_value = high_value-self.span-self.trig_delay
+            spans = self.get_max_time()//span
+            high_value = spans*span-self.trig_delay
+            low_value = high_value-span
         elif self.update_mode == 'triggered':
             # We want the lower bound of the range to be referenced to the
             # trigger itself.
             low_value = self.timeseries.latest()-self.trig_delay
-            high_value = low_value+self.span
+            high_value = low_value+span
         elif self.update_mode == 'triggered full':
             # We want the lower bound of the range to be referenced to the
             # trigger, but we don't want it to update until we have collected
@@ -59,13 +60,13 @@ class ChannelDataRange(DataRange1D):
                 # is within the range we want
                 while True:
                     ts = self.timeseries[index]
-                    high_value = ts+self.span
+                    high_value = ts+span
                     if high_value < self.get_max_time():
                         break
                     index -= 1
             except IndexError:
                 high_value = self.timeseries.t0
-            low_value = high_value-self.span-self.trig_delay
+            low_value = high_value-span-self.trig_delay
 
         # Important!  Don't update the values unless they are different.
         # Needlessly updating these values results in excessive screen redraws,

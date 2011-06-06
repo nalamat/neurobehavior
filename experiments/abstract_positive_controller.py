@@ -69,19 +69,24 @@ class AbstractPositiveController(AbstractExperimentController,
         self.buffer_TTL2 = self.iface_behavior.get_buffer('TTL2', 'r',
                 src_type=np.int8, dest_type=np.int8, block_size=24)
 
+        # Stored in TTL1
         self.model.data.spout_TTL.fs = self.buffer_TTL1.fs
         self.model.data.poke_TTL.fs = self.buffer_TTL1.fs
         self.model.data.signal_TTL.fs = self.buffer_TTL1.fs
         self.model.data.reaction_TTL.fs = self.buffer_TTL1.fs
         self.model.data.response_TTL.fs = self.buffer_TTL1.fs
         self.model.data.reward_TTL.fs = self.buffer_TTL1.fs
+
+        # Stored in TTL2
         self.model.data.TO_TTL.fs = self.buffer_TTL2.fs
         self.model.data.TO_safe_TTL.fs = self.buffer_TTL2.fs
+        self.model.data.comm_inhibit_TTL.fs = self.buffer_TTL2.fs
 
         targets1 = [self.model.data.poke_TTL, self.model.data.spout_TTL,
                     self.model.data.reaction_TTL, self.model.data.signal_TTL,
                     self.model.data.response_TTL, self.model.data.reward_TTL, ]
-        targets2 = [self.model.data.TO_safe_TTL, self.model.data.TO_TTL, ]
+        targets2 = [self.model.data.TO_safe_TTL, self.model.data.TO_TTL,
+                    self.model.data.comm_inhibit_TTL ]
 
         self.pipeline_TTL1 = deinterleave_bits(targets1)
         self.pipeline_TTL2 = deinterleave_bits(targets2)

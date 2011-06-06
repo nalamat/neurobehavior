@@ -14,6 +14,7 @@ from cns.chaco.timeseries_plot import TimeseriesPlot
 from cns.chaco.extremes_channel_plot import ExtremesChannelPlot
 from cns.chaco.ttl_plot import TTLPlot
 from cns.chaco.channel_range_tool import MultiChannelRangeTool
+from cns.chaco.channel_number_overlay import ChannelNumberOverlay
 
 class PhysiologyExperimentMixin(HasTraits):
 
@@ -23,10 +24,25 @@ class PhysiologyExperimentMixin(HasTraits):
 
     physiology_container    = Instance(Component)
     physiology_plot         = Instance(Component)
+    physiology_sort_plot    = Instance(Component)
     physiology_index_range  = Instance(ChannelDataRange)
     physiology_value_range  = Instance(DataRange1D, ())
 
     physiology_channel_span = Float(0.5e-3)
+
+    @on_trait_change('data')
+    def _physiology_sort_plot(self):
+        index_mapper = LinearMapper(range=DataRange1D(low=0, high=0.001))
+        value_mapper = LinearMapper(range=DataRange1D(low=-0.00025, high=0.0005))
+        plot = SnippetChannelPlot(history=100, channel=self.data.spikes[0],
+                value_mapper=value_mapper, index_mapper=index_mapper)
+        axis = PlotAxis(orientation='left', component=plot)
+        plot.overlays.append(axis)
+        axis = PlotAxis(orientation='bottom', component=plot)
+        plot.overlays.append(axis)
+        self.tool = WindowTool(component=plot)
+        plot.overlays.append(self.tool)
+        self.physiology_sort_plot = plot
 
     @on_trait_change('physiology_plot.channel_visible, physiology_channel_span')
     def _physiology_value_range_update(self):
@@ -65,10 +81,10 @@ class PhysiologyExperimentMixin(HasTraits):
         self._add_behavior_plots(index_mapper, container)
 
         # Create the neural plots
-        #index_mapper = LinearMapper(range=self.physiology_index_range)
         value_mapper = LinearMapper(range=self.physiology_value_range)
         plot = ExtremesChannelPlot(channel=self.data.physiology_processed, 
                 index_mapper=index_mapper, value_mapper=value_mapper)
+        plot.overlays.append(ChannelNumberOverlay(plot=plot))
         container.add(plot)
         add_default_grids(plot, major_index=1, minor_index=0.25)
         add_time_axis(plot, 'bottom', fraction=True)

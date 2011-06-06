@@ -1,5 +1,7 @@
-from enthought.traits.api import HasTraits, Instance
-from cns.channel import FileMultiChannel, RAMMultiChannel, FileChannel
+from cns import PHYSIOLOGY_CHANNELS
+from enthought.traits.api import HasTraits, Instance, List
+from cns.channel import (FileMultiChannel, RAMMultiChannel, FileChannel,
+        FileSnippetChannel)
 from cns.data.h5_utils import get_or_append_node
 import numpy as np
 
@@ -21,6 +23,18 @@ class PhysiologyDataMixin(HasTraits):
             store_path='physiology/sweep')
 
     physiology_ts = Instance('cns.channel.Timeseries', ())
+
+    physiology_spikes = List(Instance(FileSnippetChannel))
+
+    def _physiology_spikes_default(self):
+        physiology_node = get_or_append_node(self.store_node, 'physiology')
+        channels = []
+        for i in range(PHYSIOLOGY_CHANNELS): 
+            name = 'spike_{:02}'.format(i+1)
+            channel = FileSnippetChannel(node=physiology_node, name=name,
+                    dtype=np.float32, snippet_size=30)
+            channels.append(channel)
+        return channels
 
     def _physiology_sweep_default(self):
         physiology_node = get_or_append_node(self.store_node, 'physiology')
