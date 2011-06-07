@@ -59,7 +59,7 @@ class SnippetChannelPlot(BaseChannelPlot):
 
         self._configure_gc(gc)
         gc.begin_path()
-
+        
         for i, mask in enumerate(self.classifier_masks):
             color = color_table[self.colors[i]]
             gc.set_stroke_color(color)

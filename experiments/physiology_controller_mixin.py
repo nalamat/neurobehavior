@@ -33,7 +33,7 @@ class PhysiologyControllerMixin(HasTraits):
         if event is not Undefined and self.iface_physiology is not None:
             channel, windows = event
             tag = "spike%d_c" % channel
-            coeffs = np.zeros((32, 3))
+            coeffs = np.zeros((40, 3))
             for i, hoop in enumerate(windows):
                 x = round(hoop[0]*self.iface_physiology.fs)
                 coeffs[x] = hoop[1], hoop[2], i+1
@@ -61,7 +61,7 @@ class PhysiologyControllerMixin(HasTraits):
         #self.iface_physiology.set_tag('spike1_a', 0.0001)
         for i in range(PHYSIOLOGY_CHANNELS):
             name = 'spike{}'.format(i+1)
-            buffer = self.iface_physiology.get_buffer(name, 'r', block_size=32)
+            buffer = self.iface_physiology.get_buffer(name, 'r', block_size=40)
             self.buffer_spikes.append(buffer)
             self.model.data.physiology_spikes[i].fs = buffer.fs
 
@@ -95,7 +95,7 @@ class PhysiologyControllerMixin(HasTraits):
         # Get the spikes.  Each channel has a separate buffer for the spikes
         # detected online.
         for i in range(PHYSIOLOGY_CHANNELS):
-            data = self.buffer_spikes[i].read().reshape((-1, 32))
+            data = self.buffer_spikes[i].read().reshape((-1, 40))
 
             # First sample of each snippet is the timestamp (as a 32 bit
             # integer) and last sample is the classifier (also as a 32 bit

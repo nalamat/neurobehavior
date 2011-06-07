@@ -2,7 +2,7 @@
 import os, re
 from os.path import dirname, join, abspath, getmtime
 
-BASE_DIRECTORY  = 'F:/'
+BASE_DIRECTORY  = 'E:/'
 LOG_ROOT        = join(BASE_DIRECTORY, 'logs') # where log files should be stored
 TEMP_ROOT       = join(BASE_DIRECTORY, 'temp') # location for temporary files
 DATA_ROOT       = join(BASE_DIRECTORY, 'data') # location for data files
