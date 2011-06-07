@@ -8,6 +8,7 @@ from enthought.traits.ui.api import Item, Group, View, Controller
 from enthought.pyface.timer.api import Timer
 from enthought.chaco.api import (LinearMapper, DataRange1D,
         OverlayPlotContainer, PlotAxis)
+from enthought.chaco.tools.api import ZoomTool, PanTool
 
 from tdt import DSPCircuit
 from cns import RCX_ROOT
@@ -46,15 +47,25 @@ class DemoController(Controller):
 
     def _container_default(self):
         container = OverlayPlotContainer(padding=[50, 50, 50, 50])
-        index_mapper = LinearMapper(range=DataRange1D(low=0, high=0.0005))
-        value_mapper = LinearMapper(range=DataRange1D(low=-0.00025, high=0.0005))
+        index_range = DataRange1D(low=0, high=0.0012)
+        value_range = DataRange1D(low=-0.00025, high=0.0005)
+        index_mapper = LinearMapper(range=index_range)
+        value_mapper = LinearMapper(range=value_range)
         plot = SnippetChannelPlot(history=100, channel=self.snippet_store,
                 value_mapper=value_mapper, index_mapper=index_mapper)
         self.plot = plot
+
+        # Add the axes
         axis = PlotAxis(orientation='left', component=plot)
         plot.overlays.append(axis)
         axis = PlotAxis(orientation='bottom', component=plot)
         plot.overlays.append(axis)
+
+        plot.overlays.append(ZoomTool(plot, axis='value'))
+        #plot.tools.append(PanTool(plot, axis='value'))
+
+        #plot.overlays.append(BetterZoom(plot))
+
         self.tool = WindowTool(component=plot)
         plot.overlays.append(self.tool)
         container.add(plot)

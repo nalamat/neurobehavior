@@ -1,7 +1,7 @@
 # Enthought library imports
 from enthought.enable.api import cursor_style_trait, Line
 from enthought.traits.api import Any, Bool, Enum, Instance, Int, List, Trait, \
-        Tuple, HasTraits, Float, Property, Dict
+        Tuple, HasTraits, Float, Property, Dict, Event
 from enthought.enable.component import Component
 
 # Chaco imports
@@ -122,6 +122,8 @@ class WindowTool(AbstractOverlay):
     """ The base class for tools that allow the user to draw a
     series of windows.
     """
+    updated = Event
+
     # The component that this tool overlays
     component = Instance(Component)
     

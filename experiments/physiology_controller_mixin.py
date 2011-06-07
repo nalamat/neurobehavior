@@ -1,4 +1,6 @@
-from enthought.traits.api import HasTraits, Instance, Any, List
+import numpy as np
+from enthought.traits.api import (HasTraits, Instance, Any, List,
+        on_trait_change, Undefined)
 from enthought.traits.ui.api import HGroup, View, Item
 from tdt import DSPProcess
 from cns import RCX_ROOT, PHYSIOLOGY_CHANNELS
@@ -19,6 +21,26 @@ class PhysiologyControllerMixin(HasTraits):
 
     buffer_spikes           = List(Any)
 
+    @on_trait_change('model.physiology_window_+.threshold_updated')
+    def _update_sort_threshold(self, event):
+        if event is not Undefined and self.iface_physiology is not None:
+            channel, threshold = event
+            tag = "spike%d_a" % channel
+            self.iface_physiology.set_tag(tag, threshold)
+
+    @on_trait_change('model.physiology_window_+.windows_updated')
+    def _update_window(self, event):
+        if event is not Undefined and self.iface_physiology is not None:
+            channel, windows = event
+            tag = "spike%d_c" % channel
+            coeffs = np.zeros((32, 3))
+            for i, hoop in enumerate(windows):
+                x = round(hoop[0]*self.iface_physiology.fs)
+                coeffs[x] = hoop[1], hoop[2], i+1
+            self.iface_physiology.set_coefficients(tag, coeffs.ravel())
+            history = len(self.model.data.physiology_spikes[channel].buffer)
+            #self.model.physiology_sort_plot.last_reset = history
+
     def setup_physiology(self):
         # Load the circuit
         circuit = join(RCX_ROOT, 'physiology')
@@ -36,7 +58,7 @@ class PhysiologyControllerMixin(HasTraits):
         self.buffer_physiology_ttl = self.iface_physiology.get_buffer('TTL',
                 'r', src_type='int8', dest_type='int8', block_size=1)
 
-        self.iface_physiology.set_tag('spike1_a', 0.0001)
+        #self.iface_physiology.set_tag('spike1_a', 0.0001)
         for i in range(PHYSIOLOGY_CHANNELS):
             name = 'spike{}'.format(i+1)
             buffer = self.iface_physiology.get_buffer(name, 'r', block_size=32)
