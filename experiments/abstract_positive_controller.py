@@ -96,7 +96,7 @@ class AbstractPositiveController(AbstractExperimentController,
         self.update_context()
         self.update_context(self.current_setting_go.parameter_dict())
 
-        #self.iface_pump.set_trigger(start='rising', stop=None)
+        self.iface_pump.set_trigger(start='rising', stop=None)
         self.iface_pump.set_direction('infuse')
 
         # Grab the current value of the timestamp from the circuit when it is

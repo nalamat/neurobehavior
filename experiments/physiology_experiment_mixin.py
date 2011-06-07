@@ -45,12 +45,12 @@ class SortWindow(HasTraits):
     def _plot_default(self):
         # Create the plot
         index_mapper = LinearMapper(range=DataRange1D(low=0, high=0.0012))
-        value_mapper = LinearMapper(range=DataRange1D(low=-0.00025, high=0.0005))
+        value_mapper = LinearMapper(range=DataRange1D(low=-0.00025, high=0.00025))
         plot = SnippetChannelPlot(history=20,
                 channel=self.channels[self.channel-1],
                 value_mapper=value_mapper, 
                 index_mapper=index_mapper,
-                bgcolor='white', padding=[10, 10, 50, 50])
+                bgcolor='white', padding=[10, 10, 10, 10])
 
         # Add the axes labels
         axis = PlotAxis(orientation='left', component=plot)
@@ -78,55 +78,30 @@ class SortWindow(HasTraits):
 class PhysiologyExperimentMixin(HasTraits):
 
     # Acquire physiology?
-    spool_physiology        = Bool(False)
-    physiology_settings     = Instance(PhysiologyParadigmMixin, ())
+    spool_physiology         = Bool(False)
+    physiology_settings      = Instance(PhysiologyParadigmMixin, ())
 
-    physiology_container    = Instance(Component)
-    physiology_plot         = Instance(Component)
-    physiology_sort_plot    = Instance(Component)
-    physiology_index_range  = Instance(ChannelDataRange)
-    physiology_value_range  = Instance(DataRange1D, ())
+    physiology_container     = Instance(Component)
+    physiology_plot          = Instance(Component)
+    physiology_sort_plot     = Instance(Component)
+    physiology_index_range   = Instance(ChannelDataRange)
+    physiology_value_range   = Instance(DataRange1D, ())
 
-    physiology_channel_span = Float(0.5e-3)
+    physiology_channel_span  = Float(0.5e-3)
+    #physiology_sort_map      = List
 
     physiology_window_1      = Instance(SortWindow)
     physiology_window_2      = Instance(SortWindow)
     physiology_window_3      = Instance(SortWindow)
 
+    def _physiology_sort_map_default(self):
+        return [(0.0001, []) for i in range(16)]
+
     @on_trait_change('data')
     def _physiology_sort_plots(self):
-        self.physiology_window_1 = SortWindow(channels=self.data.physiology_spikes)
-        self.physiology_window_2 = SortWindow(channels=self.data.physiology_spikes)
-        self.physiology_window_3 = SortWindow(channels=self.data.physiology_spikes)
-        #container = VPlotContainer(bgcolor='transparent', padding=[20, 20, 50, 50], spacing=50)
-        #index_mapper = LinearMapper(range=DataRange1D(low=0, high=0.0012))
-        #value_mapper = LinearMapper(range=DataRange1D(low=-0.00025, high=0.0005))
-        #plot = SnippetChannelPlot(history=20,
-        #        channel=self.data.physiology_spikes[0],
-        #        value_mapper=value_mapper, index_mapper=index_mapper,
-        #        bgcolor='white')
-        #axis = PlotAxis(orientation='left', component=plot)
-        #plot.overlays.append(axis)
-        #axis = PlotAxis(orientation='bottom', component=plot)
-        #plot.overlays.append(axis)
-        #zoom = ZoomTool(plot, drag_button=None, axis="value")
-        #plot.overlays.append(zoom)
-        #self.physiology_window = WindowTool(component=plot)
-        #plot.overlays.append(self.physiology_window)
-        #container.add(plot)
-        #for i in range(3):
-        #    plot = SnippetChannelPlot(history=20,
-        #            channel=self.data.physiology_spikes[i],
-        #            value_mapper=value_mapper, index_mapper=index_mapper,
-        #            bgcolor='white')
-        #    axis = PlotAxis(orientation='left', component=plot)
-        #    plot.overlays.append(axis)
-        #    axis = PlotAxis(orientation='bottom', component=plot)
-        #    plot.overlays.append(axis)
-        #    self.tool = WindowTool(component=plot)
-        #    plot.overlays.append(self.tool)
-        #    container.add(plot)
-        #self.physiology_sort_plot = container
+        self.physiology_window_1 = SortWindow(channel=1, channels=self.data.physiology_spikes)
+        self.physiology_window_2 = SortWindow(channel=5, channels=self.data.physiology_spikes)
+        self.physiology_window_3 = SortWindow(channel=9, channels=self.data.physiology_spikes)
 
     @on_trait_change('physiology_plot.channel_visible, physiology_channel_span')
     def _physiology_value_range_update(self):
