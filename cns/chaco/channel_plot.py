@@ -113,13 +113,13 @@ class ChannelPlot(BaseChannelPlot):
             self._data_cache_valid = False
             self.invalidate_and_redraw()
 
-    def _channel_changed(self, old, new):
-        # We need to call _update_index_mapper when fs changes since the method
-        # precomputes the index value based on the sampling frequency of the
-        # channel.
-        if old is not None:
-            old.on_trait_change(self._data_changed, "updated", remove=True)
-            old.on_trait_change(self._index_mapper_updated, "fs", remove=True)
-        if new is not None:
-            new.on_trait_change(self._data_changed, "updated", dispatch="new")
-            new.on_trait_change(self._index_mapper_updated, "fs", dispatch="new")
+    #def _channel_changed(self, old, new):
+    #    # We need to call _update_index_mapper when fs changes since the method
+    #    # precomputes the index value based on the sampling frequency of the
+    #    # channel.
+    #    if old is not None:
+    #        old.on_trait_change(self._data_changed, "updated", remove=True)
+    #        old.on_trait_change(self._index_mapper_updated, "fs", remove=True)
+    #    if new is not None:
+    #        new.on_trait_change(self._data_changed, "updated", dispatch="new")
+    #        new.on_trait_change(self._index_mapper_updated, "fs", dispatch="new")

@@ -1,13 +1,13 @@
-from enthought.enable.api import ColorTrait
+from enthought.enable.api import ColorTrait, black_color_trait, color_table
 from enthought.traits.api import (Property, Int, cached_property,
-        on_trait_change, List, Color)
+        on_trait_change, List)
 import numpy as np
 from base_channel_plot import BaseChannelPlot
 
 class SnippetChannelPlot(BaseChannelPlot):
 
     last_reset = Int(0)
-    history = Int(100)
+    history = Int(20)
     classifier = Int(0)
 
     index_data = Property(depends_on='channel.fs, channel.snippet_size')
@@ -16,7 +16,7 @@ class SnippetChannelPlot(BaseChannelPlot):
     value_screen = Property(depends_on='value_data')
     classifier_masks = Property(depends_on='channel.updated')
 
-    colors = List(Color, ['red', 'green', 'blue', 'orange', 'black'])
+    colors = List(ColorTrait, ['red', 'green', 'blue', 'orange', 'black'])
 
     def _index_mapper_updated(self):
         pass
@@ -35,7 +35,6 @@ class SnippetChannelPlot(BaseChannelPlot):
 
     @cached_property
     def _get_value_screen(self):
-        print self.last_reset, len(self.channel.buffer), len(self.value_data)
         return self.value_mapper.map_screen(self.value_data)
 
     @cached_property
@@ -62,7 +61,7 @@ class SnippetChannelPlot(BaseChannelPlot):
         gc.begin_path()
 
         for i, mask in enumerate(self.classifier_masks):
-            color = np.array(self.colors[i])/255.0
+            color = color_table[self.colors[i]]
             gc.set_stroke_color(color)
             for value in self.value_screen[mask]:
                 gc.lines(np.column_stack((index, value)))

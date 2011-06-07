@@ -2,12 +2,15 @@ from enthought.enable.api import Component, ComponentEditor
 from enthought.chaco.api import (LinearMapper, DataRange1D,
         OverlayPlotContainer)
 from enthought.traits.ui.api import VGroup, HGroup, Item, Include, View, \
-        InstanceEditor, RangeEditor, HSplit
+        InstanceEditor, RangeEditor, HSplit, Tabbed
 from enthought.traits.api import Instance, HasTraits, Float, DelegatesTo, \
-        Bool, on_trait_change
+        Bool, on_trait_change, Int, on_trait_change, Any, Range, Event
 
 from physiology_paradigm_mixin import PhysiologyParadigmMixin
 
+from enthought.chaco.api import PlotAxis, VPlotContainer
+from enthought.chaco.tools.api import ZoomTool
+from cns.chaco.tools.window_tool import WindowTool
 from cns.chaco.helpers import add_default_grids, add_time_axis
 from cns.chaco.channel_data_range import ChannelDataRange
 from cns.chaco.timeseries_plot import TimeseriesPlot
@@ -15,6 +18,62 @@ from cns.chaco.extremes_channel_plot import ExtremesChannelPlot
 from cns.chaco.ttl_plot import TTLPlot
 from cns.chaco.channel_range_tool import MultiChannelRangeTool
 from cns.chaco.channel_number_overlay import ChannelNumberOverlay
+from cns.chaco.snippet_channel_plot import SnippetChannelPlot
+
+class SortWindow(HasTraits):
+
+    channels    = Any
+    plot        = Instance(SnippetChannelPlot)
+    channel     = Range(1, 16, 1)
+    threshold   = Float(0.0001)
+    tool        = Instance(WindowTool)
+
+    threshold_updated   = Event
+    windows_updated     = Event
+
+    @on_trait_change('threshold')
+    def _fire_threshold_update(self):
+        self.threshold_updated = self.channel, self.threshold
+
+    @on_trait_change('tool.updated')
+    def _fire_windows_update(self):
+        self.windows_updated = self.channel, self.tool.get_hoops()
+
+    def _channel_changed(self, new):
+        self.plot.channel = self.channels[new-1]
+
+    def _plot_default(self):
+        # Create the plot
+        index_mapper = LinearMapper(range=DataRange1D(low=0, high=0.0012))
+        value_mapper = LinearMapper(range=DataRange1D(low=-0.00025, high=0.0005))
+        plot = SnippetChannelPlot(history=20,
+                channel=self.channels[self.channel-1],
+                value_mapper=value_mapper, 
+                index_mapper=index_mapper,
+                bgcolor='white', padding=[10, 10, 50, 50])
+
+        # Add the axes labels
+        axis = PlotAxis(orientation='left', component=plot)
+        plot.overlays.append(axis)
+        axis = PlotAxis(orientation='bottom', component=plot)
+        plot.overlays.append(axis)
+
+        # Add the tools
+        zoom = ZoomTool(plot, drag_button=None, axis="value")
+        plot.overlays.append(zoom)
+        self.tool = WindowTool(component=plot)
+        plot.overlays.append(self.tool)
+
+        return plot
+
+    traits_view = View(
+            VGroup(
+                Item('channel'),
+                Item('threshold'),
+                Item('plot', editor=ComponentEditor(width=250, height=250)),
+                show_labels=False,
+                ),
+            )
 
 class PhysiologyExperimentMixin(HasTraits):
 
@@ -30,19 +89,44 @@ class PhysiologyExperimentMixin(HasTraits):
 
     physiology_channel_span = Float(0.5e-3)
 
+    physiology_window_1      = Instance(SortWindow)
+    physiology_window_2      = Instance(SortWindow)
+    physiology_window_3      = Instance(SortWindow)
+
     @on_trait_change('data')
-    def _physiology_sort_plot(self):
-        index_mapper = LinearMapper(range=DataRange1D(low=0, high=0.001))
-        value_mapper = LinearMapper(range=DataRange1D(low=-0.00025, high=0.0005))
-        plot = SnippetChannelPlot(history=100, channel=self.data.spikes[0],
-                value_mapper=value_mapper, index_mapper=index_mapper)
-        axis = PlotAxis(orientation='left', component=plot)
-        plot.overlays.append(axis)
-        axis = PlotAxis(orientation='bottom', component=plot)
-        plot.overlays.append(axis)
-        self.tool = WindowTool(component=plot)
-        plot.overlays.append(self.tool)
-        self.physiology_sort_plot = plot
+    def _physiology_sort_plots(self):
+        self.physiology_window_1 = SortWindow(channels=self.data.physiology_spikes)
+        self.physiology_window_2 = SortWindow(channels=self.data.physiology_spikes)
+        self.physiology_window_3 = SortWindow(channels=self.data.physiology_spikes)
+        #container = VPlotContainer(bgcolor='transparent', padding=[20, 20, 50, 50], spacing=50)
+        #index_mapper = LinearMapper(range=DataRange1D(low=0, high=0.0012))
+        #value_mapper = LinearMapper(range=DataRange1D(low=-0.00025, high=0.0005))
+        #plot = SnippetChannelPlot(history=20,
+        #        channel=self.data.physiology_spikes[0],
+        #        value_mapper=value_mapper, index_mapper=index_mapper,
+        #        bgcolor='white')
+        #axis = PlotAxis(orientation='left', component=plot)
+        #plot.overlays.append(axis)
+        #axis = PlotAxis(orientation='bottom', component=plot)
+        #plot.overlays.append(axis)
+        #zoom = ZoomTool(plot, drag_button=None, axis="value")
+        #plot.overlays.append(zoom)
+        #self.physiology_window = WindowTool(component=plot)
+        #plot.overlays.append(self.physiology_window)
+        #container.add(plot)
+        #for i in range(3):
+        #    plot = SnippetChannelPlot(history=20,
+        #            channel=self.data.physiology_spikes[i],
+        #            value_mapper=value_mapper, index_mapper=index_mapper,
+        #            bgcolor='white')
+        #    axis = PlotAxis(orientation='left', component=plot)
+        #    plot.overlays.append(axis)
+        #    axis = PlotAxis(orientation='bottom', component=plot)
+        #    plot.overlays.append(axis)
+        #    self.tool = WindowTool(component=plot)
+        #    plot.overlays.append(self.tool)
+        #    container.add(plot)
+        #self.physiology_sort_plot = container
 
     @on_trait_change('physiology_plot.channel_visible, physiology_channel_span')
     def _physiology_value_range_update(self):
@@ -125,11 +209,22 @@ class PhysiologyExperimentMixin(HasTraits):
 
     physiology_view = View(
             HSplit(
-                Include('physiology_settings_group'),
+                Tabbed(
+                    Include('physiology_settings_group'),
+                    VGroup(
+                        Item('physiology_window_1', style='custom', width=250),
+                        Item('physiology_window_2', style='custom', width=250),
+                        Item('physiology_window_3', style='custom', width=250),
+                        show_labels=False,
+                        ),
+                    ),
                 Item('physiology_container', 
-                    editor=ComponentEditor(width=1500, height=800), 
-                    width=1500,
+                    editor=ComponentEditor(width=1200, height=800), 
+                    width=1200,
                     resizable=True),
+                    #editor=ComponentEditor(width=250, height=250), 
+                    #width=250,
+                    #resizable=True),
                 show_labels=False,
                 ),
             resizable=True)
