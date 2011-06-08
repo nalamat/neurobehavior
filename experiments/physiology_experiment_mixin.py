@@ -8,7 +8,7 @@ from enthought.traits.api import Instance, HasTraits, Float, DelegatesTo, \
 
 from physiology_paradigm_mixin import PhysiologyParadigmMixin
 
-from enthought.chaco.api import PlotAxis, VPlotContainer
+from enthought.chaco.api import PlotAxis, VPlotContainer, PlotAxis
 from enthought.chaco.tools.api import ZoomTool
 from cns.chaco.tools.window_tool import WindowTool
 from cns.chaco.helpers import add_default_grids, add_time_axis
@@ -19,6 +19,8 @@ from cns.chaco.ttl_plot import TTLPlot
 from cns.chaco.channel_range_tool import MultiChannelRangeTool
 from cns.chaco.channel_number_overlay import ChannelNumberOverlay
 from cns.chaco.snippet_channel_plot import SnippetChannelPlot
+
+scale_formatter = lambda x: "{:.2f}".format(x*1e3)
 
 class SortWindow(HasTraits):
 
@@ -50,12 +52,16 @@ class SortWindow(HasTraits):
                 channel=self.channels[self.channel-1],
                 value_mapper=value_mapper, 
                 index_mapper=index_mapper,
-                bgcolor='white', padding=[10, 10, 10, 10])
+                bgcolor='white', padding=[60, 10, 10, 40])
+        add_default_grids(plot, major_index=1e-3, minor_index=1e-4,
+                major_value=1e-3, minor_value=1e-4)
 
         # Add the axes labels
-        axis = PlotAxis(orientation='left', component=plot)
+        axis = PlotAxis(orientation='left', component=plot,
+                tick_label_formatter=scale_formatter, title='Volts (mV)')
         plot.overlays.append(axis)
-        axis = PlotAxis(orientation='bottom', component=plot)
+        axis = PlotAxis(orientation='bottom', component=plot, title='Time (ms)',
+                tick_label_formatter=scale_formatter)
         plot.overlays.append(axis)
 
         # Add the tools
@@ -120,7 +126,8 @@ class PhysiologyExperimentMixin(HasTraits):
 
     @on_trait_change('data')
     def _generate_physiology_plot(self):
-        container = OverlayPlotContainer(padding=[20, 20, 50, 50])
+        # Padding is in left, right, top, bottom order
+        container = OverlayPlotContainer(padding=[50, 20, 20, 50])
 
         # Create the index range shared by all the plot components
         self.physiology_index_range = ChannelDataRange(span=5, trig_delay=1,
@@ -145,9 +152,13 @@ class PhysiologyExperimentMixin(HasTraits):
                 index_mapper=index_mapper, value_mapper=value_mapper)
         plot.overlays.append(ChannelNumberOverlay(plot=plot))
         container.add(plot)
-        add_default_grids(plot, major_index=1, minor_index=0.25)
+        add_default_grids(plot, major_index=1, minor_index=0.25,
+                major_value=1e-3, minor_value=1e-4)
+        axis = PlotAxis(component=plot, orientation='left',
+                tick_label_formatter=scale_formatter, title='Volts (mV)')
+        plot.underlays.append(axis)
         add_time_axis(plot, 'bottom', fraction=True)
-        add_time_axis(plot, 'top', fraction=True)
+        #add_time_axis(plot, 'top', fraction=True)
         self.physiology_plot = plot
 
         tool = MultiChannelRangeTool(component=plot)
