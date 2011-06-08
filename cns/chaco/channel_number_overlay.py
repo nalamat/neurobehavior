@@ -9,6 +9,9 @@ class ChannelNumberOverlay(AbstractOverlay):
     fill_color = ColorTrait('red')
     text_screen_offsets = Property(depends_on='plot.offsets')
 
+    fill_color = ColorTrait
+    line_color = ColorTrait
+
     @cached_property
     def _get_text_screen_offsets(self):
         text_offsets = self.plot.offsets+self.plot.channel_spacing/3.0

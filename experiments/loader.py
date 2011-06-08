@@ -6,7 +6,9 @@ from cns.data import persistence
 from cns.data.h5_utils import get_or_append_node
 import sys
 import tables
-from os.path import join
+import imp
+import os
+from os.path import join, dirname
 
 from enthought.traits.api import Any, Trait, TraitError, Bool, Str
 from enthought.traits.ui.api import View, Item, VGroup, HGroup, Spring
@@ -21,12 +23,14 @@ log = logging.getLogger(__name__)
 from cns.data.ui.cohort import CohortEditor, CohortView, CohortViewHandler
 from cns.data.h5_utils import append_node, append_date_node
 
-from scripts import settings
+#from scripts import settings
 
-#import imp
-#import os
-#settings_file = os.path.dirname(os.ENVIRON['NEUROBEHAVIOR_SETTINGS']) 
-#imp.find_module('settings', os.ENVIRON['NEUROBEHAVIOR_SETTINGS'])
+def load_settings():
+    path = os.environ['NEUROBEHAVIOR_SETTINGS']
+    return imp.load_module('settings', open(path), dirname(path), 
+                           ('.py', 'r', imp.PY_SOURCE))
+
+settings = load_settings()
 
 class ExperimentCohortView(CohortView):
 
