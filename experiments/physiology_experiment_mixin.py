@@ -20,6 +20,8 @@ from cns.chaco.channel_range_tool import MultiChannelRangeTool
 from cns.chaco.channel_number_overlay import ChannelNumberOverlay
 from cns.chaco.snippet_channel_plot import SnippetChannelPlot
 
+from cns.chaco.spike_overlay import SpikeOverlay
+
 scale_formatter = lambda x: "{:.2f}".format(x*1e3)
 
 class SortWindow(HasTraits):
@@ -158,11 +160,14 @@ class PhysiologyExperimentMixin(HasTraits):
                 tick_label_formatter=scale_formatter, title='Volts (mV)')
         plot.underlays.append(axis)
         add_time_axis(plot, 'bottom', fraction=True)
-        #add_time_axis(plot, 'top', fraction=True)
         self.physiology_plot = plot
 
         tool = MultiChannelRangeTool(component=plot)
         plot.tools.append(tool)
+
+        overlay = SpikeOverlay(plot=plot,
+                spikes=self.data.physiology_spikes)
+        plot.overlays.append(overlay)
 
         self.physiology_container = container
         self._physiology_value_range_update()

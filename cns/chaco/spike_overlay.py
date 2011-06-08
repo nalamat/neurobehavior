@@ -1,0 +1,40 @@
+import numpy as np
+from enthought.enable.api import MarkerTrait, ColorTrait
+from enthought.chaco.api import AbstractOverlay
+from enthought.chaco.scatterplot import render_markers
+from enthought.traits.api import Instance, Any, Property, cached_property, Int
+
+class SpikeOverlay(AbstractOverlay):
+
+    plot = Instance('enthought.enable.api.Component')
+    spikes = Any
+    marker = MarkerTrait('circle')
+    marker_size = Int(5)
+
+    line_width = Int(1)
+    fill_color = ColorTrait('red')
+    line_color = ColorTrait('white')
+
+    spike_screen_offsets = Property(depends_on='plot.offsets')
+
+    @cached_property
+    def _get_spike_screen_offsets(self):
+        spike_offsets = self.plot.offsets
+        return self.plot.value_mapper.map_screen(spike_offsets)
+
+    def overlay(self, component, gc, view_bounds=None, mode="normal"):
+        if len(self.plot.channel_visible) != 0:
+            with gc:
+                gc.clip_to_rect(component.x, component.y, component.width,
+                        component.height)
+                gc.set_line_width(self.line_width)
+                gc.set_fill_color(self.fill_color_)
+                gc.set_stroke_color(self.line_color_)
+                for o, n in zip(self.spike_screen_offsets, self.plot.channel_visible):
+                    spikes = self.spikes[n]
+                    ts = spikes.timestamps[:]/spikes.fs
+                    ts_offset = np.ones(len(ts))*o
+                    ts_screen = self.plot.index_mapper.map_screen(ts)
+                    points = np.column_stack((ts_screen, ts_offset))
+                    gc.draw_marker_at_points(points, self.marker_size,
+                            self.marker_.kiva_marker)
