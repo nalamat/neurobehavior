@@ -6,6 +6,7 @@ from enthought.traits.ui.api import VGroup, HGroup, Item, Include, View, \
 from enthought.traits.api import Instance, HasTraits, Float, DelegatesTo, \
      Bool, on_trait_change, Int, on_trait_change, Any, Range, Event, Property,\
      Tuple, List
+from enthought.traits.ui.editors import RangeEditor
 
 from physiology_paradigm_mixin import PhysiologyParadigmMixin
 
@@ -44,28 +45,16 @@ class SortWindow(HasTraits):
         self.settings[self.channel-1].spike_threshold = value
         
     def _get_windows(self):
+        print "getting windows"
         if self.settings is None:
             return []
+        print self.settings[self.channel-1].spike_windows
         return self.settings[self.channel-1].spike_windows
     
     def _set_windows(self, value):
         if self.settings is None:
             return
         self.settings[self.channel-1].spike_windows = value
-        
-    @on_trait_change('tool.updated')
-    def debug(self):
-        print "UPDATE TOOL EVENT"
-        print self.windows, self.tool.windows
-        print self.channel
-        
-    #@on_trait_change('tool.updated')
-    #def update_windows(self):
-        
-    #@on_trait_change('tool.updated')
-    #def _(self):
-    #    self.settings[self.channel].windows = self.tool.get_hoops()
-    #    #self.windows_updated = self.channel, self.tool.get_hoops()
 
     def _channel_changed(self, new):
         self.plot.channel = self.channels[new-1]
@@ -96,14 +85,15 @@ class SortWindow(HasTraits):
         self.tool = WindowTool(component=plot)
         plot.overlays.append(self.tool)
         
+        # Whenever we draw a window, the settings should immediately be
+        # updated!
         self.sync_trait('windows', self.tool)
-
         return plot
 
     traits_view = View(
             VGroup(
                 Item('channel'),
-                Item('threshold'),
+                Item('threshold', editor=RangeEditor(low=0, high=5e-4)),
                 Item('plot', editor=ComponentEditor(width=250, height=250)),
                 show_labels=False,
                 ),

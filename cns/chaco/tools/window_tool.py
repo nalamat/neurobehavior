@@ -7,14 +7,13 @@ from enthought.enable.component import Component
 # Chaco imports
 from enthought.chaco.api import AbstractOverlay
 
+XY = Tuple(Float, Float)
+
 class Window(HasTraits):
 
     mode            = Enum('INCLUDE', 'EXCLUDE')
     mode_color      = Dict({'INCLUDE':  'black', 'EXCLUDE':  'red',})
     component       = Instance(Component)
-    XY_COORDINATES  = Tuple(Float, Float)
-
-    _points         = List(XY_COORDINATES, [])
 
     _line           = Instance(Line, args=dict(line_width=3, vertex_size=6))
     line            = Property(Instance(Line))
@@ -23,8 +22,9 @@ class Window(HasTraits):
     # can change at anytime if the plot is resized.  Everytime the plot is
     # resized, the line is redrawn.  Each time the line is requested, we map the
     # data coordinates to the screen coordinates and update the line points.
-    points          = Property(List(XY_COORDINATES))
-    screen_points   = Property(List(XY_COORDINATES))
+    _points         = List(XY)
+    points          = Property(depends_on='_points')
+    screen_points   = Property
     distance        = Property(Float)
     constrain       = Enum('X', 'Y', None)
 
@@ -52,6 +52,7 @@ class Window(HasTraits):
     def set_hoop(self, value):
         # x-value, center-volt, half-height
         x, m, h = value
+        print "split", x, m, h
         self.points = (x, m-h), (x, m+h)
 
     def _set_points(self, points):
@@ -207,38 +208,11 @@ class WindowTool(AbstractOverlay):
         self.visible = False
         self.request_redraw()
 
-    def _activate(self):
-        """ Called by a PlotComponent when this becomes the active tool.
-        """
-        pass
+    #def _deactivate(self, component=None):
+    #    """ Called by a PlotComponent when this is no longer the active tool.
+    #    """
+    #    self.reset()
 
-    def _deactivate(self, component=None):
-        """ Called by a PlotComponent when this is no longer the active tool.
-        """
-        self.reset()
-
-    #------------------------------------------------------------------------
-    # PointLine methods
-    #------------------------------------------------------------------------
-    def add_window(self, window):
-        window.component = self.component
-        self._windows.append(window)
-        
-    def set_window(self, index, window):
-        """ Sets the data-space *index* for a screen-space *point*.
-        """
-        window.component = self.component
-        self._windows[index] = window
-    
-    def remove_window(self, index):
-        """ Removes the point for a given *index* from this tool's list of 
-        points.
-        """
-        del self._windows[index]
-
-    #------------------------------------------------------------------------
-    # "normal" state
-    #------------------------------------------------------------------------
     def normal_left_down(self, event):
         """ Handles the left mouse button being pressed while the tool is
         in the 'normal' state.
@@ -254,6 +228,7 @@ class WindowTool(AbstractOverlay):
         if over is not None:
             if event.control_down:
                 self._windows.pop(over[0]) # Delete the window
+                self.updated = self
                 self.request_redraw()
             else:
                 self.event_state = "dragging"
@@ -334,12 +309,6 @@ class WindowTool(AbstractOverlay):
         self._windows[window].update_screen_point(point, (event.x, event.y))
         self.request_redraw()
 
-    def dragging_draw(self, gc):
-        """ Draws the polygon in the 'dragging' state. 
-        """
-        for window in self._windows:
-            window.line._draw(gc)
-
     def dragging_left_up(self, event):
         """ Handles the left mouse coming up in the 'dragging' state. 
         
@@ -386,12 +355,10 @@ class WindowTool(AbstractOverlay):
         """ Draws this component overlaid on another component.
         Implements AbstractOverlay.
         """
-        draw_func = getattr(self, self.event_state + "_draw", None)
-        if draw_func:
-            gc.save_state()
+        with gc:
             gc.clip_to_rect(component.x, component.y, component.width-1, component.height-1)
-            draw_func(gc)
-            gc.restore_state()
+            for window in self._windows:
+                window.line._draw(gc)
     
     def request_redraw(self):
         """ Requests that the component redraw itself. 
@@ -411,9 +378,6 @@ class WindowTool(AbstractOverlay):
                 return i, point
         return None
     
-    def _get_coordinates(self):
-        return [w.points for w in self._windows]
-    
     windows = Property(depends_on='updated')
     
     def _get_windows(self):
@@ -422,10 +386,8 @@ class WindowTool(AbstractOverlay):
     def _set_windows(self, value):
         windows = []
         for v in value:
-            window = Window()
+            window = Window(component=self.component)
             window.set_hoop(v)
             windows.append(window)
         self._windows = windows
-    
-    def get_hoops(self):
-        return [w.get_hoop() for w in self.windows]
+        self.request_redraw()
