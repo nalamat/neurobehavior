@@ -25,21 +25,18 @@ class PhysiologyControllerMixin(HasTraits):
     def _update_threshold(self, channel, name, old, new):
         if self.iface_physiology is not None:
             tag_name = 'spike{}_a'.format(channel.number)
-            self.iface_physiology.set_value(tag_name, new)
-        
-    #@on_trait_change('model.physiology_window_+.windows_updated')
-    #def _update_window(self, event):
-    #    if event is not Undefined and self.iface_physiology is not None:
-    #        channel, windows = event
-    #        tag = "spike%d_c" % channel
-    #        coeffs = np.zeros((40, 3))
-    #        for i, hoop in enumerate(windows):
-    #            x = round(hoop[0]*self.iface_physiology.fs)
-    #            coeffs[x] = hoop[1], hoop[2], i+1
-    #        self.iface_physiology.set_coefficients(tag, coeffs.ravel())
-    #        history = len(self.model.data.physiology_spikes[channel].buffer)
+            self.iface_physiology.set_tag(tag_name, new)
+            
+    @on_trait_change('model.physiology_settings.channel_settings:spike_windows')
+    def _update_windows(self, channel, name, old, new):
+        print 'update window'
+        if self.iface_physiology is not None:
+            tag_name = 'spike{}_c'.format(channel.number)
+            print tag_name, new
+            self.iface_physiology.set_sort_windows(tag_name, new)
+            #history = len(self.model.data.physiology_spikes[channel].buffer)
             #self.model.physiology_sort_plot.last_reset = history
-
+        
     def setup_physiology(self):
         # Load the circuit
         circuit = join(RCX_ROOT, 'physiology')

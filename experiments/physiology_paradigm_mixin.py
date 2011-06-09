@@ -3,7 +3,8 @@ from math import floor, ceil
 import numpy as np
 
 from enthought.traits.api import HasTraits, Range, Tuple, Bool, Int, Str, \
-        List, Instance, Property, cached_property, Button, Float
+        List, Instance, Property, cached_property, Button, Float, on_trait_change
+
 from enthought.traits.ui.api import View, VGroup, HGroup, Item, Label, Include
 
 from enthought.traits.ui.api import TableEditor, ObjectColumn, RangeEditor
@@ -16,7 +17,7 @@ class ChannelSetting(HasTraits):
     number          = Int
     differential    = Str
     visible         = Bool(True)
-    bad             = Bool(True)
+    bad             = Bool(False)
     
     # Threshold for candidate spike used in on-line spike sorting
     spike_threshold = Float(0.0001)
@@ -31,7 +32,7 @@ channel_editor = TableEditor(
             ObjectColumn(name='number', editable=False, width=10, label=''),
             CheckboxColumn(name='visible', width=10, label='V'), 
             CheckboxColumn(name='bad', width=10, label='B'),
-            ObjectColumn(name='spike_threshold', label='Threshold', editable=False, width=20),
+            ObjectColumn(name='spike_threshold', label='Threshold', width=20),
             ObjectColumn(name='differential'),
             ]
         )
