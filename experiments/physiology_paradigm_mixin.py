@@ -3,7 +3,7 @@ from math import floor, ceil
 import numpy as np
 
 from enthought.traits.api import HasTraits, Range, Tuple, Bool, Int, Str, \
-        List, Instance, Property, cached_property, Button
+        List, Instance, Property, cached_property, Button, Float
 from enthought.traits.ui.api import View, VGroup, HGroup, Item, Label, Include
 
 from enthought.traits.ui.api import TableEditor, ObjectColumn, RangeEditor
@@ -16,13 +16,22 @@ class ChannelSetting(HasTraits):
     number          = Int
     differential    = Str
     visible         = Bool(True)
+    bad             = Bool(True)
+    
+    # Threshold for candidate spike used in on-line spike sorting
+    spike_threshold = Float(0.0001)
+    
+    # Windows used for candidate spike isolation and sorting.
+    spike_windows   = List(Tuple(Float, Float, Float), [])
 
 channel_editor = TableEditor(
         show_row_labels=True,
         sortable=False,
         columns=[
             ObjectColumn(name='number', editable=False, width=10, label=''),
-            CheckboxColumn(name='visible', width=10, label=''), 
+            CheckboxColumn(name='visible', width=10, label='V'), 
+            CheckboxColumn(name='bad', width=10, label='B'),
+            ObjectColumn(name='spike_threshold', label='Threshold', editable=False, width=20),
             ObjectColumn(name='differential'),
             ]
         )
@@ -172,10 +181,10 @@ class PhysiologyParadigmMixin(HasTraits):
     def _get_visible_channels(self):
         return [i for i, ch in enumerate(self.channel_settings) if ch.visible]
 
-    # Generates the matrix that will be used to compute the differential for the
-    # channels.  This matrix will be uploaded to the RZ5.
+    # Generates the matrix that will be used to compute the differential for
+    # the channels. This matrix will be uploaded to the RZ5.
     diff_matrix = Property(depends_on='channel_settings.differential',
-            init=True, immediate=True)
+                           init=True, immediate=True)
 
     @cached_property
     def _get_diff_matrix(self):

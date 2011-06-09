@@ -10,8 +10,8 @@ from cns.pipeline import deinterleave_bits
 class PhysiologyControllerMixin(HasTraits):
 
     # By convention, all mixin classes should prepend attribute names with the
-    # mixin name (e.g. physiology).  This prevents potential namespace
-    # collisions.
+    # mixin name (e.g. physiology). This prevents potential namespace
+    # collisions if we are using more than one mixin.
     iface_physiology        = Any
     buffer_physiology_raw   = Any
     buffer_physiology_proc  = Any
@@ -20,25 +20,24 @@ class PhysiologyControllerMixin(HasTraits):
     physiology_ttl_pipeline = Any
 
     buffer_spikes           = List(Any)
-
-    @on_trait_change('model.physiology_window_+.threshold_updated')
-    def _update_sort_threshold(self, event):
-        if event is not Undefined and self.iface_physiology is not None:
-            channel, threshold = event
-            tag = "spike%d_a" % channel
-            self.iface_physiology.set_tag(tag, threshold)
-
-    @on_trait_change('model.physiology_window_+.windows_updated')
-    def _update_window(self, event):
-        if event is not Undefined and self.iface_physiology is not None:
-            channel, windows = event
-            tag = "spike%d_c" % channel
-            coeffs = np.zeros((40, 3))
-            for i, hoop in enumerate(windows):
-                x = round(hoop[0]*self.iface_physiology.fs)
-                coeffs[x] = hoop[1], hoop[2], i+1
-            self.iface_physiology.set_coefficients(tag, coeffs.ravel())
-            history = len(self.model.data.physiology_spikes[channel].buffer)
+    
+    @on_trait_change('model.physiology_settings.channel_settings:spike_threshold')
+    def _update_threshold(self, channel, name, old, new):
+        if self.iface_physiology is not None:
+            tag_name = 'spike{}_a'.format(channel.number)
+            self.iface_physiology.set_value(tag_name, new)
+        
+    #@on_trait_change('model.physiology_window_+.windows_updated')
+    #def _update_window(self, event):
+    #    if event is not Undefined and self.iface_physiology is not None:
+    #        channel, windows = event
+    #        tag = "spike%d_c" % channel
+    #        coeffs = np.zeros((40, 3))
+    #        for i, hoop in enumerate(windows):
+    #            x = round(hoop[0]*self.iface_physiology.fs)
+    #            coeffs[x] = hoop[1], hoop[2], i+1
+    #        self.iface_physiology.set_coefficients(tag, coeffs.ravel())
+    #        history = len(self.model.data.physiology_spikes[channel].buffer)
             #self.model.physiology_sort_plot.last_reset = history
 
     def setup_physiology(self):
@@ -58,7 +57,6 @@ class PhysiologyControllerMixin(HasTraits):
         self.buffer_physiology_ttl = self.iface_physiology.get_buffer('TTL',
                 'r', src_type='int8', dest_type='int8', block_size=1)
 
-        #self.iface_physiology.set_tag('spike1_a', 0.0001)
         for i in range(PHYSIOLOGY_CHANNELS):
             name = 'spike{}'.format(i+1)
             buffer = self.iface_physiology.get_buffer(name, 'r', block_size=40)
@@ -104,7 +102,7 @@ class PhysiologyControllerMixin(HasTraits):
             ts = data[:,0].view('int32')
             cl = data[:,-1].view('int32')
             self.model.data.physiology_spikes[i].send(snip, ts, cl)
-
+            
     def set_monitor_fc_highpass(self, value):
         self.iface_physiology.set_tag('FiltHP', value)
 

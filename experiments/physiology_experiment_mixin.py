@@ -4,7 +4,8 @@ from enthought.chaco.api import (LinearMapper, DataRange1D,
 from enthought.traits.ui.api import VGroup, HGroup, Item, Include, View, \
         InstanceEditor, RangeEditor, HSplit, Tabbed
 from enthought.traits.api import Instance, HasTraits, Float, DelegatesTo, \
-        Bool, on_trait_change, Int, on_trait_change, Any, Range, Event
+     Bool, on_trait_change, Int, on_trait_change, Any, Range, Event, Property,\
+     Tuple, List
 
 from physiology_paradigm_mixin import PhysiologyParadigmMixin
 
@@ -21,27 +22,50 @@ from cns.chaco.channel_number_overlay import ChannelNumberOverlay
 from cns.chaco.snippet_channel_plot import SnippetChannelPlot
 
 from cns.chaco.spike_overlay import SpikeOverlay
+from cns.chaco.threshold_overlay import ThresholdOverlay
 
 scale_formatter = lambda x: "{:.2f}".format(x*1e3)
 
 class SortWindow(HasTraits):
 
+    settings    = Any
     channels    = Any
-    plot        = Instance(SnippetChannelPlot)
     channel     = Range(1, 16, 1)
-    threshold   = Float(0.0001)
+    
+    plot        = Instance(SnippetChannelPlot)
+    threshold   = Property(Float, depends_on='channel')
+    windows     = Property(List(Tuple(Float, Float, Float)), depends_on='channel')
     tool        = Instance(WindowTool)
-
-    threshold_updated   = Event
-    windows_updated     = Event
-
-    @on_trait_change('threshold')
-    def _fire_threshold_update(self):
-        self.threshold_updated = self.channel, self.threshold
-
+    
+    def _get_threshold(self):
+        return self.settings[self.channel-1].spike_threshold
+    
+    def _set_threshold(self, value):
+        self.settings[self.channel-1].spike_threshold = value
+        
+    def _get_windows(self):
+        if self.settings is None:
+            return []
+        return self.settings[self.channel-1].spike_windows
+    
+    def _set_windows(self, value):
+        if self.settings is None:
+            return
+        self.settings[self.channel-1].spike_windows = value
+        
     @on_trait_change('tool.updated')
-    def _fire_windows_update(self):
-        self.windows_updated = self.channel, self.tool.get_hoops()
+    def debug(self):
+        print "UPDATE TOOL EVENT"
+        print self.windows, self.tool.windows
+        print self.channel
+        
+    #@on_trait_change('tool.updated')
+    #def update_windows(self):
+        
+    #@on_trait_change('tool.updated')
+    #def _(self):
+    #    self.settings[self.channel].windows = self.tool.get_hoops()
+    #    #self.windows_updated = self.channel, self.tool.get_hoops()
 
     def _channel_changed(self, new):
         self.plot.channel = self.channels[new-1]
@@ -71,6 +95,8 @@ class SortWindow(HasTraits):
         plot.overlays.append(zoom)
         self.tool = WindowTool(component=plot)
         plot.overlays.append(self.tool)
+        
+        self.sync_trait('windows', self.tool)
 
         return plot
 
@@ -91,7 +117,7 @@ class PhysiologyExperimentMixin(HasTraits):
 
     physiology_container     = Instance(Component)
     physiology_plot          = Instance(Component)
-    physiology_sort_plot     = Instance(Component)
+    #physiology_sort_plot     = Instance(Component)
     physiology_index_range   = Instance(ChannelDataRange)
     physiology_value_range   = Instance(DataRange1D, ())
 
@@ -101,15 +127,23 @@ class PhysiologyExperimentMixin(HasTraits):
     physiology_window_1      = Instance(SortWindow)
     physiology_window_2      = Instance(SortWindow)
     physiology_window_3      = Instance(SortWindow)
+    
+    visualize_sorting        = Bool(False)
 
     def _physiology_sort_map_default(self):
         return [(0.0001, []) for i in range(16)]
 
     @on_trait_change('data')
     def _physiology_sort_plots(self):
-        self.physiology_window_1 = SortWindow(channel=1, channels=self.data.physiology_spikes)
-        self.physiology_window_2 = SortWindow(channel=5, channels=self.data.physiology_spikes)
-        self.physiology_window_3 = SortWindow(channel=9, channels=self.data.physiology_spikes)
+        settings = self.physiology_settings.channel_settings
+        channels = self.data.physiology_spikes
+        
+        window = SortWindow(channel=1, settings=settings, channels=channels)
+        self.physiology_window_1 = window
+        window = SortWindow(channel=5, settings=settings, channels=channels)
+        self.physiology_window_2 = window
+        window = SortWindow(channel=9, settings=settings, channels=channels)
+        self.physiology_window_3 = window
 
     @on_trait_change('physiology_plot.channel_visible, physiology_channel_span')
     def _physiology_value_range_update(self):
@@ -165,8 +199,11 @@ class PhysiologyExperimentMixin(HasTraits):
         tool = MultiChannelRangeTool(component=plot)
         plot.tools.append(tool)
 
-        overlay = SpikeOverlay(plot=plot,
-                spikes=self.data.physiology_spikes)
+        overlay = SpikeOverlay(plot=plot, spikes=self.data.physiology_spikes)
+        self.sync_trait('visualize_sorting', overlay, 'visible', mutual=False)
+        plot.overlays.append(overlay)
+        overlay = ThresholdOverlay(plot=plot, visible=False)
+        self.sync_trait('visualize_sorting', overlay, 'visible', mutual=False)
         plot.overlays.append(overlay)
 
         self.physiology_container = container
@@ -203,6 +240,7 @@ class PhysiologyExperimentMixin(HasTraits):
                 Tabbed(
                     Include('physiology_settings_group'),
                     VGroup(
+                        Item('visualize_sorting', label='Show spike sort overlay?'),
                         Item('physiology_window_1', style='custom', width=250),
                         Item('physiology_window_2', style='custom', width=250),
                         Item('physiology_window_3', style='custom', width=250),
@@ -213,9 +251,6 @@ class PhysiologyExperimentMixin(HasTraits):
                     editor=ComponentEditor(width=1200, height=800), 
                     width=1200,
                     resizable=True),
-                    #editor=ComponentEditor(width=250, height=250), 
-                    #width=250,
-                    #resizable=True),
                 show_labels=False,
                 ),
             resizable=True)
