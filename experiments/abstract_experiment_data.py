@@ -116,6 +116,14 @@ class AbstractExperimentData(PhysiologyDataMixin, PumpDataMixin):
         return np.unique(self.par_seq)
 
     def log_trial(self, **kwargs):
+        #for k, v in kwargs.items():
+            #if type(v) not in (int, str, bool, float):
+            #    log.debug("Cannot store %s in the trial log", k)
+                #del kwargs[k]
+        try:
+            del kwargs['remind']
+        except:
+            pass
         names, record = zip(*sorted(kwargs.items()))
         if len(self.trial_log) == 0:
             self._trial_log_columns = names

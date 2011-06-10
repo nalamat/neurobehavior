@@ -31,10 +31,8 @@ class PhysiologyControllerMixin(HasTraits):
             
     @on_trait_change('model.physiology_settings.channel_settings:spike_windows')
     def _update_windows(self, channel, name, old, new):
-        print 'update window'
         if self.iface_physiology is not None:
             tag_name = 'c_spike{}'.format(channel.number)
-            print tag_name, new
             self.iface_physiology.set_sort_windows(tag_name, new)
             #history = len(self.model.data.physiology_spikes[channel].buffer)
             #self.model.physiology_sort_plot.last_reset = history
