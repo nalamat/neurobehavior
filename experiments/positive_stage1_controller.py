@@ -10,7 +10,7 @@ from pump_controller_mixin import PumpControllerMixin
 from positive_stage1_data import PositiveStage1Data
 
 from os.path import join
-from cns import RCX_ROOT
+from cns import get_config
 
 class PositiveStage1Controller(AbstractExperimentController,
         PumpControllerMixin):
@@ -18,7 +18,7 @@ class PositiveStage1Controller(AbstractExperimentController,
     status = Property(Str, depends_on='state')
 
     def setup_experiment(self, info):
-        circuit = join(RCX_ROOT, 'positive-behavior-stage1')
+        circuit = join(get_config('RCX_ROOT'), 'positive-behavior-stage1')
         self.iface_behavior = self.process.load_circuit(circuit, 'RZ6')
         self.buffer_signal = self.iface_behavior.get_buffer('signal', 'w')
         self.buffer_TTL = self.iface_behavior.get_buffer('TTL', 'r',

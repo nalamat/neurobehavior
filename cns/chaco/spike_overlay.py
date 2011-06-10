@@ -3,15 +3,16 @@ from enthought.enable.api import MarkerTrait, ColorTrait
 from enthought.chaco.api import AbstractOverlay
 from enthought.chaco.scatterplot import render_markers
 from enthought.traits.api import Instance, Any, Property, cached_property, Int
+from enthought.traits.ui.api import View, Item, VGroup
 
 class SpikeOverlay(AbstractOverlay):
 
     plot = Instance('enthought.enable.api.Component')
     spikes = Any
-    marker = MarkerTrait('circle')
+    marker = MarkerTrait('inverted_triangle')
     marker_size = Int(5)
 
-    line_width = Int(1)
+    line_width = Int(0)
     fill_color = ColorTrait('red')
     line_color = ColorTrait('white')
 
@@ -38,3 +39,15 @@ class SpikeOverlay(AbstractOverlay):
                     points = np.column_stack((ts_screen, ts_offset))
                     gc.draw_marker_at_points(points, self.marker_size,
                             self.marker_.kiva_marker)
+
+    traits_view = View(
+        VGroup(
+            Item('marker'),
+            Item('marker_size'),
+            Item('line_width'),        
+            Item('fill_color'),
+            Item('line_color'),
+            show_border=True,
+            label='Spike Marker',
+            ),
+        )

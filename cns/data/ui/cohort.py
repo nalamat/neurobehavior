@@ -44,9 +44,11 @@ class CohortEditor(TableEditor):
 
 class CohortViewHandler(FileHandler):
 
-    path            = File(cns.COHORT_ROOT)
-    wildcard        = Str(cns.COHORT_WILDCARD)
-    modified_trait  = '_modified'
+    path = File
+    wildcard = Str
+    modified_trait = '_modified'
+    #path            = File(cns.COHORT_ROOT)
+    #wildcard        = Str(cns.COHORT_WILDCARD)
 
     def new_object(self, info):
         info.object.cohort = Cohort()

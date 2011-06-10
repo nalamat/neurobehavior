@@ -1,4 +1,4 @@
-import cPickle as pickle
+#import cPickle as pickle
 
 from enthought.pyface.api import error, information
 from cns.data.ui.cohort import CohortView, CohortViewHandler
@@ -22,20 +22,12 @@ log = logging.getLogger(__name__)
 # Import the experiments
 from cns.data.ui.cohort import CohortEditor, CohortView, CohortViewHandler
 from cns.data.h5_utils import append_node, append_date_node
-
-#from scripts import settings
-
-def load_settings():
-    path = os.environ['NEUROBEHAVIOR_SETTINGS']
-    return imp.load_module('settings', open(path), dirname(path), 
-                           ('.py', 'r', imp.PY_SOURCE))
-
-settings = load_settings()
+from cns import get_config
 
 class ExperimentCohortView(CohortView):
 
-    #path = settings.COHORT_ROOT
-    #wildcard = settings.COHORT_WILDCARD
+    path = get_config('COHORT_ROOT')
+    wildcard = get_config('COHORT_WILDCARD')
 
     traits_view = View(
         VGroup(
@@ -213,16 +205,14 @@ def prepare_experiment(args, store_node):
     return model, controller
 
 def test_experiment(args):
-    #from cns import TEMP_ROOT
-    filename = join(settings.TEMP_ROOT, 'test_experiment.hd5')
+    filename = join(get_config('TEMP_ROOT'), 'test_experiment.hd5')
     file = tables.openFile(filename, 'w')
     model, controller = prepare_experiment(args, file.root)
     model.configure_traits(handler=controller)
 
 def profile_experiment(args):
-    #from cns import TEMP_ROOT
     import cProfile
-    profile_data_file = join(settings.TEMP_ROOT, 'profile.dmp')
+    profile_data_file = join(get_config('TEMP_ROOT'), 'profile.dmp')
     cProfile.runctx('test_experiment(args)', globals(), {'args': args},
             filename=profile_data_file)
 

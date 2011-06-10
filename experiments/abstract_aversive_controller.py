@@ -13,7 +13,7 @@ from copy import deepcopy
 from abstract_experiment_controller import AbstractExperimentController
 from pump_controller_mixin import PumpControllerMixin
 
-from cns import RCX_ROOT
+from cns import get_config
 from os.path import join
 
 from aversive_data import RawAversiveData as AversiveData
@@ -33,7 +33,7 @@ class AbstractAversiveController(AbstractExperimentController,
         # AversiveFMController needs to change the initialization sequence a
         # little (i.e. it needs to use different microcode and the microcode
         # does not contain int and trial buffers).
-        circuit = join(RCX_ROOT, 'aversive-behavior')
+        circuit = join(get_config('RCX_ROOT'), 'aversive-behavior')
         self.iface_behavior = self.process.load_circuit(circuit, 'RZ6')
         self.buffer_trial = self.iface_behavior.get_buffer('trial', 'w')
         self.buffer_int = self.iface_behavior.get_buffer('int', 'w')

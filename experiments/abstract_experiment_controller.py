@@ -3,7 +3,8 @@ from datetime import datetime, timedelta
 from cns.data.persistence import add_or_update_object_node
 
 from tdt import DSPProcess, DSPProject
-import cns
+from cns import get_config
+#import cns
 
 from enthought.pyface.api import error, confirm, YES, ConfirmationDialog
 from enthought.pyface.timer.api import Timer
@@ -314,7 +315,7 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
             mesg += self.model.paradigm.err_messages()
             error(self.info.ui.control, mesg)
         try:
-            if cns.RCX_USE_SUBPROCESS:
+            if get_config('RCX_USE_SUBPROCESS'):
                 log.debug("USING DSP PROCESS")
                 self.process = DSPProcess()
             else:

@@ -1,5 +1,5 @@
 from os.path import join
-from cns import RCX_ROOT
+from cns import get_config
 from tdt import DSPCircuit
 
 from abstract_experiment_controller import AbstractExperimentController
@@ -26,7 +26,7 @@ class BasicCharacterizationController(AbstractExperimentController):
     toolbar = Instance(BasicCharacterizationToolbar, (), toolbar=True)
 
     def setup_experiment(self, info):
-        circuit = join(RCX_ROOT, 'basic_audio')
+        circuit = join(get_config('RCX_ROOT'), 'basic_audio')
         self.iface_audio = self.process.load_circuit(circuit, 'RZ6')
 
     def start_experiment(self, info):
