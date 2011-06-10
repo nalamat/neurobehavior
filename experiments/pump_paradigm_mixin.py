@@ -5,12 +5,14 @@ from cns import get_config
 
 from eval import ExpressionTrait
 
+SYRINGE_DATA = get_config('SYRINGE_DATA')
+
 class PumpParadigmMixin(HasTraits):
     
     pump_rate = ExpressionTrait(0.5, label='Pump rate (ml/min)')
     pump_rate_delta = Float(0.025, label='Pump rate delta (ml)')
     pump_syringe = Enum(get_config('SYRINGE_DEFAULT'), 
-                        sorted(get_config('SYRINGE_DATA').keys()),
+                        sorted(SYRINGE_DATA.keys()),
                         store='attribute', ignore=True)
     pump_syringe_diameter = Property(store='attribute',
             depends_on='pump_syringe', queue=True, init=True)
