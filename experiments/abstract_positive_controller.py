@@ -12,7 +12,7 @@ from cns.data.persistence import add_or_update_object
 from positive_data import PositiveData
 from copy import deepcopy
 
-from cns import RCX_ROOT
+from cns import get_config
 from os.path import join
 
 import numpy as np
@@ -57,7 +57,7 @@ class AbstractPositiveController(AbstractExperimentController,
         self.model.par_info_adapter.parameters = value
 
     def setup_experiment(self, info):
-        circuit = join(RCX_ROOT, 'positive-behavior-v2')
+        circuit = join(get_config('RCX_ROOT'), 'positive-behavior-v2')
         self.iface_behavior = self.process.load_circuit(circuit, 'RZ6')
 
         # primary speaker

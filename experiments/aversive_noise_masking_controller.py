@@ -12,7 +12,7 @@ log = logging.getLogger(__name__)
 from aversive_data import RawAversiveData as AversiveData
 from cns.pipeline import deinterleave_bits
 
-from cns import RCX_ROOT
+from cns import get_config
 from os.path import join
 
 class AversiveNoiseMaskingController(AbstractAversiveController):
@@ -41,7 +41,7 @@ class AversiveNoiseMaskingController(AbstractAversiveController):
         # relative path to the circuit itself.  If you launch the program from
         # the "root" directory (i.e. <path_to_neurobehavior> where components is
         # a subfolder) this will work.
-        circuit = join(RCX_ROOT, 'aversive-behavior-masking_MjR')
+        circuit = join(get_config('RCX_ROOT'), 'aversive-behavior-masking_MjR')
         # Now that we have switched TDT I/O to a second CPU, we need to load the
         # circuits slightly differently.  This allows Python to inspect the
         # circuit and compute how much shared memory is required before the I/O

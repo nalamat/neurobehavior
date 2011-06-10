@@ -1,3 +1,4 @@
+import numpy as np
 from enthought.enable.api import Component, ComponentEditor
 from enthought.chaco.api import (LinearMapper, DataRange1D,
         OverlayPlotContainer)
@@ -21,17 +22,45 @@ from cns.chaco.ttl_plot import TTLPlot
 from cns.chaco.channel_range_tool import MultiChannelRangeTool
 from cns.chaco.channel_number_overlay import ChannelNumberOverlay
 from cns.chaco.snippet_channel_plot import SnippetChannelPlot
+from cns import get_config
 
 from cns.chaco.spike_overlay import SpikeOverlay
 from cns.chaco.threshold_overlay import ThresholdOverlay
 
-scale_formatter = lambda x: "{:.2f}".format(x*1e3)
+CHANNELS = get_config('PHYSIOLOGY_CHANNELS')
+VOLTAGE_SCALE = 1e3
+scale_formatter = lambda x: "{:.2f}".format(x*VOLTAGE_SCALE)
+
+def ptt(event_times, trig_times):
+    return np.concatenate([event_times-tt for tt in trig_times])
+
+#class Histogram(HasTraits):
+    
+#    channel = Range(1, CHANNELS, 1)
+    #spikes = Any
+    #timeseries = Any
+    #bin_size = Float(0.25)
+    #bin_lb = Float(-1)
+    #bin_ub = Float(5)
+    
+    #bins = Property(depends_on='bin_+')
+    
+    #def _get_bins(self):
+        #return np.arange(self.bin_lb, self.bin_ub, self.bin_size)
+    
+    #def _get_counts(self):
+        #spikes = self.spikes[self.channel-1]
+        #et = spikes.timestamps
+        #return np.histogram(ptt(self.channel.times
+    
+    #def _get_histogram(self):
+        #self.spikes.timestamps[:]
 
 class SortWindow(HasTraits):
 
     settings    = Any
     channels    = Any
-    channel     = Range(1, 16, 1)
+    channel     = Range(1, CHANNELS, 1)
     
     plot        = Instance(SnippetChannelPlot)
     threshold   = Property(Float, depends_on='channel')
@@ -39,16 +68,14 @@ class SortWindow(HasTraits):
     tool        = Instance(WindowTool)
     
     def _get_threshold(self):
-        return self.settings[self.channel-1].spike_threshold
+        return self.settings[self.channel-1].spike_threshold*VOLTAGE_SCALE
     
     def _set_threshold(self, value):
-        self.settings[self.channel-1].spike_threshold = value
+        self.settings[self.channel-1].spike_threshold = value/VOLTAGE_SCALE
         
     def _get_windows(self):
-        print "getting windows"
         if self.settings is None:
             return []
-        print self.settings[self.channel-1].spike_windows
         return self.settings[self.channel-1].spike_windows
     
     def _set_windows(self, value):
@@ -93,7 +120,8 @@ class SortWindow(HasTraits):
     traits_view = View(
             VGroup(
                 Item('channel'),
-                Item('threshold', editor=RangeEditor(low=0, high=5e-4)),
+                Item('threshold', editor=RangeEditor(low=0*VOLTAGE_SCALE, 
+                                                     high=5e-4*VOLTAGE_SCALE)),
                 Item('plot', editor=ComponentEditor(width=250, height=250)),
                 show_labels=False,
                 ),
@@ -107,18 +135,19 @@ class PhysiologyExperimentMixin(HasTraits):
 
     physiology_container     = Instance(Component)
     physiology_plot          = Instance(Component)
-    #physiology_sort_plot     = Instance(Component)
     physiology_index_range   = Instance(ChannelDataRange)
     physiology_value_range   = Instance(DataRange1D, ())
 
     physiology_channel_span  = Float(0.5e-3)
-    #physiology_sort_map      = List
 
     physiology_window_1      = Instance(SortWindow)
     physiology_window_2      = Instance(SortWindow)
     physiology_window_3      = Instance(SortWindow)
     
     visualize_sorting        = Bool(False)
+    
+    spike_overlay            = Instance(SpikeOverlay)
+    threshold_overlay        = Instance(ThresholdOverlay)
 
     def _physiology_sort_map_default(self):
         return [(0.0001, []) for i in range(16)]
@@ -192,9 +221,13 @@ class PhysiologyExperimentMixin(HasTraits):
         overlay = SpikeOverlay(plot=plot, spikes=self.data.physiology_spikes)
         self.sync_trait('visualize_sorting', overlay, 'visible', mutual=False)
         plot.overlays.append(overlay)
+        self.spike_overlay = overlay
         overlay = ThresholdOverlay(plot=plot, visible=False)
         self.sync_trait('visualize_sorting', overlay, 'visible', mutual=False)
+        self.physiology_settings.sync_trait('spike_thresholds', overlay,
+                                            'thresholds', mutual=False)
         plot.overlays.append(overlay)
+        self.threshold_overlay = overlay
 
         self.physiology_container = container
         self._physiology_value_range_update()
@@ -234,6 +267,11 @@ class PhysiologyExperimentMixin(HasTraits):
                         Item('physiology_window_1', style='custom', width=250),
                         Item('physiology_window_2', style='custom', width=250),
                         Item('physiology_window_3', style='custom', width=250),
+                        show_labels=False,
+                        ),
+                    VGroup(
+                        Item('object.threshold_overlay', style='custom'),
+                        Item('object.spike_overlay', style='custom'),
                         show_labels=False,
                         ),
                     ),

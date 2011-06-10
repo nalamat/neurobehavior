@@ -20,7 +20,7 @@ class ChannelSetting(HasTraits):
     bad             = Bool(False)
     
     # Threshold for candidate spike used in on-line spike sorting
-    spike_threshold = Float(0.0001)
+    spike_threshold = Float(0.0005)
     
     # Windows used for candidate spike isolation and sorting.
     spike_windows   = List(Tuple(Float, Float, Float), [])
@@ -32,7 +32,7 @@ channel_editor = TableEditor(
             ObjectColumn(name='number', editable=False, width=10, label=''),
             CheckboxColumn(name='visible', width=10, label='V'), 
             CheckboxColumn(name='bad', width=10, label='B'),
-            ObjectColumn(name='spike_threshold', label='Threshold', width=20),
+            #ObjectColumn(name='spike_threshold', label='Threshold', width=20),
             ObjectColumn(name='differential'),
             ]
         )
@@ -51,15 +51,15 @@ class PhysiologyParadigmMixin(HasTraits):
     diff_sagittal   = Button('Sagittal')
     diff_coronal    = Button('Coronal')
     diff_all        = Button('All')
-    diff_visible    = Bool(True)
+    #diff_visible    = Bool(True)
 
     def _get_diff_group(self, channel, group):
         ub = int(ceil(channel/group)*group + 1)
         lb = ub - group
         diff = range(lb, ub)
         diff.remove(channel)
-        if self.diff_visible:
-            diff = [d for d in diff if self.channel_settings[d-1].visible]
+        #if self.diff_visible:
+        diff = [d for d in diff if not self.channel_settings[d-1].bad]
         return ', '.join(str(ch) for ch in diff)
 
     def _diff_none_fired(self):
@@ -88,7 +88,7 @@ class PhysiologyParadigmMixin(HasTraits):
                 Item('diff_coronal', width=WIDTH),
                 Item('diff_all', width=WIDTH),
                 Item('diff_none', width=WIDTH),
-                Item('diff_visible', label='Only visible?', show_label=True),
+                #Item('diff_good', label='Only good?', show_label=True),
                 show_labels=False,
                 ),
             )
@@ -125,8 +125,8 @@ class PhysiologyParadigmMixin(HasTraits):
             )
 
     def _set_visible(self, channels):
-        for channel in self.channel_settings:
-            channel.visible = channel.number in channels
+        for ch in self.channel_settings:
+            ch.visible = ch.number in channels and not ch.bad
 
     def _ch_14_fired(self):
         self._set_visible(range(1, 5))
@@ -180,7 +180,14 @@ class PhysiologyParadigmMixin(HasTraits):
 
     @cached_property
     def _get_visible_channels(self):
-        return [i for i, ch in enumerate(self.channel_settings) if ch.visible]
+        settings = self.channel_settings
+        return [i for i, ch in enumerate(settings) if ch.visible]
+    
+    spike_thresholds = Property(depends_on='channel_settings.spike_threshold',
+                                init=True, immediate=True)
+    
+    def _get_spike_thresholds(self):
+        return [ch.spike_threshold for ch in self.channel_settings]
 
     # Generates the matrix that will be used to compute the differential for
     # the channels. This matrix will be uploaded to the RZ5.
@@ -232,7 +239,7 @@ class PhysiologyParadigmMixin(HasTraits):
 
     physiology_view = View(
             VGroup(
-                Item('commutator_inhibit'),
+                Item('commutator_inhibit', label='Inhibit commutator?'),
                 Include('filter_group'),
                 Include('monitor_group'),
                 Include('visible_group'),
