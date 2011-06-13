@@ -23,6 +23,12 @@ class PhysiologyControllerMixin(HasTraits):
 
     buffer_spikes           = List(Any)
     
+    @on_trait_change('model.physiology_settings.channel_settings:spike_sign')
+    def _update_sign(self, channel, name, old, new):
+        if self.iface_physiology is not None:
+            tag_name = 's_spike{}'.format(channel.number)
+            self.iface_physiology.set_tag(tag_name, new)
+    
     @on_trait_change('model.physiology_settings.channel_settings:spike_threshold')
     def _update_threshold(self, channel, name, old, new):
         if self.iface_physiology is not None:
@@ -102,6 +108,11 @@ class PhysiologyControllerMixin(HasTraits):
         for ch, threshold in enumerate(value):
             name = 'a_spike{}'.format(ch+1)
             self.iface_physiology.set_tag(name, threshold)
+            
+    def set_spike_signs(self, value):
+        for ch, sign in enumerate(value):
+            name = 's_spike{}'.format(ch+1)
+            self.iface_physiology.set_tag(name, sign)
             
     def set_monitor_fc_highpass(self, value):
         self.iface_physiology.set_tag('FiltHP', value)

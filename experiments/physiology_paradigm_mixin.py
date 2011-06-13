@@ -21,9 +21,21 @@ class ChannelSetting(HasTraits):
     
     # Threshold for candidate spike used in on-line spike sorting
     spike_threshold = Float(0.0005)
+    # Should spike_threshold trigger on +/-?
+    spike_sign = Bool(False)
     
     # Windows used for candidate spike isolation and sorting.
     spike_windows   = List(Tuple(Float, Float, Float), [])
+    
+    spike_sort_summary = Property(Str, depends_on='spike_+')
+    
+    def _get_spike_sort_summary(self):
+        if not self.spike_sign:
+            return u"\u00B1{} with {} windows".format(abs(self.spike_threshold),
+                                                      len(self.spike_windows))
+        else:
+            return "{:+} with {} windows".format(self.spike_threshold,
+                                                 len(self.spike_windows))
 
 channel_editor = TableEditor(
         show_row_labels=True,
@@ -32,8 +44,9 @@ channel_editor = TableEditor(
             ObjectColumn(name='number', editable=False, width=10, label=''),
             CheckboxColumn(name='visible', width=10, label='V'), 
             CheckboxColumn(name='bad', width=10, label='B'),
-            #ObjectColumn(name='spike_threshold', label='Threshold', width=20),
             ObjectColumn(name='differential'),
+            ObjectColumn(name='spike_sort_summary', label='Sort?', width=20, 
+                         editable=False),
             ]
         )
 
@@ -188,6 +201,12 @@ class PhysiologyParadigmMixin(HasTraits):
     
     def _get_spike_thresholds(self):
         return [ch.spike_threshold for ch in self.channel_settings]
+    
+    spike_signs = Property(depends_on='channel_settings.spike_sign', 
+                           init=True, immediate=True)
+    
+    def _get_spike_signs(self):
+        return [ch.spike_sign for ch in self.channel_settings]
 
     # Generates the matrix that will be used to compute the differential for
     # the channels. This matrix will be uploaded to the RZ5.

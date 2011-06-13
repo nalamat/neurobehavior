@@ -34,27 +34,27 @@ scale_formatter = lambda x: "{:.2f}".format(x*VOLTAGE_SCALE)
 def ptt(event_times, trig_times):
     return np.concatenate([event_times-tt for tt in trig_times])
 
-#class Histogram(HasTraits):
+class Histogram(HasTraits):
     
-#    channel = Range(1, CHANNELS, 1)
-    #spikes = Any
-    #timeseries = Any
-    #bin_size = Float(0.25)
-    #bin_lb = Float(-1)
-    #bin_ub = Float(5)
+    channel = Range(1, CHANNELS, 1)
+    spikes = Any
+    timeseries = Any
+    bin_size = Float(0.25)
+    bin_lb = Float(-1)
+    bin_ub = Float(5)
     
-    #bins = Property(depends_on='bin_+')
+    bins = Property(depends_on='bin_+')
     
-    #def _get_bins(self):
-        #return np.arange(self.bin_lb, self.bin_ub, self.bin_size)
+    def _get_bins(self):
+        return np.arange(self.bin_lb, self.bin_ub, self.bin_size)
     
-    #def _get_counts(self):
-        #spikes = self.spikes[self.channel-1]
-        #et = spikes.timestamps
-        #return np.histogram(ptt(self.channel.times
+    def _get_counts(self):
+        spikes = self.spikes[self.channel-1]
+        et = spikes.timestamps/spikes.fs
+        return np.histogram(ptt(spikes, et), bins=self.bins)[0]
     
-    #def _get_histogram(self):
-        #self.spikes.timestamps[:]
+    def _get_histogram(self):
+        self.spikes.timestamps[:]
 
 class SortWindow(HasTraits):
 
@@ -64,8 +64,15 @@ class SortWindow(HasTraits):
     
     plot        = Instance(SnippetChannelPlot)
     threshold   = Property(Float, depends_on='channel')
+    sign        = Property(Bool, depends_on='channel')
     windows     = Property(List(Tuple(Float, Float, Float)), depends_on='channel')
     tool        = Instance(WindowTool)
+    
+    def _get_sign(self):
+        return self.settings[self.channel-1].spike_sign
+    
+    def _set_sign(self, value):
+        self.settings[self.channel-1].spike_sign = value
     
     def _get_threshold(self):
         return self.settings[self.channel-1].spike_threshold*VOLTAGE_SCALE
@@ -94,13 +101,13 @@ class SortWindow(HasTraits):
                 channel=self.channels[self.channel-1],
                 value_mapper=value_mapper, 
                 index_mapper=index_mapper,
-                bgcolor='white', padding=[60, 10, 10, 40])
+                bgcolor='white', padding=[60, 5, 5, 40])
         add_default_grids(plot, major_index=1e-3, minor_index=1e-4,
                 major_value=1e-3, minor_value=1e-4)
 
         # Add the axes labels
         axis = PlotAxis(orientation='left', component=plot,
-                tick_label_formatter=scale_formatter, title='Volts (mV)')
+                tick_label_formatter=scale_formatter, title='Signal (mV)')
         plot.overlays.append(axis)
         axis = PlotAxis(orientation='bottom', component=plot, title='Time (ms)',
                 tick_label_formatter=scale_formatter)
@@ -116,12 +123,17 @@ class SortWindow(HasTraits):
         # updated!
         self.sync_trait('windows', self.tool)
         return plot
+    
+    THRESHOLD_EDITOR = RangeEditor(low=-5e-4*VOLTAGE_SCALE, 
+                                   high=5e-4*VOLTAGE_SCALE)
 
     traits_view = View(
             VGroup(
                 Item('channel'),
-                Item('threshold', editor=RangeEditor(low=0*VOLTAGE_SCALE, 
-                                                     high=5e-4*VOLTAGE_SCALE)),
+                HGroup(
+                    Item('sign', label='Signed?'),
+                    Item('threshold', editor=THRESHOLD_EDITOR),
+                    ),
                 Item('plot', editor=ComponentEditor(width=250, height=250)),
                 show_labels=False,
                 ),
@@ -148,9 +160,6 @@ class PhysiologyExperimentMixin(HasTraits):
     
     spike_overlay            = Instance(SpikeOverlay)
     threshold_overlay        = Instance(ThresholdOverlay)
-
-    def _physiology_sort_map_default(self):
-        return [(0.0001, []) for i in range(16)]
 
     @on_trait_change('data')
     def _physiology_sort_plots(self):
@@ -226,6 +235,8 @@ class PhysiologyExperimentMixin(HasTraits):
         self.sync_trait('visualize_sorting', overlay, 'visible', mutual=False)
         self.physiology_settings.sync_trait('spike_thresholds', overlay,
                                             'thresholds', mutual=False)
+        self.physiology_settings.sync_trait('spike_signs', overlay,
+                                            'signs', mutual=False)
         plot.overlays.append(overlay)
         self.threshold_overlay = overlay
 
