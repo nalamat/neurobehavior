@@ -33,6 +33,12 @@ name_lookup = {'group':     'Group',
                'array':     'Array',
                'table':     'Table'}
 
+def get_temp_file():
+    from cns import get_config
+    filename = join(get_config('TEMP_ROOT'), 'test_experiment.hd5')
+    datafile = tables.openFile(filename, 'w')
+    return datafile
+
 def node_keys(node):
     attrs = node._v_attrs._f_list('user')
     attrs = set(attrs) - set(['module', 'klass'])

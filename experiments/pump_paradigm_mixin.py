@@ -1,16 +1,19 @@
 from enthought.traits.api import HasTraits, Float, Enum, Property
 from enthought.traits.ui.api import View, Item, VGroup, HGroup
 
-from cns import SYRINGE_DEFAULT, SYRINGE_DATA
+from cns import get_config
 
 from eval import ExpressionTrait
+
+SYRINGE_DATA = get_config('SYRINGE_DATA')
 
 class PumpParadigmMixin(HasTraits):
     
     pump_rate = ExpressionTrait(0.5, label='Pump rate (ml/min)')
     pump_rate_delta = Float(0.025, label='Pump rate delta (ml)')
-    pump_syringe = Enum(SYRINGE_DEFAULT, sorted(SYRINGE_DATA.keys()),
-            store='attribute', ignore=True)
+    pump_syringe = Enum(get_config('SYRINGE_DEFAULT'), 
+                        sorted(SYRINGE_DATA.keys()),
+                        store='attribute', ignore=True)
     pump_syringe_diameter = Property(store='attribute',
             depends_on='pump_syringe', queue=True, init=True)
 

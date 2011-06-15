@@ -71,6 +71,9 @@ def store_table(node, object, name, trait):
     # Create copy of value since we may need to convert the datetime series.
     value = getattr(object, name)
     value = array(value, dtype=trait.dtype)
+    if trait.dtype is not None:
+        log.debug("Table trait dtype %r", trait.dtype)
+    log.debug("Table array dtype %r", value.dtype)
 
     try:
         # Table already exists.  We delete the data in the table and re-add it.

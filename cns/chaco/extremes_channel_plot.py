@@ -1,6 +1,7 @@
 import numpy as np
 from channel_plot import ChannelPlot
-from enthought.traits.api import List, Float
+from enthought.traits.api import (List, Float, on_trait_change, Any, Property,
+        cached_property)
 
 import logging
 log = logging.getLogger(__name__)
@@ -10,6 +11,10 @@ def decimate_extremes(data, downsample):
     if data.shape[-1] == 0:
         return [], []
 
+    # Determine the "fragment" size that we are unable to decimate.  A
+    # downsampling factor of 5 means that we perform the operation in chunks of
+    # 5 samples.  If we have only 13 samples of data, then we cannot decimate
+    # the last 3 samples and will simply discard them. 
     last_dim = data.ndim
     offset = data.shape[-1] % downsample
 
@@ -43,21 +48,27 @@ class ExtremesChannelPlot(ChannelPlot):
     '''
 
     # Offset of all channels along the value axis
-    offset  = Float(0.25e-3)
+    channel_offset  = Float(0.25e-3)
 
     # Distance between each channel along the value axis
-    spacing = Float(0.5e-3)
+    channel_spacing = Float(0.5e-3)
 
     # Which channels are visible?
-    visible = List([])
+    channel_visible = List([])
+
+    offsets = Property(depends_on='channel_spacing, channel_offset, channel_visible')
+    text_screen_offsets = Property(depends_on='offsets')
 
     # Offset, spacing and visible only affect the screen points, so we only
     # invalidate the screen cache.  The data cache is fine.
 
-    def _invalidate_screen(self):
-        self.invalidate_draw()
-        self._screen_cache_valid = False
-        self.request_redraw()
+    _cached_min     = Any
+    _cached_max     = Any
+
+    def _index_mapper_updated(self):
+        super(ExtremesChannelPlot, self)._index_mapper_updated()
+        self._cached_min = None
+        self._cached_max = None
 
     def _offset_changed(self):
         self._invalidate_screen()
@@ -68,34 +79,44 @@ class ExtremesChannelPlot(ChannelPlot):
     def _spacing_changed(self):
         self._invalidate_screen()
 
+    @cached_property
+    def _get_offsets(self):
+        channels = len(self.channel_visible)
+        offsets = self.channel_spacing*np.arange(channels)[:,np.newaxis]
+        return offsets[::-1] + self.channel_offset
+
     def _get_screen_points(self):
         if not self._screen_cache_valid:
             if self._cached_data.shape[-1] == 0:
+                self._cached_screen_data = [], []
                 self._cached_screen_index = []
-                self._cached_screen_data = []
             else:
-                # Get the decimated data
+                if len(self.channel_visible) == 0:
+                    self._cached_screen_data = [], []
+                    self._cached_screen_index = []
+                    self._screen_cache_valid = True
+                    return self._cached_screen_index, self._cached_screen_data
+                    
                 decimation_factor = self._decimation_factor()
-                cached_data = self._cached_data[self.visible]
-                values = decimate_extremes(cached_data, decimation_factor)
 
-                if type(values) == type(()):
-                    channels, samples = values[0].shape
-                    offsets = self.spacing*np.arange(channels)[:,np.newaxis]
-                    offsets += self.offset
-
-                    mins = values[0] + offsets
-                    s_val_min = self.value_mapper.map_screen(mins)
-
-                    maxes = values[1] + offsets
-                    s_val_max = self.value_mapper.map_screen(maxes)
-                    self._cached_screen_data = s_val_min, s_val_max
+                if self._cached_min is not None:
+                    n_cached = self._cached_min.shape[-1]*decimation_factor
+                    to_decimate = self._cached_data[..., n_cached:]
+                    mins, maxes = decimate_extremes(to_decimate, decimation_factor)
+                    self._cached_min = np.hstack((self._cached_min, mins))
+                    self._cached_max = np.hstack((self._cached_max, maxes))
                 else:
-                    channels, samples = values.shape
-                    offsets = self.offset*np.arange(channels)[:np.newaxis]
-                    s_val_pts = self.value_mapper.map_screen(values)
-                    s_val_pts = s_val_pts/channels + offsets
-                    self._cached_screen_data = s_val_pts
+                    mins, maxes = decimate_extremes(self._cached_data, decimation_factor)
+                    self._cached_min = mins
+                    self._cached_max = maxes
+
+                # Now, map them to the screen
+                channels, samples = self._cached_min.shape
+                mins = self._cached_min[self.channel_visible] + self.offsets
+                s_val_min = self.value_mapper.map_screen(mins)
+                maxes = self._cached_max[self.channel_visible] + self.offsets
+                s_val_max = self.value_mapper.map_screen(maxes)
+                self._cached_screen_data = s_val_min, s_val_max
 
                 total_samples = self._cached_data.shape[-1]
                 t = self.index_values[:total_samples:decimation_factor][:samples]
@@ -106,7 +127,7 @@ class ExtremesChannelPlot(ChannelPlot):
         return self._cached_screen_index, self._cached_screen_data
 
     def _render(self, gc, points):
-        idx, val = points
+        idx, (mins, maxes) = points
         if len(idx) == 0:
             return
 
@@ -116,18 +137,10 @@ class ExtremesChannelPlot(ChannelPlot):
         gc.set_line_width(self.line_width) 
 
         gc.begin_path()
-        if type(val) == type(()):
-            mins, maxes = val
-            # Data has been decimated.  Plot as a series of lines from min to
-            # max.
-            for i in range(len(mins)):
-                starts = np.column_stack((idx, mins[i]))
-                ends = np.column_stack((idx, maxes[i]))
-                gc.line_set(starts, ends)
-        else:
-            # Data has not been decimated.  Plot as a standard connected line
-            # plot.
-            gc.lines(np.column_stack((idx, val)))
+        for i in range(len(mins)):
+            starts = np.column_stack((idx, mins[i]))
+            ends = np.column_stack((idx, maxes[i]))
+            gc.line_set(starts, ends)
 
         gc.stroke_path()
         self._draw_default_axes(gc)

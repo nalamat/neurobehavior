@@ -2,14 +2,20 @@
 import os, re
 from os.path import dirname, join, abspath, getmtime
 
-BASE_DIRECTORY  = 'E:/'
+BASE_DIRECTORY  = 'D:/'
 LOG_ROOT        = join(BASE_DIRECTORY, 'logs') # where log files should be stored
 TEMP_ROOT       = join(BASE_DIRECTORY, 'temp') # location for temporary files
 DATA_ROOT       = join(BASE_DIRECTORY, 'data') # location for data files
 COHORT_ROOT     = DATA_ROOT                    # location for cohort files
 CAL_ROOT        = join(BASE_DIRECTORY, 'calibration') # calibration files
-RCX_ROOT        = join(abspath(dirname(__file__)), '../components')
 COHORT_WILDCARD = 'Cohort files (*.cohort.hd5)|*.cohort.hd5|'
+
+# __file__ is a special variable that is available in all Python files (when
+# loaded by the Python interpreter) that contains the path of the current file
+# or script. We extract the directory portion of the path and use that to
+# determine where the RCX files are stored. We keep components in source code
+# control as well to ensure that changes to the RCX files track changes to the
+# software.
 
 def get_recent_cal(pattern):
     try:
@@ -31,6 +37,9 @@ CAL_SECONDARY   = get_recent_cal(re.compile('.*secondary.*'))
 TDT_AUDIO = 'RZ6'
 TDT_BEHAVIOR = 'RZ6'
 TDT_PHYSIOLOGY = 'RZ5'
+
+# Physiology settings
+PHYSIOLOGY_CHANNELS = 16
 
 # Subprocess configuration
 RCX_USE_SUBPROCESS      = False # Run IO as a subprocess?
@@ -56,7 +65,6 @@ import sys
 libdir = abspath(join(dirname(__file__), '..'))
 sys.path.insert(0, libdir)
 
-from cns import LOG_ROOT
 import logging.config
 from time import strftime
 

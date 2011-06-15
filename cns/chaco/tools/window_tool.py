@@ -1,21 +1,19 @@
 # Enthought library imports
 from enthought.enable.api import cursor_style_trait, Line
 from enthought.traits.api import Any, Bool, Enum, Instance, Int, List, Trait, \
-        Tuple, HasTraits, Float, Property, Dict
+        Tuple, HasTraits, Float, Property, Dict, Event
 from enthought.enable.component import Component
 
 # Chaco imports
 from enthought.chaco.api import AbstractOverlay
 
+XY = Tuple(Float, Float)
+
 class Window(HasTraits):
 
     mode            = Enum('INCLUDE', 'EXCLUDE')
-    mode_color      = Dict({'INCLUDE':  'black',
-                            'EXCLUDE':  'red',})
+    mode_color      = Dict({'INCLUDE':  'black', 'EXCLUDE':  'red',})
     component       = Instance(Component)
-    XY_COORDINATES  = Tuple(Float, Float)
-
-    _points         = List(XY_COORDINATES, [])
 
     _line           = Instance(Line, args=dict(line_width=3, vertex_size=6))
     line            = Property(Instance(Line))
@@ -24,8 +22,9 @@ class Window(HasTraits):
     # can change at anytime if the plot is resized.  Everytime the plot is
     # resized, the line is redrawn.  Each time the line is requested, we map the
     # data coordinates to the screen coordinates and update the line points.
-    points          = Property(List(XY_COORDINATES))
-    screen_points   = Property(List(XY_COORDINATES))
+    _points         = List(XY)
+    points          = Property(depends_on='_points')
+    screen_points   = Property
     distance        = Property(Float)
     constrain       = Enum('X', 'Y', None)
 
@@ -45,6 +44,16 @@ class Window(HasTraits):
 
     def _get_points(self):
         return self._points
+
+    def get_hoop(self):
+        (x1, y1), (x2, y2) = self.points
+        return x1, (y1+y2)/2.0, abs(y1-y2)/2.0
+    
+    def set_hoop(self, value):
+        # x-value, center-volt, half-height
+        x, m, h = value
+        print "split", x, m, h
+        self.points = (x, m-h), (x, m+h)
 
     def _set_points(self, points):
         self._points = self._constrain_coords(points[0], points)
@@ -115,14 +124,19 @@ class Window(HasTraits):
         return abs(p_x-e_x) + abs(p_y-e_y) <= distance
 
 class WindowTool(AbstractOverlay):
-    """ The base class for tools that allow the user to draw a
-    series of windows.
+    """ 
+    The base class for tools that allow the user to draw a series of windows.
+    
+    Primarily used for spike isolation and sorting, but can conceivably be
+    useful for other scenarios as well.
     """
+    updated = Event
+
     # The component that this tool overlays
     component = Instance(Component)
     
-    # The current line segment being drawn.
-    windows = List(Window)
+    # The current windows
+    _windows = List(Window)
     
     # The event states are:
     #   normal: 
@@ -163,15 +177,12 @@ class WindowTool(AbstractOverlay):
     # Cursor shape for non-tool use.
     original_cursor = cursor_style_trait("arrow")
     # Cursor shape for drawing.
-    normal_cursor = cursor_style_trait("pencil")
+    normal_cursor = cursor_style_trait("arrow")
     # Cursor shape for deleting points.
-    delete_cursor = cursor_style_trait("bullseye")
+    delete_cursor = cursor_style_trait("arrow")
     # Cursor shape for moving points.
     move_cursor = cursor_style_trait("sizing")
 
-    #------------------------------------------------------------------------
-    # Traits inherited from BaseTool
-    #------------------------------------------------------------------------
     # The tool is initially invisible, because there is nothing to draw.
     visible = Bool(False)
 
@@ -192,43 +203,16 @@ class WindowTool(AbstractOverlay):
         """ Resets the tool, throwing away any points, and making the tool
         invisible.
         """
-        self.windows = []
+        self._windows = []
         self.event_state = "normal"
         self.visible = False
         self.request_redraw()
 
-    def _activate(self):
-        """ Called by a PlotComponent when this becomes the active tool.
-        """
-        pass
+    #def _deactivate(self, component=None):
+    #    """ Called by a PlotComponent when this is no longer the active tool.
+    #    """
+    #    self.reset()
 
-    def _deactivate(self, component=None):
-        """ Called by a PlotComponent when this is no longer the active tool.
-        """
-        self.reset()
-
-    #------------------------------------------------------------------------
-    # PointLine methods
-    #------------------------------------------------------------------------
-    def add_window(self, window):
-        window.component = self.component
-        self.windows.append(window)
-        
-    def set_window(self, index, window):
-        """ Sets the data-space *index* for a screen-space *point*.
-        """
-        window.component = self.component
-        self.windows[index] = window
-    
-    def remove_window(self, index):
-        """ Removes the point for a given *index* from this tool's list of 
-        points.
-        """
-        del self.windows[index]
-
-    #------------------------------------------------------------------------
-    # "normal" state
-    #------------------------------------------------------------------------
     def normal_left_down(self, event):
         """ Handles the left mouse button being pressed while the tool is
         in the 'normal' state.
@@ -240,23 +224,24 @@ class WindowTool(AbstractOverlay):
         """
         # Determine if the user is dragging/deleting an existing point, or
         # creating a new one
-        over = self._over_window(event, self.windows)
+        over = self._over_window(event, self._windows)
         if over is not None:
             if event.control_down:
-                self.windows.pop(over[0]) # Delete the window
+                self._windows.pop(over[0]) # Delete the window
+                self.updated = self
                 self.request_redraw()
             else:
                 self.event_state = "dragging"
                 self._dragged = over
                 self._drag_new_point = False
                 self.dragging_mouse_move(event)
-        elif len(self.windows) < self.max_windows:
+        elif len(self._windows) < self.max_windows:
             start_xy = event.x, event.y
             window = Window(screen_points=[start_xy, start_xy],
                             component=self.component)
             if event.shift_down:
                 window.mode = 'EXCLUDE'
-            self.windows.append(window)
+            self._windows.append(window)
 
             self._dragged = -1, 1 #e.g. last "window"
             self._drag_new_point = True
@@ -277,7 +262,7 @@ class WindowTool(AbstractOverlay):
         """
         # If the user moves over an existing point, change the cursor to be the
         # move_cursor; otherwise, set it to the normal cursor
-        over = self._over_window(event, self.windows)
+        over = self._over_window(event, self._windows)
         if over is not None:
             if event.control_down:
                 event.window.set_pointer(self.delete_cursor)
@@ -285,7 +270,7 @@ class WindowTool(AbstractOverlay):
                 event.window.set_pointer(self.move_cursor)
         else:
             event.handled = False
-            if len(self.windows) < self.max_windows:
+            if len(self._windows) < self.max_windows:
                 event.window.set_pointer(self.normal_cursor)
             else:
                 event.window.set_pointer(self.original_cursor)
@@ -294,7 +279,7 @@ class WindowTool(AbstractOverlay):
     def normal_draw(self, gc):
         """ Draws the line.
         """
-        for window in self.windows:
+        for window in self._windows:
             window.line._draw(gc)
     
     def normal_key_pressed(self, event):
@@ -321,21 +306,15 @@ class WindowTool(AbstractOverlay):
         line segment being drawn.
         """
         window, point = self._dragged
-        self.windows[window].update_screen_point(point, (event.x, event.y))
+        self._windows[window].update_screen_point(point, (event.x, event.y))
         self.request_redraw()
-
-    def dragging_draw(self, gc):
-        """ Draws the polygon in the 'dragging' state. 
-        """
-        for window in self.windows:
-            window.line._draw(gc)
 
     def dragging_left_up(self, event):
         """ Handles the left mouse coming up in the 'dragging' state. 
         
         Switches to 'normal' state.
         """
-        if self.windows[self._dragged[0]].distance < 4:
+        if self._windows[self._dragged[0]].distance < 4:
             self._cancel_drag()
         else:
             self.event_state = "normal"
@@ -363,7 +342,7 @@ class WindowTool(AbstractOverlay):
         if self._dragged != None:
             if self._drag_new_point:
                 # Only remove the point if it was a newly-placed point
-                self.windows.pop(self._dragged[0])
+                self._windows.pop(self._dragged[0])
             self._dragged = None
         self.mouse_position = None
         self.event_state = "normal"
@@ -376,12 +355,10 @@ class WindowTool(AbstractOverlay):
         """ Draws this component overlaid on another component.
         Implements AbstractOverlay.
         """
-        draw_func = getattr(self, self.event_state + "_draw", None)
-        if draw_func:
-            gc.save_state()
+        with gc:
             gc.clip_to_rect(component.x, component.y, component.width-1, component.height-1)
-            draw_func(gc)
-            gc.restore_state()
+            for window in self._windows:
+                window.line._draw(gc)
     
     def request_redraw(self):
         """ Requests that the component redraw itself. 
@@ -390,35 +367,27 @@ class WindowTool(AbstractOverlay):
         self.component.invalidate_draw()
         self.component.request_redraw()
 
-    #------------------------------------------------------------------------
-    # Private methods
-    #------------------------------------------------------------------------
     def _over_window(self, event, windows):
-        """ Return the index of a point in *points* that *event* is 'over'.
+        """
+        Return the index of a point in *points* that *event* is 'over'.
         Returns None if there is no such point.
         """
         for i, window in enumerate(windows):
             point = window._hittest(event)
             if point is not None:
                 return i, point
-        return None # If no _hittest passes
-
-    def _finalize_selection(self):
-        """Abstract method called to take action after the line selection is complete
-        """
-        pass
+        return None
     
-    #------------------------------------------------------------------------
-    # Trait event handlers
-    #------------------------------------------------------------------------
-    def _component_changed(self, old, new):
-        if new:
-            self.container = new
-        return
+    windows = Property(depends_on='updated')
     
-    #------------------------------------------------------------------------
-    # Trait event handlers
-    #------------------------------------------------------------------------
-    def _get_coordinates(self):
-        return [window.points for window in self.windows]
-    
+    def _get_windows(self):
+        return [w.get_hoop() for w in self._windows]
+        
+    def _set_windows(self, value):
+        windows = []
+        for v in value:
+            window = Window(component=self.component)
+            window.set_hoop(v)
+            windows.append(window)
+        self._windows = windows
+        self.request_redraw()

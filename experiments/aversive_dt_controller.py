@@ -3,7 +3,6 @@ from neurogen import block_definitions as blocks
 from enthought.traits.api import Any
 from abstract_aversive_controller import AbstractAversiveController
 
-from cns import RCX_ROOT
 from os.path import join
 
 class AversiveDTController(AbstractAversiveController):

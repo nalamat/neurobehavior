@@ -1,4 +1,6 @@
 import numpy as np
+import logging
+log = logging.getLogger(__name__)
 
 from physiology_data_mixin import PhysiologyDataMixin
 from pump_data_mixin import PumpDataMixin
@@ -114,6 +116,14 @@ class AbstractExperimentData(PhysiologyDataMixin, PumpDataMixin):
         return np.unique(self.par_seq)
 
     def log_trial(self, **kwargs):
+        #for k, v in kwargs.items():
+            #if type(v) not in (int, str, bool, float):
+            #    log.debug("Cannot store %s in the trial log", k)
+                #del kwargs[k]
+        try:
+            del kwargs['remind']
+        except:
+            pass
         names, record = zip(*sorted(kwargs.items()))
         if len(self.trial_log) == 0:
             self._trial_log_columns = names
@@ -121,5 +131,8 @@ class AbstractExperimentData(PhysiologyDataMixin, PumpDataMixin):
         elif names == self._trial_log_columns:
             self._trial_log.append(record)
         else:
+            log.debug("Expected the following columns %r",
+                    self._trial_log_columns)
+            log.debug("Recieved the following columns %r", names)
             raise ValueError, "Invalid log_trial attempt"
         self.new_trial = kwargs

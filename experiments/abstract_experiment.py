@@ -65,6 +65,7 @@ class AbstractExperiment(PhysiologyExperimentMixin):
     traits_group = VGroup(
             Item('handler.toolbar', style='custom'),
             Tabbed(
+                Item('handler.tracker', style='custom'),
                 Item('paradigm', style='custom'),
                 Item('handler.current_context', editor=context_editor),
                 show_labels=False,
