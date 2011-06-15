@@ -1,36 +1,30 @@
+from base_channel_plot import BaseChannelPlot
 import numpy as np
+from enthought.traits.api import Float, Bool, Enum, on_trait_change, Property
 
-from enthought.chaco.api import BaseXYPlot
-from enthought.enable.api import black_color_trait, LineStyle
-from enthought.traits.api import Instance, Float, Event, Bool, Enum, \
-        on_trait_change, Property
-
-class ChannelPlot(BaseXYPlot):
+class ChannelPlot(BaseChannelPlot):
     '''
     Designed for efficiently handling time series data stored in a channel.
     Each time a Channel.updated event is fired, the new data is obtained and
     plotted.
     '''
 
-    channel                 = Instance('cns.channel.Channel')
-    fill_color              = black_color_trait
-    line_color              = black_color_trait
-    line_width              = Float(1.0)
-    line_style              = LineStyle
-    data_changed            = Event
     _data_cache_valid       = Bool(False)
     _screen_cache_valid     = Bool(False)
+    #index                   = Property(depends_on='channel')
 
-    index                   = Property(depends_on='channel')
+    def _invalidate_screen(self):
+        self._screen_cache_valid = False
+        self.invalidate_and_redraw()
 
-    def _get_index(self):
-        return self.channel
+    #def _get_index(self):
+    #    return self.channel
 
     def __init__(self, **kwargs):
         super(ChannelPlot, self).__init__(**kwargs)
-        self.index_mapper.on_trait_change(self._index_range_updated, "updated")
+        self._index_mapper_changed(None, self.index_mapper)
 
-    def _index_range_updated(self):
+    def _index_mapper_updated(self):
         '''
         Compute array of index values (i.e. the time of each sample that could
         be displayed in the visible range)
@@ -46,11 +40,13 @@ class ChannelPlot(BaseXYPlot):
             high = int(self.index_range.high*fs)
             self.index_values = np.arange(low, high)/fs
             self._data_cache_valid = False
+            self._invalidate_screen()
 
     def _index_mapper_changed(self, old, new):
-        super(ChannelPlot, self)._index_mapper_changed(old, new)
-        old.on_trait_change(self._index_range_updated, "updated", remove=True)
-        new.on_trait_change(self._index_range_updated, "updated", remove=True)
+        if old is not None:
+            old.on_trait_change(self._index_mapper_updated, "updated", remove=True)
+        if new is not None:
+            new.on_trait_change(self._index_mapper_updated, "updated")
 
     def _decimation_factor(self):
         '''
@@ -114,12 +110,16 @@ class ChannelPlot(BaseXYPlot):
         # exact same picture.
         if self.index_range.mask_data(np.array(bounds)).any():
             self._new_bounds_cache = bounds
-            self.invalidate_draw()
             self._data_cache_valid = False
-            self.request_redraw()
+            self.invalidate_and_redraw()
 
-    def _channel_changed(self, old, new):
-        if old is not None:
-            old.on_trait_change(self._data_changed, "updated", remove=True)
-        if new is not None:
-            new.on_trait_change(self._data_changed, "updated", dispatch="new")
+    #def _channel_changed(self, old, new):
+    #    # We need to call _update_index_mapper when fs changes since the method
+    #    # precomputes the index value based on the sampling frequency of the
+    #    # channel.
+    #    if old is not None:
+    #        old.on_trait_change(self._data_changed, "updated", remove=True)
+    #        old.on_trait_change(self._index_mapper_updated, "fs", remove=True)
+    #    if new is not None:
+    #        new.on_trait_change(self._data_changed, "updated", dispatch="new")
+    #        new.on_trait_change(self._index_mapper_updated, "fs", dispatch="new")

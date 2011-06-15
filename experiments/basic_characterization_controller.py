@@ -1,5 +1,5 @@
 from os.path import join
-from cns import RCX_ROOT
+from cns import get_config
 from tdt import DSPCircuit
 
 from abstract_experiment_controller import AbstractExperimentController
@@ -26,10 +26,12 @@ class BasicCharacterizationController(AbstractExperimentController):
     toolbar = Instance(BasicCharacterizationToolbar, (), toolbar=True)
 
     def setup_experiment(self, info):
-        circuit = join(RCX_ROOT, 'basic_audio')
+        circuit = join(get_config('RCX_ROOT'), 'basic_audio')
         self.iface_audio = self.process.load_circuit(circuit, 'RZ6')
 
     def start_experiment(self, info):
+        self.init_context()
+        self.update_context()
         #self.init_paradigm(self.model.paradigm)
         self.iface_audio.trigger('A', 'high')
         self.state = 'running'
@@ -76,6 +78,15 @@ class BasicCharacterizationController(AbstractExperimentController):
         print amplitude, offset
         self.iface_audio.set_tag('m_amplitude', amplitude)
         self.iface_audio.set_tag('m_shift', offset)
+
+    def set_commutator_inhibit(self, value):
+        self.iface_audio.set_tag('comm_inhibit', value)
+
+    def set_primary_attenuation(self, value):
+        self.iface_audio.set_tag('att_A', value)
+
+    def set_secondary_attenuation(self, value):
+        self.iface_audio.set_tag('att_B', value)
 
     def get_ts(self):
         return -1

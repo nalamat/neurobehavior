@@ -12,7 +12,7 @@ from cns.data.persistence import add_or_update_object
 from positive_data import PositiveData
 from copy import deepcopy
 
-from cns import RCX_ROOT
+from cns import get_config
 from os.path import join
 
 import numpy as np
@@ -57,7 +57,7 @@ class AbstractPositiveController(AbstractExperimentController,
         self.model.par_info_adapter.parameters = value
 
     def setup_experiment(self, info):
-        circuit = join(RCX_ROOT, 'positive-behavior-v2')
+        circuit = join(get_config('RCX_ROOT'), 'positive-behavior-v2')
         self.iface_behavior = self.process.load_circuit(circuit, 'RZ6')
 
         # primary speaker
@@ -69,19 +69,24 @@ class AbstractPositiveController(AbstractExperimentController,
         self.buffer_TTL2 = self.iface_behavior.get_buffer('TTL2', 'r',
                 src_type=np.int8, dest_type=np.int8, block_size=24)
 
+        # Stored in TTL1
         self.model.data.spout_TTL.fs = self.buffer_TTL1.fs
         self.model.data.poke_TTL.fs = self.buffer_TTL1.fs
         self.model.data.signal_TTL.fs = self.buffer_TTL1.fs
         self.model.data.reaction_TTL.fs = self.buffer_TTL1.fs
         self.model.data.response_TTL.fs = self.buffer_TTL1.fs
         self.model.data.reward_TTL.fs = self.buffer_TTL1.fs
+
+        # Stored in TTL2
         self.model.data.TO_TTL.fs = self.buffer_TTL2.fs
         self.model.data.TO_safe_TTL.fs = self.buffer_TTL2.fs
+        self.model.data.comm_inhibit_TTL.fs = self.buffer_TTL2.fs
 
         targets1 = [self.model.data.poke_TTL, self.model.data.spout_TTL,
                     self.model.data.reaction_TTL, self.model.data.signal_TTL,
                     self.model.data.response_TTL, self.model.data.reward_TTL, ]
-        targets2 = [self.model.data.TO_safe_TTL, self.model.data.TO_TTL, ]
+        targets2 = [self.model.data.TO_safe_TTL, self.model.data.TO_TTL,
+                    self.model.data.comm_inhibit_TTL ]
 
         self.pipeline_TTL1 = deinterleave_bits(targets1)
         self.pipeline_TTL2 = deinterleave_bits(targets2)
@@ -197,7 +202,8 @@ class AbstractPositiveController(AbstractExperimentController,
                     self.pipeline_TTL2.send(self.buffer_TTL2.read_all())
                     self.log_trial(ts_start, ts_end, last_ttype)
                     break
-                except ValueError:
+                except ValueError, e:
+                    log.exception(e)
                     log.debug("Waiting for more data")
                     pass
 

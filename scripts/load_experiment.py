@@ -3,7 +3,7 @@
 import logging
 import os 
 import sys
-import settings
+from cns import set_config
 from experiments import loader
 import argparse
 
@@ -50,11 +50,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     try:
-        import cns
-        cns.RCX_USE_SUBPROCESS = args.subprocess
+        set_config('RCX_USE_SUBPROCESS', args.subprocess)
 
         # Do some additional checking of argument list to make sure it is valid
-        if args.mode != 'inspect': 
+        if args.mode != 'inspect':
             invalid = loader.get_invalid_parameters(args)
             if len(invalid) != 0:
                 if len(invalid) == 1:
