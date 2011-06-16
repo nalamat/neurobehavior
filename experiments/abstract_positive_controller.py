@@ -267,7 +267,6 @@ class AbstractPositiveController(AbstractExperimentController,
         self.reset_sequence()
 
     def reset_sequence(self):
-        print 'resetting sequence'
         order = self.current_order
         parameters = self.current_go_parameters
         if order is not None and parameters is not None:
@@ -299,6 +298,10 @@ class AbstractPositiveController(AbstractExperimentController,
         if self.iface_behavior.get_tag('react_del_n') < 2:
             self.iface_behavior.set_tag('react_del_n', 2)
         self.current_reaction_window_delay = value
+
+        # We need to be sure to update the duration as well if we adjust this
+        # value
+        self.set_reaction_window_duration(self.current_context['reaction_window_duration'])
 
     def set_reaction_window_duration(self, value):
         delay = self.current_context['reaction_window_delay']
