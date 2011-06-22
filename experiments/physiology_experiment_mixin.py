@@ -101,7 +101,7 @@ class SortWindow(HasTraits):
                 channel=self.channels[self.channel-1],
                 value_mapper=value_mapper, 
                 index_mapper=index_mapper,
-                bgcolor='white', padding=[60, 5, 5, 40])
+                bgcolor='white', padding=[60, 5, 5, 20])
         add_default_grids(plot, major_index=1e-3, minor_index=1e-4,
                 major_value=1e-3, minor_value=1e-4)
 
@@ -109,7 +109,7 @@ class SortWindow(HasTraits):
         axis = PlotAxis(orientation='left', component=plot,
                 tick_label_formatter=scale_formatter, title='Signal (mV)')
         plot.overlays.append(axis)
-        axis = PlotAxis(orientation='bottom', component=plot, title='Time (ms)',
+        axis = PlotAxis(orientation='bottom', component=plot, 
                 tick_label_formatter=scale_formatter)
         plot.overlays.append(axis)
 
@@ -129,10 +129,11 @@ class SortWindow(HasTraits):
 
     traits_view = View(
             VGroup(
-                Item('channel'),
+                #Item('channel'),
                 HGroup(
+                    Item('channel', style='text', show_label=False, width=-25),
                     Item('sign', label='Signed?'),
-                    Item('threshold', editor=THRESHOLD_EDITOR),
+                    Item('threshold', editor=THRESHOLD_EDITOR, show_label=False, springy=True),
                     ),
                 Item('plot', editor=ComponentEditor(width=250, height=250)),
                 show_labels=False,
@@ -156,10 +157,14 @@ class PhysiologyExperimentMixin(HasTraits):
     physiology_window_2      = Instance(SortWindow)
     physiology_window_3      = Instance(SortWindow)
     
-    visualize_sorting        = Bool(False)
     
+    # Overlays
     spike_overlay            = Instance(SpikeOverlay)
     threshold_overlay        = Instance(ThresholdOverlay)
+    
+    # Show the overlays?
+    visualize_spikes         = Bool(True)
+    visualize_thresholds     = Bool(False)
 
     @on_trait_change('data')
     def _physiology_sort_plots(self):
@@ -228,11 +233,11 @@ class PhysiologyExperimentMixin(HasTraits):
         plot.tools.append(tool)
 
         overlay = SpikeOverlay(plot=plot, spikes=self.data.physiology_spikes)
-        self.sync_trait('visualize_sorting', overlay, 'visible', mutual=False)
+        self.sync_trait('visualize_spikes', overlay, 'visible', mutual=False)
         plot.overlays.append(overlay)
         self.spike_overlay = overlay
         overlay = ThresholdOverlay(plot=plot, visible=False)
-        self.sync_trait('visualize_sorting', overlay, 'visible', mutual=False)
+        self.sync_trait('visualize_thresholds', overlay, 'visible', mutual=False)
         self.physiology_settings.sync_trait('spike_thresholds', overlay,
                                             'thresholds', mutual=False)
         self.physiology_settings.sync_trait('spike_signs', overlay,
@@ -274,7 +279,11 @@ class PhysiologyExperimentMixin(HasTraits):
                 Tabbed(
                     Include('physiology_settings_group'),
                     VGroup(
-                        Item('visualize_sorting', label='Show spike sort overlay?'),
+                        HGroup(
+                            Item('visualize_spikes', label='Show sorted spikes?'),
+                            Item('visualize_thresholds', label='Show sort threshold?'),
+                            show_border=True,
+                            ),
                         Item('physiology_window_1', style='custom', width=250),
                         Item('physiology_window_2', style='custom', width=250),
                         Item('physiology_window_3', style='custom', width=250),
