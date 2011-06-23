@@ -7,7 +7,7 @@ from enthought.traits.ui.api import VGroup, HGroup, Item, Include, View, \
 from enthought.traits.api import Instance, HasTraits, Float, DelegatesTo, \
      Bool, on_trait_change, Int, on_trait_change, Any, Range, Event, Property,\
      Tuple, List
-from enthought.traits.ui.editors import RangeEditor
+from enthought.traits.ui.api import RangeEditor
 
 from physiology_paradigm_mixin import PhysiologyParadigmMixin
 
@@ -126,6 +126,7 @@ class SortWindow(HasTraits):
     
     THRESHOLD_EDITOR = RangeEditor(low=-5e-4*VOLTAGE_SCALE, 
                                    high=5e-4*VOLTAGE_SCALE)
+    #THRESHOLD_EDITOR = ScrubberEditor()
 
     traits_view = View(
             VGroup(

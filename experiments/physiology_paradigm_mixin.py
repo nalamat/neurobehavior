@@ -64,14 +64,12 @@ class PhysiologyParadigmMixin(HasTraits):
     diff_sagittal   = Button('Sagittal')
     diff_coronal    = Button('Coronal')
     diff_all        = Button('All')
-    #diff_visible    = Bool(True)
 
     def _get_diff_group(self, channel, group):
         ub = int(ceil(channel/group)*group + 1)
         lb = ub - group
         diff = range(lb, ub)
         diff.remove(channel)
-        #if self.diff_visible:
         diff = [d for d in diff if not self.channel_settings[d-1].bad]
         return ', '.join(str(ch) for ch in diff)
 
@@ -101,7 +99,6 @@ class PhysiologyParadigmMixin(HasTraits):
                 Item('diff_coronal', width=WIDTH),
                 Item('diff_all', width=WIDTH),
                 Item('diff_none', width=WIDTH),
-                #Item('diff_good', label='Only good?', show_label=True),
                 show_labels=False,
                 ),
             )
@@ -179,8 +176,8 @@ class PhysiologyParadigmMixin(HasTraits):
     monitor_gain_4      = Range(0, 100, 50, init=True, immediate=True)
 
     # Bandpass filter settings
-    monitor_fc_highpass = Range(0, 12.5e3, 300, init=True, immediate=True)
-    monitor_fc_lowpass  = Range(0, 12.5e3, 10e3, init=True, immediate=True)
+    monitor_fc_highpass = Range(0, 1e3, 300, init=True, immediate=True)
+    monitor_fc_lowpass  = Range(1e3, 5e3, 5e3, init=True, immediate=True)
 
     channel_settings    = List(Instance(ChannelSetting))
 
