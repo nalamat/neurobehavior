@@ -34,7 +34,7 @@ class PhysiologyDataMixin(HasTraits):
         for i in range(CHANNELS):
             name = 'spike_{:02}'.format(i+1)
             channel = FileSnippetChannel(node=physiology_node, name=name,
-                    dtype=np.float32, snippet_size=38)
+                    dtype=np.float32, snippet_size=18)
             channels.append(channel)
         return channels
 

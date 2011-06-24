@@ -8,6 +8,7 @@ from os.path import join
 from cns.pipeline import deinterleave_bits
 
 CHANNELS = get_config('PHYSIOLOGY_CHANNELS')
+SPIKE_SNIPPET_SIZE = 20
 
 class PhysiologyControllerMixin(HasTraits):
 
@@ -40,8 +41,6 @@ class PhysiologyControllerMixin(HasTraits):
         if self.iface_physiology is not None:
             tag_name = 'c_spike{}'.format(channel.number)
             self.iface_physiology.set_sort_windows(tag_name, new)
-            #history = len(self.model.data.physiology_spikes[channel].buffer)
-            #self.model.physiology_sort_plot.last_reset = history
         
     def setup_physiology(self):
         # Load the circuit
@@ -50,19 +49,25 @@ class PhysiologyControllerMixin(HasTraits):
 
         # Initialize the buffers that will be spooling the data
         self.buffer_physiology_raw = self.iface_physiology.get_buffer('craw',
-                'r', src_type='int16', dest_type='float32', channels=CHANNELS)
+                'r', src_type='int16', dest_type='float32', channels=CHANNELS,
+                block_size=1048)
         self.buffer_physiology_filt = self.iface_physiology.get_buffer('cfilt',
-                'r', src_type='int16', dest_type='float32', channels=CHANNELS)
+                'r', src_type='int16', dest_type='float32', channels=CHANNELS,
+                block_size=1048)
         self.buffer_physiology_ts = self.iface_physiology.get_buffer('trig/',
                 'r', src_type='int32', dest_type='int32', block_size=1)
         self.buffer_physiology_ttl = self.iface_physiology.get_buffer('TTL',
                 'r', src_type='int8', dest_type='int8', block_size=1)
 
+
         for i in range(CHANNELS):
             name = 'spike{}'.format(i+1)
-            buffer = self.iface_physiology.get_buffer(name, 'r', block_size=40)
+            buffer = self.iface_physiology.get_buffer(name, 'r',
+                    block_size=SPIKE_SNIPPET_SIZE)
             self.buffer_spikes.append(buffer)
-            self.model.data.physiology_spikes[i].fs = buffer.fs
+            spikes = self.model.data.physiology_spikes[i] 
+            spikes.snippet_size = SPIKE_SNIPPET_SIZE-2
+            spikes.fs = buffer.fs
 
         # Ensure that the data store has the correct sampling frequency
         self.model.data.physiology_raw.fs = self.buffer_physiology_raw.fs
@@ -94,7 +99,8 @@ class PhysiologyControllerMixin(HasTraits):
         # Get the spikes.  Each channel has a separate buffer for the spikes
         # detected online.
         for i in range(CHANNELS):
-            data = self.buffer_spikes[i].read().reshape((-1, 40))
+            data = self.buffer_spikes[i].read().reshape((-1,
+                SPIKE_SNIPPET_SIZE))
 
             # First sample of each snippet is the timestamp (as a 32 bit
             # integer) and last sample is the classifier (also as a 32 bit
