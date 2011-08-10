@@ -25,8 +25,7 @@ class ChannelSetting(HasTraits):
     spike_sign = Bool(False)
     
     # Windows used for candidate spike isolation and sorting.
-    spike_windows   = List(Tuple(Float, Float, Float), [])
-    
+    spike_windows = List(Tuple(Float, Float, Float), [])
     spike_sort_summary = Property(Str, depends_on='spike_+')
     
     def _get_spike_sort_summary(self):
@@ -255,7 +254,8 @@ class PhysiologyParadigmMixin(HasTraits):
 
     physiology_view = View(
             VGroup(
-                Item('commutator_inhibit', label='Inhibit commutator?'),
+                Item('commutator_inhibit', label='Inhibit commutator?',
+                    show_label=True),
                 Include('filter_group'),
                 Include('monitor_group'),
                 Include('visible_group'),
