@@ -1,8 +1,31 @@
 from abstract_experiment_paradigm import AbstractExperimentParadigm
-from enthought.traits.api import Range, Bool
-from enthought.traits.ui.api import View, VGroup
+from enthought.traits.api import Range, Bool, Button, Any
+from enthought.traits.ui.api import View, VGroup, HGroup, Item
 
 class BasicCharacterizationParadigm(AbstractExperimentParadigm):
+    
+    mute_speakers = Button
+    swap_speakers = Button
+    _old_speaker_settings = Any(None)
+    
+    def _mute_speakers_fired(self):
+        if self._old_speaker_settings is None:
+            primary = self.primary_attenuation
+            secondary = self.secondary_attenuation
+            self._old_speaker_settings = primary, secondary
+            self.primary_attenuation = 120
+            self.secondary_attenuation = 120
+        else:
+            primary, secondary = self._old_speaker_settings
+            self.primary_attenuation = primary
+            self.secondary_attenuation = secondary
+            self._old_speaker_settings = None
+            
+    def _swap_speakers_fired(self):
+        primary = self.primary_attenuation
+        secondary = self.secondary_attenuation
+        self.primary_attenuation = secondary
+        self.secondary_attenuation = primary
 
     primary_attenuation     = Range(0, 120, 120, init=True, immediate=True)
     secondary_attenuation   = Range(0, 120, 120, init=True, immediate=True)
@@ -20,8 +43,12 @@ class BasicCharacterizationParadigm(AbstractExperimentParadigm):
     traits_view = View(
             VGroup(
                 'commutator_inhibit',
-                'primary_attenuation',
-                'secondary_attenuation',
+                HGroup(
+                    Item('mute_speakers', show_label=False),
+                    Item('swap_speakers', show_label=False),
+                    'primary_attenuation',
+                    'secondary_attenuation',
+                    ),
                 'trial_duration',
                 'token_duration',
                 'center_frequency',
