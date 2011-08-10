@@ -1,4 +1,4 @@
-from enthought.traits.api import Any
+from enthought.traits.api import Instance
 from numpy.random import uniform
 from abstract_positive_controller import AbstractPositiveController
 import neurogen.block_definitions as blocks
@@ -7,34 +7,44 @@ from neurogen.calibration import Calibration, equalized_data
 
 class PositiveAMNoiseController(AbstractPositiveController):
 
-    # The blocks that create the signal
-    carrier     = Any
-    modulator   = Any
-    envelope    = Any
-    output      = Any
+    noise_carrier   = Instance(blocks.Block)
+    tone_carrier    = Instance(blocks.Block)
+    modulator       = Instance(blocks.Block)
+    envelope        = Instance(blocks.Block)
+    output          = Instance(Sink)
 
-    def set_lb_modulation_onset(self, value):
-        self.current_lb = value
+    def _tone_carrier_default(self):
+        return blocks.Tone(frequency=2e3)
 
-    def set_ub_modulation_onset(self, value):
-        self.current_ub = value
-        
-    def set_seed(self, value):
-        self.carrier.seed = value
-
-    def _carrier_default(self):
-        return blocks.BroadbandNoise()
-
-    def _modulator_default(self):
-        return blocks.SAM(token=self.carrier.waveform, equalize_power=True,
-                equalize_phase=False)
+    def _noise_carrier_default(self):
+        return blocks.BandlimitedNoise()
 
     def _envelope_default(self):
-        return blocks.Cos2Envelope(token=self.modulator.waveform)
+        return blocks.Cos2Envelope()
 
     def _output_default(self):
         return Sink(token=self.envelope.waveform, fs=self.iface_behavior.fs,
-                calibration=Calibration(equalized_data))
+                    calibration=Calibration(equalized_data))
+
+    def set_fc(self, value):
+        self.tone_carrier.frequency = value
+        self.noise_carrier.fc = value
+
+    def set_bandwidth(self, value):
+        if value == 0:
+            self.modulator.token = self.tone_carrier.waveform
+        else:
+            self.modulator.token = self.noise_carrier.waveform
+            self.noise_carrier.bandwidth = value
+        
+    def set_seed(self, value):
+        self.noise_carrier.seed = value
+
+    def _modulator_default(self):
+        return blocks.SAM(equalize_power=True, equalize_phase=False)
+
+    def _envelope_default(self):
+        return blocks.Cos2Envelope(token=self.modulator.waveform)
 
     def _compute_signal(self):
         self.envelope.duration = self.current_duration
@@ -63,6 +73,15 @@ class PositiveAMNoiseController(AbstractPositiveController):
 
     def set_nogo_parameter(self, value):
         self.current_nogo_parameter = value
+
+    def set_rp(self, value):
+        self.noise_carrier.rp = value
+
+    def set_rs(self, value):
+        self.noise_carrier.rs = value
+
+    def set_order(self, value):
+        self.noise_carrier.order = value
 
     def trigger_next(self):
         speaker = self.select_speaker()
