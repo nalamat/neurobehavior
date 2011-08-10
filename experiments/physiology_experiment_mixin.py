@@ -130,7 +130,6 @@ class SortWindow(HasTraits):
 
     traits_view = View(
             VGroup(
-                #Item('channel'),
                 HGroup(
                     Item('channel', style='text', show_label=False, width=-25),
                     Item('sign', label='Signed?'),
