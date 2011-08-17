@@ -8,7 +8,8 @@ from enthought.traits.ui.api import View, HGroup, Item, VGroup, spring, \
     InstanceEditor, Group, TableEditor, ObjectColumn
 from enthought.traits.ui.tabular_adapter import TabularAdapter
 
-import cns
+#import cns
+from cns import get_config
 import logging
 log = logging.getLogger(__name__)
 
@@ -44,9 +45,11 @@ class CohortEditor(TableEditor):
 
 class CohortViewHandler(FileHandler):
 
-    path            = File(cns.COHORT_ROOT)
-    wildcard        = Str(cns.COHORT_WILDCARD)
-    modified_trait  = '_modified'
+    path = File
+    wildcard = Str
+    modified_trait = '_modified'
+    path            = File(get_config('COHORT_ROOT'))
+    wildcard        = Str(get_config('COHORT_WILDCARD'))
 
     def new_object(self, info):
         info.object.cohort = Cohort()

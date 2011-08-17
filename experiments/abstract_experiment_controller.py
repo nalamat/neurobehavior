@@ -3,22 +3,27 @@ from datetime import datetime, timedelta
 from cns.data.persistence import add_or_update_object_node
 
 from tdt import DSPProcess, DSPProject
-import cns
+from tdt.device import RZ6
+from cns import get_config
 
 from enthought.pyface.api import error, confirm, YES, ConfirmationDialog
 from enthought.pyface.timer.api import Timer
 from enthought.etsconfig.api import ETSConfig
 from enthought.traits.api import (Any, Instance, Enum, Dict, on_trait_change, 
         HasTraits, List, Button, Bool, Tuple, Callable, Int, Property,
-        cached_property)
+        cached_property, Undefined, Event, TraitError)
 from enthought.traits.ui.api import Controller, View, HGroup, Item, spring
 
 from cns.widgets.toolbar import ToolBar
 from enthought.savage.traits.ui.svg_button import SVGButton
 from cns.widgets import icons
 
-from physiology_controller_mixin import PhysiologyControllerMixin
-from eval import eval_context
+from .physiology_controller_mixin import PhysiologyControllerMixin
+
+from enthought.traits.api import HasTraits, Dict, on_trait_change, Property, \
+        cached_property
+
+from evaluate import evaluate_expressions, evaluate_value
 
 from PyQt4 import QtGui
 
@@ -148,16 +153,12 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
     current_    = Any(current=True)
     choice_     = Any(choice=True)
 
-    # iface_* and buffer_* are handles to hardware needed to run the experiment.
+    # iface_* and buffer_* are handles to hardware and hardware memory buffers
     iface_      = Any(iface=True)
     buffer_     = Any(buffer=True)
 
     data_       = Any(data=True)
     pipeline_   = Any(pipeline=True)
-
-    # Hold information about the windows we have configured
-    window_     = Any
-    screen_     = Any
 
     # List of tasks to be run during experiment.  Each entry is a tuple
     # (callable, frequency) where frequency is how often the task should be run.
@@ -176,10 +177,9 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
     # the process is started (so the process can appropriately allocate the
     # required shared memory resources).
     process         = Any
-
     system_tray     = Any
 
-    # Calibration
+    # Calibration objects
     cal_primary     = Instance('neurogen.Calibration')
     cal_secondary   = Instance('neurogen.Calibration')
 
@@ -192,9 +192,6 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
             for toolbar in self.trait_names(toolbar=True):
                 getattr(self, toolbar).install(self, info)
 
-            self.window_behavior = info.ui.control
-            self.window_behavior.showFullScreen()
-
             # If we want to spool physiology, launch the physiology window as
             # well.  It should appear in the second monitor.  The parent of this
             # window should be the current window (info.ui.control) that way
@@ -204,76 +201,16 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
                         parent=self.window_behavior,
                         view='physiology_view').control
 
-            # Now, let's get some information about the screen geometry so that
-            # the secondary window appears in the other monitor.  This does not
-            # deal with triple-head systems (nor has it been tested on "virtual"
-            # desktops).
-            from PyQt4.QtGui import QApplication
-            desktop = QApplication.desktop()
-
-            # Determine which screen is the main one and set the secondary
-            # window geometry to the non-main screen.
-            self.screen_count = desktop.screenCount()
-            if self.screen_count == 2:
-                self.screen_primary = desktop.primaryScreen()
-                self.screen_0_geometry = desktop.screenGeometry(0)
-                self.screen_1_geometry = desktop.screenGeometry(1)
-            self.window_toggle = 0
-
-            # We always want to show the experiment in fullscreen mode.  This
-            # assumes Qt4 is the GUI (wx has a slightly different method name).
-            self.window_mode = 'fullscreen'
-            self.swap_screens(None)
-
         except Exception, e:
             log.exception(e)
             self.state = 'disconnected'
             error(info.ui.control, str(e))
 
+        # Use this for non-blocking error messages
         self.system_tray = QtGui.QSystemTrayIcon(info.ui.control)
         self.system_tray.messageClicked.connect(self.message_clicked)
         self.system_tray.setVisible(True)
-
-    # GUI commands to toggle between window modes
-
-    def toggle_maximized(self, info):
-        if info.ui.control.isMaximized():
-            info.ui.control.showNormal()
-        else:
-            info.ui.control.showMaximized()
-
-    def toggle_fullscreen(self, info):
-        if info.ui.control.isFullScreen():
-            info.ui.control.showNormal()
-        else:
-            info.ui.control.showFullScreen()
-
-    def swap_screens(self, info):
-        # If we have only one monitor attached, the user is out of luck if
-        # they want to display the physiology in a second monitor
-        if self.screen_count == 1:
-            return
-        # This code is Qt4 specific and will not work if wx is used
-        if self.window_toggle:
-            self.window_behavior.setGeometry(self.screen_1_geometry)
-            if self.window_physiology is not None:
-                self.window_physiology.setGeometry(self.screen_0_geometry)
-            self.window_toggle = 0
-        else:
-            self.window_behavior.setGeometry(self.screen_0_geometry)
-            if self.window_physiology is not None:
-                self.window_physiology.setGeometry(self.screen_1_geometry)
-            self.window_toggle = 1
-
-        if self.window_mode == 'fullscreen':
-            self.window_behavior.showFullScreen()
-            if self.window_physiology is not None:
-                self.window_physiology.showFullScreen()
-        elif self.window_mode == 'maximized':
-            self.window_behavior.showMaximized()
-            if self.window_physiology is not None:
-                self.window_physiology.showMaximized()
-
+        
     def close(self, info, is_ok):
         '''
         Prevent user from closing window while an experiment is running since
@@ -309,27 +246,23 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
 
         Subclasses must implement `start_experiment`
         '''
-        if not self.model.paradigm.is_valid():
-            mesg = 'Please correct the following errors first:\n'
-            mesg += self.model.paradigm.err_messages()
-            error(self.info.ui.control, mesg)
         try:
-            if cns.RCX_USE_SUBPROCESS:
+            if get_config('RCX_USE_SUBPROCESS'):
                 log.debug("USING DSP PROCESS")
                 self.process = DSPProcess()
             else:
                 log.debug("USING DSP PROJECT")
                 self.process = DSPProject()
-            # I don't really like having this check here; however, it works for
-            # our purposes.
+            # I don't really like having this check here; however, it works
+            # for our purposes.
             if self.model.spool_physiology:
                 # Ensure that the settings are applied
                 self.setup_physiology()
 
-            # setup_experiment should load the necessary circuits and initialize
-            # the buffers.  This data is required before the hardware process is
-            # launched since the shared memory, locks and pipelines must be
-            # created.  
+            # setup_experiment should load the necessary circuits and
+            # initialize the buffers. This data is required before the
+            # hardware process is launched since the shared memory, locks and
+            # pipelines must be created.
             self.setup_experiment(info)
 
             # Start the harware process
@@ -350,7 +283,7 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
             self.model.start_time = datetime.now()
             self.timer = Timer(100, self.run_tasks)
 
-        except BaseException, e:
+        except Exception, e:
             log.exception(e)
             error(self.info.ui.control, str(e))
 
@@ -360,7 +293,7 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
             self.process.stop()
             self.pending_changes = {}
             self.old_values = {}
-        except BaseException, e:
+        except Exception, e:
             log.exception(e)
             error(self.info.ui.control, str(e))
 
@@ -369,29 +302,25 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
             self.model.stop_time = datetime.now()
             info.ui.view.close_result = True
             self.state = 'complete'
-        except BaseException, e:
+        except Exception, e:
             log.exception(e)
             error(self.info.ui.control, str(e))
         finally:
             # Always attempt to save, no matter what!
             add_or_update_object_node(self.model, self.model.exp_node)
-
+            
     def run_tasks(self):
         for task, frequency in self.tasks:
             if frequency == 1 or not (self.tick_count % frequency):
                 try:
                     task()
-                except BaseException, e:
+                except Exception, e:
                     # Display an error message to the user
                     log.exception(e)
                     mesg = "The following exception occured in the program:" + \
                             "\n\n%s"
                     mesg = mesg % str(e)
                     self.system_tray.showMessage("Error running task", mesg)
-                    #dialog = ConfirmationDialog(message=mesg, yes_label='Stop',
-                    #        no_label='Continue')
-                    #if dialog.open() == YES:
-                    #    self.stop(self.info)
         self.tick_count += 1
 
     def message_clicked(self):
@@ -402,85 +331,20 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
             self.stop(self.info)
 
     ############################################################################
-    # Apply/Revert code
-    ############################################################################
-    pending_changes     = Dict({})
-    old_values          = Dict({})
-
-    @on_trait_change('model.paradigm.-ignore')
-    def queue_change(self, instance, name, old, new):
-        if self.state <> 'halted' and not name.endswith('_items'):
-            trait = instance.trait(name)
-            if trait.immediate == True:
-                self.apply_change(instance, name, new)
-                set_func = 'set_' + name
-                if hasattr(self, set_func):
-                    getattr(self, set_func)(new)
-            else:
-                key = instance, name
-                if key not in self.old_values:
-                    self.old_values[key] = old
-                    self.pending_changes[key] = new
-                elif new == self.old_values[key]:
-                    del self.pending_changes[key]
-                    del self.old_values[key]
-                else:
-                    self.pending_changes[key] = new
-
-    def apply_change(self, instance, name, value, info=None):
-        '''
-        Applies an individual change
-        '''
-        self.current_parameters[name] = deepcopy(value)
-        self.log_event(self.get_ts(), name, value)
-
-    def apply(self, info=None):
-        '''
-        Called when Apply button is pressed.  Goes through all parameters that
-        have changed and attempts to apply them.
-        '''
-        for key, value in self.pending_changes.items():
-            instance, name = key
-            self.apply_change(instance, name, value, info)
-            del self.pending_changes[key]
-            del self.old_values[key]
-
-    def log_event(self, ts, name, value):
-        self.model.data.log_event(ts, name, value)
-        log.debug("EVENT: %d, %s, %r", ts, name, value)
-        
-    def revert(self, info=None):
-        '''Revert changes requested while experiment is running.'''
-        for (object, name), value in self.old_values.items():
-            log.debug('reverting changes for %s', name)
-            setattr(object, name, value)
-        self.old_values = {}
-        self.pending_changes = {}
-
-    ############################################################################
     # Method stubs to be implemented
     ############################################################################
+    
     def resume(self, info=None):
-        error(info.ui.control, 'This action has not been implemented yet')
         raise NotImplementedError
 
     def pause(self, info=None):
-        error(info.ui.control, 'This action has not been implemented yet')
         raise NotImplementedError
 
     def remind(self, info=None):
-        error(info.ui.control, 'This action has not been implemented yet')
         raise NotImplementedError
 
     def initialize_experiment(self, info=None):
-        pass
-
-    def init_current(self, info=None):
-        '''
-        Called whenever the trial sequence needs to be reset (e.g. the number of
-        safes or the parameter sequence changes).
-        '''
-        raise NotImplementedException
+        raise NotImplementedError
 
     def start_experiment(self, info=None):
         '''
@@ -488,84 +352,323 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
         buffers here.  Be sure to call init_current from this method at the
         appropriate point.
         '''
-        raise NotImplementedException
+        raise NotImplementedError
 
     def stop_experiment(self, info=None):
         '''
-        Called when the experiment is stopped.  Shut down any pieces of hardware
-        needed and be sure to save your data!
+        Called when the experiment is stopped. This can normally be (safely)
+        left unimplemented.
         '''
         pass
 
     def get_ts(self):
-        raise NotImplementedException
+        '''
+        Return the current timestamp. Should be a value that we can reference
+        against the rest of the data we are collecting in the experiment.
+        '''
+        raise NotImplementedError
 
     def set_speaker_mode(self, value):
         self.current_speaker_mode = value
 
-    def get_current_settings(self):
-        settings = {}
-        for trait in self.trait_names(current=True):
-            settings[trait] = getattr(self, trait)
-        return settings
+    def set_attenuations(self, att1, att2):
+        # TDT's built-in attenuators for the RZ6 function in 20 dB steps, so we
+        # need to determine the next greater step size for the attenuator.  The
+        # maximun hardware attenuation is 60 dB.
+        hw1, sw1 = RZ6.split_attenuation(att1)
+        hw2, sw2 = RZ6.split_attenuation(att2)
 
-    def set_experiment_parameters(self, setting):
+        # Don't update unless either has changed!
+        if (hw1 != self.current_hw_att1) or (hw2 != self.current_hw_att2):
+            #self.iface_behavior.set_att_bits(RZ6.atten_to_bits(hw1, hw2))
+            self.iface_behavior.set_tag('att1', hw1)
+            self.iface_behavior.set_tag('att2', hw2)
+            self.output_primary.hw_attenuation = hw1
+            self.output_primary.hw_attenuation = hw2
+            self.current_hw_att1 = hw1
+            self.current_hw_att2 = hw2
+            log.debug('Set hardware attenuation to %.2f and %.2f', hw1, hw2)
+
+    def set_expected_speaker_range(self, value):
+        self._update_attenuators()
+
+    def set_fixed_attenuation(self, value):
+        self._update_attenuators()
+
+    def set_speaker_equalize(self, value):
+        self.output_primary.equalize = value
+        self.output_secondary.equalize = value
+
+    def _update_attenuators(self):
+        if self.get_current_value('fixed_attenuation'):
+            expected_range = self.get_current_value('expected_speaker_range')
+            expected_range = [(s.frequency, s.max_level) for s in expected_range]
+            att1 = self.cal_primary.get_best_attenuation(expected_range)
+            att2 = self.cal_secondary.get_best_attenuation(expected_range)
+            log.debug('Best attenuations are %.2f and %.2f', att1, att2)
+            self.set_attenuations(att1, att2)
+        else:
+            self.output_primary.hw_attenuation = None
+            self.output_secondary.hw_attenuation = None
+
+    def log_trial(self, **kwargs):
+        for key, value in self.context_log.items():
+            if value:
+                kwargs[key] = self.current_context[key]
+        self.model.data.log_trial(**kwargs)
+
+    def log_event(self, ts, name, value):
+        self.model.data.log_event(ts, name, value)
+        log.debug("EVENT: %d, %s, %r", ts, name, value)
+
+    '''
+    If an experiment is running, we need to queue changes to most of the
+    settings in the GUI to ensure that the user has a chance to finish making
+    all the changes they desire before the new settings take effect.
+    
+    Supported metadata
+    ------------------
+    ignore
+        Do not monitor the trait for changes
+    immediate
+        Apply the changes immediately (i.e. do not queue the changes)
+        
+    Handling changes to a parameter
+    -------------------------------
+    When a parameter is modified via the GUI, the controller needs to know how
+    to handle this change.  For example, changing the pump rate or reward
+    volume requires sending a command to the pump via the serial port.
+    
+    When a change to a parameter is applied, the class instance the parameter
+    belongs to is checked to see if it has a method, "set_parameter_name",
+    defined. If not, the controller checks to see if it has the method defined
+    on itself.
+    
+    The function must have the following signature
+    
+    def set_parameter_name(self, value)
+    '''
+
+    pending_changes = Dict
+    old_values = Dict
+
+    @classmethod
+    def _get_context_name(cls, instance, trait):
         '''
-        Setting must be an instance of Enthought's HasTraits class.  Each trait
-        reflects a different parameter.  For single-parameter settings, there
-        will only be one trait defined.
+        Return a name that can be accessed via the context namespace.
         '''
-        for parameter, value in setting.parameter_dict().items():
-            getattr(self, 'set_' + parameter)(value)
-            
-    current_parameters = Dict
+        value = getattr(instance, trait)
+        if getattr(instance, 'namespace', None) is not None:
+            return '{}.{}'.format(instance.namespace, trait)
+        return trait
+    
+    #@on_trait_change('model.[data,paradigm].+container*.[+context, +monitor]')
+    @on_trait_change('model.[data,paradigm].[+context, +monitor]',
+                     'model.[data,paradigm].+container.[+context, +monitor]')
+    def handle_change(self, instance, name, old, new):
+        '''
+        Handles changes to traits in the paradigm that have the monitor
+        attribute set to True.  This will also handle traits on objects in the
+        paradigm provided you set the object's metadata to container.
+        '''
+        if self.state <> 'halted':
+            # Obtain the trait definition so we can query its metadata
+            trait = instance.trait(name)
+            if name.endswith('_items'):
+                # Trait change notifications to list items require special
+                # handling. For simplicity, let's just rebuild the old and new
+                # values of the list and treat the change as a completely new
+                # list.
+                removed, added = new.removed, new.added
+                name = name[:-6] # strip the '_items' part
+                new = getattr(instance, name)[:]
+                old = new[:]
+
+                for e in removed:
+                    old.append(e)
+                for e in added:
+                    old.remove(e)
+                
+            if trait.immediate:
+                self.current_expressions[name] = new
+                self.pending_expressions[name] = new
+                self.evaluate_pending_expressions()
+            else:
+                self.queue_change(instance, name, old, new)
+                
+    def queue_change(self, instance, name, old, new):
+        '''
+        Queue a change and make a backup of its old value so we can revert if
+        desired.
+        '''
+        key = instance, name
+
+        if key not in self.old_values:
+            # This is the first time a change has been requested to the trait.
+            # Cache the old value and add the trait to the dictionary of changes
+            # that need to be applied.
+            self.old_values[key] = old
+            self.pending_changes[key] = new
+        elif new == self.old_values[key]:
+            # The user set the value back to its original value without
+            # explicitly requesting a revert.  Remove the trait from the stack
+            # since it no longer needs to be applied.
+            del self.pending_changes[key]
+            del self.old_values[key]
+        else:
+            # There is currently a pending change for the trait in the system,
+            # but a new value has been requested.  Update the dictionary of
+            # requested changes with the most recently requested value.  Do not
+            # update the cache of old values since this cache is meant to
+            # reflect the value of the trait the last time the apply() function
+            # was called.
+            self.pending_changes[key] = new
+
+    def apply(self, info=None):
+        '''
+        Apply all pending changes.
+        '''
+        # Make a backup of the pending changes just in case something happens so
+        # we can roll back to the original values.
+        pending_changes_backup = self.pending_changes.copy()
+        old_values_backup = self.old_values.copy()
+        current_expressions_backup = self.current_expressions.copy()
+        
+        try:
+            # Attempt to evaluate the expressions and apply the resulting values
+            for (instance, name), value in self.pending_changes.items():
+                xname = self._get_context_name(instance, name)
+                self.current_expressions[xname] = deepcopy(value)
+                del self.pending_changes[instance, name]
+                del self.old_values[instance, name]
+            self.invalidate_context()
+            self.evaluate_pending_expressions()
+        except Exception, e:
+            # A problem occured when attempting to apply the context. Roll back
+            # the changes and notify the user.  Hopefully we never reach this
+            # point.
+            self.apply_context(self.old_context)
+            self.pending_changes = pending_changes_backup
+            self.old_values = old_values_backup
+            self.current_expressions = current_expressions_backup
+            self.pending_expressions = {}
+
+            log.exception(e)
+            mesg = '''Unable to apply your requested changes due to an error. No
+            changes have been made. Please review the changes you have requested
+            to ensure that they are indeed valid.\n\n''' + str(e)
+            error(info.ui.control, message=mesg, title='Error applying changes')
+
+    def revert(self, info=None):
+        '''
+        Revert GUI fields to original values
+        '''
+        for (instance, name), value in self.old_values.items():
+            try:
+                setattr(instance, name, value)
+            except TraitError, e:
+                # This is raised for readonly traits so we'll pass them by
+                print e
+                pass
+        self.old_values = {}
+        self.pending_changes = {}
+    
+    current_expressions = Dict
+    pending_expressions = Dict
+    current_evaluated = Dict
     current_context = Dict
-    current_context_list = Property(depends_on='current_context')
+    context_labels = Dict
+    context_log = Dict
+    old_context = Dict
 
-    def init_paradigm(self, paradigm):
-        for parameter in paradigm.trait_names(init=True):
-            value = getattr(paradigm, parameter)
-            getattr(self, 'set_'+parameter)(value)
+    current_context_updated = Event
 
-    def init_context(self):
-        '''
-        Configuring the equipment based on initial values in the paradigm.
-        '''
-        for parameter in self.model.paradigm.get_parameters():
-            value = getattr(self.model.paradigm, parameter)
-            self.current_parameters[parameter] = deepcopy(value)
+    # List of name, value, label tuples (used for displaying in the GUI)
+    current_context_list = List
 
-    def update_context(self, extra_context=None):
+    def invalidate_context(self):
         '''
-        Revaluate all context-dependent variables
+        Invalidate the current context.  This forces the program to reevaluate
+        all expressions.
+        '''
+        self.old_context = self.current_context.copy()
+        self.pending_expressions = self.current_expressions.copy()
+        self.current_context = {}
+
+    def get_current_value(self, name):
+        '''
+        Get the current value of a context variable.  If the context variable
+        has not been evaluated yet, compute its value from the
+        pending_expressions stack.  Additional context variables may be
+        evaluated as needed.
+        '''
+        try:
+            return self.current_context[name]
+        except:
+            evaluate_value(name, self.pending_expressions, self.current_context)
+            self.current_context_updated = True
+            return self.current_context[name]
+
+    def evaluate_pending_expressions(self, extra_context=None):
+        '''
+        Evaluate all pending expressions and store results in current_context.
 
         If extra_content is provided, it will be included in the local
-        namespace.  If extra_content defines the value of a parameter, that
-        value will take precedence.
+        namespace. If extra_content defines the value of a parameter also
+        present in pending_expressions, the value stored in extra_context takes
+        precedence.
         '''
-        if extra_context is None:
-            extra_context = {}
-        data_context = self.model.data.get_context()
+        if extra_context is not None:
+            self.current_context.update(extra_context)
+            for key in extra_context:
+                if key in self.pending_expressions:
+                    del self.pending_expressions[key]
+        evaluate_expressions(self.pending_expressions, self.current_context)
+        self.current_context_updated = True
 
-        old_context = self.current_context.copy()
-        extra_context.update(data_context)
-        
-        new_context = eval_context(self.current_parameters, extra_context)
-        self.current_context = new_context
-        for parameter, value in self.current_context.items():
-            if old_context.get(parameter, None) != value:
-                set_func = 'set_' + parameter
-                if hasattr(self, set_func):
-                    getattr(self, set_func)(value)
+    def apply_context(self, context):
+        for name, value in context.items():
+            self._apply_context_value(name, value)
+        self.current_context_updated = True
 
-    @cached_property
-    def _get_current_context_list(self):
+    @on_trait_change('current_context_items')
+    def _apply_context_changes(self, event):
+        '''
+        Automatically apply changes as expressions are evaluated and their
+        result added to the context
+        '''
+        for name, value in event.added.items():
+            if self.old_context.get(name, None) != value:
+                self._apply_context_value(name, value)
+        for name, value in event.changed.items():
+            if self.old_context.get(name, None) != value:
+                self._apply_context_value(name, value)
+
+    def _apply_context_value(self, name, value):
+        log.debug('Applying %s', name)
+        try:
+            getattr(self, 'set_{}'.format(name))(value)
+        except AttributeError, e:
+            log.warn(str(e))
+
+    @on_trait_change('current_context_updated')
+    def _update_current_context_list(self):
         context = []
-        for k, v in self.current_context.items():
-            try:
-                label = self.model.paradigm.trait(k).label
-                context.append((label, v, k))
-            except:
-                context.append(('', v, k))
-        context.sort()
-        return context
+        for name, value in self.current_context.items():
+            label = self.context_labels.get(name, '')
+            changed = not self.old_context.get(name, None) == value
+            log = self.context_log[name]
+            context.append((name, value, label, log, changed))
+        self.current_context_list = sorted(context)
+
+    def populate_context(self, instance):
+        '''
+        Identify all traits that should be part of the context to be evaluated
+        and add them to the current expression dictionary.
+        '''
+        for name, trait in instance.traits(context=True).items():
+            xname = self._get_context_name(instance, name)
+            self.current_expressions[xname] = getattr(instance, name)
+            self.context_labels[xname] = trait.label
+            self.context_log[xname] = trait.log
+        self.pending_expressions = self.current_expressions.copy()

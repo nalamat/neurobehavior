@@ -2,80 +2,34 @@ from __future__ import division
 
 import numpy as np
 from enthought.traits.api import HasTraits, Any, Instance, DelegatesTo, \
-        Int, Float, Property, on_trait_change, cached_property
+        Int, Float, Property, on_trait_change, cached_property, List, Dict
 from enthought.traits.ui.api import View, Item, VGroup, HGroup, InstanceEditor,\
     VSplit, HSplit, TabularEditor, Group, Include, Tabbed
 
 from enthought.enable.api import Component, ComponentEditor
-
-from analysis_plot_mixin import AnalysisPlotMixin
-
-import cns
-
 from abstract_experiment import AbstractExperiment
-from positive_data import PositiveData
 
-from enthought.chaco.api import DataRange1D, LinearMapper, PlotAxis, PlotGrid, \
+from enthought.chaco.api import DataRange1D, LinearMapper, \
         OverlayPlotContainer
 
-from cns.chaco.channel_data_range import ChannelDataRange
-from cns.chaco.ttl_plot import TTLPlot
-from cns.chaco.timeseries_plot import TimeseriesPlot
-from cns.chaco.dynamic_bar_plot import DynamicBarPlot, DynamicBarplotAxis
-from cns.chaco.helpers import add_default_grids, add_time_axis
+from cns.chaco_exts.channel_data_range import ChannelDataRange
+from cns.chaco_exts.ttl_plot import TTLPlot
+from cns.chaco_exts.extremes_channel_plot import ExtremesChannelPlot
+from cns.chaco_exts.timeseries_plot import TimeseriesPlot
+from cns.chaco_exts.dynamic_bar_plot import DynamicBarPlot, DynamicBarplotAxis
+from cns.chaco_exts.helpers import add_default_grids, add_time_axis
+from cns.chaco_exts.channel_range_tool import ChannelRangeTool
 
 from enthought.traits.ui.api import VGroup, Item
+
+from colors import color_names
 
 from enthought.traits.ui.api import TabularEditor
 from enthought.traits.ui.tabular_adapter import TabularAdapter
 
-from enthought.traits.api import *
-
-from colors import color_names
-
-class ParInfoAdapter(TabularAdapter):
-
-    color_map  = Dict
-    parameters = List
-
-    columns = [ ('P', 'parameter'),
-                ('Hit %', 'hit_frac'), 
-                ('FA %', 'fa_frac'),
-                ('GO/NOGO', 'go_nogo_ratio'),
-                ('GO #', 'go'),
-                ('NOGO #', 'nogo'),
-                ('HIT #', 'hit'),
-                ('MISS #', 'miss'),
-                ('FA #', 'fa'),
-                ('CR #', 'cr'),
-                ('d\'', 'd'),
-                ('C', 'criterion'),
-                (u'WD x\u0304', 'mean_react'),
-                (u'WD x\u0303', 'median_react'),
-                (u'WD \u03C3\u2093', 'std_react'),
-                (u'RS x\u0304', 'mean_resp'),
-                (u'RS x\u0303', 'median_resp'),
-                (u'RS \u03C3\u2093', 'std_resp'),
-                ]
-
-    parameter_text = Property
-
-    def _get_parameter_text(self):
-        return ', '.join('{}'.format(p) for p in self._get_parameters())
-
-    def _get_parameters(self):
-        return [self.item[p] for p in self.parameters]
-
-    def _get_bg_color(self):
-        try:
-            key = ', '.join('{}'.format(p) for p in self._get_parameters()[:-1])
-            return self.color_map[key]
-        except:
-            return
-
 class TrialLogAdapter(TabularAdapter):
 
-    parameters = List(['parameter'])
+    parameters = List([])
 
     # List of tuples (column_name, field )
     columns = [ ('P',       'parameter'),
@@ -112,14 +66,14 @@ class TrialLogAdapter(TabularAdapter):
         return "{0}:{1:02}".format(*divmod(int(seconds), 60))
 
     def _get_bg_color(self):
-        if self.item['ttype'] == 'GO':
-            return color_names['light green']
-        elif self.item['ttype'] == 'GO_REMIND':
+        if self.item['ttype'] == 'GO_REMIND':
             return color_names['dark green']
-        elif self.item['ttype'] == 'NOGO':
-            return color_names['light red']
+        elif self.item['ttype'] == 'GO':
+            return color_names['light green']
         elif self.item['ttype'] == 'NOGO_REPEAT':
             return color_names['dark red']
+        elif self.item['ttype'] == 'NOGO':
+            return color_names['light red']
 
     def _get_reaction_image(self):
         if self.item['reaction'] == 'early':
@@ -144,147 +98,105 @@ class TrialLogAdapter(TabularAdapter):
         else:
             return '@icons:none_node'   # a gray icon
 
-class AbstractPositiveExperiment(AbstractExperiment, AnalysisPlotMixin):
+class AbstractPositiveExperiment(AbstractExperiment):
 
-    index_range         = Any
-    par_info_adapter    = ParInfoAdapter()
-    par_info_editor     = TabularEditor(editable=False,
-                                        adapter=par_info_adapter)
-
-    trial_log_adapter   = TrialLogAdapter()
-    trial_log_editor    = TabularEditor(editable=False,
-                                        adapter=trial_log_adapter)
-    trial_log_view      = Property(depends_on='data.trial_log',
-                                   editor=trial_log_editor)
+    experiment_plot = Instance(Component)
+    trial_log_adapter = TrialLogAdapter()
+    trial_log_editor = TabularEditor(editable=False, adapter=trial_log_adapter)
+    trial_log_view = Property(depends_on='data.trial_log',
+                              editor=trial_log_editor)
 
     @cached_property
     def _get_trial_log_view(self):
-        # Allows us to ensure that last trial always appears at the top of the
-        # list (otherwise we constantly need to scroll down to see the latest
-        # trial).  Eventually we can add per-column sorting back in, but that is
-        # a very low priority.
+        # Reverse the list (this compensates for a bug in Enthought's
+        # Qt implementation of the TabularEditor (TODO submit patch for this
+        # bug)
         return self.data.trial_log[::-1]
 
-    experiment_plot = Instance(Component)
-
-    @on_trait_change('data')
-    def _generate_experiment_plot(self):
-        plots = {}
-        index_range = ChannelDataRange()
-        index_range.sources = [self.data.spout_TTL]
-        index_mapper = LinearMapper(range=index_range)
-        self.index_range = index_range
-
-        container = OverlayPlotContainer(padding=[20, 20, 20, 50])
-
+    def _add_behavior_plots(self, index_mapper, container, alpha=0.25):
         value_range = DataRange1D(low_setting=-0, high_setting=1)
         value_mapper = LinearMapper(range=value_range)
         plot = TTLPlot(channel=self.data.spout_TTL, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
-                fill_color=(0.25, 0.41, 0.88, 0.5), rect_center=0.25,
-                rect_height=0.2)
+                fill_color=(0.25, 0.41, 0.88, alpha), line_width=1,
+                rect_center=0.25, rect_height=0.2)
+        container.add(plot)
+        plot = TTLPlot(channel=self.data.signal_TTL, reference=0,
+                index_mapper=index_mapper, value_mapper=value_mapper,
+                fill_color=(0, 0, 0, alpha), line_color=(0, 0, 0, 0.75),
+                line_width=1, rect_height=0.3, rect_center=0.5)
+        container.add(plot)
+        plot = TTLPlot(channel=self.data.poke_TTL, reference=0,
+                index_mapper=index_mapper, value_mapper=value_mapper,
+                fill_color=(.17, .54, .34, alpha), rect_center=0.75,
+                line_width=1, rect_height=0.2)
+        container.add(plot)
+        plot = TTLPlot(channel=self.data.reaction_TTL, reference=0,
+                index_mapper=index_mapper, value_mapper=value_mapper,
+                fill_color=(1, 0, 0, alpha), line_color=(1, 0, 0, 1),
+                line_width=1, rect_height=0.1, rect_center=0.6)
+        container.add(plot)
+        plot = TTLPlot(channel=self.data.response_TTL, reference=0,
+                index_mapper=index_mapper, value_mapper=value_mapper,
+                fill_color=(0, 1, 0, alpha), line_color=(0, 1, 0, 1),
+                line_width=1, rect_height=0.1, rect_center=0.5)
+        container.add(plot)
+        plot = TTLPlot(channel=self.data.reward_TTL, reference=0,
+                index_mapper=index_mapper, value_mapper=value_mapper,
+                fill_color=(0, 0, 1, alpha), line_color=(0, 0, 1, 1),
+                line_width=1, rect_height=0.1, rect_center=0.4)
+        container.add(plot)
+        plot = TTLPlot(channel=self.data.comm_inhibit_TTL, reference=0,
+                index_mapper=index_mapper, value_mapper=value_mapper,
+                fill_color=(0, 1, 1, alpha), line_color=(0, 1, 1, 1),
+                line_width=1, rect_height=0.1, rect_center=0.2)
+        container.add(plot)
+        plot = TTLPlot(channel=self.data.TO_TTL, reference=0,
+                index_mapper=index_mapper, value_mapper=value_mapper,
+                fill_color=(1, 0, 0, alpha), line_color=(1, 0, 0, 1),
+                line_width=1, rect_height=0.1, rect_center=0.1)
+        container.add(plot)
+
+    @on_trait_change('data')
+    def _generate_experiment_plot(self):
+        plots = {}
+        index_range = ChannelDataRange(trig_delay=0)
+        index_range.sources = [self.data.spout_TTL]
+        index_mapper = LinearMapper(range=index_range)
+        self.index_range = index_range
+        container = OverlayPlotContainer(padding=[20, 20, 50, 5])
+        self._add_behavior_plots(index_mapper, container, 0.5)
+
+        plot = container.components[0]
 
         add_default_grids(plot, major_index=1, minor_index=0.25)
         add_time_axis(plot, orientation='top')
-        container.add(plot)
-
-        plots["Spout Contact"] = plot
-
-        plot = TTLPlot(channel=self.data.poke_TTL, reference=0,
-                index_mapper=index_mapper, value_mapper=value_mapper,
-                fill_color=(.17, .54, .34, 0.5), rect_center=0.75,
-                rect_height=0.2)
-
-        container.add(plot)
-        plots["Nose Poke"] = plot
-
-        plot = TTLPlot(channel=self.data.signal_TTL, reference=0,
-                index_mapper=index_mapper, value_mapper=value_mapper,
-                fill_color=(0, 0, 0, 0.25), line_color=(0, 0, 0, 0.75),
-                line_width=1, rect_height=0.3, rect_center=0.5)
-        container.add(plot)
-        plots["Signal"] = plot
-
-        plot = TTLPlot(channel=self.data.reaction_TTL, reference=0,
-                index_mapper=index_mapper, value_mapper=value_mapper,
-                fill_color=(1, 0, 0, 0.25), line_color=(1, 0, 0, 1),
-                line_width=1, rect_height=0.1, rect_center=0.6)
-        container.add(plot)
-        plots["Reaction Window"] = plot
-
-        plot = TTLPlot(channel=self.data.response_TTL, reference=0,
-                index_mapper=index_mapper, value_mapper=value_mapper,
-                fill_color=(0, 1, 0, 0.25), line_color=(0, 1, 0, 1),
-                line_width=1, rect_height=0.1, rect_center=0.5)
-        container.add(plot)
-        plots["Response Window"] = plot
-
-        plot = TTLPlot(channel=self.data.reward_TTL, reference=0,
-                index_mapper=index_mapper, value_mapper=value_mapper,
-                fill_color=(0, 0, 1, 0.25), line_color=(0, 0, 1, 1),
-                line_width=1, rect_height=0.1, rect_center=0.4)
-        container.add(plot)
-        plots["Reward Window"] = plot
-
-        plot = TTLPlot(channel=self.data.TO_TTL, reference=0,
-                index_mapper=index_mapper, value_mapper=value_mapper,
-                fill_color=(1, 0, 0, 0.5), line_color=(1, 0, 0, 1),
-                line_width=1, rect_height=0.1, rect_center=0.125)
-        container.add(plot)
-        plots["Timeout Window"] = plot
-
-        plot = TTLPlot(channel=self.data.TO_safe_TTL, reference=0,
-                index_mapper=index_mapper, value_mapper=value_mapper,
-                fill_color=(0, 0.5, 0, 0.25), line_color=(0, 0.5, 0, 1),
-                line_width=1, rect_height=0.1, rect_center=0.125)
-        container.add(plot)
-        plots["Timeout Safe Window"] = plot
 
         self.experiment_plot = container
-
-    pump_group = VGroup(
-            Item('handler.pump_toolbar', style='custom',
-                 show_label=False), 
-            Item('object.data.water_infused',
-                 label='Dispensed (mL)', style='readonly'),
-            Item('object.paradigm.pump_syringe'),
-            Item('object.paradigm.pump_syringe_diameter', 
-                 label='Diameter (mm)', style='readonly'),
-            label='Pump Status',
-            show_border=True,
-            )
 
     status_group = VGroup(
             Item('animal', style='readonly'),
             Item('handler.status', style='readonly'),
-            Item('handler.current_poke_dur', 
-                 label='Poke duration (s)', style='readonly'),
-            Item('handler.current_setting_go', style='readonly',
-                 label='Current GO'),
+            Item('handler.current_setting', style='readonly',
+                 label='Current setting'),
             label='Experiment',
             show_border=True,
             )
 
-    plots_group = VSplit(
-            VGroup(
-                HGroup(HGroup('object.index_range.span')),
-                Item('experiment_plot', editor=ComponentEditor(),
-                    show_label=False, width=1000, height=300)
-                ),
+    plots_group = VGroup(
+            Item('experiment_plot', editor=ComponentEditor(), show_label=False,
+                width=1000, height=300),
             Include('analysis_plot_group'),
-            Item('object.data.par_info', editor=par_info_editor,
-                label='Performance Statistics'),
             show_labels=False,
             )
 
     traits_group = HSplit(
             VGroup(
                 Item('handler.toolbar', style='custom'),
-                Include('pump_group'),
                 Include('status_group'),
                 Tabbed(
-                    Item('handler', editor=InstanceEditor(view='method_view')),
-                    Item('paradigm', style='custom', editor=InstanceEditor()),
+                    Item('paradigm', style='custom', editor=InstanceEditor(),
+                         label='Settings'),
                     Include('context_group'),
                     show_labels=False,
                     ),
@@ -296,17 +208,21 @@ class AbstractPositiveExperiment(AbstractExperiment, AnalysisPlotMixin):
                     Item('object.data.global_fa_frac', label='Mean FA (frac)'),
                     Item('object.data.go_trial_count', label='Total GO'),
                     Item('object.data.nogo_trial_count', label='Total NOGO'),
-                    Item('object.data.max_reaction_time', 
-                        label='Slowest Mean Reaction Time (s)'),
-                    Item('object.data.max_response_time', 
-                        label='Slowest Mean Response Time (s)'),
-                    label='Statistics Summary',
+                    Item('object.data.water_infused', 
+                        label='Water dispensed (mL)'),
+                    label='Experiment Summary',
                     style='readonly',
                     show_border=True,
                     ),
+                VGroup(
+                    Item('object.data.mask_mode'),
+                    Item('object.data.mask_num'),
+                    label='Analysis settings',
+                    show_border=True,
+                    ),
                 Tabbed(
-                    Include('analysis_group'),
                     Item('trial_log_view', label='Trial log'),
+                    Include('analysis_settings_group'),
                     show_labels=False,
                     ),
                 show_labels=False,

@@ -1,18 +1,18 @@
-import cPickle as pickle
-
 from enthought.pyface.api import error, information
 from cns.data.ui.cohort import CohortView, CohortViewHandler
 from cns.data import persistence
 from cns.data.h5_utils import get_or_append_node
 import sys
 import tables
-from os.path import join
+import imp
+import os
+from os.path import join, dirname, basename, exists
 
 from enthought.traits.api import Any, Trait, TraitError, Bool, Str
 from enthought.traits.ui.api import View, Item, VGroup, HGroup, Spring
-from experiments.trial_setting import TrialSetting, trial_setting_editor
+from experiments import trial_setting
 from enthought.traits.api import Float
-from enthought.traits.ui.api import ObjectColumn
+import neurogen
 
 import logging
 log = logging.getLogger(__name__)
@@ -20,18 +20,12 @@ log = logging.getLogger(__name__)
 # Import the experiments
 from cns.data.ui.cohort import CohortEditor, CohortView, CohortViewHandler
 from cns.data.h5_utils import append_node, append_date_node
-
-from scripts import settings
-
-#import imp
-#import os
-#settings_file = os.path.dirname(os.ENVIRON['NEUROBEHAVIOR_SETTINGS']) 
-#imp.find_module('settings', os.ENVIRON['NEUROBEHAVIOR_SETTINGS'])
+from cns import get_config
 
 class ExperimentCohortView(CohortView):
 
-    #path = settings.COHORT_ROOT
-    #wildcard = settings.COHORT_WILDCARD
+    path = get_config('COHORT_ROOT')
+    wildcard = get_config('COHORT_WILDCARD')
 
     traits_view = View(
         VGroup(
@@ -154,41 +148,45 @@ class ExperimentLauncher(CohortViewHandler):
             self.launch_experiment(info, info.object.selected)
 
 def prepare_experiment(args, store_node):
-    # Load the experiment classes
-    e = get_experiment(args.type)
-    node_name = e['node_name'] + '_' + '_'.join(args.rove)
+    if len(args.analyze) == 0:
+        args.analyze = args.rove[:]
+
+    module = get_experiment(args.type)
+    
+    # Find the classes
+    paradigm_class = module.Paradigm
+    experiment_class = module.Experiment
+    controller_class = module.Controller
+    data_class = module.Data
+    node_name = module.node_name
+
+    #e = get_experiment(args.type)
     exp_node = append_date_node(store_node, node_name + '_')
     data_node = append_node(exp_node, 'data')
 
-    experiment_class, experiment_args = e['experiment']
-    data_class, data_args = e['data']
-    paradigm_class, paradigm_args = e['paradigm']
-    controller_class, controller_args = e['controller']
-
     # Configure the TrialSetting/trial_setting_editor objects to contain the
     # parameters we wish to control in the experiment
-    columns = []
-    for parameter in args.rove:
-        label = paradigm_class.class_traits()[parameter].label
-        try:
-            trait = Float(label=label, store='attribute')
-            TrialSetting.add_class_trait(parameter, trait)
-        except TraitError:
-            pass
-        finally:
-            column = ObjectColumn(name=parameter, label=label, width=75)
-            columns.append(column)
-    TrialSetting.parameters = args.rove
-    trial_setting_editor.columns = columns
+    trial_setting.add_parameters(args.rove, paradigm_class)
 
     # Load the calibration data
-    #controller_args['cal_primary'] = neurogen.load_mat_cal(settings.CAL_PRIMARY)
-    #controller_args['cal_secondary'] = neurogen.load_mat_cal(settings.CAL_SECONDARY)
+    from neurogen.calibration import Calibration
 
-    # Prepare the classes.  This really is a lot of boilerplate to link up
+    filename = get_config('CAL_PRIMARY')
+    cal_primary = neurogen.load_mat_cal(filename, False)
+    log.debug('Loaded calibration file %s for primary', filename)
+
+    filename = get_config('CAL_SECONDARY')
+    cal_secondary = neurogen.load_mat_cal(filename, False)
+    log.debug('Loaded calibration file %s for secondary', filename)
+
+    controller_args = {}
+    controller_args['cal_primary'] = cal_primary
+    controller_args['cal_secondary'] = cal_secondary
+    
+    # Prepare the classes. This really is a lot of boilerplate to link up
     # parameters with paradigms, etc, to facilitate analysis
-    paradigm = paradigm_class(**paradigm_args)
-    data = data_class(store_node=data_node, **data_args)
+    paradigm = paradigm_class()
+    data = data_class(store_node=data_node)
     data.parameters = args.analyze
     model = experiment_class(
             store_node=store_node, 
@@ -197,7 +195,6 @@ def prepare_experiment(args, store_node):
             data=data,
             paradigm=paradigm,
             spool_physiology=args.physiology,
-            **experiment_args
             )
     if len(args.analyze) > 0:
         model.plot_index = args.analyze[0]
@@ -209,25 +206,41 @@ def prepare_experiment(args, store_node):
     return model, controller
 
 def test_experiment(args):
-    #from cns import TEMP_ROOT
-    filename = join(settings.TEMP_ROOT, 'test_experiment.hd5')
-    file = tables.openFile(filename, 'w')
-    model, controller = prepare_experiment(args, file.root)
+    '''
+    Run experiment using a temporary file for the data
+    '''
+    # Create a temporary file to write the data to
+    import tempfile
+    tempname = 'neurobehavior_tmp.h5'
+    tempdir = tempfile.gettempdir()
+    filename = os.path.join(tempfile.gettempdir(), tempname)
+    log.debug("Creating temporary file %s for testing", filename)
+    launch_experiment(args, filename, True)
+
+    # Once the program exists, remove the temporary file
+    os.unlink(filename)
+    log.debug("Deleted temporary file %s", filename)
+
+def launch_experiment(args, filename, overwrite=False):
+    log.debug('Opening file %s for writing', filename)
+    handle = tables.openFile(filename, 'a')
+    model, controller = prepare_experiment(args, handle.root)
     model.configure_traits(handler=controller)
+    handle.close()
+    log.debug('Closing file %s', filename)
 
 def profile_experiment(args):
-    #from cns import TEMP_ROOT
     import cProfile
-    profile_data_file = join(settings.TEMP_ROOT, 'profile.dmp')
+    profile_data_file = join(get_config('TEMP_ROOT'), 'profile.dmp')
     cProfile.runctx('test_experiment(args)', globals(), {'args': args},
-            filename=profile_data_file)
+                    filename=profile_data_file)
 
     # Once experiment is done, print out some statistics
     import pstats
     p = pstats.Stats(profile_data_file)
     p.strip_dirs().sort_stats('cumulative').print_stats(50)
 
-def launch_experiment(args):
+def launch_experiment_selector(args):
     handler = ExperimentLauncher(args=args)
     ExperimentCohortView().configure_traits(handler=handler)
 
@@ -235,10 +248,12 @@ def inspect_experiment(args):
     '''
     Print out parameters available for requested paradigm
     '''
-    e = get_experiment(args.type)
-    p = e['paradigm'][0]()
-    parameters = list(p.parameter_info.items())
-    parameters.sort()
+    
+    # Get a list of the parameters available in the paradigm
+    p = get_experiment(args.type).Paradigm
+    parameters = sorted(list(p.get_parameter_info().items()))
+
+    # Add the column headings
     parameters.insert(0, ('Variable Name', 'Label'))
     parameters.insert(1, ('-------------', '-----'))
 
@@ -260,85 +275,9 @@ def inspect_experiment(args):
 def get_invalid_parameters(args):
     parameters = set(args.rove)
     parameters.update(args.analyze)
-    paradigm = get_experiment(args.type)['paradigm'][0]()
+    paradigm = get_experiment(args.type).Paradigm
     return [p for p in parameters if p not in paradigm.get_parameters()]
-
-import re
-
-# Define the classes required for each experiment.
-EXPERIMENTS = {
-        'basic_characterization': {
-            'experiment':   ('AbstractExperiment', {}), 
-            'paradigm':     ('BasicCharacterizationParadigm', {}),
-            'controller':   ('BasicCharacterizationController', {}), 
-            'data':         ('AbstractExperimentData', {}),
-            'node_name':    'BasicCharacterizationExperiment',
-            },
-        'positive_training': {
-            'experiment':   ('PositiveStage1Experiment', {}),
-            'paradigm':     ('PositiveStage1Paradigm', {}),
-            'controller':   ('PositiveStage1Controller', {}),
-            'data':         ('PositiveStage1Data', {}),
-            'node_name':    'PositiveStage1Experiment',
-            },
-        'positive_am_noise': {
-            'experiment':   ('AbstractPositiveExperiment', {}), 
-            'paradigm':     ('PositiveAMNoiseParadigm', {}), 
-            'controller':   ('PositiveAMNoiseController', {}), 
-            'data':         ('PositiveData',  {}),
-            'node_name':    'PositiveAMNoiseExperiment',
-            },
-        'positive_dt': {
-            'experiment':   ('AbstractPositiveExperiment', {}), 
-            'paradigm':     ('PositiveDTParadigm', {}),
-            'controller':   ('PositiveDTController', {}), 
-            'data':         ('PositiveData', {}),
-            'node_name':    'PositiveDTExperiment',
-            },
-        'aversive_fm': {
-            'experiment':   ('AbstractAversiveExperiment', {}), 
-            'paradigm':     ('AversiveFMParadigm', {}),
-            'controller':   ('AversiveFMController', {}), 
-            'data':         ('AversiveData', {}),
-            'node_name':    'AversiveFMExperiment',
-            },
-        'aversive_dt': {
-            'experiment':   ('AbstractAversiveExperiment', {}), 
-            'paradigm':     ('AversiveDTParadigm', {}),
-            'controller':   ('AversiveDTController', {}), 
-            'data':         ('AversiveData', {}),
-            'node_name':    'AversiveDTExperiment',
-            },
-        'aversive_am_noise': {
-            'experiment':   ('AbstractAversiveExperiment', {}), 
-            'paradigm':     ('AversiveAMNoiseParadigm', {}),
-            'controller':   ('AversiveAMNoiseController', {}), 
-            'data':         ('AversiveData', {}),
-            'node_name':    'AversiveAMNoiseExperiment',
-            },
-        'aversive_noise_masking': {
-            'experiment':   ('AbstractAversiveExperiment', {}), 
-            'paradigm':     ('AversiveNoiseMaskingParadigm', {}),
-            'controller':   ('AversiveNoiseMaskingController', {}), 
-            'data':         ('AversiveData', {}),
-            'node_name':    'AversiveNoiseMaskingExperiment',
-            },
-        }
-
-def convert(name):
-    s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
-    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
 def get_experiment(etype):
     from importlib import import_module
-    experiment = EXPERIMENTS[etype].copy()
-    for k, v in experiment.items():
-        if k != 'node_name' and type(v[0]) == type(''):
-            try:
-                klass = __import__(v[0])
-            except:
-                module = '.' + convert(v[0])
-                module = import_module(module, package='experiments')
-                klass = getattr(module, v[0])
-            experiment[k] = (klass, v[1])
-    return experiment
+    return import_module('launchers.{}'.format(etype))

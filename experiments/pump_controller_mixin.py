@@ -90,6 +90,8 @@ class PumpControllerMixin(HasTraits):
         self.iface_pump.set_rate(value, unit='ml/min')
 
     def set_pump_syringe_diameter(self, value):
+        while self.iface_pump.get_status() != 'halted':
+            pass
         self.iface_pump.set_diameter(value, unit='mm')
 
     def set_pump_rate_delta(self, value):

@@ -9,7 +9,7 @@ from trial_setting import TrialSetting, trial_setting_editor
 from abstract_experiment_paradigm import AbstractExperimentParadigm
 from pump_paradigm_mixin import PumpParadigmMixin
 
-from eval import ExpressionTrait
+from evaluate import Expression
 
 class AbstractAversiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
     '''Defines an aversive paradigm, but not the signals that will be used.
@@ -19,27 +19,19 @@ class AbstractAversiveParadigm(AbstractExperimentParadigm, PumpParadigmMixin):
     '''
     # Trait defines a drop-down selector if you provide it with a list of
     # options
-    order         = Trait('descending', choice.options, store='attribute')
-    warn_sequence = List(Instance(TrialSetting), minlen=1,
-                         store='child', editor=trial_setting_editor)
-    remind        = Instance(TrialSetting, (), store='child')
-    safe          = Instance(TrialSetting, (), store='child')
 
-    def _warn_sequence_default(self):
-        return [TrialSetting()]
-
-    prevent_disarm = Bool(True, store='attribute', 
+    prevent_disarm = Bool(True, store='attribute', context=True,
             label='Prevent disarming of aversive stimulus?')
 
     # By default, Range provides a slider as the GUI widget.  Note that you can
     # override the default widget if desired.
-    lick_th = ExpressionTrait(0.75, label='Contact threshold')
-    aversive_delay = ExpressionTrait(1, label='Aversive Stimulus Delay (s)')
-    aversive_duration = ExpressionTrait(0.3, label='Aversive Stimulus Duration (s)')
-    shock_level = ExpressionTrait(0.5, label='Shock level (mA)')
+    lick_th = Expression(0.75, label='Contact threshold')
+    aversive_delay = Expression(1, label='Aversive Stimulus Delay (s)')
+    aversive_duration = Expression(0.3, label='Aversive Stimulus Duration (s)')
+    shock_level = Expression(0.5, label='Shock level (mA)')
 
-    num_safe = ExpressionTrait('randint(2, 5)', label='Number of safes')
-    trial_duration = ExpressionTrait(1.0, label='Trial duration (s)') 
+    num_safe = Expression('randint(2, 5)', label='Number of safes')
+    trial_duration = Expression(1.0, label='Trial duration (s)') 
 
     #===========================================================================
     # The views available

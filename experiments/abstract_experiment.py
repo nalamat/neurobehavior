@@ -17,13 +17,24 @@ log = logging.getLogger(__name__)
 
 from enthought.traits.ui.api import TabularEditor
 from enthought.traits.ui.tabular_adapter import TabularAdapter
+from colors import color_names
 
 class ContextAdapter(TabularAdapter):
 
     columns = [('Parameter'), ('Value'), ('Variable')]
 
-    def get_width(self, object, trait, column):
+    def get_image(self, obj, trait, row, column):
+        if column == 0 and self.item[-2]:
+            return '@icons:tuple_node'
+
+    def get_width(self, obj, trait, column):
         return 100
+
+    def get_bg_color(self, obj, trait, row):
+        if self.item[-1]:
+            return color_names['light green']
+        else:
+            return color_names['white']
 
 context_editor = TabularEditor(adapter=ContextAdapter(), editable=False)
 
@@ -36,7 +47,6 @@ class AbstractExperiment(PhysiologyExperimentMixin):
 
     paradigm            = Instance(AbstractExperimentParadigm, store='child')
     data                = Instance(AbstractExperimentData, store='child')
-
     start_time          = Instance(datetime, store='attribute')
     stop_time           = Instance(datetime, store='attribute')
     duration            = Property(store='attribute')
@@ -57,9 +67,7 @@ class AbstractExperiment(PhysiologyExperimentMixin):
             return self.stop_time-self.start_time
 
     key_bindings = KeyBindings(
-        KeyBinding(binding1='Ctrl-m', method_name='toggle_maximized'),
-        KeyBinding(binding1='Ctrl-f', method_name='toggle_fullscreen'),
-        KeyBinding(binding1='Ctrl-s', method_name='swap_screens'),
+        KeyBinding(binding1='Ctrl-r', method_name='start'),
         )
 
     traits_group = VGroup(

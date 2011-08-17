@@ -5,8 +5,8 @@ from enthought.enable.api import Component, ComponentEditor
 from enthought.chaco.api import DataRange1D, LinearMapper, \
         PlotAxis, PlotGrid, OverlayPlotContainer
 
-from cns.chaco.channel_data_range import ChannelDataRange
-from cns.chaco.ttl_plot import TTLPlot
+from cns.chaco_exts.channel_data_range import ChannelDataRange
+from cns.chaco_exts.ttl_plot import TTLPlot
 
 from abstract_experiment import AbstractExperiment
 from positive_stage1_paradigm import PositiveStage1Paradigm

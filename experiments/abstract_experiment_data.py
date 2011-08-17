@@ -1,4 +1,6 @@
 import numpy as np
+import logging
+log = logging.getLogger(__name__)
 
 from physiology_data_mixin import PhysiologyDataMixin
 from pump_data_mixin import PumpDataMixin
@@ -31,8 +33,7 @@ class AbstractExperimentData(PhysiologyDataMixin, PumpDataMixin):
 
     def get_context(self):
         context_names = self.trait_names(context=True)
-        context = dict((t, getattr(self, t)) for t in context_names)
-        return context
+        return dict((t, getattr(self, t)) for t in context_names)
 
     # Node to store the data in
     store_node = Any
@@ -50,7 +51,6 @@ class AbstractExperimentData(PhysiologyDataMixin, PumpDataMixin):
     _trial_log = List
     _trial_log_columns = Tuple
     trial_log = Property(store='table', depends_on='_trial_log')
-    masked_trial_log = Property(depends_on='_trial_log')
 
     @cached_property
     def _get_trial_log(self):
@@ -60,19 +60,15 @@ class AbstractExperimentData(PhysiologyDataMixin, PumpDataMixin):
         else:
             return []
 
-    @cached_property
-    def _get_masked_trial_log(self):
-        return self.trial_log
-
-    par_seq = Property(depends_on='trial_log, parameters')
+    par_seq = Property(depends_on='masked_trial_log, parameters')
 
     @cached_property
     def _get_par_seq(self):
         try:
-            arr = np.empty(len(self.trial_log), dtype=object)
-            arr[:] = zip(*[self.trial_log[p] for p in self.parameters])
+            arr = np.empty(len(self.masked_trial_log), dtype=object)
+            arr[:] = zip(*[self.masked_trial_log[p] for p in self.parameters])
             return arr
-        except:
+        except Exception, e:
             return np.array([])
 
     def channel_from_buffer(self, buffer, channel_name):
@@ -89,7 +85,7 @@ class AbstractExperimentData(PhysiologyDataMixin, PumpDataMixin):
 
         setattr(self, channel_name, channel)
 
-    par_mask = Property(depends_on='trial_log, parameters')
+    par_mask = Property(depends_on='masked_trial_log, parameters')
 
     @cached_property
     def _get_par_mask(self):
@@ -106,7 +102,7 @@ class AbstractExperimentData(PhysiologyDataMixin, PumpDataMixin):
             result.append(m)
         return result
 
-    pars = Property(List(Int), depends_on='trial_log, parameters')
+    pars = Property(List(Int), depends_on='masked_trial_log, parameters')
 
     @cached_property
     def _get_pars(self):
@@ -122,7 +118,7 @@ class AbstractExperimentData(PhysiologyDataMixin, PumpDataMixin):
         elif names == self._trial_log_columns:
             self._trial_log.append(record)
         else:
-            print set(names).difference(self._trial_log_columns)
-            print set(self._trial_log_columns).difference(names)
-            raise ValueError, "Invalid log_trial attempt"
+            log.debug("Expected the following columns %r", self._trial_log_columns)
+            log.debug("Recieved the following columns %r", names)
+            raise AttributeError, "Invalid log_trial attempt"
         self.new_trial = kwargs

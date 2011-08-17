@@ -13,8 +13,7 @@ setup(
     description=description,
     #package_data={'experiments': ['components/*.rcx']},
     #requires=['tdtpy', 'new_era'],
-    scripts=['scripts/load_experiment.py', 'scripts/edit_cohort.py',
-             'scripts/settings.py'], 
+    scripts=['scripts/load_experiment.py', 'scripts/edit_cohort.py',]
 )
 
 #import os
