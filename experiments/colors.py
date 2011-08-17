@@ -7,6 +7,7 @@ color_names = {
     'dark red': '#FA8072',
     'gray': '#D3D3D3',
     'light blue': '#ADD8E6',
+    'white': '#FFFFFF',
           }
 
 

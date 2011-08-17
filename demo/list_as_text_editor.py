@@ -5,7 +5,7 @@ Created on May 4, 2010
 '''
 from enthought.traits.api import HasTraits, List, Float
 from enthought.traits.ui.api import View, Item
-from cns.traits.ui.api import ListAsStringEditor
+from cns.trait_defs.ui.api import ListAsStringEditor
 
 class Parameters(HasTraits):
 

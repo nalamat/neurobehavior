@@ -2,7 +2,7 @@ from tdt import DSPCircuit
 
 from abstract_aversive_controller import AbstractAversiveController
 
-from cns import RCX_ROOT
+from cns import get_config
 from os.path import join
 
 class AversiveFMController(AbstractAversiveController):
@@ -11,7 +11,7 @@ class AversiveFMController(AbstractAversiveController):
         # AversiveFMController needs to change the initialization sequence a
         # little (i.e. it needs to use different microcode and the microcode
         # does not contain int and trial buffers).
-        circuit = join(RCX_ROOT, 'aversive-behavior-FM')
+        circuit = join(get_config('RCX_ROOT'), 'aversive-behavior-FM')
         self.iface_behavior = self.process.load_circuit(circuit, 'RZ6')
         self.buffer_TTL = self.iface_behavior.get_buffer('TTL', 'r',
                 src_type='int8', dest_type='int8', block_size=24)

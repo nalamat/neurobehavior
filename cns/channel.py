@@ -11,10 +11,10 @@
 import warnings
 from cns.buffer import SoftwareRingBuffer
 from cns.data.h5_utils import append_node
-from cns.util.signal import rfft
+#from cns.util.signal import rfft
 from enthought.traits.api import HasTraits, Property, Array, Int, Event, \
     Instance, on_trait_change, Bool, Any, String, Float, cached_property, List, Str, \
-    DelegatesTo, Enum, Dict
+    DelegatesTo, Enum, Dict, Set
 import numpy as np
 import tables
 
@@ -118,8 +118,6 @@ class Channel(HasTraits):
             Check that start and end fall within the valid data range
         '''
         t0_index = int(self.t0*self.fs)
-        #lb = np.max(0, start-t0_index+reference)
-        #ub = np.max(0, end-t0_index+reference)
         lb = start-t0_index+reference
         ub = end-t0_index+reference
 
@@ -306,27 +304,32 @@ class FileChannel(Channel):
     use_checksum
         Ensures data integrity, but at cost of degraded read/write performance
 
-    Default settings for the compression filter should create the smallest
-    possible file size while providing adequate read/write performance.
-    Checksumming allows us to check for data integrity.  I have it disabled by
-    default because small aberrations in a large, continuous waveform are not of
-    as much concern to us and I understand there can be a sizable performance
-    penalty.
+    Default settings for the compression filter are no compression which
+    provides the best read/write performance. 
     
     Note that if compression_level is > 0 and compression_type is None,
     tables.Filter will raise an exception.
     '''
-    compression_level   = Int(9)
-    compression_type    = Enum('zlib', 'lzo', 'bzip', 'blosc', None)
+
+    # According to http://www.pytables.org/docs/manual-1.4/ch05.html the best
+    # compression method is LZO with a compression level of 1 and shuffling, but
+    # it really depends on the type of data we are collecting.
+    compression_level   = Int(0)
+    compression_type    = Enum(None, 'lzo', 'zlib', 'bzip', 'blosc')
     use_checksum        = Bool(False)
+    use_shuffle         = Bool(False)
     
     # It is important to implement dtype appropriately, otherwise it defaults to
     # float64 (double-precision float).
-    dtype = Any
+    dtype               = Any
 
     node                = Instance(tables.group.Group)
     name                = String('FileChannel')
-    expected_duration   = Float(1800) # seconds
+
+    # Duration is in seconds.  The default corresponds to a 30 minute
+    # experiment, which we seem to have settled on as the "standard" for running
+    # appetitive experiments.
+    expected_duration   = Float(1800) 
     shape               = Property
     buffer              = Instance(tables.array.Array)
 
@@ -336,13 +339,13 @@ class FileChannel(Channel):
     def _buffer_default(self):
         atom = tables.Atom.from_dtype(np.dtype(self.dtype))
         filters = tables.Filters(complevel=self.compression_level,
-                complib=self.compression_type, fletcher32=self.use_checksum)
+                complib=self.compression_type, fletcher32=self.use_checksum,
+                shuffle=self.use_shuffle)
         buffer = append_node(self.node, self.name, 'EArray', atom, self.shape,
                 expectedrows=int(self.fs*self.expected_duration),
                 filters=filters)
         return buffer
 
-    #@on_trait_change('fs')
     def _fs_changed(self, new):
         self.buffer.setAttr('fs', self.fs)
 
@@ -493,46 +496,45 @@ class FileMultiChannel(MultiChannel, FileChannel):
         buffer.setAttr('channels', self.channels)
         return buffer
 
-#class SnippetChannel(Channel):
-#
-#    buffer = Instance(SoftwareRingBuffer)
-#    samples = Int
-#    history = Int
-#    signal = Property(Array(dtype='f'))
-#    average_signal = Property(Array(dtype='f'))
-#    buffered = Int(0)
-#    buffer_full = Bool(False)
-#
-#    @on_trait_change('samples, fs, history')
-#    def _configure_buffer(self):
-#        self.buffer = SoftwareRingBuffer((self.history, self.samples))
-#
-#    def _get_t(self):
-#        return np.arange(-self.samples, 0) / self.fs
-#
-#    def _get_signal(self):
-#        return self.buffer.buffered
-#
-#    def send(self, data):
-#        # Ensure that 1D arrays containing a single snippet are broadcast
-#        # properly to the correct shape.
-#        data.shape = (-1, self.samples)
-#        added = self.buffer.write(data)
-#
-#        if self.buffer_full:
-#            self.updated = added, added
-#        else:
-#            self.buffered += added
-#            if self.buffered > self.history:
-#                self.buffer_full = True
-#                removed = self.buffered % self.history
-#                self.buffer_full
-#                self.updated = removed, added
-#            else:
-#                self.updated = 0, added
-#
-#    def _get_average_signal(self):
-#        return self.buffer.buffered.mean(0)
-#
-#    def __len__(self):
-#        return self.samples
+class FileSnippetChannel(FileChannel):
+
+    snippet_size = Int
+    classifiers = Any
+    timestamps = Any
+    unique_classifiers = Set
+
+    def _classifiers_default(self):
+        atom = tables.Atom.from_dtype(np.dtype('int32'))
+        array = append_node(self.node, self.name + '_classifier', 'EArray', atom,
+                (0,), expectedrows=int(self.fs*self.expected_duration))
+        return array
+
+    def _timestamps_default(self):
+        atom = tables.Atom.from_dtype(np.dtype('int32'))
+        array = append_node(self.node, self.name + '_ts', 'EArray', atom,
+                (0,), expectedrows=int(self.fs*self.expected_duration))
+        return array
+    
+    def _get_shape(self):
+        return (0, self.snippet_size)
+
+    def send(self, data, timestamps, classifiers):
+        data.shape = (-1, self.snippet_size)
+        self.buffer.append(data)
+        self.classifiers.append(classifiers)
+        self.timestamps.append(timestamps)
+        self.unique_classifiers.update(set(classifiers))
+        self.updated = True
+
+    def get_recent(self, history=1, classifier=None):
+        if len(self.buffer) == 0:
+            return np.array([]).reshape((-1, self.snippet_size))
+        spikes = self.buffer[-history:]
+        if classifier is not None:
+            classifiers = self.classifiers[-history:]
+            mask = classifiers[:] == classifier
+            return spikes[mask]
+        return spikes
+
+    def get_recent_average(self, count=1, classifier=None):
+        return self.get_recent(count, classifier).mean(0)

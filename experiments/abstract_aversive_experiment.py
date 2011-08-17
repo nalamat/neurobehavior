@@ -7,11 +7,11 @@ from enthought.enable.api import Component, ComponentEditor
 from enthought.chaco.api import DataRange1D, LinearMapper, PlotLabel, \
         VPlotContainer, PlotAxis, OverlayPlotContainer, Legend, ToolTip
 
-from cns.chaco.channel_data_range import ChannelDataRange
-from cns.chaco.channel_plot import ChannelPlot
-from cns.chaco.ttl_plot import TTLPlot
-from cns.chaco.dynamic_bar_plot import DynamicBarPlot, DynamicBarplotAxis
-from cns.chaco.helpers import add_default_grids, add_time_axis
+from cns.chaco_exts.channel_data_range import ChannelDataRange
+from cns.chaco_exts.channel_plot import ChannelPlot
+from cns.chaco_exts.ttl_plot import TTLPlot
+from cns.chaco_exts.dynamic_bar_plot import DynamicBarPlot, DynamicBarplotAxis
+from cns.chaco_exts.helpers import add_default_grids, add_time_axis
 
 from abstract_experiment import AbstractExperiment
 from abstract_aversive_paradigm import AbstractAversiveParadigm
@@ -50,9 +50,7 @@ class TrialLogAdapter(TabularAdapter):
     contact_score_text = Property
 
     def _get_parameter_text(self):
-        #print self.object.par_seq[self.row]
         return str(self.object.par_seq[-self.row])
-        #return ', '.join('{}'.format(p) for p in self.item['parameter'])
 
     def _get_speaker_text(self):
         return self.item['speaker'][0].upper()

@@ -1,91 +1,111 @@
-# Major library imports
-from numpy import arange, sort
-from numpy.random import random
+from os.path import join
+import numpy as np
+from cns.chaco_exts.snippet_channel_plot import SnippetChannelPlot
 
-from enthought.enable.example_support import DemoFrame, demo_main
-
-# Enthought library imports
 from enthought.enable.api import Component, ComponentEditor, Window
-from enthought.traits.api import HasTraits, Instance, Button
-from enthought.traits.ui.api import Item, Group, View
+from enthought.traits.api import HasTraits, Instance, Button, Any
+from enthought.traits.ui.api import Item, Group, View, Controller
+from enthought.pyface.timer.api import Timer
+from enthought.chaco.api import (LinearMapper, DataRange1D,
+        OverlayPlotContainer, PlotAxis)
+from enthought.chaco.tools.api import ZoomTool, PanTool
 
-# Chaco imports
-from enthought.chaco.api import ArrayPlotData, Plot
-from cns.widgets.tools.window_tool import WindowTool
-from cns.widgets.tools.zoom_tool import RLZoomTool
+from tdt import DSPCircuit
+from cns import RCX_ROOT
+from cns.chaco_exts.helpers import add_default_grids
+from cns.chaco_exts.tools.window_tool import WindowTool
+from cns.channel import FileSnippetChannel
+from cns.data.h5_utils import get_temp_file
 
-#===============================================================================
-# # Create the Chaco plot.
-#===============================================================================
-def _create_plot_component():
-
-    # Create some data
-    numpts = 1000
-    x = sort(random(numpts))
-    y = random(numpts)
-
-    # Create a plot data obect and give it this data
-    pd = ArrayPlotData()
-    pd.set_data("index", x)
-    pd.set_data("value", y)
-
-    # Create the plot
-    plot = Plot(pd)
-    plot.plot(("index", "value"),
-              type="scatter",
-              name="my_plot",
-              marker="square",
-              index_sort="ascending",
-              color="lightblue",
-              outline_color="none",
-              marker_size=3,
-              bgcolor="white")
-
-    # Tweak some of the plot properties
-    plot.title = "Click to add points, press Enter to finalize selection"
-    plot.padding = 50
-    plot.line_width = 1
-
-    # Attach some tools to the plot
-    #pan = PanTool(plot, drag_button="right", constrain_key="shift")
-    #plot.tools.append(pan)
-    zoom = RLZoomTool(component=plot)
-    plot.overlays.append(zoom)
-    #plot.tools.append(WindowTool(plot))
-    return plot
-
-#===============================================================================
-# Attributes to use for the plot view.
-size=(650,650)
-title="Line drawing example"
-bg_color="lightgray"
-
-#===============================================================================
-# # Demo class that is used by the demo.py application.
-#===============================================================================
 class Demo(HasTraits):
 
-    plot = Instance(Component)
-    tool = Instance(WindowTool)
-    show = Button('Show Windows')
-
-    def _show_fired(self):
-        print self.tool.coordinates
-
     traits_view = View(
-                    Group(
-                        Item('plot', editor=ComponentEditor(size=size),
-                             show_label=False),
-                        Item('show'),
-                        orientation = "vertical"),
-                    resizable=True, title=title,
-                    height=1, width=1)
+            Item('handler.button'),
+            Item('handler.container', editor=ComponentEditor(size=(400,400))),
+            resizable=True)
 
-    def _plot_default(self):
-        plot = _create_plot_component()
-        self.tool = WindowTool(plot)
+class DemoController(Controller):
+
+    iface = Any
+    timer = Any
+    snippet_source = Any
+    snippet_store = Any
+    plot = Any
+    container = Any
+    button = Button
+    tool = Any
+
+    def _button_fired(self):
+        hoops = self.tool.get_hoops()
+        coeffs = np.zeros((32, 3))
+        for i, hoop in enumerate(hoops):
+            x = round(hoop[0]*self.snippet_source.fs)
+            coeffs[x] = hoop[1], hoop[2], i+1
+            print x, hoop[1], hoop[2], i+1
+        self.iface.set_coefficients('spike1_c', coeffs.ravel())
+        self.plot.last_reset = len(self.snippet_store.buffer)
+
+    def _container_default(self):
+        container = OverlayPlotContainer(padding=[50, 50, 50, 50])
+        index_range = DataRange1D(low=0, high=0.0012)
+        value_range = DataRange1D(low=-0.00025, high=0.0005)
+        index_mapper = LinearMapper(range=index_range)
+        value_mapper = LinearMapper(range=value_range)
+        plot = SnippetChannelPlot(history=100, channel=self.snippet_store,
+                value_mapper=value_mapper, index_mapper=index_mapper)
+        self.plot = plot
+
+        # Add the axes
+        axis = PlotAxis(orientation='left', component=plot)
+        plot.overlays.append(axis)
+        axis = PlotAxis(orientation='bottom', component=plot)
+        plot.overlays.append(axis)
+
+        plot.overlays.append(ZoomTool(plot, axis='value'))
+        #plot.tools.append(PanTool(plot, axis='value'))
+
+        #plot.overlays.append(BetterZoom(plot))
+
+        self.tool = WindowTool(component=plot)
         plot.overlays.append(self.tool)
-        return plot
+        container.add(plot)
 
-demo = Demo()
-demo.configure_traits()
+#        plot = SnippetChannelPlot(history=100, channel=self.snippet_store,
+#                value_mapper=value_mapper, index_mapper=index_mapper,
+#                classifier=1, line_color='red')
+#        container.add(plot)
+#
+        #plot = SnippetChannelPlot(history=100, channel=self.snippet_store,
+        #        value_mapper=value_mapper, index_mapper=index_mapper,
+        #        classifier=2, line_color='green')
+        #container.add(plot)
+
+        #plot = SnippetChannelPlot(history=5, channel=self.snippet_store,
+        #        value_mapper=value_mapper, index_mapper=index_mapper,
+        #        classifier=2, line_color='blue')
+        #container.add(plot)
+
+        return container
+
+    def _snippet_store_default(self):
+        datafile = get_temp_file()
+        return FileSnippetChannel(node=datafile.root, name='snippet',
+                snippet_size=30)
+
+    def init(self, info):
+        filename = join(RCX_ROOT, 'physiology')
+        self.iface = DSPCircuit(filename, 'RZ5')
+        self.iface.set_tag('spike1_a', 1e-4)
+        self.snippet_source = self.iface.get_buffer('spike1', 'r',
+                block_size=32)
+        self.snippet_store.fs = self.snippet_source.fs
+        self.iface.start()
+        self.iface.trigger('A', 'high')
+        self.timer = Timer(100, self.monitor)
+
+    def monitor(self):
+        data = self.snippet_source.read().reshape((-1, 32))
+        self.snippet_store.send(data[:,1:-1], data[:,0].view('int32'),
+                data[:,-1].view('int32'))
+
+Demo().configure_traits(handler=DemoController())

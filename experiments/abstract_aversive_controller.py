@@ -10,7 +10,7 @@ from copy import deepcopy
 from abstract_experiment_controller import AbstractExperimentController
 from pump_controller_mixin import PumpControllerMixin
 
-from cns import RCX_ROOT
+from cns import get_config
 from os.path import join
 
 from aversive_data import RawAversiveData as AversiveData
@@ -20,30 +20,17 @@ log = logging.getLogger(__name__)
 
 class AbstractAversiveController(AbstractExperimentController,
         PumpControllerMixin):
-
     # Derive from PumpControllerMixin since the code used to control the pump is
     # same regardless of whether it's positive or aversive paradigm.
 
     status = Property(Str, depends_on='state, current_trial')
 
-    def setup_shock(self, info):
-        # First, we need to load the circuit we need to control the shocker.
-        # We currently use DAC channel 12 of the RZ5 to control shock level;
-        # however, the RZ5 will already have a circuit loaded if we're using it
-        # for physiology.  The physiology circuit is already configured to
-        # control the shocker.  However, if we are not acquiring physiology, we
-        # need to load a circuit that allows us to control the shocker.
-        if not self.model.spool_physiology:
-            circuit = join(RCX_ROOT, 'shock-controller')
-            self.iface_shock = self.process.load_circuit(circuit, 'RZ5')
-        else:
-            # This assumes that iface_physiology has already been initialized.
-            # In the current abstract_experiment_controller, setup_physiology is
-            # called before setup_experiment.
-            self.iface_shock = self.iface_physiology
-
     def setup_experiment(self, info):
-        circuit = join(RCX_ROOT, 'aversive-behavior')
+        # I have broken this out into a separate function because
+        # AversiveFMController needs to change the initialization sequence a
+        # little (i.e. it needs to use different microcode and the microcode
+        # does not contain int and trial buffers).
+        circuit = join(get_config('RCX_ROOT'), 'aversive-behavior')
         self.iface_behavior = self.process.load_circuit(circuit, 'RZ6')
         self.buffer_trial = self.iface_behavior.get_buffer('trial', 'w')
         self.buffer_int = self.iface_behavior.get_buffer('int', 'w')
@@ -51,18 +38,15 @@ class AbstractAversiveController(AbstractExperimentController,
                 src_type='int8', dest_type='int8', block_size=24)
         self.buffer_contact = self.iface_behavior.get_buffer('contact', 'r',
                 src_type='int8', dest_type='float32', block_size=24)
-        self.setup_shock(info)
 
     def start_experiment(self, info):
-        self.init_context()
-        self.update_context()
+        self.init_paradigm(self.model.paradigm)
         # Pump will halt when it has infused the requested volume.  To allow it
         # to infuse continuously, we set the volume to 0.
         self.iface_pump.set_volume(0)
         # Pump will start on a rising edge (e.g. the subject touches the spout)
         # and stop on a falling edge (e.g. the subject leaves the spout).
         self.iface_pump.set_trigger(start='rising', stop='falling')
-        self.iface_pump.set_direction('infuse')
 
         # Ensure that sampling frequencies are stored properly
         self.model.data.contact_digital.fs = self.buffer_TTL.fs
@@ -108,7 +92,6 @@ class AbstractAversiveController(AbstractExperimentController,
 
     def remind(self, info=None):
         self.state = 'manual'
-        self.update_context()
         self.update_remind()
         self.trigger_next()
         self.set_pause_state(False)
@@ -125,7 +108,7 @@ class AbstractAversiveController(AbstractExperimentController,
         self.trigger_next()
 
     def stop_experiment(self, info=None):
-        self.model.data.mask_mode = 'none'
+        self.model.analyzed.mask_mode = 'none'
 
     def log_trial(self, ts_start, ts_end, ttype):
         self.model.data.log_trial(ts_start=ts_start, ts_end=ts_end,
@@ -146,9 +129,8 @@ class AbstractAversiveController(AbstractExperimentController,
             # Process "reminder" signals
             if self.state == 'manual':
                 self.pause()
-                #par = self.current_remind.parameter
-                self.model.data.log_trial(ts_start=ts_start, ts_end=ts_end,
-                        ttype='remind', **self.current_remind.parameter_dict())
+                par = self.current_remind.parameter
+                self.model.data.log_trial(ts_start, ts_end, par, 'remind')
                 self.update_warn()
             else:
                 last_trial = self.current_trial
@@ -160,23 +142,22 @@ class AbstractAversiveController(AbstractExperimentController,
                     # current_par, compute a new num_safe, and update the warn
                     # signal.
                     log.debug('processing warning trial')
-                    self.model.data.log_trial(ts_start=ts_start, ts_end=ts_end,
-                            ttype='warn', **self.current_warn.parameter_dict())
+                    par = self.current_warn.parameter
+                    self.model.data.log_trial(ts_start, ts_end, par, 'warn')
+                    self.current_num_safe = self.choice_num_safe()
                     self.current_warn = self.choice_setting.next()
 
                     # If there are 3 safes, current trial will be 1, 2, 3, 4
                     # where 4 is the warn
-                    self.update_context(self.current_warn.parameter_dict())
                     self.current_trial = 1
-                    log.debug('new num_safe %d, new setting %s',
-                              self.current_num_safe, self.current_warn)
+                    log.debug('new num_safe %d, new par %f',
+                              self.current_num_safe,
+                              self.current_warn.parameter)
                     self.update_warn()
                 elif last_trial <= self.current_num_safe: 
                     # The last trial was a safe trial
-                    #par = self.current_warn.parameter
-                    self.model.data.log_trial(ts_start=ts_start, ts_end=ts_end,
-                            ttype='safe', **self.current_warn.parameter_dict())
-                    #self.model.data.log_trial(ts_start, ts_end, par, 'safe')
+                    par = self.current_warn.parameter
+                    self.model.data.log_trial(ts_start, ts_end, par, 'safe')
                 else:
                     # Something bad happened.  We should never end up in this
                     # situation, so if we do this means that it is likely an
@@ -247,12 +228,22 @@ class AbstractAversiveController(AbstractExperimentController,
             self.choice_setting = choice.get(order, parameters)
             self.current_trial = 1
             if self.current_warn is None:
-                print "setting"
                 self.current_warn = self.choice_setting.next()
 
-    def set_num_safe(self, value):
-        self.current_num_safe = value
-         
+    def set_min_safe(self, value):
+        self.current_min_safe = value
+        self.reset_safes()
+
+    def set_max_safe(self, value):
+        self.current_max_safe = value
+
+    def reset_safes(self):
+        lb = self.current_min_safe
+        ub = self.current_max_safe
+        if lb is not None and ub is not None:
+            self.choice_num_safe = partial(np.random.randint, lb, ub+1)
+            self.current_num_safe = self.choice_num_safe()
+
     def set_safe(self, value):
         self.current_safe = deepcopy(value)
 
@@ -295,11 +286,6 @@ class AbstractAversiveController(AbstractExperimentController,
 
     def set_attenuation(self, value):
         self.iface_behavior.set_tag('att_A', value)
-
-    def set_shock_level(self, value):
-        # Programmable input ranges from 0 to 2.5 V corresponding to a 0 to 5 mA
-        # range.  Divide by 2.0 to convert mA to the corresponding shock level.
-        self.iface_shock.set_tag('shock_level', value/2.0)
 
     def update_remind(self):
         raise NotImplementedError

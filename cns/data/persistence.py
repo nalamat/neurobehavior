@@ -18,11 +18,12 @@ def next_id(element, name=''):
     element._f_setAttr(name+'_NEXT_ID', next_id + 1)
     return next_id
 
-def get_np_dtype(trait):
-    return dtype(zip(trait.col_names, trait.col_types))
+#def get_np_dtype(trait):
+#    return dtype(zip(trait.col_names, trait.col_types))
 
 def get_traits(object, filter_readonly=False, filter_events=True, **metadata):
-    '''Convenience function to filter out readonly traits.  This is useful for
+    '''
+    Convenience function to filter out readonly traits.  This is useful for
     reconstructing a traited class that has been persisted.  Typically readonly
     traits are properties that the traited class reconstructs from other class
     attributes.
@@ -71,6 +72,9 @@ def store_table(node, object, name, trait):
     # Create copy of value since we may need to convert the datetime series.
     value = getattr(object, name)
     value = array(value, dtype=trait.dtype)
+    if trait.dtype is not None:
+        log.debug("Table trait dtype %r", trait.dtype)
+    log.debug("Table array dtype %r", value.dtype)
 
     try:
         # Table already exists.  We delete the data in the table and re-add it.
@@ -86,34 +90,28 @@ def store_table(node, object, name, trait):
 def store_child(node, object, name, trait):
     value = getattr(object, name)
 
-    try: group_node = getattr(node, name)
+    try: 
+        group_node = getattr(node, name)
     except tables.NoSuchNodeError:
         object_path = node._v_pathname
         group_node = node._v_file.createGroup(object_path, name)
 
-    if hasattr(value, '__iter__'): # This is a list of items
-        #children.append(group_node)
+    if hasattr(value, '__iter__'): 
+        # This is a list of items
         group_children = []
         for i, v in enumerate(value):
             log.debug("Adding or updating %s", v)
             name = v.__class__.__name__ + '_' + str(i)
             child = add_or_update_object(v, group_node, name)
             group_children.append(child)
-        # TODO: study this carefully
-        # We need to think about whether we should be deleting records.
-        # Maybe just add a deleted attribute so we know not to load the
-        # node when the parent object is loaded.
-        #for child in group_node._v_children.values():
-        #    if child not in group_children:
-        #        child._f_remove(recursive=True)
-    else: # nope, it's not a list, just a single object
+    else: 
+        # nope, it's not a list, just a single object
         add_or_update_object(value, node, name)
 
 def update_object(object):
     '''
     Updates record for object loaded from HDF5 file.
     '''
-
     if not hasattr(object, 'UNIQUE_ID'):
         raise IOError, "Object does not have an existing entry in file"
     object_node = object.store_node
@@ -234,6 +232,10 @@ def guess_str_resolution(time_string):
     return res[index]
 
 def guess_datetime_fmt(datetime_val):
+    '''
+    Given a date, time or datetime object, select the optimal format string for
+    representing the value accurately.
+    '''
     # datetime is a subclass of date, so be sure that we do elif so that the
     # second condition is not evaluated.
     if isinstance(datetime_val, datetime.datetime):
@@ -244,13 +246,13 @@ def guess_datetime_fmt(datetime_val):
         fmt = date_fmt
     return fmt
 
-def strptime_arr(value, resolution=None):
-    if len(value) == 0:
-        return value
-    if resolution is None:
-        resolution = guess_str_resolution(value[0])
-    fmt = get_date_fmt(resolution)
-    return [datetime.datetime.strptime(v, fmt) for v in value]
+#def strptime_arr(value, resolution=None):
+#    if len(value) == 0:
+#        return value
+#    if resolution is None:
+#        resolution = guess_str_resolution(value[0])
+#    fmt = get_date_fmt(resolution)
+#    return [datetime.datetime.strptime(v, fmt) for v in value]
 
 def strptime(value, resolution=None):
     if value is None or value == 'None':
@@ -264,14 +266,14 @@ def strptime(value, resolution=None):
     else:
         return value_datetime
 
-def strftime_arr(value, resolution=None):
-    if len(value) == 0:
-        return value
-    if resolution is None:
-        fmt = guess_datetime_fmt(value[0])
-    else:
-        fmt = get_date_fmt(resolution)
-    return [v.strftime(fmt) for v in value]
+#def strftime_arr(value, resolution=None):
+#    if len(value) == 0:
+#        return value
+#    if resolution is None:
+#        fmt = guess_datetime_fmt(value[0])
+#    else:
+#        fmt = get_date_fmt(resolution)
+#    return [v.strftime(fmt) for v in value]
 
 def strftime(value, resolution=None):
     if value is None:
@@ -282,32 +284,32 @@ def strftime(value, resolution=None):
         fmt = get_date_fmt(resolution)
     return value.strftime(fmt)
 
-def switch_datetime_fmt(table, trait, parser):
-    # TODO: this is obviously not the most efficient implementation; however,
-    # it works!
-    if len(table):
-        try:
-            dtype = trait.dtype
-        except AttributeError:
-            raise DeprecationWarning, "Use dtype metadata now"
-            dtype = get_np_dtype(trait)
+#def switch_datetime_fmt(table, trait, parser):
+#    # TODO: this is obviously not the most efficient implementation; however,
+#    # it works!
+#    if len(table):
+#        try:
+#            dtype = trait.dtype
+#        except AttributeError:
+#            raise DeprecationWarning, "Use dtype metadata now"
+#            dtype = get_np_dtype(trait)
+#
+#        table = [tuple(row) for row in table]
+#        table = array(table, dtype=dtype)
+#        return [tuple(e) for e in table.tolist()]
+#    else:
+#        return []
+#
+#sanitize_datetimes = functools.partial(switch_datetime_fmt, parser=strftime_arr)
+#unsanitize_datetimes = functools.partial(switch_datetime_fmt,
+#        parser=strptime_arr)
 
-        table = [tuple(row) for row in table]
-        table = array(table, dtype=dtype)
-        return [tuple(e) for e in table.tolist()]
-    else:
-        return []
-
-sanitize_datetimes = functools.partial(switch_datetime_fmt, parser=strftime_arr)
-unsanitize_datetimes = functools.partial(switch_datetime_fmt,
-        parser=strptime_arr)
-
-def append_metadata(object, source):
+def append_metadata(obj, source):
     from os.path import abspath
-    object.store_node_source = abspath(source._v_file.filename)
-    object.store_node_path = source._v_pathname
-    object.store_node = source
-    return object
+    obj.store_node_source = abspath(source._v_file.filename)
+    obj.store_node_path = source._v_pathname
+    obj.store_node = source
+    return obj
 
 class PersistenceReadError(BaseException):
     '''Unable to recreate persisted object.'''
@@ -361,7 +363,6 @@ def load_attribute(node, name, trait):
     elif isinstance(value, bool_):
         value = bool(value)
     return value
-
 
 def get_object(filename, path, *args, **kw):
     '''
@@ -495,11 +496,11 @@ def load_object(source, path=None, type=None):
             raise PersistenceReadError(node._v_file.filename, node._v_pathname)
 
     loaders = (('channel', load_channel),
-               #('node', load_node),
                ('automatic', load_automatic),
                ('child', load_child),
                ('table', load_table),
                ('attribute', load_attribute),
+               ('parameter', load_parameter),
               )
 
     for mode, load in loaders:
