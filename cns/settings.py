@@ -49,11 +49,6 @@ PHYSIOLOGY_CHANNELS = 16
 CHACO_NOAXES_PADDING = 5
 CHACO_AXES_PADDING = [50, 5, 5, 50]
 
-# Subprocess configuration
-RCX_USE_SUBPROCESS      = False # Run IO as a subprocess?
-RCX_PROCESS_POLL_PERIOD = 0.1   # Poll period in seconds
-RCX_PROCESS_CACHE_SIZE  = 30    # Cache size in seconds for each buffer
-
 # Options for pump syringe
 SYRINGE_DEFAULT = 'Popper 20cc (glass)'
 SYRINGE_DATA = {

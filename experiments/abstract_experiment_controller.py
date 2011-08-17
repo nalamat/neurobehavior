@@ -247,12 +247,6 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
         Subclasses must implement `start_experiment`
         '''
         try:
-            if get_config('RCX_USE_SUBPROCESS'):
-                log.debug("USING DSP PROCESS")
-                self.process = DSPProcess()
-            else:
-                log.debug("USING DSP PROJECT")
-                self.process = DSPProject()
             # I don't really like having this check here; however, it works
             # for our purposes.
             if self.model.spool_physiology:
