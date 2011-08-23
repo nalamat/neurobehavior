@@ -24,9 +24,9 @@ class PositiveExperimentToolBar(ExperimentToolBar):
     
     traits_view = View(
             HGroup(Item('apply',
-                        enabled_when="object.handler.pending_changes<>{}"),
+                        enabled_when="object.handler.pending_changes"),
                    Item('revert',
-                        enabled_when="object.handler.pending_changes<>{}",),
+                        enabled_when="object.handler.pending_changes",),
                    Item('start',
                         enabled_when="object.handler.state=='halted'",),
                    '_',
@@ -93,10 +93,7 @@ class AbstractPositiveController(AbstractExperimentController, PumpControllerMix
 
     def start_experiment(self, info):
         # What parameters should be available in the context?
-        self.current_ttype, self.current_setting = self.initial_setting()
-        self.populate_context(self.model.paradigm)
-        self.populate_context(self.model.data)
-        self.evaluate_pending_expressions(self.current_setting.parameter_dict())
+        self.initialize_context()
         
         # Grab the current value of the timestamp from the circuit when it is
         # first loaded
@@ -104,37 +101,37 @@ class AbstractPositiveController(AbstractExperimentController, PumpControllerMix
         self.current_poke_end_ts = self.get_poke_end_ts()
 
         self.state = 'running'
-        self.trigger_next()
         self.iface_behavior.trigger('A', 'high')
-
+        
         # Add tasks to the queue
         self.tasks.append((self.monitor_behavior, 1))
         self.tasks.append((self.monitor_pump, 5))
+        
+        # Prepare the first trial
+        self.trigger_next()
 
     def _get_status(self):
         if self.state == 'disconnected':
             return 'Error'
         elif self.state == 'halted':
             return 'Halted'
-        else:
+        elif self.current_ttype is not None:
             return self.current_ttype.lower().replace('_', ' ')
+        else:
+            return ''
 
     def remind(self, info=None):
         # Pause circuit and see if trial is running. If trial is already
         # running, it's too late and a lock cannot be acquired. If trial is
         # not running, changes can be made. A lock is returned (note this is
         # not thread-safe).
+        self.remind_requested = True
+        
+        # Attempt to apply it immediately. If not, then the remind will be
+        # presented on the next trial.
         if self.request_pause():
-            self.invalidate_context()
-            self.current_ttype, self.current_setting = self.remind_setting()
-            self.evaluate_pending_expressions(self.current_setting.parameter_dict())
-            
             self.trigger_next()
-            self.current_go_requested = False
             self.request_resume()
-        else:
-            log.debug("Trial is running, let's try later")
-            self.current_go_requested = True
 
     ############################################################################
     # Master controller
@@ -167,14 +164,7 @@ class AbstractPositiveController(AbstractExperimentController, PumpControllerMix
                     log.exception(e)
                     log.debug("Waiting for more data")
                     pass
-
-            self.invalidate_context()
-            self.current_ttype, self.current_setting = self.next_setting()
-            self.evaluate_pending_expressions(self.current_setting.parameter_dict())
-                    
-            if self.current_go_requested:
-                self.remind()
-
+                
             self.trigger_next()
 
     def is_go(self):
@@ -301,6 +291,11 @@ class AbstractPositiveController(AbstractExperimentController, PumpControllerMix
             self.iface_behavior.set_tag('puff_dur_n', 1)
 
     def trigger_next(self):
+        log.debug('Preparing next trial')
+        self.invalidate_context()
+        self.current_ttype, self.current_setting = self.next_setting()
+        self.evaluate_pending_expressions(self.current_setting)
+        
         self.current_speaker = self.select_speaker()
         self.iface_behavior.set_tag('go?', self.is_go())
 
@@ -315,6 +310,8 @@ class AbstractPositiveController(AbstractExperimentController, PumpControllerMix
         elif self.current_speaker == 'both':
             att1, waveform1 = self.output_primary.realize()
             att2, waveform2 = self.output_secondary.realize()
+        else:
+            print self.current_speaker
 
         self.set_attenuations(att1, att2)
         self.buffer_out1.set(waveform1)

@@ -108,9 +108,7 @@ class ConstantLimitsExperimentMixin(HasTraits):
 
     def _create_plot_container(self, value):
         container_class = OverlayPlotContainer
-
         container_kw = dict(padding=CHACO_AXES_PADDING, spacing=5, bgcolor='white')
-
         range_hint = self.data.PLOT_RANGE_HINTS.get(value, {})
         value_range = DataRange1D(**range_hint)
         self.plot_range[value] = value_range

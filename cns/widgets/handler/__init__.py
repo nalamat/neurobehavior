@@ -26,6 +26,15 @@ def filehandler_menu():
 def filehandler_menubar():
     return MenuBar(filehandler_menu())
 
+def get_save_file(path, wildcard):
+    wildcard = wildcard.split('|')[1][1:]
+    fd = FileDialog(action='save as', default_directory=path, wildcard=wildcard)
+    if fd.open() == OK and fd.path <> '':
+        if not fd.path.endswith(wildcard):
+            fd.path += wildcard
+        return fd.path
+    return None
+
 def confirm_if_modified(func):
     '''Decorator for the filehandler class to ensure that changes are not
     discarded before the user has had a chance to save.
@@ -81,7 +90,7 @@ class FileHandler(Controller):
                 self.path = os.path.dirname(fd.path)
                 info.ui.modified = True
                 return True
-            except BaseException, e:
+            except Exception, e:
                 log.exception(e)
                 error(info.ui.control, str(e))
                 raise
@@ -103,7 +112,7 @@ class FileHandler(Controller):
                 
     @check_valid
     def saveas_file(self, info):
-        file = self.get_save_file(info)
+        file = get_save_file(self.path, self.wildcard)
         if file is not None:
             try:
                 self.save_object(info, file)
@@ -112,18 +121,6 @@ class FileHandler(Controller):
             except BaseException, e:
                 log.exception(e)
                 error(info.ui.control, str(e))
-            
-    def get_save_file(self, info):
-        wildcard = self.wildcard.split('|')[1][1:]
-        fd = FileDialog(action='save as',
-                        default_directory=self.path,
-                        wildcard=self.wildcard)
-        if fd.open() == OK and fd.path <> '':
-            if not fd.path.endswith(wildcard):
-                fd.path += wildcard
-            return fd.path
-        else:
-            return None
 
     @confirm_if_modified
     def close(self, info, is_ok=True):

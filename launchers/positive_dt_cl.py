@@ -2,6 +2,9 @@ from enthought.traits.api import Instance
 from enthought.traits.ui.api import View, Include, VSplit, VGroup, Item
 from enthought.enable.api import Component, ComponentEditor
 
+#from cns.widgets.handler import filehandler_menubar
+from experiments.paradigm_menu import create_menubar
+
 from experiments import (
         # Controller and mixins
         AbstractPositiveController,
@@ -39,9 +42,10 @@ class Paradigm(
         ):
 
     traits_view = View(
+            Include('file_group'),
+            Include('constant_limits_paradigm_mixin_group'),
             Include('speaker_group'),
             Include('abstract_positive_paradigm_group'),
-            Include('constant_limits_paradigm_mixin_group'),
             Include('temporal_integration_group'),
             Include('pump_paradigm_mixin_syringe_group'),
             )
@@ -59,6 +63,7 @@ class Experiment(AbstractPositiveExperiment, ConstantLimitsExperimentMixin):
             resizable=True,
             height=0.9,
             width=0.9,
+            menubar=create_menubar(),
             handler=Controller)
 
 node_name = 'PositiveDTCLExperiment'

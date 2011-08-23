@@ -1,13 +1,15 @@
 import os, re, sys
 from os.path import dirname, join, abspath, getmtime
 
-BASE_DIRECTORY  = os.environ['NEUROBEHAVIOR_BASE']
-LOG_ROOT        = join(BASE_DIRECTORY, 'logs') # where log files should be stored
-TEMP_ROOT       = join(BASE_DIRECTORY, 'temp') # location for temporary files
-DATA_ROOT       = join(BASE_DIRECTORY, 'data') # location for data files
-COHORT_ROOT     = DATA_ROOT                    # location for cohort files
-CAL_ROOT        = join(BASE_DIRECTORY, 'calibration') # calibration files
-COHORT_WILDCARD = 'Cohort files (*.cohort.hd5)|*.cohort.hd5|'
+BASE_DIRECTORY      = os.environ['NEUROBEHAVIOR_BASE']
+LOG_ROOT            = join(BASE_DIRECTORY, 'logs') # where log files should be stored
+TEMP_ROOT           = join(BASE_DIRECTORY, 'temp') # location for temporary files
+DATA_ROOT           = join(BASE_DIRECTORY, 'data') # location for data files
+COHORT_ROOT         = DATA_ROOT                    # location for cohort files
+CAL_ROOT            = join(BASE_DIRECTORY, 'calibration') # calibration files
+PARADIGM_ROOT       = join(BASE_DIRECTORY, 'settings')
+COHORT_WILDCARD     = 'Cohort files (*.cohort.hd5)|*.cohort.hd5|'
+PARADIGM_WILDCARD   = 'Paradigm files (*.paradigm)|*.paradigm|'
 
 PROGRAM_BASE = abspath(join(dirname(__file__), '..'))
 EXPERIMENT_ROOT = join(PROGRAM_BASE, 'launchers')
