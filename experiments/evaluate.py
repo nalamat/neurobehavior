@@ -111,6 +111,19 @@ class ParameterExpression(object):
     def __repr__(self):
         return "{} ({})".format(self._expression, self._cache_valid)
 
+    # One must define both the == and != rich comparision methods for
+    # on_trait_change to properly register trait changes while ignoring
+    # situations where two ParameterExpressions have identical values.
+    def __eq__(self, other):
+        if not isinstance(other, ParameterExpression):
+            return NotImplemented
+        return self._expression == other._expression
+
+    def __ne__(self, other):
+        if not isinstance(other, ParameterExpression):
+            return NotImplemented
+        return self._expression != other._expression
+
     def __getstate__(self):
         '''
         Code objects cannot be pickled
@@ -136,12 +149,16 @@ def evaluate_value(parameter, expressions, context=None):
     if context is None:
         context = {}
 
+    if parameter in context:
+        del expressions[parameter]
+        return context
+
     expression = expressions[parameter]
     del expressions[parameter]
 
     if isinstance(expression, ParameterExpression):
         for d in expression._dependencies:
-            if d in expressions and d not in context:
+            if d in expressions:
                 evaluate_value(d, expressions, context)
         context[parameter] = expression.evaluate(context)
     else:
@@ -214,12 +231,34 @@ class TestExpressions(unittest.TestCase):
             for parameter in expected:
                 self.assertTrue(parameter not in parameters)
 
+    def test_equal(self):
+        a = ParameterExpression('a+b')
+        b = ParameterExpression('a+b')
+        self.assertEqual(a, b)
+
+from enthought.traits.api import HasTraits, on_trait_change
+class TestTraits(HasTraits):
+     
+    a = Instance(ParameterExpression, ('a+4',))
+
+    @on_trait_change('a')
+    def print_change(self):
+        print 'changed'
+
+
 if __name__ == '__main__':
-    parameters = {'a': ParameterExpression('1'), 'b': ParameterExpression('a')}
+    #parameters = {'a': ParameterExpression('1'), 'b': ParameterExpression('a')}
     #evaluate_value('a', parameters)
-    context = {}
-    evaluate_expressions(parameters, context)
-    print parameters, context
+    #context = {}
+    #evaluate_expressions(parameters, context)
+    #print parameters, context
     #import doctest
     #doctest.testmod()
     #unittest.main()
+    t = TestTraits()
+    print 'assinging'
+    t.a = ParameterExpression('b+4')
+    print 'assinging'
+    t.a = ParameterExpression('b+4')
+    print 'assinging'
+    t.a = ParameterExpression('b+4')

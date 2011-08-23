@@ -5,7 +5,6 @@ from enthought.traits.ui.api import VGroup, Item, HGroup, View, Include, \
 
 from cns import choice
 
-from trial_setting import TrialSetting, trial_setting_editor
 from abstract_experiment_paradigm import AbstractExperimentParadigm
 from pump_paradigm_mixin import PumpParadigmMixin
 

@@ -20,9 +20,37 @@ class PhysiologyControllerMixin(HasTraits):
     buffer_physiology_ts    = Any
     buffer_physiology_ttl   = Any
     physiology_ttl_pipeline = Any
-
     buffer_spikes           = List(Any)
-    
+
+    def close(self, info, is_ok):
+        '''
+        Prevent user from closing window while an experiment is running since
+        data is not saved to file until the stop button is pressed.
+        '''
+
+        # We can abort a close event by returning False.  If an experiment
+        # is currently running, confirm that the user really did want to close
+        # the window.  If no experiment is running, then it's OK since the user
+        # can always restart the experiment.
+        if self.state not in ('disconnected', 'halted', 'complete'):
+            mesg = 'Experiment is still running.  Are you sure you want to exit?'
+
+            # The function confirm returns an integer that represents the
+            # response that the user requested.  YES is a constant (also
+            # imported from the same module as confirm) corresponding to the
+            # return value of confirm when the user presses the "yes" button on
+            # the dialog.  If any other button (e.g. "no", "abort", etc.) is
+            # pressed, the return value will be something other than YES and we
+            # will assume that the user has requested not to quit the
+            # experiment.
+            if confirm(info.ui.control, mesg) == YES:
+                self.stop(info)
+                return True
+            else:
+                return False
+        else:
+            return True
+
     @on_trait_change('model.physiology_settings.channel_settings:spike_threshold')
     def _update_threshold(self, channel, name, old, new):
         if self.iface_physiology is not None:

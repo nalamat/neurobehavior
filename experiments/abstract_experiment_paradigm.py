@@ -1,5 +1,5 @@
 from enthought.traits.api import HasTraits, Enum, Property, Bool, List, \
-     Float, Button, Instance
+     Float, Button, Instance, Tuple
 from enthought.traits.ui.api import VGroup, Item, HGroup
 
 PARAMETER_FILTER = {
@@ -13,14 +13,23 @@ from enthought.traits.ui.tabular_adapter import TabularAdapter
 
 class SpeakerRange(HasTraits):
     
-    frequency = Float(store='attribute', context=True, log=False)
-    max_level = Float(store='attribute', context=True, log=False)
+    frequency = Float(store='attribute', log=False)
+    max_level = Float(store='attribute', log=False)
     
-    def __cmp__(self, other):
-        a = (self.frequency, self.max_level)
-        b = (other.frequency, other.max_level)
-        return cmp(a, b)
+    def __lt__(self, other):
+        if not isinstance(other, SpeakerRange):
+            return NotImplemented
+        a = self.frequency, self.max_level
+        b = other.frequency, other.max_level
+        return a < b
     
+    def __eq__(self, other):
+        if not isinstance(other, SpeakerRange):
+            return NotImplemented
+        a = self.frequency, self.max_level
+        b = other.frequency, other.max_level
+        return a == b
+
 speaker_range_columns = [
     ('Frequency (Hz)', 'frequency'),
     ('Max level (dB SPL)', 'max_level'),
@@ -36,27 +45,27 @@ speaker_range_editor = TabularEditor(
 
 class AbstractExperimentParadigm(HasTraits):
 
-    speaker_mode = Enum('primary', 'secondary', 'both', 'random', context=True,
-            label='Speaker mode', store='attribute')
-    speaker_equalize = Bool(False, context=True, label='Equalize speakers?',
-            store='attribute')
-    primary_gain = Float(0, label='Primary gain', store='attribute',
-            context=True)
-    secondary_gain = Float(0, label='Primary gain', store='attribute',
-            context=True)
-    fixed_attenuation = Bool(True, context=True, 
-            label='Fixed hardware attenuation?')
-    primary_attenuation = Float(120.0, label='Primary attenuation',
-            store='attribute', context=True)
-    secondary_attenuation = Float(120.0, label='Secondary attenuation',
-            store='attribute', context=True)
-    expected_speaker_range = List(Instance(SpeakerRange), container=True,
-            context=True, store='attribute', label='Expected speaker range')
+    def __load_paradigm_fired(self):
+        instance = load_instance(PARADIGM_ROOT, PARADIGM_WILDCARD)
+        if instance is not None:
+            self.copy_traits(instance)
+
+    def __save_paradigm_fired(self):
+        print dump_instance(self, PARADIGM_ROOT, PARADIGM_WILDCARD)
+
+    speaker_mode = Enum('primary', 'secondary', 'both', 'random', label='Speaker mode', store='attribute', context=True)
+    speaker_equalize = Bool(False, label='Equalize speakers?', store='attribute', context=True)
+    primary_gain = Float(0, label='Primary gain', store='attribute', context=True)
+    secondary_gain = Float(0, label='Primary gain', store='attribute', context=True)
+    fixed_attenuation = Bool(False, label='Fixed hardware attenuation?', context=True)
+    primary_attenuation = Float(120.0, label='Primary attenuation', store='attribute', context=True)
+    secondary_attenuation = Float(120.0, label='Secondary attenuation', store='attribute', context=True)
+    expected_speaker_range = List(Instance(SpeakerRange), container=True, store='attribute', label='Expected speaker range', context=True)
 
     _add_speaker_range = Button('Add')
     _remove_speaker_range = Button('Remove')
     _sort_speaker_range = Button('Sort')
-    _selected_speaker_range = List(Instance(SpeakerRange))
+    _selected_speaker_range = List
     
     def __sort_speaker_range_fired(self):
         self.expected_speaker_range.sort()
@@ -66,9 +75,7 @@ class AbstractExperimentParadigm(HasTraits):
         # duplicate 
         if len(self._selected_speaker_range) != 0:
             for speaker_range in self._selected_speaker_range:
-                new = SpeakerRange()
-                new.copy_traits(speaker_range)
-                self.expected_speaker_range.append(new)
+                self.expected_speaker_range.append(speaker_range.clone_traits())
         else:
             self.expected_speaker_range.append(SpeakerRange())
         

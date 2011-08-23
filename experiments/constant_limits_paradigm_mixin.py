@@ -9,15 +9,14 @@ from .evaluate import Expression
 
 class ConstantLimitsParadigmMixin(HasTraits):
 
-    remind_setting = Instance(TrialSetting, (), 
-            namespace='remind', container=True, context=True, log=False)
-
-    nogo_setting = Instance(TrialSetting, (), 
-            namespace='nogo', container=True, context=True, log=False)
+    remind_setting = Instance(TrialSetting, (), log=False, container=True,
+            context=True, label='Remind setting')
+    nogo_setting = Instance(TrialSetting, (), log=False, container=True,
+            context=True, label='Nogo setting')
 
     go_settings = List(Instance(TrialSetting), container=True, context=True)
     go_setting_order = Trait('shuffled set', choice.options, context=True,
-                             label='Go setting order', log=True)
+            label='Go setting order', log=True)
     go_probability = Expression('0.5 if c_nogo < 5 else 1', store='attribute',
             context=True, label='Go probability', log=True)
     repeat_fa = Bool(True, store='attribute', context=True, 
@@ -29,8 +28,7 @@ class ConstantLimitsParadigmMixin(HasTraits):
     _add = Button()
     _remove = Button()
     _sort = Button()
-
-    _selected_setting = List(Instance(TrialSetting))
+    _selected_setting = List(Instance(TrialSetting), ignore=True)
 
     def _go_settings_default(self):
         return [TrialSetting()]
@@ -61,7 +59,7 @@ class ConstantLimitsParadigmMixin(HasTraits):
                 ),
             HGroup(
                 Item('nogo_setting', style='custom', show_label=False),
-                label='NOGO', show_border=True,
+                label='Nogo', show_border=True,
                 ),
             Item('go_probability'),
             Item('go_setting_order'),

@@ -2,7 +2,7 @@ from copy import deepcopy, copy
 from datetime import datetime, timedelta
 from cns.data.persistence import add_or_update_object_node
 
-from tdt import DSPProcess, DSPProject
+from tdt import DSPProject
 from tdt.device import RZ6
 from cns import get_config
 
@@ -23,12 +23,46 @@ from .physiology_controller_mixin import PhysiologyControllerMixin
 from enthought.traits.api import HasTraits, Dict, on_trait_change, Property, \
         cached_property
 
-from evaluate import evaluate_expressions, evaluate_value
+from .apply_revert_controller_mixin import ApplyRevertControllerMixin
 
 from PyQt4 import QtGui
 
 import logging
 log = logging.getLogger(__name__)
+
+from enthought.pyface.api import FileDialog, OK
+from cns import get_config
+
+def get_save_file(path, wildcard):
+    wildcard = wildcard.split('|')[1][1:]
+    fd = FileDialog(action='save as', default_directory=path, wildcard=wildcard)
+    if fd.open() == OK and fd.path <> '':
+        if not fd.path.endswith(wildcard):
+            fd.path += wildcard
+        return fd.path
+    return None
+
+def load_instance(path, wildcard):
+    fd = FileDialog(action='open', default_directory=path, wildcard=wildcard)
+    if fd.open() == OK and fd.path <> '':
+        import cPickle as pickle
+        with open(fd.path, 'rb') as infile:
+            return pickle.load(infile)
+    else:
+        return None
+
+def dump_instance(instance, path, wildcard):
+    filename = get_save_file(path, wildcard)
+    if filename is not None:
+        import cPickle as pickle
+        with open(filename, 'wb') as outfile:
+            pickle.dump(instance, outfile)
+        return True
+    return False
+
+PARADIGM_ROOT = get_config('PARADIGM_ROOT')
+PARADIGM_WILDCARD = get_config('PARADIGM_WILDCARD')
+
 
 class ExperimentToolBar(ToolBar):
 
@@ -52,10 +86,10 @@ class ExperimentToolBar(ToolBar):
 
     traits_view = View(
             HGroup(Item('apply',
-                        enabled_when="object.handler.pending_changes<>{}",
+                        enabled_when="object.handler.pending_changes",
                         **item_kw),
                    Item('revert',
-                        enabled_when="object.handler.pending_changes<>{}",
+                        enabled_when="object.handler.pending_changes",
                         **item_kw),
                    Item('start',
                         enabled_when="object.handler.state=='halted'",
@@ -80,7 +114,8 @@ class ExperimentToolBar(ToolBar):
             kind='subpanel',
             )
 
-class AbstractExperimentController(Controller, PhysiologyControllerMixin):
+class AbstractExperimentController(PhysiologyControllerMixin,
+                                   ApplyRevertControllerMixin, Controller):
     """Primary controller for TDT System 3 hardware.  This class must be
     configured with a model that contains the appropriate parameters (e.g.
     Paradigm) and a view to show these parameters.
@@ -176,7 +211,7 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
     # with the DSPs.  All circuits must be loaded and buffers initialized before
     # the process is started (so the process can appropriately allocate the
     # required shared memory resources).
-    process         = Any
+    process         = Instance(DSPProject, ())
     system_tray     = Any
 
     # Calibration objects
@@ -197,9 +232,7 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
             # window should be the current window (info.ui.control) that way
             # both windows get closed when the app exits.
             if self.model.spool_physiology:
-                self.window_physiology = info.object.edit_traits(
-                        parent=self.window_behavior,
-                        view='physiology_view').control
+                info.object.edit_traits(view='physiology_view').control
 
         except Exception, e:
             log.exception(e)
@@ -240,6 +273,8 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
         else:
             return True
 
+    shadow_ = Any
+
     def start(self, info=None):
         '''
         Handles starting an experiment
@@ -247,8 +282,8 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
         Subclasses must implement `start_experiment`
         '''
         try:
-            # I don't really like having this check here; however, it works
-            # for our purposes.
+            # I don't really like having this check here; however, it works for
+            # our purposes.
             if self.model.spool_physiology:
                 # Ensure that the settings are applied
                 self.setup_physiology()
@@ -285,8 +320,7 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
         try:
             self.timer.stop()
             self.process.stop()
-            self.pending_changes = {}
-            self.old_values = {}
+            self.pending_changes = False
         except Exception, e:
             log.exception(e)
             error(self.info.ui.control, str(e))
@@ -415,254 +449,23 @@ class AbstractExperimentController(Controller, PhysiologyControllerMixin):
         self.model.data.log_event(ts, name, value)
         log.debug("EVENT: %d, %s, %r", ts, name, value)
 
-    '''
-    If an experiment is running, we need to queue changes to most of the
-    settings in the GUI to ensure that the user has a chance to finish making
-    all the changes they desire before the new settings take effect.
-    
-    Supported metadata
-    ------------------
-    ignore
-        Do not monitor the trait for changes
-    immediate
-        Apply the changes immediately (i.e. do not queue the changes)
-        
-    Handling changes to a parameter
-    -------------------------------
-    When a parameter is modified via the GUI, the controller needs to know how
-    to handle this change.  For example, changing the pump rate or reward
-    volume requires sending a command to the pump via the serial port.
-    
-    When a change to a parameter is applied, the class instance the parameter
-    belongs to is checked to see if it has a method, "set_parameter_name",
-    defined. If not, the controller checks to see if it has the method defined
-    on itself.
-    
-    The function must have the following signature
-    
-    def set_parameter_name(self, value)
-    '''
+    def load_paradigm(self, info):
+        instance = load_instance(PARADIGM_ROOT, PARADIGM_WILDCARD)
+        if instance is not None:
+            self.model.paradigm = instance
 
-    pending_changes = Dict
-    old_values = Dict
+    def saveas_paradigm(self, info):
+        dump_instance(self.model.paradigm, PARADIGM_ROOT, PARADIGM_WILDCARD)
 
-    @classmethod
-    def _get_context_name(cls, instance, trait):
-        '''
-        Return a name that can be accessed via the context namespace.
-        '''
-        value = getattr(instance, trait)
-        if getattr(instance, 'namespace', None) is not None:
-            return '{}.{}'.format(instance.namespace, trait)
-        return trait
-    
-    #@on_trait_change('model.[data,paradigm].+container*.[+context, +monitor]')
-    @on_trait_change('model.[data,paradigm].[+context, +monitor]',
-                     'model.[data,paradigm].+container.[+context, +monitor]')
-    def handle_change(self, instance, name, old, new):
-        '''
-        Handles changes to traits in the paradigm that have the monitor
-        attribute set to True.  This will also handle traits on objects in the
-        paradigm provided you set the object's metadata to container.
-        '''
-        if self.state <> 'halted':
-            # Obtain the trait definition so we can query its metadata
-            trait = instance.trait(name)
-            if name.endswith('_items'):
-                # Trait change notifications to list items require special
-                # handling. For simplicity, let's just rebuild the old and new
-                # values of the list and treat the change as a completely new
-                # list.
-                removed, added = new.removed, new.added
-                name = name[:-6] # strip the '_items' part
-                new = getattr(instance, name)[:]
-                old = new[:]
+    #def select_parameters(self, info):
+    #    parameters = self.model.paradigm.get_parameter_info().keys()
+    #    print ParameterSelector(available_parameters=parameters).edit_traits().parameters
 
-                for e in removed:
-                    old.append(e)
-                for e in added:
-                    old.remove(e)
-                
-            if trait.immediate:
-                self.current_expressions[name] = new
-                self.pending_expressions[name] = new
-                self.evaluate_pending_expressions()
-            else:
-                self.queue_change(instance, name, old, new)
-                
-    def queue_change(self, instance, name, old, new):
-        '''
-        Queue a change and make a backup of its old value so we can revert if
-        desired.
-        '''
-        key = instance, name
-
-        if key not in self.old_values:
-            # This is the first time a change has been requested to the trait.
-            # Cache the old value and add the trait to the dictionary of changes
-            # that need to be applied.
-            self.old_values[key] = old
-            self.pending_changes[key] = new
-        elif new == self.old_values[key]:
-            # The user set the value back to its original value without
-            # explicitly requesting a revert.  Remove the trait from the stack
-            # since it no longer needs to be applied.
-            del self.pending_changes[key]
-            del self.old_values[key]
-        else:
-            # There is currently a pending change for the trait in the system,
-            # but a new value has been requested.  Update the dictionary of
-            # requested changes with the most recently requested value.  Do not
-            # update the cache of old values since this cache is meant to
-            # reflect the value of the trait the last time the apply() function
-            # was called.
-            self.pending_changes[key] = new
-
-    def apply(self, info=None):
-        '''
-        Apply all pending changes.
-        '''
-        # Make a backup of the pending changes just in case something happens so
-        # we can roll back to the original values.
-        pending_changes_backup = self.pending_changes.copy()
-        old_values_backup = self.old_values.copy()
-        current_expressions_backup = self.current_expressions.copy()
-        
-        try:
-            # Attempt to evaluate the expressions and apply the resulting values
-            for (instance, name), value in self.pending_changes.items():
-                xname = self._get_context_name(instance, name)
-                self.current_expressions[xname] = deepcopy(value)
-                del self.pending_changes[instance, name]
-                del self.old_values[instance, name]
-            self.invalidate_context()
-            self.evaluate_pending_expressions()
-        except Exception, e:
-            # A problem occured when attempting to apply the context. Roll back
-            # the changes and notify the user.  Hopefully we never reach this
-            # point.
-            self.apply_context(self.old_context)
-            self.pending_changes = pending_changes_backup
-            self.old_values = old_values_backup
-            self.current_expressions = current_expressions_backup
-            self.pending_expressions = {}
-
-            log.exception(e)
-            mesg = '''Unable to apply your requested changes due to an error. No
-            changes have been made. Please review the changes you have requested
-            to ensure that they are indeed valid.\n\n''' + str(e)
-            error(info.ui.control, message=mesg, title='Error applying changes')
-
-    def revert(self, info=None):
-        '''
-        Revert GUI fields to original values
-        '''
-        for (instance, name), value in self.old_values.items():
-            try:
-                setattr(instance, name, value)
-            except TraitError, e:
-                # This is raised for readonly traits so we'll pass them by
-                print e
-                pass
-        self.old_values = {}
-        self.pending_changes = {}
-    
-    current_expressions = Dict
-    pending_expressions = Dict
-    current_evaluated = Dict
-    current_context = Dict
-    context_labels = Dict
-    context_log = Dict
-    old_context = Dict
-
-    current_context_updated = Event
-
-    # List of name, value, label tuples (used for displaying in the GUI)
-    current_context_list = List
-
-    def invalidate_context(self):
-        '''
-        Invalidate the current context.  This forces the program to reevaluate
-        all expressions.
-        '''
-        self.old_context = self.current_context.copy()
-        self.pending_expressions = self.current_expressions.copy()
-        self.current_context = {}
-
-    def get_current_value(self, name):
-        '''
-        Get the current value of a context variable.  If the context variable
-        has not been evaluated yet, compute its value from the
-        pending_expressions stack.  Additional context variables may be
-        evaluated as needed.
-        '''
-        try:
-            return self.current_context[name]
-        except:
-            evaluate_value(name, self.pending_expressions, self.current_context)
-            self.current_context_updated = True
-            return self.current_context[name]
-
-    def evaluate_pending_expressions(self, extra_context=None):
-        '''
-        Evaluate all pending expressions and store results in current_context.
-
-        If extra_content is provided, it will be included in the local
-        namespace. If extra_content defines the value of a parameter also
-        present in pending_expressions, the value stored in extra_context takes
-        precedence.
-        '''
-        if extra_context is not None:
-            self.current_context.update(extra_context)
-            for key in extra_context:
-                if key in self.pending_expressions:
-                    del self.pending_expressions[key]
-        evaluate_expressions(self.pending_expressions, self.current_context)
-        self.current_context_updated = True
-
-    def apply_context(self, context):
-        for name, value in context.items():
-            self._apply_context_value(name, value)
-        self.current_context_updated = True
-
-    @on_trait_change('current_context_items')
-    def _apply_context_changes(self, event):
-        '''
-        Automatically apply changes as expressions are evaluated and their
-        result added to the context
-        '''
-        for name, value in event.added.items():
-            if self.old_context.get(name, None) != value:
-                self._apply_context_value(name, value)
-        for name, value in event.changed.items():
-            if self.old_context.get(name, None) != value:
-                self._apply_context_value(name, value)
-
-    def _apply_context_value(self, name, value):
-        log.debug('Applying %s', name)
-        try:
-            getattr(self, 'set_{}'.format(name))(value)
-        except AttributeError, e:
-            log.warn(str(e))
-
-    @on_trait_change('current_context_updated')
-    def _update_current_context_list(self):
-        context = []
-        for name, value in self.current_context.items():
-            label = self.context_labels.get(name, '')
-            changed = not self.old_context.get(name, None) == value
-            log = self.context_log[name]
-            context.append((name, value, label, log, changed))
-        self.current_context_list = sorted(context)
-
-    def populate_context(self, instance):
-        '''
-        Identify all traits that should be part of the context to be evaluated
-        and add them to the current expression dictionary.
-        '''
-        for name, trait in instance.traits(context=True).items():
-            xname = self._get_context_name(instance, name)
-            self.current_expressions[xname] = getattr(instance, name)
-            self.context_labels[xname] = trait.label
-            self.context_log[xname] = trait.log
-        self.pending_expressions = self.current_expressions.copy()
+#from enthought.traits.ui.api import SetEditor
+#
+#class ParameterSelector(HasTraits):
+#
+#    EDITOR = SetEditor(name='available_parameters')
+#
+#    available_parameters = List
+#    parameters = List(editor=EDITOR)
