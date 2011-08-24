@@ -175,12 +175,12 @@ class AbstractPositiveExperiment(AbstractExperiment):
         self.experiment_plot = container
 
     status_group = VGroup(
-            Item('animal', style='readonly'),
-            Item('handler.status', style='readonly'),
-            Item('handler.current_setting', style='readonly',
-                 label='Current setting'),
+            Item('animal'),
+            Item('handler.status'),
+            Item('handler.current_setting'),
             label='Experiment',
             show_border=True,
+            style='readonly'
             )
 
     plots_group = VGroup(

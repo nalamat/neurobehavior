@@ -1,4 +1,5 @@
 from enthought.traits.api import HasTraits, Bool, on_trait_change, Dict, Event, List, Any
+from enthought.pyface.api import error
 from evaluate import evaluate_expressions, evaluate_value
 
 import logging
@@ -91,11 +92,12 @@ class ApplyRevertControllerMixin(HasTraits):
             # point.
             log.exception(e)
             mesg = '''
-            Unable to apply your requested changes due to an error. No changes
+            Unable to apply your requested changes due to an error.  No changes
             have been made. Please review the changes you have requested to
-            ensure that they are indeed valid.\n\n''' + str(e)
+            ensure that they are indeed valid.'''
             import textwrap
-            textwrap.dedent(mesg)
+            mesg = textwrap.dedent(mesg).strip().replace('\n', ' ')
+            mesg += '\n\nError message: ' + str(e)
             error(info.ui.control, message=mesg, title='Error applying changes')
 
     def revert(self, info=None):
