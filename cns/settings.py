@@ -7,9 +7,12 @@ TEMP_ROOT           = join(BASE_DIRECTORY, 'temp') # location for temporary file
 DATA_ROOT           = join(BASE_DIRECTORY, 'data') # location for data files
 COHORT_ROOT         = DATA_ROOT                    # location for cohort files
 CAL_ROOT            = join(BASE_DIRECTORY, 'calibration') # calibration files
-PARADIGM_ROOT       = join(BASE_DIRECTORY, 'settings')
+SETTINGS_ROOT       = join(BASE_DIRECTORY, 'settings')
+PARADIGM_ROOT       = join(SETTINGS_ROOT, 'paradigm')
+PHYSIOLOGY_ROOT     = join(SETTINGS_ROOT, 'physiology')
 COHORT_WILDCARD     = 'Cohort files (*.cohort.hd5)|*.cohort.hd5|'
-PARADIGM_WILDCARD   = 'Paradigm files (*.paradigm)|*.paradigm|'
+PARADIGM_WILDCARD   = 'Paradigm settings (*.par)|*.par|'
+PHYSIOLOGY_WILDCARD = 'Physiology settings (*.phy)|*.phy|'
 
 PROGRAM_BASE = abspath(join(dirname(__file__), '..'))
 EXPERIMENT_ROOT = join(PROGRAM_BASE, 'launchers')
@@ -105,8 +108,8 @@ logging_config = {
             # The debug level for these modules are extremely noisy, so INFO is the best level
             'tdt.dsp_buffer': { 'level': 'WARN', },
             'tdt.dsp_circuit': { 'level': 'WARN', },
-            'neurogen': { 'level': 'WARN', },
-            'neurogen.blocks': { 'level': 'WARN', },
+            'neurogen': { 'level': 'DEBUG', },
+            'neurogen.blocks': { 'level': 'DEBUG', },
             },
         'root': {
             'level': 'DEBUG',
