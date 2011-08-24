@@ -1,6 +1,7 @@
 from enthought.traits.api import HasTraits, Enum, Property, Bool, List, \
      Float, Button, Instance, Tuple
 from enthought.traits.ui.api import VGroup, Item, HGroup
+from .evaluate import Expression
 
 PARAMETER_FILTER = {
         'editable': lambda x: x is not False,
@@ -13,8 +14,8 @@ from enthought.traits.ui.tabular_adapter import TabularAdapter
 
 class SpeakerRange(HasTraits):
     
-    frequency = Float(store='attribute', log=False)
-    max_level = Float(store='attribute', log=False)
+    frequency = Float(store='attribute', context=True, log=False)
+    max_level = Float(store='attribute', context=True, log=False)
     
     def __lt__(self, other):
         if not isinstance(other, SpeakerRange):
@@ -53,14 +54,18 @@ class AbstractExperimentParadigm(HasTraits):
     def __save_paradigm_fired(self):
         print dump_instance(self, PARADIGM_ROOT, PARADIGM_WILDCARD)
 
-    speaker_mode = Enum('primary', 'secondary', 'both', 'random', label='Speaker mode', store='attribute', context=True)
-    speaker_equalize = Bool(False, label='Equalize speakers?', store='attribute', context=True)
-    primary_gain = Float(0, label='Primary gain', store='attribute', context=True)
-    secondary_gain = Float(0, label='Primary gain', store='attribute', context=True)
-    fixed_attenuation = Bool(False, label='Fixed hardware attenuation?', context=True)
-    primary_attenuation = Float(120.0, label='Primary attenuation', store='attribute', context=True)
-    secondary_attenuation = Float(120.0, label='Secondary attenuation', store='attribute', context=True)
-    expected_speaker_range = List(Instance(SpeakerRange), container=True, store='attribute', label='Expected speaker range', context=True)
+    speaker = Expression("random_speaker(0.5)", label='Output Speaker',
+            store='attribute', context=True, log=True)
+    speaker_equalize = Bool(False, label='Equalize speakers?',
+            store='attribute', context=True, log=True)
+    #primary_gain = Float(0, label='Primary gain', store='attribute',
+    #        context=True, log=True)
+    #secondary_gain = Float(0, label='Secondary gain', store='attribute',
+    #        context=True, log=True)
+    fixed_attenuation = Bool(False, label='Fixed hardware attenuation?',
+            context=True, log=True)
+    expected_speaker_range = List(Instance(SpeakerRange), container=True,
+            store='attribute', label='Expected speaker range', context=True)
 
     _add_speaker_range = Button('Add')
     _remove_speaker_range = Button('Remove')
@@ -82,6 +87,7 @@ class AbstractExperimentParadigm(HasTraits):
     def __remove_speaker_range_fired(self):
         for speaker_range in self._selected_speaker_range:
             self.expected_speaker_range.remove(speaker_range)
+        self._selected_speaker_range = []
     
     @classmethod
     def get_parameters(cls):
@@ -101,12 +107,10 @@ class AbstractExperimentParadigm(HasTraits):
         return cls.get_parameter_info()[parameter]
 
     speaker_group = VGroup(
-            'speaker_mode',
+            'speaker',
             'speaker_equalize',
-            Item('primary_attenuation', style='readonly'),
-            Item('secondary_attenuation', style='readonly'),
-            'primary_gain',
-            'secondary_gain',
+            #'primary_gain',
+            #'secondary_gain',
             Item('fixed_attenuation'),
             VGroup(
                 HGroup('_add_speaker_range', '_remove_speaker_range', 
