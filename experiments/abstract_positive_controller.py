@@ -133,7 +133,6 @@ class AbstractPositiveController(AbstractExperimentController):
     # Master controller
     ############################################################################
     def monitor_behavior(self):
-        #self.model.data.microphone.send(self.buffer_mic.read())
         self.pipeline_TTL1.send(self.buffer_TTL1.read())
         self.pipeline_TTL2.send(self.buffer_TTL2.read())
         ts_end = self.get_trial_end_ts()

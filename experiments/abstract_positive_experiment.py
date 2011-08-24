@@ -166,12 +166,9 @@ class AbstractPositiveExperiment(AbstractExperiment):
         self.index_range = index_range
         container = OverlayPlotContainer(padding=[20, 20, 50, 5])
         self._add_behavior_plots(index_mapper, container, 0.5)
-
         plot = container.components[0]
-
         add_default_grids(plot, major_index=1, minor_index=0.25)
         add_time_axis(plot, orientation='top')
-
         self.experiment_plot = container
 
     status_group = VGroup(

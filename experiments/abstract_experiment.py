@@ -10,6 +10,7 @@ from abstract_experiment_data import AbstractExperimentData
 from abstract_experiment_paradigm import AbstractExperimentParadigm
 
 from enthought.traits.ui.key_bindings import KeyBinding, KeyBindings
+from experiments.paradigm_menu import create_menubar
 
 import logging
 log = logging.getLogger(__name__)
@@ -92,5 +93,6 @@ class AbstractExperiment(HasTraits):
             Include('traits_group'), 
             key_bindings=key_bindings,
             resizable=True, 
+            menubar=create_menubar(),
             height=0.9, 
             width=0.9)

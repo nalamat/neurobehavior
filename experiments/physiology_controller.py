@@ -1,19 +1,28 @@
 import numpy as np
 from enthought.traits.api import (HasTraits, Instance, Any, List,
-        on_trait_change, Undefined)
-from enthought.traits.ui.api import HGroup, View, Item
-from tdt import DSPProcess
+        on_trait_change, Undefined, Enum)
+
+from enthought.traits.ui.api import Controller
+from enthought.pyface.api import error
+from enthought.pyface.timer.api import Timer
+
+from tdt import DSPProject
 from cns import get_config
 from os.path import join
 from cns.pipeline import deinterleave_bits
 
 CHANNELS = get_config('PHYSIOLOGY_CHANNELS')
+PHYSIOLOGY_WILDCARD = get_config('PHYSIOLOGY_WILDCARD')
+PHYSIOLOGY_ROOT = get_config('PHYSIOLOGY_ROOT')
 
-class PhysiologyControllerMixin(HasTraits):
+from .utils import get_save_file, load_instance, dump_instance
+
+class PhysiologyController(Controller):
 
     # By convention, all mixin classes should prepend attribute names with the
     # mixin name (e.g. physiology). This prevents potential namespace
     # collisions if we are using more than one mixin.
+    buffer_                 = Any
     iface_physiology        = Any
     buffer_physiology_raw   = Any
     buffer_physiology_proc  = Any
@@ -21,20 +30,24 @@ class PhysiologyControllerMixin(HasTraits):
     buffer_physiology_ttl   = Any
     physiology_ttl_pipeline = Any
     buffer_spikes           = List(Any)
+    state                   = Enum('master', 'client')
+    process                 = Instance(DSPProject, ())
+    timer                   = Instance(Timer)
+    parent                  = Any
 
-    def close(self, info, is_ok):
-        '''
-        Prevent user from closing window while an experiment is running since
-        data is not saved to file until the stop button is pressed.
-        '''
+    def init(self, info):
+        self.setup_physiology()
+        self.model = info.object
+        if self.state == 'master':
+            self.process.start()
+            self.iface_physiology.trigger('A', 'high')
+            self.start()
 
-        # We can abort a close event by returning False.  If an experiment
-        # is currently running, confirm that the user really did want to close
-        # the window.  If no experiment is running, then it's OK since the user
-        # can always restart the experiment.
-        if self.state not in ('disconnected', 'halted', 'complete'):
-            mesg = 'Experiment is still running.  Are you sure you want to exit?'
-
+    def close(self, info, is_ok, from_parent=False):
+        return True
+        if self.state == 'client':
+            return from_parent
+        else:
             # The function confirm returns an integer that represents the
             # response that the user requested.  YES is a constant (also
             # imported from the same module as confirm) corresponding to the
@@ -43,28 +56,12 @@ class PhysiologyControllerMixin(HasTraits):
             # pressed, the return value will be something other than YES and we
             # will assume that the user has requested not to quit the
             # experiment.
-            if confirm(info.ui.control, mesg) == YES:
+            if confirm(info.ui.control, 'OK to stop?') == YES:
                 self.stop(info)
                 return True
             else:
                 return False
-        else:
-            return True
 
-    @on_trait_change('model.physiology_settings.channel_settings:spike_threshold')
-    def _update_threshold(self, channel, name, old, new):
-        if self.iface_physiology is not None:
-            tag_name = 'a_spike{}'.format(channel.number)
-            self.iface_physiology.set_tag(tag_name, new)
-            
-    @on_trait_change('model.physiology_settings.channel_settings:spike_windows')
-    def _update_windows(self, channel, name, old, new):
-        if self.iface_physiology is not None:
-            tag_name = 'c_spike{}'.format(channel.number)
-            self.iface_physiology.set_sort_windows(tag_name, new)
-            #history = len(self.model.data.physiology_spikes[channel].buffer)
-            #self.model.physiology_sort_plot.last_reset = history
-        
     def setup_physiology(self):
         # Load the circuit
         circuit = join(get_config('RCX_ROOT'), 'physiology')
@@ -84,17 +81,30 @@ class PhysiologyControllerMixin(HasTraits):
             name = 'spike{}'.format(i+1)
             buffer = self.iface_physiology.get_buffer(name, 'r', block_size=40)
             self.buffer_spikes.append(buffer)
-            self.model.data.physiology_spikes[i].fs = buffer.fs
 
+    @on_trait_change('model.data')
+    def update_data(self):
         # Ensure that the data store has the correct sampling frequency
+        for i in range(CHANNELS):
+            data_spikes = self.model.data.physiology_spikes
+            for src, dest in zip(self.buffer_spikes, data_spikes):
+                dest.fs = src.fs
         self.model.data.physiology_raw.fs = self.buffer_physiology_raw.fs
         self.model.data.physiology_processed.fs = self.buffer_physiology_filt.fs
         self.model.data.physiology_ram.fs = self.buffer_physiology_raw.fs
         self.model.data.physiology_ts.fs = self.buffer_physiology_ts.fs
         self.model.data.physiology_sweep.fs = self.buffer_physiology_ttl.fs
 
+        # Setup the pipeline
         targets = [self.model.data.physiology_sweep]
         self.physiology_ttl_pipeline = deinterleave_bits(targets)
+
+    def start(self):
+        self.timer = Timer(100, self.monitor_physiology)
+
+    def stop(self):
+        self.timer.stop()
+        self.process.stop()
 
     def monitor_physiology(self):
         # Acquire raw physiology data
@@ -125,47 +135,80 @@ class PhysiologyControllerMixin(HasTraits):
             ts = data[:,0].view('int32')
             cl = data[:,-1].view('int32')
             self.model.data.physiology_spikes[i].send(snip, ts, cl)
-            
+
+    @on_trait_change('model.settings.spike_thresholds')
     def set_spike_thresholds(self, value):
         for ch, threshold in enumerate(value):
             name = 'a_spike{}'.format(ch+1)
             self.iface_physiology.set_tag(name, threshold)
             
+    @on_trait_change('model.settings.monitor_fc_highpass')
     def set_monitor_fc_highpass(self, value):
         self.iface_physiology.set_tag('FiltHP', value)
 
+    @on_trait_change('model.settings.monitor_fc_lowpass')
     def set_monitor_fc_lowpass(self, value):
         self.iface_physiology.set_tag('FiltLP', value)
 
+    @on_trait_change('model.settings.monitor_ch_1')
     def set_monitor_ch_1(self, value):
         self.iface_physiology.set_tag('ch1_out', value)
 
+    @on_trait_change('model.settings.monitor_ch_2')
     def set_monitor_ch_2(self, value):
         self.iface_physiology.set_tag('ch2_out', value)
 
+    @on_trait_change('model.settings.monitor_ch_3')
     def set_monitor_ch_3(self, value):
         self.iface_physiology.set_tag('ch3_out', value)
 
+    @on_trait_change('model.settings.monitor_ch_4')
     def set_monitor_ch_4(self, value):
         self.iface_physiology.set_tag('ch4_out', value)
 
+    @on_trait_change('model.settings.monitor_gain_1')
     def set_monitor_gain_1(self, value):
         self.iface_physiology.set_tag('ch1_out_sf', value*1e3)
 
+    @on_trait_change('model.settings.monitor_gain_2')
     def set_monitor_gain_2(self, value):
         self.iface_physiology.set_tag('ch2_out_sf', value*1e3)
 
+    @on_trait_change('model.settings.monitor_gain_3')
     def set_monitor_gain_3(self, value):
         self.iface_physiology.set_tag('ch3_out_sf', value*1e3)
 
+    @on_trait_change('model.settings.monitor_gain_4')
     def set_monitor_gain_4(self, value):
         self.iface_physiology.set_tag('ch4_out_sf', value*1e3)
 
+    @on_trait_change('model.settings.visible_channels')
     def set_visible_channels(self, value):
         self.model.physiology_plot.channel_visible = value
 
+    @on_trait_change('model.settings.diff_matrix')
     def set_diff_matrix(self, value):
         self.iface_physiology.set_coefficients('diff_map', value.ravel())
 
-    def set_commutator_inhibit(self, value):
-        self.iface_behavior.set_tag('comm_inhibit', value)
+    @on_trait_change('model:settings:channel_settings:spike_threshold')
+    def _update_threshold(self, channel, name, old, new):
+        if self.iface_physiology is not None:
+            tag_name = 'a_spike{}'.format(channel.number)
+            self.iface_physiology.set_tag(tag_name, new)
+            
+    @on_trait_change('model:settings:channel_settings:spike_windows')
+    def _update_windows(self, channel, name, old, new):
+        print channel
+        if self.iface_physiology is not None:
+            tag_name = 'c_spike{}'.format(channel.number)
+            self.iface_physiology.set_sort_windows(tag_name, new)
+            #history = len(self.model.data.physiology_spikes[channel].buffer)
+            #self.model.physiology_sort_plot.last_reset = history
+        
+    def load_settings(self, info):
+        instance = load_instance(PHYSIOLOGY_ROOT, PHYSIOLOGY_WILDCARD)
+        if instance is not None:
+            self.model.settings = instance
+
+    def saveas_settings(self, info):
+        dump_instance(self.model.settings, PHYSIOLOGY_ROOT, PHYSIOLOGY_WILDCARD)

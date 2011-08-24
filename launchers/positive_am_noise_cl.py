@@ -46,19 +46,11 @@ class Paradigm(
             Include('pump_paradigm_mixin_syringe_group'),
             )
 
-class Data(PositiveData, ConstantLimitsDataMixin):
-    pass
+class Data(PositiveData, ConstantLimitsDataMixin): pass
 
 class Experiment(AbstractPositiveExperiment, ConstantLimitsExperimentMixin):
 
     data = Instance(Data, (), store='child')
     paradigm = Instance(Paradigm, (), store='child')
-
-    traits_view = View(
-            Include('traits_group'),
-            resizable=True,
-            height=0.9,
-            width=0.9,
-            handler=Controller)
 
 node_name = 'PositiveAMNoiseCLExperiment'
