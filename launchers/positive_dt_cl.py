@@ -2,7 +2,6 @@ from enthought.traits.api import Instance
 from enthought.traits.ui.api import View, Include, VSplit, VGroup, Item
 from enthought.enable.api import Component, ComponentEditor
 
-#from cns.widgets.handler import filehandler_menubar
 from experiments.paradigm_menu import create_menubar
 
 from experiments import (
@@ -42,7 +41,6 @@ class Paradigm(
         ):
 
     traits_view = View(
-            Include('file_group'),
             Include('constant_limits_paradigm_mixin_group'),
             Include('speaker_group'),
             Include('abstract_positive_paradigm_group'),
@@ -50,8 +48,7 @@ class Paradigm(
             Include('pump_paradigm_mixin_syringe_group'),
             )
 
-class Data(PositiveData, ConstantLimitsDataMixin):
-    pass
+class Data(PositiveData, ConstantLimitsDataMixin): pass
 
 class Experiment(AbstractPositiveExperiment, ConstantLimitsExperimentMixin):
 
