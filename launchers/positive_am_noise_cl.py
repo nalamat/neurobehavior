@@ -39,8 +39,8 @@ class Paradigm(
         ):
 
     traits_view = View(
-            Include('abstract_positive_paradigm_group'),
             Include('constant_limits_paradigm_mixin_group'),
+            Include('abstract_positive_paradigm_group'),
             Include('speaker_group'),
             Include('am_noise_group'),
             Include('pump_paradigm_mixin_syringe_group'),
