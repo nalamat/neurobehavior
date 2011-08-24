@@ -23,9 +23,14 @@ Available attributes for evaluating experiment parameters.
         
     '''
 
+class EvaluationError(NameError): pass
+
 def choice(sequence):
     i = np.random.randint(0, len(sequence))
     return sequence[i]
+
+def random_speaker(bias=0.5):
+    return 'primary' if np.random.uniform() <= bias else 'secondary'
 
 def get_dependencies(string):
     '''
@@ -53,14 +58,15 @@ def get_dependencies(string):
 class ParameterExpression(object):
 
     GLOBALS = {
-            'random':       np.random,
-            'arange':       np.arange,
-            'randint':      np.random.randint,
-            'uniform':      np.random.uniform,
-            'exponential':  np.random.exponential,
-            'clip':         np.clip,
-            'choice':       choice,
-            'toss':         lambda x: np.random.uniform() <= x,
+            'random':           np.random,
+            'arange':           np.arange,
+            'randint':          np.random.randint,
+            'uniform':          np.random.uniform,
+            'exponential':      np.random.exponential,
+            'clip':             np.clip,
+            'choice':           choice,
+            'toss':             lambda x: np.random.uniform() <= x,
+            'random_speaker':   random_speaker,
             }
 
     def __init__(self, value):
@@ -146,24 +152,38 @@ def evaluate_value(parameter, expressions, context=None):
     If an expression is evaluated, it is removed from the stack of expressions
     and added to the context.
     '''
-    if context is None:
-        context = {}
+    try:
+        if context is None:
+            context = {}
 
-    if parameter in context:
+        if parameter in context:
+            del expressions[parameter]
+            return context
+
+        expression = expressions[parameter]
         del expressions[parameter]
+
+        if isinstance(expression, ParameterExpression):
+            for d in expression._dependencies:
+                if d in expressions:
+                    evaluate_value(d, expressions, context)
+            context[parameter] = expression.evaluate(context)
+        else:
+            context[parameter] = expression
         return context
-
-    expression = expressions[parameter]
-    del expressions[parameter]
-
-    if isinstance(expression, ParameterExpression):
-        for d in expression._dependencies:
-            if d in expressions:
-                evaluate_value(d, expressions, context)
-        context[parameter] = expression.evaluate(context)
-    else:
-        context[parameter] = expression
-    return context
+    except EvaluationError, e:
+        # Add an empty catch block here because EvaluationError is a subclass of
+        # NameError and we only want to catch explicit instances of NameError so
+        # we can convert them to EvaluationErrors.
+        raise
+    except NameError, e:
+        # Catch NameErrors and convert them to EvaluationErrors
+        mesg = """
+        Unable to evaluate '{}' because {} or has a circular reference (either
+        directly or indirectly via other variables) to '{}'"""
+        import textwrap
+        mesg = textwrap.dedent(mesg).strip().replace('\n', ' ')
+        raise EvaluationError, mesg.format(parameter, e, parameter)
 
 def evaluate_expressions(expressions, current_context):
     '''
