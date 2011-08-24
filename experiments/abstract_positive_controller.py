@@ -1,16 +1,8 @@
-from functools import partial
-
-from enthought.traits.api import Str, Property, Float, on_trait_change, \
-        Instance, Any
+from enthought.traits.api import Str, Property, Instance
 from enthought.traits.ui.api import View, Item, HGroup, spring
-from pump_controller_mixin import PumpControllerMixin
 from abstract_experiment_controller import AbstractExperimentController
 from abstract_experiment_controller import ExperimentToolBar
 from cns.pipeline import deinterleave_bits
-from cns import choice
-from cns.data.persistence import add_or_update_object
-from positive_data import PositiveData
-from copy import deepcopy
 
 from cns import get_config
 from os.path import join
@@ -42,7 +34,7 @@ class PositiveExperimentToolBar(ExperimentToolBar):
             kind='subpanel',
             )
 
-class AbstractPositiveController(AbstractExperimentController, PumpControllerMixin):
+class AbstractPositiveController(AbstractExperimentController):
     
     # Override default implementation of toolbar used by AbstractExperiment
     toolbar = Instance(PositiveExperimentToolBar, (), toolbar=True)
@@ -62,8 +54,8 @@ class AbstractPositiveController(AbstractExperimentController, PumpControllerMix
         self.buffer_TTL2 = self.iface_behavior.get_buffer('TTL2', 'r',
                 src_type=np.int8, dest_type=np.int8, block_size=24)
         # microphone
-        self.buffer_mic = self.iface_behavior.get_buffer('mic', 'r')
-        self.model.data.microphone.fs = self.buffer_mic.fs
+        #self.buffer_mic = self.iface_behavior.get_buffer('mic', 'r')
+        #self.model.data.microphone.fs = self.buffer_mic.fs
 
         # Stored in TTL1
         self.model.data.spout_TTL.fs = self.buffer_TTL1.fs
@@ -109,6 +101,10 @@ class AbstractPositiveController(AbstractExperimentController, PumpControllerMix
         
         # Prepare the first trial
         self.trigger_next()
+
+    def stop_experiment(self, info):
+        self.iface_behavior.trigger('A', 'low')
+        self.state = 'halted'
 
     def _get_status(self):
         if self.state == 'disconnected':
@@ -158,7 +154,9 @@ class AbstractPositiveController(AbstractExperimentController, PumpControllerMix
                             ts_start=ts_start, 
                             ts_end=ts_end,
                             ttype=self.current_ttype,
-                            speaker=self.current_speaker)
+                            primary_hw_attenuation=self.current_hw_att1,
+                            secondary_hw_attenuation=self.current_hw_att2,
+                            )
                     break
                 except ValueError, e:
                     log.exception(e)
@@ -241,12 +239,6 @@ class AbstractPositiveController(AbstractExperimentController, PumpControllerMix
     def request_resume(self):
         self.iface_behavior.trigger(3)
 
-    def set_nogo(self, value):
-        self.current_nogo = deepcopy(value)
-
-    def set_remind(self, value):
-        self.current_remind = deepcopy(value)
-
     def set_reward_volume(self, value):
         # If the pump volume is set to 0, this actually has the opposite
         # consequence of what was intended since a volume of 0 tells the pump to
@@ -257,28 +249,6 @@ class AbstractPositiveController(AbstractExperimentController, PumpControllerMix
         else:
             self.iface_behavior.set_tag('pump_trig_ms', 200)
             self.set_pump_volume(value)
-
-    def set_waveform(self, speaker, signal):
-        silence = np.zeros(len(signal))
-        if speaker == 'primary':
-            self.buffer_out1.set(signal)
-            self.buffer_out2.set(silence)
-        elif speaker == 'secondary':
-            self.buffer_out1.set(silence)
-            self.buffer_out2.set(signal)
-        else:
-            self.buffer_out1.set(signal)
-            self.buffer_out2.set(signal)
-
-    def select_speaker(self):
-        speaker_mode = self.get_current_value('speaker_mode')
-        if speaker_mode in ('primary', 'secondary', 'both'):
-            return self.current_speaker_mode
-        elif speaker_mode == 'random':
-            return 'primary' if np.random.uniform(0, 1) < 0.5 else 'secondary'
-        else:
-            mesg = "Speaker mode {} not supported".format(self.current_speaker_mode)
-            raise NotImplementedError, mesg
 
     def set_fa_puff_duration(self, value):
         # The air puff is triggered off of a Schmitt2 component.  If nHi is set
@@ -296,24 +266,52 @@ class AbstractPositiveController(AbstractExperimentController, PumpControllerMix
         self.current_ttype, self.current_setting = self.next_setting()
         self.evaluate_pending_expressions(self.current_setting)
         
-        self.current_speaker = self.select_speaker()
+        speaker = self.get_current_value('speaker')
+
         self.iface_behavior.set_tag('go?', self.is_go())
+        log.debug('Trial is %s and speaker is %s', self.current_ttype, speaker)
 
         # The outputs will automatically handle scaling the waveform given
         # the current hardware attenuation settings.
-        if self.current_speaker == 'primary':
-            att1, waveform1 = self.output_primary.realize()
-            att2, waveform2 = att1, np.zeros(len(waveform1))
-        elif self.current_speaker == 'secondary':
-            att2, waveform2 = self.output_secondary.realize()
-            att1, waveform1 = att2, np.zeros(len(waveform2))
-        elif self.current_speaker == 'both':
-            att1, waveform1 = self.output_primary.realize()
-            att2, waveform2 = self.output_secondary.realize()
-        else:
-            print self.current_speaker
+        if speaker == 'primary':
+            att1, waveform1, clip1, floor1 = self.output_primary.realize()
+            att2, waveform2 = None, np.zeros(len(waveform1))
+            clip2, floor2 = False, False
+        elif speaker == 'secondary':
+            att2, waveform2, clip2, floor2 = self.output_secondary.realize()
+            att1, waveform1 = None, np.zeros(len(waveform2))
+            clip1, floor1 = False, False
+        elif speaker == 'both':
+            att1, waveform1, clip1, floor1 = self.output_primary.realize()
+            att2, waveform2, clip2, floor2 = self.output_secondary.realize()
 
+        clip_mesg = 'The {} output exceeds the maximum limits of the system'
+        floor_mesg = 'The {} output is below the noise floor of the system'
+        message = ''
+        if clip1:
+            message += clip_mesg.format('primary')
+        if clip2:
+            message += clip_mesg.format('secondary')
+        if floor1:
+            message += floor_mesg.format('primary')
+        if floor2:
+            message += floor_mesg.format('secondary')
+        if clip1 or clip2 or floor1 or floor2:
+            mesg = '''
+            The current experiment settings will produce a distorted signal.
+            Please review your settings carefully and correct any discrepancies
+            you observe.
+            '''
+            import textwrap
+            mesg = textwrap.dedent(mesg).strip().replace('\n', ' ')
+            mesg = message + '\n\n' + mesg
+            self.handle_error(mesg)
+
+        # set_attenuations has a built-in safety check to ensure attenuation has
+        # not changed.  If it has, indeed, changed and fixed_attenuation is
+        # True, then an error will be raised.
         self.set_attenuations(att1, att2)
+
         self.buffer_out1.set(waveform1)
         self.buffer_out2.set(waveform2)
         self.iface_behavior.trigger(1)

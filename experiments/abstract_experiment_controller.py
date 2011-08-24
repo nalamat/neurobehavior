@@ -1,6 +1,7 @@
 from copy import deepcopy, copy
 from datetime import datetime, timedelta
 from cns.data.persistence import add_or_update_object_node
+from cns.data.h5_utils import get_or_append_node
 
 from tdt import DSPProject
 from tdt.device import RZ6
@@ -11,58 +12,35 @@ from enthought.pyface.timer.api import Timer
 from enthought.etsconfig.api import ETSConfig
 from enthought.traits.api import (Any, Instance, Enum, Dict, on_trait_change, 
         HasTraits, List, Button, Bool, Tuple, Callable, Int, Property,
-        cached_property, Undefined, Event, TraitError)
+        cached_property, Undefined, Event, TraitError, Str)
 from enthought.traits.ui.api import Controller, View, HGroup, Item, spring
 
 from cns.widgets.toolbar import ToolBar
 from enthought.savage.traits.ui.svg_button import SVGButton
 from cns.widgets import icons
 
-from .physiology_controller_mixin import PhysiologyControllerMixin
+from PyQt4.QtGui import QApplication
 
 from enthought.traits.api import HasTraits, Dict, on_trait_change, Property, \
         cached_property
 
 from .apply_revert_controller_mixin import ApplyRevertControllerMixin
 
-from PyQt4 import QtGui
+#from PyQt4 import QtGui
 
 import logging
 log = logging.getLogger(__name__)
 
-from enthought.pyface.api import FileDialog, OK
 from cns import get_config
-
-def get_save_file(path, wildcard):
-    wildcard = wildcard.split('|')[1][1:]
-    fd = FileDialog(action='save as', default_directory=path, wildcard=wildcard)
-    if fd.open() == OK and fd.path <> '':
-        if not fd.path.endswith(wildcard):
-            fd.path += wildcard
-        return fd.path
-    return None
-
-def load_instance(path, wildcard):
-    fd = FileDialog(action='open', default_directory=path, wildcard=wildcard)
-    if fd.open() == OK and fd.path <> '':
-        import cPickle as pickle
-        with open(fd.path, 'rb') as infile:
-            return pickle.load(infile)
-    else:
-        return None
-
-def dump_instance(instance, path, wildcard):
-    filename = get_save_file(path, wildcard)
-    if filename is not None:
-        import cPickle as pickle
-        with open(filename, 'wb') as outfile:
-            pickle.dump(instance, outfile)
-        return True
-    return False
+from .utils import get_save_file, load_instance, dump_instance
 
 PARADIGM_ROOT = get_config('PARADIGM_ROOT')
 PARADIGM_WILDCARD = get_config('PARADIGM_WILDCARD')
 
+from physiology_experiment import PhysiologyExperiment
+from physiology_paradigm import PhysiologyParadigm
+from physiology_data import PhysiologyData
+from physiology_controller import PhysiologyController
 
 class ExperimentToolBar(ToolBar):
 
@@ -114,8 +92,7 @@ class ExperimentToolBar(ToolBar):
             kind='subpanel',
             )
 
-class AbstractExperimentController(PhysiologyControllerMixin,
-                                   ApplyRevertControllerMixin, Controller):
+class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
     """Primary controller for TDT System 3 hardware.  This class must be
     configured with a model that contains the appropriate parameters (e.g.
     Paradigm) and a view to show these parameters.
@@ -217,6 +194,21 @@ class AbstractExperimentController(PhysiologyControllerMixin,
     # Calibration objects
     cal_primary     = Instance('neurogen.Calibration')
     cal_secondary   = Instance('neurogen.Calibration')
+    
+    physiology_handler = Instance(PhysiologyController)
+    
+    def handle_error(self, error):
+        mesg = '{}\n\nDo you wish to stop the program?'.format(error)
+        
+        # Since this is a critical error, we should force the window to the
+        # top so the user knows there is a problem. Typically this is
+        # considered rude behavior in programming; however, experiments take
+        # priority.
+        self.info.ui.control.activateWindow()
+        QApplication.beep()
+        #QApplication.alert(self.info.ui.control, 1000)
+        if confirm(self.info.ui.control, mesg, 'Error while running') == YES:
+            self.stop(self.info)
 
     def init(self, info):
         try:
@@ -232,7 +224,13 @@ class AbstractExperimentController(PhysiologyControllerMixin,
             # window should be the current window (info.ui.control) that way
             # both windows get closed when the app exits.
             if self.model.spool_physiology:
-                info.object.edit_traits(view='physiology_view').control
+                data_node = info.object.data_node
+                node = get_or_append_node(data_node, 'physiology')
+                data = PhysiologyData(store_node=node)
+                experiment = PhysiologyExperiment(data=data)
+                handler = PhysiologyController()
+                experiment.edit_traits(handler=handler, parent=None)
+                self.physiology_handler = handler
 
         except Exception, e:
             log.exception(e)
@@ -240,23 +238,22 @@ class AbstractExperimentController(PhysiologyControllerMixin,
             error(info.ui.control, str(e))
 
         # Use this for non-blocking error messages
-        self.system_tray = QtGui.QSystemTrayIcon(info.ui.control)
-        self.system_tray.messageClicked.connect(self.message_clicked)
-        self.system_tray.setVisible(True)
+        #self.system_tray = QtGui.QSystemTrayIcon(info.ui.control)
+        #self.system_tray.messageClicked.connect(self.message_clicked)
+        #self.system_tray.setVisible(True)
         
     def close(self, info, is_ok):
         '''
         Prevent user from closing window while an experiment is running since
         data is not saved to file until the stop button is pressed.
         '''
-
         # We can abort a close event by returning False.  If an experiment
         # is currently running, confirm that the user really did want to close
         # the window.  If no experiment is running, then it's OK since the user
         # can always restart the experiment.
+        close = True
         if self.state not in ('disconnected', 'halted', 'complete'):
             mesg = 'Experiment is still running.  Are you sure you want to exit?'
-
             # The function confirm returns an integer that represents the
             # response that the user requested.  YES is a constant (also
             # imported from the same module as confirm) corresponding to the
@@ -265,13 +262,17 @@ class AbstractExperimentController(PhysiologyControllerMixin,
             # pressed, the return value will be something other than YES and we
             # will assume that the user has requested not to quit the
             # experiment.
-            if confirm(info.ui.control, mesg) == YES:
-                self.stop(info)
-                return True
+            if confirm(info.ui.control, mesg) != YES:
+                close = False
             else:
-                return False
-        else:
-            return True
+                self.stop(info)
+        
+        if close:
+            pass
+            #if self.physiology_handler is not None:
+                #print 'attemting to close handler'
+                #self.physiology_handler.close(info, True, True)
+        return close
 
     shadow_ = Any
 
@@ -285,7 +286,6 @@ class AbstractExperimentController(PhysiologyControllerMixin,
             # I don't really like having this check here; however, it works for
             # our purposes.
             if self.model.spool_physiology:
-                # Ensure that the settings are applied
                 self.setup_physiology()
 
             # setup_experiment should load the necessary circuits and
@@ -298,10 +298,11 @@ class AbstractExperimentController(PhysiologyControllerMixin,
             self.process.start()
 
             if self.model.spool_physiology:
-                settings = self.model.physiology_settings
-                self.init_paradigm(settings)
-                settings.on_trait_change(self.queue_change, '+')
-                self.tasks.append((self.monitor_physiology, 1))
+                self.physiology_controller.start()
+                #settings = self.model.physiology_settings
+                ##self.init_paradigm(settings)
+                #settings.on_trait_change(self.queue_change, '+')
+                #self.tasks.append((self.monitor_physiology, 1))
 
             # Now that the process is started, we can configure the circuit
             # (e.g. read/write to tags) and gather the information we need to
@@ -313,8 +314,18 @@ class AbstractExperimentController(PhysiologyControllerMixin,
             self.timer = Timer(100, self.run_tasks)
 
         except Exception, e:
+            if self.state != 'halted':
+                self.stop_experiment(info)
             log.exception(e)
-            error(self.info.ui.control, str(e))
+            mesg = '''
+            Unable to start the experiment due to an error.  Please correct the
+            error condition and attempt to restart the experiment.  Note that
+            you may have to shut down and start the program again.
+            '''
+            import textwrap
+            mesg = textwrap.dedent(mesg).strip().replace('\n', ' ')
+            mesg += '\n\nError message: ' + str(e)
+            error(self.info.ui.control, mesg, title='Error starting experiment')
 
     def stop(self, info=None):
         try:
@@ -324,7 +335,6 @@ class AbstractExperimentController(PhysiologyControllerMixin,
         except Exception, e:
             log.exception(e)
             error(self.info.ui.control, str(e))
-
         try:
             self.stop_experiment(info)
             self.model.stop_time = datetime.now()
@@ -345,18 +355,8 @@ class AbstractExperimentController(PhysiologyControllerMixin,
                 except Exception, e:
                     # Display an error message to the user
                     log.exception(e)
-                    mesg = "The following exception occured in the program:" + \
-                            "\n\n%s"
-                    mesg = mesg % str(e)
-                    self.system_tray.showMessage("Error running task", mesg)
+                    self.handle_error(e)
         self.tick_count += 1
-
-    def message_clicked(self):
-        mesg = "An exception occured in the program.  What should we do?"
-        dialog = ConfirmationDialog(message=mesg, yes_label='Stop',
-                no_label='Continue')
-        if dialog.open() == YES:
-            self.stop(self.info)
 
     ############################################################################
     # Method stubs to be implemented
@@ -399,23 +399,31 @@ class AbstractExperimentController(PhysiologyControllerMixin,
     def set_speaker_mode(self, value):
         self.current_speaker_mode = value
 
-    def set_attenuations(self, att1, att2):
+    def set_attenuations(self, att1, att2, check=True):
         # TDT's built-in attenuators for the RZ6 function in 20 dB steps, so we
         # need to determine the next greater step size for the attenuator.  The
-        # maximun hardware attenuation is 60 dB.
-        hw1, sw1 = RZ6.split_attenuation(att1)
-        hw2, sw2 = RZ6.split_attenuation(att2)
+        # maximum hardware attenuation is 60 dB.
+        log.debug('Attempting to change attenuation to %r and %r', att1, att2)
 
-        # Don't update unless either has changed!
-        if (hw1 != self.current_hw_att1) or (hw2 != self.current_hw_att2):
-            #self.iface_behavior.set_att_bits(RZ6.atten_to_bits(hw1, hw2))
-            self.iface_behavior.set_tag('att1', hw1)
-            self.iface_behavior.set_tag('att2', hw2)
-            self.output_primary.hw_attenuation = hw1
-            self.output_primary.hw_attenuation = hw2
-            self.current_hw_att1 = hw1
-            self.current_hw_att2 = hw2
-            log.debug('Set hardware attenuation to %.2f and %.2f', hw1, hw2)
+        if att1 is not None:
+            hw1, sw1 = RZ6.split_attenuation(att1)
+            if hw1 != self.current_hw_att1:
+                if check and self.get_current_value('fixed_attenuation'):
+                    raise ValueError, 'Cannot change primary attenuation'
+                self.iface_behavior.set_tag('att1', hw1)
+                self.current_hw_att1 = hw1
+                self.output_primary.hw_attenuation = hw1
+                log.debug('Updated primary attenuation to %.2f', hw1)
+
+        if att2 is not None:
+            hw2, sw2 = RZ6.split_attenuation(att2)
+            if hw2 != self.current_hw_att2:
+                if check and self.get_current_value('fixed_attenuation'):
+                    raise ValueError, 'Cannot change secondary attenuation'
+                self.iface_behavior.set_tag('att2', hw2)
+                self.current_hw_att2 = hw2
+                self.output_secondary.hw_attenuation = hw2
+                log.debug('Updated secondary attenuation to %.2f', hw2)
 
     def set_expected_speaker_range(self, value):
         self._update_attenuators()
@@ -429,15 +437,17 @@ class AbstractExperimentController(PhysiologyControllerMixin,
 
     def _update_attenuators(self):
         if self.get_current_value('fixed_attenuation'):
-            expected_range = self.get_current_value('expected_speaker_range')
-            expected_range = [(s.frequency, s.max_level) for s in expected_range]
-            att1 = self.cal_primary.get_best_attenuation(expected_range)
-            att2 = self.cal_secondary.get_best_attenuation(expected_range)
+            ranges = self.get_current_value('expected_speaker_range')
+            ranges = [(s.frequency, s.max_level) for s in ranges]
+            att1 = self.cal_primary.get_best_attenuation(ranges)
+            att2 = self.cal_secondary.get_best_attenuation(ranges)
             log.debug('Best attenuations are %.2f and %.2f', att1, att2)
-            self.set_attenuations(att1, att2)
+            self.set_attenuations(att1, att2, False)
+            self.output_primary.fixed_attenuation = True
+            self.output_secondary.fixed_attenuation = True
         else:
-            self.output_primary.hw_attenuation = None
-            self.output_secondary.hw_attenuation = None
+            self.output_primary.fixed_attenuation = False
+            self.output_secondary.fixed_attenuation = False
 
     def log_trial(self, **kwargs):
         for key, value in self.context_log.items():
@@ -456,16 +466,3 @@ class AbstractExperimentController(PhysiologyControllerMixin,
 
     def saveas_paradigm(self, info):
         dump_instance(self.model.paradigm, PARADIGM_ROOT, PARADIGM_WILDCARD)
-
-    #def select_parameters(self, info):
-    #    parameters = self.model.paradigm.get_parameter_info().keys()
-    #    print ParameterSelector(available_parameters=parameters).edit_traits().parameters
-
-#from enthought.traits.ui.api import SetEditor
-#
-#class ParameterSelector(HasTraits):
-#
-#    EDITOR = SetEditor(name='available_parameters')
-#
-#    available_parameters = List
-#    parameters = List(editor=EDITOR)
