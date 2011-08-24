@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from enthought.traits.api import HasTraits, Any, Instance, Property
+from enthought.traits.api import HasTraits, Any, Instance, Property, Bool
 from enthought.traits.ui.api import View, Include, VGroup, Item, Tabbed
 
 from cns.data.h5_utils import append_date_node, append_node
@@ -8,7 +8,6 @@ from cns.data.h5_utils import append_date_node, append_node
 from abstract_experiment_controller import AbstractExperimentController
 from abstract_experiment_data import AbstractExperimentData
 from abstract_experiment_paradigm import AbstractExperimentParadigm
-from physiology_experiment_mixin import PhysiologyExperimentMixin
 
 from enthought.traits.ui.key_bindings import KeyBinding, KeyBindings
 
@@ -38,7 +37,7 @@ class ContextAdapter(TabularAdapter):
 
 context_editor = TabularEditor(adapter=ContextAdapter(), editable=False)
 
-class AbstractExperiment(PhysiologyExperimentMixin):
+class AbstractExperiment(HasTraits):
 
     animal              = Any
     store_node          = Any
@@ -51,6 +50,8 @@ class AbstractExperiment(PhysiologyExperimentMixin):
     stop_time           = Instance(datetime, store='attribute')
     duration            = Property(store='attribute')
     date                = Property(store='attribute', depends_on='start_time')
+
+    spool_physiology         = Bool(False)
 
     def _get_date(self):
         if self.start_time is None:

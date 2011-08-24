@@ -2,7 +2,6 @@ import numpy as np
 import logging
 log = logging.getLogger(__name__)
 
-from physiology_data_mixin import PhysiologyDataMixin
 from pump_data_mixin import PumpDataMixin
 
 from enthought.traits.api import (List, Property, Tuple, cached_property, Any,
@@ -14,7 +13,7 @@ from cns.data.h5_utils import get_or_append_node
 from cns.channel import FileChannel
 from cns.util.math import rcount
 
-class AbstractExperimentData(PhysiologyDataMixin, PumpDataMixin):
+class AbstractExperimentData(PumpDataMixin):
 
     new_trial = Event
 

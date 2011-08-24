@@ -150,7 +150,6 @@ class ExperimentLauncher(CohortViewHandler):
 def prepare_experiment(args, store_node):
     if len(args.analyze) == 0:
         args.analyze = args.rove[:]
-
     module = get_experiment(args.type)
     
     # Find the classes
@@ -160,7 +159,6 @@ def prepare_experiment(args, store_node):
     data_class = module.Data
     node_name = module.node_name
 
-    #e = get_experiment(args.type)
     exp_node = append_date_node(store_node, node_name + '_')
     data_node = append_node(exp_node, 'data')
 
@@ -182,6 +180,10 @@ def prepare_experiment(args, store_node):
     controller_args = {}
     controller_args['cal_primary'] = cal_primary
     controller_args['cal_secondary'] = cal_secondary
+    
+    log.debug('store_node: %s', store_node)
+    log.debug('data_node: %s', data_node)
+    log.debug('exp_node: %s', exp_node)
     
     # Prepare the classes. This really is a lot of boilerplate to link up
     # parameters with paradigms, etc, to facilitate analysis
