@@ -2,7 +2,7 @@ from enthought.pyface.api import FileDialog, OK
 import cPickle as pickle
 
 def get_save_file(path, wildcard):
-    wildcard = wildcard.split('|')[1][1:]
+    #wildcard = wildcard.split('|')[1][1:]
     fd = FileDialog(action='save as', default_directory=path, wildcard=wildcard)
     if fd.open() == OK and fd.path <> '':
         if not fd.path.endswith(wildcard):
@@ -27,4 +27,3 @@ def dump_instance(instance, path, wildcard):
             pickle.dump(instance, outfile)
         return True
     return False
-

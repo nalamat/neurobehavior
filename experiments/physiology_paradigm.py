@@ -37,7 +37,7 @@ channel_editor = TableEditor(
             ]
         )
 
-class PhysiologyParadigmMixin(HasTraits):
+class PhysiologyParadigm(HasTraits):
 
     commutator_inhibit      = Bool(False, init=True, immediate=True)
 

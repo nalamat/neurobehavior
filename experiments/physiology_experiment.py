@@ -9,7 +9,9 @@ from enthought.traits.api import Instance, HasTraits, Float, DelegatesTo, \
      Tuple, List
 from enthought.traits.ui.editors import RangeEditor
 
-from physiology_paradigm_mixin import PhysiologyParadigmMixin
+from physiology_paradigm import PhysiologyParadigm
+from physiology_data import PhysiologyData
+from physiology_controller import PhysiologyController
 
 from enthought.chaco.api import PlotAxis, VPlotContainer, PlotAxis
 from enthought.chaco.tools.api import ZoomTool
@@ -30,6 +32,16 @@ from cns.chaco_exts.threshold_overlay import ThresholdOverlay
 CHANNELS = get_config('PHYSIOLOGY_CHANNELS')
 VOLTAGE_SCALE = 1e3
 scale_formatter = lambda x: "{:.2f}".format(x*VOLTAGE_SCALE)
+
+from enthought.traits.ui.menu import MenuBar, Menu, ActionGroup, Action
+
+def create_menubar():
+    actions = ActionGroup(
+            Action(name='Load settings', action='load_settings'),
+            Action(name='Save settings as', action='saveas_settings'),
+            )
+    menu = Menu(actions, name='&Physiology')
+    return MenuBar(menu)
 
 def ptt(event_times, trig_times):
     return np.concatenate([event_times-tt for tt in trig_times])
@@ -112,8 +124,7 @@ class SortWindow(HasTraits):
         self.tool = WindowTool(component=plot)
         plot.overlays.append(self.tool)
         
-        # Whenever we draw a window, the settings should immediately be
-        # updated!
+        # Whenever we draw a window, the settings should immediately be updated!
         self.sync_trait('windows', self.tool)
         return plot
 
@@ -127,11 +138,10 @@ class SortWindow(HasTraits):
                 ),
             )
 
-class PhysiologyExperimentMixin(HasTraits):
+class PhysiologyExperiment(HasTraits):
 
-    # Acquire physiology?
-    spool_physiology         = Bool(False)
-    physiology_settings      = Instance(PhysiologyParadigmMixin, ())
+    settings                 = Instance(PhysiologyParadigm, ())
+    data                     = Instance(PhysiologyData)
 
     physiology_container     = Instance(Component)
     physiology_plot          = Instance(Component)
@@ -148,13 +158,14 @@ class PhysiologyExperimentMixin(HasTraits):
     
     spike_overlay            = Instance(SpikeOverlay)
     threshold_overlay        = Instance(ThresholdOverlay)
+    parent                   = Any
 
     def _physiology_sort_map_default(self):
         return [(0.0001, []) for i in range(16)]
 
     @on_trait_change('data')
     def _physiology_sort_plots(self):
-        settings = self.physiology_settings.channel_settings
+        settings = self.settings.channel_settings
         channels = self.data.physiology_spikes
         
         window = SortWindow(channel=1, settings=settings, channels=channels)
@@ -179,7 +190,7 @@ class PhysiologyExperimentMixin(HasTraits):
     def _physiology_channel_span_changed(self):
         self._physiology_value_range_update()
 
-    @on_trait_change('data')
+    @on_trait_change('data, parent')
     def _generate_physiology_plot(self):
         # Padding is in left, right, top, bottom order
         container = OverlayPlotContainer(padding=[50, 20, 20, 50])
@@ -198,8 +209,6 @@ class PhysiologyExperimentMixin(HasTraits):
                 line_color='transparent', rect_center=0.5, rect_height=1.0)
         add_default_grids(plot, major_index=1, minor_index=0.25)
         container.add(plot)
-
-        self._add_behavior_plots(index_mapper, container)
 
         # Create the neural plots
         value_mapper = LinearMapper(range=self.physiology_value_range)
@@ -224,23 +233,26 @@ class PhysiologyExperimentMixin(HasTraits):
         self.spike_overlay = overlay
         overlay = ThresholdOverlay(plot=plot, visible=False)
         self.sync_trait('visualize_sorting', overlay, 'visible', mutual=False)
-        self.physiology_settings.sync_trait('spike_thresholds', overlay,
-                                            'thresholds', mutual=False)
+        self.settings.sync_trait('spike_thresholds', overlay, 'thresholds',
+                mutual=False)
         plot.overlays.append(overlay)
         self.threshold_overlay = overlay
+
+        # Hack alert.  Can we separate this out into a separate function?
+        if self.parent is not None:
+            self.parent._add_behavior_plots(index_mapper,
+                    self.physiology_container)
 
         self.physiology_container = container
         self._physiology_value_range_update()
 
-    def _add_behavior_plots(self, index_mapper, container):
-        pass
-
     physiology_settings_group = VGroup(
-            Item('physiology_settings', style='custom',
+            Item('settings', style='custom',
                 editor=InstanceEditor(view='physiology_view')),
             Include('physiology_view_settings_group'),
             show_border=True,
             show_labels=False,
+            label='Channel settings'
             )
 
     physiology_view_settings_group = VGroup(
@@ -268,11 +280,13 @@ class PhysiologyExperimentMixin(HasTraits):
                         Item('physiology_window_2', style='custom', width=250),
                         Item('physiology_window_3', style='custom', width=250),
                         show_labels=False,
+                        label='Sort settings'
                         ),
                     VGroup(
                         Item('object.threshold_overlay', style='custom'),
                         Item('object.spike_overlay', style='custom'),
                         show_labels=False,
+                        label='GUI settings'
                         ),
                     ),
                 Item('physiology_container', 
@@ -281,4 +295,15 @@ class PhysiologyExperimentMixin(HasTraits):
                     resizable=True),
                 show_labels=False,
                 ),
+            menubar=create_menubar(),
+            handler=PhysiologyController,
             resizable=True)
+
+if __name__ == '__main__':
+    import tables
+    from cns import get_config
+    from os.path import join
+    tempfile = join(get_config('TEMP_ROOT'), 'test_physiology.h5')
+    datafile = tables.openFile(tempfile, 'w')
+    data = PhysiologyData(store_node=datafile.root)
+    PhysiologyExperiment(data=data).configure_traits()

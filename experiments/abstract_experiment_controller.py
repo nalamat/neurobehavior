@@ -12,7 +12,7 @@ from enthought.pyface.timer.api import Timer
 from enthought.etsconfig.api import ETSConfig
 from enthought.traits.api import (Any, Instance, Enum, Dict, on_trait_change, 
         HasTraits, List, Button, Bool, Tuple, Callable, Int, Property,
-        cached_property, Undefined, Event, TraitError, Str)
+        cached_property, Undefined, Event, TraitError, Str, Float)
 from enthought.traits.ui.api import Controller, View, HGroup, Item, spring
 
 from cns.widgets.toolbar import ToolBar
@@ -196,6 +196,9 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
     cal_secondary   = Instance('neurogen.Calibration')
     
     physiology_handler = Instance(PhysiologyController)
+
+    current_hw_att1 = Float(0)
+    current_hw_att2 = Float(0)
     
     def handle_error(self, error):
         mesg = '{}\n\nDo you wish to stop the program?'.format(error)
@@ -206,7 +209,6 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
         # priority.
         self.info.ui.control.activateWindow()
         QApplication.beep()
-        #QApplication.alert(self.info.ui.control, 1000)
         if confirm(self.info.ui.control, mesg, 'Error while running') == YES:
             self.stop(self.info)
 
@@ -227,8 +229,9 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
                 data_node = info.object.data_node
                 node = get_or_append_node(data_node, 'physiology')
                 data = PhysiologyData(store_node=node)
-                experiment = PhysiologyExperiment(data=data)
-                handler = PhysiologyController()
+                experiment = PhysiologyExperiment(data=data, parent=info.object)
+                handler = PhysiologyController(process=self.process,
+                                               parent=self, mode='client')
                 experiment.edit_traits(handler=handler, parent=None)
                 self.physiology_handler = handler
 
@@ -286,7 +289,7 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
             # I don't really like having this check here; however, it works for
             # our purposes.
             if self.model.spool_physiology:
-                self.setup_physiology()
+                self.physiology_handler.setup_physiology()
 
             # setup_experiment should load the necessary circuits and
             # initialize the buffers. This data is required before the
@@ -298,7 +301,7 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
             self.process.start()
 
             if self.model.spool_physiology:
-                self.physiology_controller.start()
+                self.physiology_handler.start()
                 #settings = self.model.physiology_settings
                 ##self.init_paradigm(settings)
                 #settings.on_trait_change(self.queue_change, '+')

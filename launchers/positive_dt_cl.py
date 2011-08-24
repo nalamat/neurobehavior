@@ -2,8 +2,6 @@ from enthought.traits.api import Instance
 from enthought.traits.ui.api import View, Include, VSplit, VGroup, Item
 from enthought.enable.api import Component, ComponentEditor
 
-from experiments.paradigm_menu import create_menubar
-
 from experiments import (
         # Controller and mixins
         AbstractPositiveController,
@@ -54,13 +52,5 @@ class Experiment(AbstractPositiveExperiment, ConstantLimitsExperimentMixin):
 
     data = Instance(Data, (), store='child')
     paradigm = Instance(Paradigm, (), store='child')
-
-    traits_view = View(
-            Include('traits_group'),
-            resizable=True,
-            height=0.9,
-            width=0.9,
-            menubar=create_menubar(),
-            handler=Controller)
 
 node_name = 'PositiveDTCLExperiment'
