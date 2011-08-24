@@ -85,9 +85,12 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
             except IndexError:
                 return self.trial_log
 
-    c_nogo = Int(0, context=True, immediate=True, label='Consecutive nogos')
-    c_hit = Int(0, context=True, immediate=True, label='Consecutive hits')
-    c_fa = Int(0, context=True, immediate=True, label='Consecutive false alarms')
+    c_hit = Int(0, context=True, label='Consecutive hits (excluding reminds)')
+    c_fa = Int(0, context=True, label='Consecutive fas (excluding repeats)')
+    c_nogo = Int(0, context=True, label='Consecutive nogos (excluding repeats)')
+    #c_fa_all = Int(0, context=True, immediate=True, label='Consecutive fas')
+    c_nogo_all = Int(0, context=True, label='Consecutive nogos')
+    fa_rate = Float(0, context=True, label='Running FA rate (frac)')
 
     def get_data(self, name):
         return getattr(self, name)
@@ -172,9 +175,15 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
         AbstractExperimentData.log_trial(self, **kwargs)
 
         # Now, compute the context data
-        self.c_nogo = self.rcount(self.nogo_seq)
-        self.c_hit = self.rcount(self.hit_seq[self.go_seq | self.fa_seq])
-        self.c_fa = self.rcount(self.fa_seq[self.early_seq | self.nogo_seq])
+        normal_seq = self.nogo_normal_seq | self.go_seq
+        self.c_nogo = self.rcount(self.nogo_normal_seq[normal_seq])
+        self.c_nogo_all = self.rcount(self.nogo_seq)
+        self.c_fa = self.rcount(self.fa_seq[self.early_seq|self.nogo_seq])
+        self.fa_rate = self.fa_seq[self.early_seq|self.nogo_seq][-10:].mean()
+
+        # We include the FA seq when slicing that way we can reset the count if
+        # the gerbil false alarms (which they almost certainly do)
+        self.c_hit = self.rcount(self.hit_seq[self.go_seq|self.fa_seq])
 
     def compute_response(self, ts_start, ts_end):
         '''
@@ -287,6 +296,8 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
     # Trial type sequences
     go_seq      = Property(Array('b'), depends_on='masked_trial_log')
     nogo_seq    = Property(Array('b'), depends_on='masked_trial_log')
+    nogo_normal_seq = Property(Array('b'), depends_on='masked_trial_log')
+    nogo_repeat_seq = Property(Array('b'), depends_on='masked_trial_log')
 
     # Response sequences
     spout_seq   = Property(Array('b'), depends_on='masked_trial_log')
@@ -308,10 +319,16 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
         return string_array_equal(self.ttype_seq, 'GO')
 
     @cached_property
+    def _get_nogo_normal_seq(self):
+        return string_array_equal(self.ttype_seq, 'NOGO') 
+
+    @cached_property
+    def _get_nogo_repeat_seq(self):
+        return string_array_equal(self.ttype_seq, 'NOGO_REPEAT') 
+
+    @cached_property
     def _get_nogo_seq(self):
-        nogo = string_array_equal(self.ttype_seq, 'NOGO') 
-        nogo_repeat = string_array_equal(self.ttype_seq, 'NOGO_REPEAT') 
-        return nogo ^ nogo_repeat
+        return self.nogo_repeat_seq ^ self.nogo_normal_seq
 
     @cached_property
     def _get_poke_seq(self):
