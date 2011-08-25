@@ -48,6 +48,44 @@ class CohortViewHandler(FileHandler):
     path = File
     wildcard = Str
     modified_trait = '_modified'
+import logging
+log = logging.getLogger(__name__)
+
+class AnimalColumn(ObjectColumn):
+
+    SEX_COLORMAP = {'M': '#ADD8E6',
+                    'F': '#FFB6C1',
+                    'U': '#D3D3D3'}
+
+    def get_cell_color(self, object):
+        if self.name == 'sex':
+            return self.SEX_COLORMAP[object.sex]
+        elif object.processed:
+            return '#D3D3D3'
+        else:
+            return '#FFFFFF'
+
+class CohortEditor(TableEditor):
+
+    sortable        = True
+    selected        = 'selected'
+    selection_mode  = 'row'
+    dclick          = 'dclicked'
+
+    columns=[
+        AnimalColumn(name='nyu_id', label='ID'),
+        AnimalColumn(name='parents'),
+        AnimalColumn(name='birth'),
+        AnimalColumn(name='age', editable=False),
+        AnimalColumn(name='sex'),
+        AnimalColumn(name='identifier'),
+        ]
+
+class CohortViewHandler(FileHandler):
+
+    path = File
+    wildcard = Str
+    modified_trait = '_modified'
     path            = File(get_config('COHORT_ROOT'))
     wildcard        = Str(get_config('COHORT_WILDCARD'))
 

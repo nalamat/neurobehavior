@@ -5,11 +5,11 @@ import numpy as np
 
 class PositiveAMNoiseControllerMixin(HasTraits):
 
-    carrier = Instance(blocks.Block)
-    modulator = Instance(blocks.Block)
-    envelope = Instance(blocks.Block)
-    output_primary = Instance(blocks.Block)
-    output_secondary = Instance(blocks.Block)
+    noise_carrier   = Instance(blocks.Block)
+    tone_carrier    = Instance(blocks.Block)
+    modulator       = Instance(blocks.Block)
+    envelope        = Instance(blocks.Block)
+    output          = Instance(Sink)
     
     def set_speaker_equalize(self, value):
         self.output_primary.equalize = value
@@ -18,27 +18,40 @@ class PositiveAMNoiseControllerMixin(HasTraits):
     def set_level(self, value):
         self.carrier.level = value
     
-    def set_lb_modulation_onset(self, value):
-        self.current_lb = value
+    def _tone_carrier_default(self):
+        return blocks.Tone(frequency=2e3)
 
-    def set_ub_modulation_onset(self, value):
-        self.current_ub = value
+    def _noise_carrier_default(self):
+        return blocks.BandlimitedNoise()
+
+    def _envelope_default(self):
+        return blocks.Cos2Envelope()
+
+    def _output_default(self):
+        return Sink(token=self.envelope.waveform, fs=self.iface_behavior.fs,
+                    calibration=Calibration(equalized_data))
+
+    def set_fc(self, value):
+        self.tone_carrier.frequency = value
+        self.noise_carrier.fc = value
+
+    def set_bandwidth(self, value):
+        if value == 0:
+            self.modulator.token = self.tone_carrier.waveform
+        else:
+            self.modulator.token = self.noise_carrier.waveform
+            self.noise_carrier.bandwidth = value
         
     def set_seed(self, value):
-        self.carrier.seed = value
-
-    def _carrier_default(self):
-        return blocks.BroadbandNoise()
+        self.noise_carrier.seed = value
 
     def _modulator_default(self):
-        return blocks.SAM(token=self.carrier.waveform, equalize_power=True,
-                          equalize_phase=False)
+        return blocks.SAM(equalize_power=True, equalize_phase=False)
 
     def _envelope_default(self):
         return blocks.Cos2Envelope(token=self.modulator.waveform)
 
     def _output_primary_default(self):
-        return Sink(token=self.envelope.waveform, fs=self.iface_behavior.fs,
                     calibration=self.cal_secondary)
     
     def _output_secondary_default(self):
@@ -70,6 +83,15 @@ class PositiveAMNoiseControllerMixin(HasTraits):
 
     def set_nogo_parameter(self, value):
         self.current_nogo_parameter = value
+
+    def set_rp(self, value):
+        self.noise_carrier.rp = value
+
+    def set_rs(self, value):
+        self.noise_carrier.rs = value
+
+    def set_order(self, value):
+        self.noise_carrier.order = value
         
     def _compute_signal(self):
         self.envelope.duration = self.current_duration

@@ -190,6 +190,10 @@ class AbstractPositiveController(AbstractExperimentController):
             self.iface_behavior.set_tag('react_del_n', 2)
         self.current_reaction_window_delay = value
 
+        # We need to be sure to update the duration as well if we adjust this
+        # value
+        self.set_reaction_window_duration(self.current_context['reaction_window_duration'])
+
     def set_reaction_window_duration(self, value):
         delay = self.get_current_value('reaction_window_delay')
         self.iface_behavior.cset_tag('react_end_n', delay+value, 's', 'n')

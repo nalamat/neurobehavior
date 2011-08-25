@@ -21,9 +21,20 @@ class ChannelSetting(HasTraits):
     
     # Threshold for candidate spike used in on-line spike sorting
     spike_threshold = Float(0.0005)
+    # Should spike_threshold trigger on +/-?
+    spike_sign = Bool(False)
     
     # Windows used for candidate spike isolation and sorting.
-    spike_windows   = List(Tuple(Float, Float, Float), [])
+    spike_windows = List(Tuple(Float, Float, Float), [])
+    spike_sort_summary = Property(Str, depends_on='spike_+')
+    
+    def _get_spike_sort_summary(self):
+        if not self.spike_sign:
+            return u"\u00B1{} with {} windows".format(abs(self.spike_threshold),
+                                                      len(self.spike_windows))
+        else:
+            return "{:+} with {} windows".format(self.spike_threshold,
+                                                 len(self.spike_windows))
 
 channel_editor = TableEditor(
         show_row_labels=True,
@@ -32,8 +43,9 @@ channel_editor = TableEditor(
             ObjectColumn(name='number', editable=False, width=10, label=''),
             CheckboxColumn(name='visible', width=10, label='V'), 
             CheckboxColumn(name='bad', width=10, label='B'),
-            #ObjectColumn(name='spike_threshold', label='Threshold', width=20),
             ObjectColumn(name='differential'),
+            ObjectColumn(name='spike_sort_summary', label='Sort?', width=20, 
+                         editable=False),
             ]
         )
 
@@ -51,14 +63,12 @@ class PhysiologyParadigm(HasTraits):
     diff_sagittal   = Button('Sagittal')
     diff_coronal    = Button('Coronal')
     diff_all        = Button('All')
-    #diff_visible    = Bool(True)
 
     def _get_diff_group(self, channel, group):
         ub = int(ceil(channel/group)*group + 1)
         lb = ub - group
         diff = range(lb, ub)
         diff.remove(channel)
-        #if self.diff_visible:
         diff = [d for d in diff if not self.channel_settings[d-1].bad]
         return ', '.join(str(ch) for ch in diff)
 
@@ -88,7 +98,6 @@ class PhysiologyParadigm(HasTraits):
                 Item('diff_coronal', width=WIDTH),
                 Item('diff_all', width=WIDTH),
                 Item('diff_none', width=WIDTH),
-                #Item('diff_good', label='Only good?', show_label=True),
                 show_labels=False,
                 ),
             )
@@ -166,8 +175,8 @@ class PhysiologyParadigm(HasTraits):
     monitor_gain_4      = Range(0, 100, 50, init=True, immediate=True)
 
     # Bandpass filter settings
-    monitor_fc_highpass = Range(0, 12.5e3, 300, init=True, immediate=True)
-    monitor_fc_lowpass  = Range(0, 12.5e3, 10e3, init=True, immediate=True)
+    monitor_fc_highpass = Range(0, 1e3, 300, init=True, immediate=True)
+    monitor_fc_lowpass  = Range(1e3, 5e3, 5e3, init=True, immediate=True)
 
     channel_settings    = List(Instance(ChannelSetting))
 
@@ -188,6 +197,12 @@ class PhysiologyParadigm(HasTraits):
     
     def _get_spike_thresholds(self):
         return [ch.spike_threshold for ch in self.channel_settings]
+    
+    spike_signs = Property(depends_on='channel_settings.spike_sign', 
+                           init=True, immediate=True)
+    
+    def _get_spike_signs(self):
+        return [ch.spike_sign for ch in self.channel_settings]
 
     # Generates the matrix that will be used to compute the differential for
     # the channels. This matrix will be uploaded to the RZ5.
@@ -239,7 +254,8 @@ class PhysiologyParadigm(HasTraits):
 
     physiology_view = View(
             VGroup(
-                Item('commutator_inhibit', label='Inhibit commutator?'),
+                Item('commutator_inhibit', label='Inhibit commutator?',
+                    show_label=True),
                 Include('filter_group'),
                 Include('monitor_group'),
                 Include('visible_group'),
