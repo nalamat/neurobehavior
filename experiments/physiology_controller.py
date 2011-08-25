@@ -13,6 +13,7 @@ from cns.pipeline import deinterleave_bits
 
 CHANNELS = get_config('PHYSIOLOGY_CHANNELS')
 PHYSIOLOGY_WILDCARD = get_config('PHYSIOLOGY_WILDCARD')
+SPIKE_SNIPPET_SIZE = 20
 PHYSIOLOGY_ROOT = get_config('PHYSIOLOGY_ROOT')
 
 from .utils import get_save_file, load_instance, dump_instance
@@ -69,18 +70,25 @@ class PhysiologyController(Controller):
 
         # Initialize the buffers that will be spooling the data
         self.buffer_physiology_raw = self.iface_physiology.get_buffer('craw',
-                'r', src_type='int16', dest_type='float32', channels=CHANNELS)
+                'r', src_type='int16', dest_type='float32', channels=CHANNELS,
+                block_size=1048)
         self.buffer_physiology_filt = self.iface_physiology.get_buffer('cfilt',
-                'r', src_type='int16', dest_type='float32', channels=CHANNELS)
+                'r', src_type='int16', dest_type='float32', channels=CHANNELS,
+                block_size=1048)
         self.buffer_physiology_ts = self.iface_physiology.get_buffer('trig/',
                 'r', src_type='int32', dest_type='int32', block_size=1)
         self.buffer_physiology_ttl = self.iface_physiology.get_buffer('TTL',
                 'r', src_type='int8', dest_type='int8', block_size=1)
 
+
         for i in range(CHANNELS):
             name = 'spike{}'.format(i+1)
-            buffer = self.iface_physiology.get_buffer(name, 'r', block_size=40)
+            buffer = self.iface_physiology.get_buffer(name, 'r',
+                    block_size=SPIKE_SNIPPET_SIZE)
             self.buffer_spikes.append(buffer)
+            spikes = self.model.data.physiology_spikes[i] 
+            spikes.snippet_size = SPIKE_SNIPPET_SIZE-2
+            spikes.fs = buffer.fs
 
     @on_trait_change('model.data')
     def update_data(self):
@@ -126,7 +134,8 @@ class PhysiologyController(Controller):
         # Get the spikes.  Each channel has a separate buffer for the spikes
         # detected online.
         for i in range(CHANNELS):
-            data = self.buffer_spikes[i].read().reshape((-1, 40))
+            data = self.buffer_spikes[i].read().reshape((-1,
+                SPIKE_SNIPPET_SIZE))
 
             # First sample of each snippet is the timestamp (as a 32 bit
             # integer) and last sample is the classifier (also as a 32 bit
@@ -141,6 +150,11 @@ class PhysiologyController(Controller):
         for ch, threshold in enumerate(value):
             name = 'a_spike{}'.format(ch+1)
             self.iface_physiology.set_tag(name, threshold)
+            
+    def set_spike_signs(self, value):
+        for ch, sign in enumerate(value):
+            name = 's_spike{}'.format(ch+1)
+            self.iface_physiology.set_tag(name, sign)
             
     @on_trait_change('model.settings.monitor_fc_highpass')
     def set_monitor_fc_highpass(self, value):
