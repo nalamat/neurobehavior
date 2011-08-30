@@ -2,7 +2,7 @@ from __future__ import division
 
 import numpy as np
 from enthought.chaco.api import DataRange1D
-from enthought.traits.api import Float, List, Instance, Enum
+from enthought.traits.api import Float, List, Instance, Enum, Int
 
 class ChannelDataRange(DataRange1D):
 
@@ -11,6 +11,7 @@ class ChannelDataRange(DataRange1D):
     span            = Float(20)
     trig_delay      = Float(5)
     update_mode     = Enum('auto', 'auto full', 'triggered', 'triggered full')
+    trigger         = Int(-1)
 
     scroll_period   = Float(20)
 
@@ -48,7 +49,11 @@ class ChannelDataRange(DataRange1D):
         elif self.update_mode == 'triggered':
             # We want the lower bound of the range to be referenced to the
             # trigger itself.
-            low_value = self.timeseries.latest()-self.trig_delay
+            #low_value = self.timeseries.latest()-self.trig_delay
+            try:
+                low_value = self.timeseries[self.trigger]-self.trig_delay
+            except:
+                low_value = -self.trig_delay
             high_value = low_value+span
         elif self.update_mode == 'triggered full':
             # We want the lower bound of the range to be referenced to the
