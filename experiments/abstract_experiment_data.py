@@ -13,12 +13,21 @@ from cns.data.h5_utils import get_or_append_node
 from cns.channel import FileChannel
 from cns.util.math import rcount
 
+def string_array_equal(a, string):
+    if len(a) == 0:
+        return np.array([])
+    else:
+        return np.array(a) == string
+
 class AbstractExperimentData(PumpDataMixin):
 
     new_trial = Event
 
     def rcount(self, sequence):
         return rcount(sequence)
+
+    def string_array_equal(self, array, string):
+        return string_array_equal(array, string)
 
     def apply_mask(self, fun, masks, sequence):
         return np.array([fun(sequence[m]) for m in masks])

@@ -15,7 +15,6 @@ from cns.pipeline import deinterleave, broadcast
 from cns.channel import Timeseries, FileChannel
 
 from enthought.traits.ui.api import CheckListEditor
-from enthought.chaco.api import AbstractPlotData
 
 import logging
 log = logging.getLogger(__name__)
@@ -24,12 +23,6 @@ log = logging.getLogger(__name__)
 ts = lambda TTL: np.flatnonzero(TTL)
 edge_rising = lambda TTL: np.r_[0, np.diff(TTL.astype('i'))] == 1
 edge_falling = lambda TTL: np.r_[0, np.diff(TTL.astype('i'))] == -1
-
-def string_array_equal(a, string):
-    if len(a) == 0:
-        return np.array([])
-    else:
-        return np.array(a) == string
 
 # Version log
 #
@@ -60,7 +53,7 @@ def string_array_equal(a, string):
 # V2.6 - 110605 - Added commutator inhibit TTL (comm_inhibit_TTL) to indicate
 # when commutator is being suppressed from spinning.
 # V2.7 - 110718 - Added microphone data buffer
-class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
+class PositiveData_0_1(AbstractExperimentData, SDTDataMixin):
     '''
     masked_trial_log is essentially a list of the trials, along with the parameters
     and some basic analysis.
@@ -77,7 +70,7 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
             if len(self.trial_log) == 0:
                 return self.trial_log
 
-            go_seq = string_array_equal(self.trial_log['ttype'], 'GO')
+            go_seq = self.string_array_equal(self.trial_log['ttype'], 'GO')
             go_number = go_seq[::-1].cumsum()
             try:
                 index = np.nonzero(go_number > self.mask_num)[0][0]
@@ -88,12 +81,8 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
     c_hit = Int(0, context=True, label='Consecutive hits (excluding reminds)')
     c_fa = Int(0, context=True, label='Consecutive fas (excluding repeats)')
     c_nogo = Int(0, context=True, label='Consecutive nogos (excluding repeats)')
-    #c_fa_all = Int(0, context=True, immediate=True, label='Consecutive fas')
     c_nogo_all = Int(0, context=True, label='Consecutive nogos')
     fa_rate = Float(0, context=True, label='Running FA rate (frac)')
-
-    def get_data(self, name):
-        return getattr(self, name)
 
     # VERSION is a reserved keyword in HDF5 files, so I avoid using it here.
     OBJECT_VERSION = Float(2.7, store='attribute')
@@ -316,15 +305,15 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin, AbstractPlotData):
 
     @cached_property
     def _get_go_seq(self):
-        return string_array_equal(self.ttype_seq, 'GO')
+        return self.string_array_equal(self.ttype_seq, 'GO')
 
     @cached_property
     def _get_nogo_normal_seq(self):
-        return string_array_equal(self.ttype_seq, 'NOGO') 
+        return self.string_array_equal(self.ttype_seq, 'NOGO') 
 
     @cached_property
     def _get_nogo_repeat_seq(self):
-        return string_array_equal(self.ttype_seq, 'NOGO_REPEAT') 
+        return self.string_array_equal(self.ttype_seq, 'NOGO_REPEAT') 
 
     @cached_property
     def _get_nogo_seq(self):
