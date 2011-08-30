@@ -231,7 +231,7 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
                 data = PhysiologyData(store_node=node)
                 experiment = PhysiologyExperiment(data=data, parent=info.object)
                 handler = PhysiologyController(process=self.process,
-                                               parent=self, mode='client')
+                                               parent=self, state='client')
                 experiment.edit_traits(handler=handler, parent=None)
                 self.physiology_handler = handler
 
@@ -286,11 +286,6 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
         Subclasses must implement `start_experiment`
         '''
         try:
-            # I don't really like having this check here; however, it works for
-            # our purposes.
-            if self.model.spool_physiology:
-                self.physiology_handler.setup_physiology()
-
             # setup_experiment should load the necessary circuits and
             # initialize the buffers. This data is required before the
             # hardware process is launched since the shared memory, locks and
@@ -302,10 +297,6 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
 
             if self.model.spool_physiology:
                 self.physiology_handler.start()
-                #settings = self.model.physiology_settings
-                ##self.init_paradigm(settings)
-                #settings.on_trait_change(self.queue_change, '+')
-                #self.tasks.append((self.monitor_physiology, 1))
 
             # Now that the process is started, we can configure the circuit
             # (e.g. read/write to tags) and gather the information we need to
