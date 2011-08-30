@@ -266,14 +266,6 @@ def strptime(value, resolution=None):
     else:
         return value_datetime
 
-#def strftime_arr(value, resolution=None):
-#    if len(value) == 0:
-#        return value
-#    if resolution is None:
-#        fmt = guess_datetime_fmt(value[0])
-#    else:
-#        fmt = get_date_fmt(resolution)
-#    return [v.strftime(fmt) for v in value]
 
 def strftime(value, resolution=None):
     if value is None:
@@ -284,25 +276,6 @@ def strftime(value, resolution=None):
         fmt = get_date_fmt(resolution)
     return value.strftime(fmt)
 
-#def switch_datetime_fmt(table, trait, parser):
-#    # TODO: this is obviously not the most efficient implementation; however,
-#    # it works!
-#    if len(table):
-#        try:
-#            dtype = trait.dtype
-#        except AttributeError:
-#            raise DeprecationWarning, "Use dtype metadata now"
-#            dtype = get_np_dtype(trait)
-#
-#        table = [tuple(row) for row in table]
-#        table = array(table, dtype=dtype)
-#        return [tuple(e) for e in table.tolist()]
-#    else:
-#        return []
-#
-#sanitize_datetimes = functools.partial(switch_datetime_fmt, parser=strftime_arr)
-#unsanitize_datetimes = functools.partial(switch_datetime_fmt,
-#        parser=strptime_arr)
 
 def append_metadata(obj, source):
     from os.path import abspath
