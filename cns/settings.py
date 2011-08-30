@@ -65,6 +65,14 @@ SYRINGE_DATA = {
         'B-D 10cc (glass)'      : 14.20,
         }
 
+# __file__ is a special variable that is available in all Python files (when
+# loaded by the Python interpreter) that contains the path of the current file
+# or script. We extract the directory portion of the path and use that to
+# determine where the RCX files are stored. We keep components in source code
+# control as well to ensure that changes to the RCX files track changes to the
+# software.
+RCX_ROOT = join(abspath(dirname(__file__)), '../components')
+
 # Ensure that ETS toolkit will default to Qt4 if we load it
 os.environ['ETS_TOOLKIT'] = 'qt4' 
 
