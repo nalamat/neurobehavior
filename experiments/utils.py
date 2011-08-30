@@ -2,11 +2,11 @@ from enthought.pyface.api import FileDialog, OK
 import cPickle as pickle
 
 def get_save_file(path, wildcard):
-    #wildcard = wildcard.split('|')[1][1:]
+    wildcard_base = wildcard.split('|')[1][1:]
     fd = FileDialog(action='save as', default_directory=path, wildcard=wildcard)
     if fd.open() == OK and fd.path <> '':
-        if not fd.path.endswith(wildcard):
-            fd.path += wildcard
+        if not fd.path.endswith(wildcard_base):
+            fd.path += wildcard_base
         return fd.path
     return None
 
