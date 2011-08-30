@@ -2,6 +2,10 @@ import logging
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
+from .basic_characterization_controller import BasicCharacterizationController
+from .basic_characterization_paradigm import BasicCharacterizationParadigm
+#from .basic_characterization_experiment import BasicCharacterizationExperiment
+
 # Base paradigm classes
 from .abstract_positive_paradigm import AbstractPositiveParadigm
 from .abstract_aversive_paradigm import AbstractAversiveParadigm
@@ -13,9 +17,11 @@ from .abstract_aversive_controller import AbstractAversiveController
 # Base experiment classes
 from .abstract_positive_experiment import AbstractPositiveExperiment
 from .abstract_aversive_experiment import AbstractAversiveExperiment
+from .abstract_experiment import AbstractExperiment
 
 # Base data classes
 from .positive_data import PositiveData
+from .abstract_experiment_data import AbstractExperimentData
 
 # Mixin classes for selecting the next parameter via method of constant limits
 from .constant_limits_paradigm_mixin import ConstantLimitsParadigmMixin
