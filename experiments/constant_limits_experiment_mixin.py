@@ -153,8 +153,8 @@ class ConstantLimitsExperimentMixin(HasTraits):
 
     def _update_data_categories(self, index_name, value_name, component):
         plot_name = index_name+value_name
-        index = self.data.get_data(index_name)
-        value = self.data.get_data(value_name)
+        index = getattr(self.data, index_name)
+        value = getattr(self.data, value_name)
         categories = [p[:-1] for p in index]
         unique_categories = sorted(set(categories))
 

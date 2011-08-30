@@ -21,6 +21,7 @@ from .abstract_experiment import AbstractExperiment
 
 # Base data classes
 from .positive_data import PositiveData
+from .aversive_data import AversiveData
 from .abstract_experiment_data import AbstractExperimentData
 
 # Mixin classes for selecting the next parameter via method of constant limits
@@ -44,3 +45,7 @@ from .temporal_integration_paradigm_mixin import TemporalIntegrationParadigmMixi
 from .temporal_integration_controller_mixin import TemporalIntegrationControllerMixin
 from .am_noise_paradigm_mixin import AMNoiseParadigmMixin
 from .positive_am_noise_controller_mixin import PositiveAMNoiseControllerMixin
+
+# FM paradigm
+from .fm_paradigm_mixin import FMParadigmMixin
+from .aversive_fm_controller_mixin import AversiveFMControllerMixin

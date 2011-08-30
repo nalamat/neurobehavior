@@ -15,13 +15,15 @@ from enthought.traits.ui.api import View
 
 from aversive_analysis_mixin import AversiveAnalysisMixin
 
-class RawAversiveData_v0_2(AbstractExperimentData, AversiveAnalysisMixin):
+class AversiveData(AbstractExperimentData, AversiveAnalysisMixin):
     '''
     Low-level container for data.  Absolutely no post-processing, metadata or
     analysis of this data is made.
     '''
     
     OBJECT_VERSION = Float(3, store='attribute')
+
+    c_safe = Property(context=True)
 
     #-------------------------------------------------------------------
     # Raw data
@@ -104,11 +106,11 @@ class RawAversiveData_v0_2(AbstractExperimentData, AversiveAnalysisMixin):
 
     @cached_property
     def _get_safe_seq(self):
-        return self.ttype_seq == 'safe'
+        return self.string_array_equal(self.ttype_seq, 'safe')
 
     @cached_property
     def _get_warn_seq(self):
-        return self.ttype_seq == 'warn'
+        return self.string_array_equal(self.ttype_seq, 'warn')
 
     par_safe_mask = Property(depends_on='trial_log, parameters')
     par_warn_mask = Property(depends_on='trial_log, parameters')
@@ -137,5 +139,6 @@ class RawAversiveData_v0_2(AbstractExperimentData, AversiveAnalysisMixin):
     def _get_warn_trial_count(self):
         return np.sum(self.warn_seq)
 
-RawAversiveData = RawAversiveData_v0_2
-AversiveData = RawAversiveData
+    @cached_property
+    def _get_c_safe(self):
+        return self.rcount(self.safe_seq)

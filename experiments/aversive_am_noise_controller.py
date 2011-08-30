@@ -17,9 +17,8 @@ class AversiveAMNoiseController(AbstractAversiveController):
         return blocks.BroadbandNoise(seed=-1)
 
     def _modulator_default(self):
-        return blocks.SAM(token=self.carrier,
-                          equalize_power=True,
-                          equalize_phase=True)
+        return blocks.SAM(token=self.carrier, equalize_power=True,
+                equalize_phase=True)
 
     def _output_default(self):
         return blocks.Output(token=self.modulator)
@@ -33,11 +32,6 @@ class AversiveAMNoiseController(AbstractAversiveController):
         fs = self.iface_behavior.fs
         return self.output.realize(fs, self.current_trial_duration)
 
-    def update_remind(self):
-        self.set_experiment_parameters(self.current_remind)
-        waveform = self._compute_signal()
-        self.buffer_trial.set(waveform)
-
     def update_warn(self):
         self.set_experiment_parameters(self.current_warn)
         waveform = self._compute_signal()
@@ -47,7 +41,6 @@ class AversiveAMNoiseController(AbstractAversiveController):
         if self.buffer_int.total_samples_written == 0:
             # We have not yet initialized the buffer with data.  Let's fill it
             # all up in one shot.
-            self.set_experiment_parameters(self.current_safe)
             #self.modulator.depth = self.current_safe.parameter
 
             # Let's freeze our safe signal and turn it into a generator.  This
@@ -72,4 +65,4 @@ class AversiveAMNoiseController(AbstractAversiveController):
         self.modulator.depth = value
 
     def set_modulation_frequency(self, value):
-        self.current_modulation_frequency = value
+        self.modulator.fm = value

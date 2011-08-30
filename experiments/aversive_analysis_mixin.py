@@ -182,9 +182,12 @@ class AversiveAnalysisMixin(SDTDataMixin):
 
     @cached_property
     def _get_global_fa_frac(self):
-        fa = np.sum(self.fa_seq)
-        cr = np.sum(self.cr_seq)
-        return fa/(fa+cr)
+        try:
+            fa = np.sum(self.fa_seq)
+            cr = np.sum(self.cr_seq)
+            return fa/(fa+cr)
+        except ZeroDivisionError:
+            return np.nan
 
     @cached_property
     def _get_par_info(self):
@@ -207,10 +210,3 @@ class AversiveAnalysisMixin(SDTDataMixin):
 
     def _get_summary_trial_log(self):
         return self.trial_log[::-1]
-        #try:
-        #    trial_log = mlab.rec_append_fields(self.trial_log, 
-        #            ('parameter', 'contact_score', 'on_spout'), 
-        #            (self.par_seq, self.contact_scores, self.on_spout_seq))
-        #    return trial_log[::-1]
-        #except:
-        #    return np.array([])

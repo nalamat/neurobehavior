@@ -28,7 +28,7 @@ from colors import color_names
 
 class TrialLogAdapter(TabularAdapter):
     
-    #parameters = List(['modulation_depth'])
+    parameters = List([])
 
     # List of tuples (column_name, field )
     columns = [ ('P',       'parameter'),
@@ -50,7 +50,8 @@ class TrialLogAdapter(TabularAdapter):
     contact_score_text = Property
 
     def _get_parameter_text(self):
-        return str(self.object.par_seq[-self.row])
+        print self.object
+        return ', '.join('{}'.format(self.item[p]) for p in self.parameters)
 
     def _get_speaker_text(self):
         return self.item['speaker'][0].upper()
@@ -96,6 +97,8 @@ trial_log_editor = TabularEditor(editable=False, adapter=TrialLogAdapter())
 par_info_editor = TabularEditor(editable=False, adapter=ParInfoAdapter())
 
 class AbstractAversiveExperiment(AbstractExperiment):
+
+    trial_log_adapter = TrialLogAdapter()
 
     experiment_plot     = Instance(Component)
     par_score_chart     = Instance(Component)
