@@ -1,6 +1,9 @@
+from __future__ import division
+
 from base_channel_plot import BaseChannelPlot
 import numpy as np
-from enthought.traits.api import Float, Bool, Enum, on_trait_change, Property
+from enthought.traits.api import (Float, Bool, Enum, on_trait_change, Property,
+        cached_property, Int)
 
 class ChannelPlot(BaseChannelPlot):
     '''
@@ -9,8 +12,12 @@ class ChannelPlot(BaseChannelPlot):
     plotted.
     '''
 
-    _data_cache_valid       = Bool(False)
-    _screen_cache_valid     = Bool(False)
+    _data_cache_valid = Bool(False)
+    _screen_cache_valid = Bool(False)
+
+    # When decimating, how many samples should be extracted per point?
+    dec_points = Int(2)
+    dec_factor = Property(depends_on='index_mapper.updated, dec_points')
 
     def _invalidate_screen(self):
         self._screen_cache_valid = False
@@ -45,7 +52,8 @@ class ChannelPlot(BaseChannelPlot):
         if new is not None:
             new.on_trait_change(self._index_mapper_updated, "updated")
 
-    def _decimation_factor(self):
+    @cached_property
+    def _get_dec_factor(self):
         '''
         Compute decimation factor based on the sampling frequency of the channel
         itself.
@@ -54,7 +62,7 @@ class ChannelPlot(BaseChannelPlot):
         screen_width = screen_max-screen_min # in pixels
         range = self.index_range
         data_width = (range.high-range.low)*self.channel.fs
-        return np.floor((data_width/screen_width))
+        return np.floor((data_width/screen_width)/self.dec_points)
 
     def _gather_points(self):
         if not self._data_cache_valid:
@@ -109,14 +117,3 @@ class ChannelPlot(BaseChannelPlot):
             self._new_bounds_cache = bounds
             self._data_cache_valid = False
             self.invalidate_and_redraw()
-
-    #def _channel_changed(self, old, new):
-    #    # We need to call _update_index_mapper when fs changes since the method
-    #    # precomputes the index value based on the sampling frequency of the
-    #    # channel.
-    #    if old is not None:
-    #        old.on_trait_change(self._data_changed, "updated", remove=True)
-    #        old.on_trait_change(self._index_mapper_updated, "fs", remove=True)
-    #    if new is not None:
-    #        new.on_trait_change(self._data_changed, "updated", dispatch="new")
-    #        new.on_trait_change(self._index_mapper_updated, "fs", dispatch="new")
