@@ -80,31 +80,27 @@ class PhysiologyController(Controller):
         self.buffer_physiology_ttl = self.iface_physiology.get_buffer('TTL',
                 'r', src_type='int8', dest_type='int8', block_size=1)
 
-
         for i in range(CHANNELS):
             name = 'spike{}'.format(i+1)
             buffer = self.iface_physiology.get_buffer(name, 'r',
                     block_size=SPIKE_SNIPPET_SIZE)
             self.buffer_spikes.append(buffer)
-            spikes = self.model.data.physiology_spikes[i] 
-            spikes.snippet_size = SPIKE_SNIPPET_SIZE-2
-            spikes.fs = buffer.fs
 
     @on_trait_change('model.data')
     def update_data(self):
         # Ensure that the data store has the correct sampling frequency
         for i in range(CHANNELS):
-            data_spikes = self.model.data.physiology_spikes
+            data_spikes = self.model.data.spikes
             for src, dest in zip(self.buffer_spikes, data_spikes):
                 dest.fs = src.fs
-        self.model.data.physiology_raw.fs = self.buffer_physiology_raw.fs
-        self.model.data.physiology_processed.fs = self.buffer_physiology_filt.fs
-        self.model.data.physiology_ram.fs = self.buffer_physiology_raw.fs
-        self.model.data.physiology_ts.fs = self.buffer_physiology_ts.fs
-        self.model.data.physiology_sweep.fs = self.buffer_physiology_ttl.fs
+                dest.snippet_size = SPIKE_SNIPPET_SIZE-2
+        self.model.data.raw.fs = self.buffer_physiology_raw.fs
+        self.model.data.processed.fs = self.buffer_physiology_filt.fs
+        self.model.data.ts.fs = self.buffer_physiology_ts.fs
+        self.model.data.sweep.fs = self.buffer_physiology_ttl.fs
 
         # Setup the pipeline
-        targets = [self.model.data.physiology_sweep]
+        targets = [self.model.data.sweep]
         self.physiology_ttl_pipeline = deinterleave_bits(targets)
 
     def start(self):
@@ -117,11 +113,11 @@ class PhysiologyController(Controller):
     def monitor_physiology(self):
         # Acquire raw physiology data
         waveform = self.buffer_physiology_raw.read()
-        self.model.data.physiology_raw.send(waveform)
+        self.model.data.raw.send(waveform)
 
         # Acquire filtered physiology data
         waveform = self.buffer_physiology_filt.read()
-        self.model.data.physiology_processed.send(waveform)
+        self.model.data.processed.send(waveform)
 
         # Acquire sweep data
         ttl = self.buffer_physiology_ttl.read()
@@ -129,7 +125,7 @@ class PhysiologyController(Controller):
 
         # Get the timestamps
         ts = self.buffer_physiology_ts.read()
-        self.model.data.physiology_ts.send(ts)
+        self.model.data.ts.send(ts)
 
         # Get the spikes.  Each channel has a separate buffer for the spikes
         # detected online.
@@ -143,7 +139,7 @@ class PhysiologyController(Controller):
             snip = data[:,1:-1]
             ts = data[:,0].view('int32')
             cl = data[:,-1].view('int32')
-            self.model.data.physiology_spikes[i].send(snip, ts, cl)
+            self.model.data.spikes[i].send(snip, ts, cl)
 
     @on_trait_change('model.settings.spike_thresholds')
     def set_spike_thresholds(self, value):
@@ -151,6 +147,7 @@ class PhysiologyController(Controller):
             name = 'a_spike{}'.format(ch+1)
             self.iface_physiology.set_tag(name, threshold)
             
+    @on_trait_change('model.settings.spike_signs')
     def set_spike_signs(self, value):
         for ch, sign in enumerate(value):
             name = 's_spike{}'.format(ch+1)
@@ -196,9 +193,10 @@ class PhysiologyController(Controller):
     def set_monitor_gain_4(self, value):
         self.iface_physiology.set_tag('ch4_out_sf', value*1e3)
 
-    @on_trait_change('model.settings.visible_channels')
-    def set_visible_channels(self, value):
-        self.model.physiology_plot.channel_visible = value
+    @on_trait_change('model:settings:mapped_channels')
+    def set_mapped_channels(self, value):
+        #self.iface_physiology.set_coefficients('ch_map', value)
+        pass
 
     @on_trait_change('model.settings.diff_matrix')
     def set_diff_matrix(self, value):
@@ -212,7 +210,6 @@ class PhysiologyController(Controller):
             
     @on_trait_change('model:settings:channel_settings:spike_windows')
     def _update_windows(self, channel, name, old, new):
-        print channel
         if self.iface_physiology is not None:
             tag_name = 'c_spike{}'.format(channel.number)
             self.iface_physiology.set_sort_windows(tag_name, new)
