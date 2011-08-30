@@ -13,7 +13,7 @@ from experiments import (
         AbstractAversiveParadigm,
         ConstantLimitsParadigmMixin,
         PumpParadigmMixin,
-        AversiveFMParadigmMixin,
+        FMParadigmMixin,
 
         # The experiment
         AbstractAversiveExperiment,
@@ -39,10 +39,11 @@ class Paradigm(
         ):
 
     traits_view = View(
+            Include('constant_limits_paradigm_mixin_group'),
+            Include('signal_group'),
             Include('abstract_aversive_paradigm_group'),
-            Include('speaker_group'),
-            Include('fm_group'),
             Include('pump_paradigm_mixin_syringe_group'),
+            Include('speaker_group'),
             )
 
 class Data(AversiveData, ConstantLimitsDataMixin):

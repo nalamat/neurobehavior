@@ -39,8 +39,6 @@ class AbstractPositiveController(AbstractExperimentController):
     # Override default implementation of toolbar used by AbstractExperiment
     toolbar = Instance(PositiveExperimentToolBar, (), toolbar=True)
 
-    status = Property(Str, depends_on='state, current_ttype')
-
     def setup_experiment(self, info):
         circuit = join(get_config('RCX_ROOT'), 'positive-behavior-v2')
         self.iface_behavior = self.process.load_circuit(circuit, 'RZ6')
@@ -50,9 +48,9 @@ class AbstractPositiveController(AbstractExperimentController):
         # secondary speaker
         self.buffer_out2 = self.iface_behavior.get_buffer('out2', 'w')
         self.buffer_TTL1 = self.iface_behavior.get_buffer('TTL', 'r',
-                src_type=np.int8, dest_type=np.int8, block_size=24)
+                src_type='int8', dest_type='int8', block_size=24)
         self.buffer_TTL2 = self.iface_behavior.get_buffer('TTL2', 'r',
-                src_type=np.int8, dest_type=np.int8, block_size=24)
+                src_type='int8', dest_type='int8', block_size=24)
         # microphone
         #self.buffer_mic = self.iface_behavior.get_buffer('mic', 'r')
         #self.model.data.microphone.fs = self.buffer_mic.fs
@@ -105,16 +103,6 @@ class AbstractPositiveController(AbstractExperimentController):
     def stop_experiment(self, info):
         self.iface_behavior.trigger('A', 'low')
         self.state = 'halted'
-
-    def _get_status(self):
-        if self.state == 'disconnected':
-            return 'Error'
-        elif self.state == 'halted':
-            return 'Halted'
-        elif self.current_ttype is not None:
-            return self.current_ttype.lower().replace('_', ' ')
-        else:
-            return ''
 
     def remind(self, info=None):
         # Pause circuit and see if trial is running. If trial is already
@@ -218,9 +206,6 @@ class AbstractPositiveController(AbstractExperimentController):
 
     def get_trial_start_ts(self):
         return self.iface_behavior.get_tag('trial/')
-
-    def set_timeout_grace_period(self, value):
-        pass
 
     def set_timeout_trigger(self, value):
         flag = 0 if value == 'FA only' else 1

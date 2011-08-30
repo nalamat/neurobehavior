@@ -1,13 +1,10 @@
 from tdt import DSPCircuit
-
-from abstract_aversive_controller import AbstractAversiveController
-
 from cns import get_config
 from os.path import join
 
-class AversiveFMController(AbstractAversiveController):
+class AversiveFMControllerMixin(object):
 
-    def setup_experiment(self, info):
+    def _setup_circuit(self, info):
         # AversiveFMController needs to change the initialization sequence a
         # little (i.e. it needs to use different microcode and the microcode
         # does not contain int and trial buffers).
@@ -22,10 +19,10 @@ class AversiveFMController(AbstractAversiveController):
     # We are overriding the three signal update methods (remind, warn, safe) to
     # work with the specific circuit we constructed
     def update_remind(self):
-        self.set_experiment_parameters(self.current_remind)
+        pass
 
     def update_warn(self):
-        self.set_experiment_parameters(self.current_warn)
+        pass
 
     def update_safe(self):
         pass
