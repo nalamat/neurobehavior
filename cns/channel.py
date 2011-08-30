@@ -8,10 +8,7 @@
 .. moduleauthor:: Brad Buran <bburan@alum.mit.edu>
 '''
 
-import warnings
-from cns.buffer import SoftwareRingBuffer
 from cns.data.h5_utils import append_node
-#from cns.util.signal import rfft
 from enthought.traits.api import HasTraits, Property, Array, Int, Event, \
     Instance, on_trait_change, Bool, Any, String, Float, cached_property, List, Str, \
     DelegatesTo, Enum, Dict, Set
@@ -47,6 +44,21 @@ class Timeseries(HasTraits):
     def __getitem__(self, s):
         return self.series[s]/self.fs
 
+    def __len__(self):
+        return len(self.series)
+
+#class FileTimeseries(self):
+#
+#    node    = Instance(tables.group.Group)
+#    name    = String('FileTimeseries')
+#    buffer  = Instance(tables.array.Array)
+#
+#    def _buffer_default(self):
+#        if self.name in self.node._v_children:
+#            return self._load_buffer()
+#        else:
+#            return self._create_buffer()
+
 class Channel(HasTraits):
     '''
     Base class for dealing with a continuous stream of data.  Subclasses are
@@ -65,20 +77,23 @@ class Channel(HasTraits):
         The sample sequence
     '''
 
-    metadata = Dict({'selections': None})
+    #metadata = Dict({'selections': None})
 
     # Sampling frequency of the data stored in the buffer
-    fs = Float
+    fs = Float(attr=True)
 
     # Time of first sample in the buffer.  Typically this is 0, but if we delay
     # acquisition or discard "old" data (e.g. via a RAMBuffer), then we need to
     # update t0.
-    t0 = Float(0)
+    t0 = Float(0, attr=True)
 
     # Fired when new data is added
     updated = Event
    
     signal = Property
+
+    def __getitem__(self, slice):
+        return self.signal.__getitem__(slice)
 
     def get_data(self):
         return self.signal
@@ -272,10 +287,10 @@ class Channel(HasTraits):
             range = self.get_range_index(lb_index, ub_index, timestamps)
             return fun(range)
 
-class FileChannel(Channel):
+class FileMixin(HasTraits):
     '''
-    An implementation of `Channel` that streams acquired data to a HDF5_ EArray.
-    Note that if no buffer is availale, then one will be created automatically.
+    Mixin class that streams acquired data to a HDF5_ EArray.  Note that if no
+    buffer is availale, then one will be created automatically.
 
     .. _HDF5: http://www.hdfgroup.org/HDF5/
 
@@ -332,11 +347,19 @@ class FileChannel(Channel):
     expected_duration   = Float(1800) 
     shape               = Property
     buffer              = Instance(tables.array.Array)
+    signal              = Property
 
     def _get_shape(self):
         return (0,)
 
     def _buffer_default(self):
+        print self.name, self.node
+        if self.name in self.node._v_children:
+            return self._load_buffer()
+        else:
+            return self._create_buffer()
+
+    def _create_buffer(self):
         atom = tables.Atom.from_dtype(np.dtype(self.dtype))
         filters = tables.Filters(complevel=self.compression_level,
                 complib=self.compression_type, fletcher32=self.use_checksum,
@@ -346,16 +369,33 @@ class FileChannel(Channel):
                 filters=filters)
         return buffer
 
-    def _fs_changed(self, new):
-        self.buffer.setAttr('fs', self.fs)
+    def _load_buffer(self):
+        buffer = self.node._v_children[self.name] 
+        traits = {}
+        for t in self.trait_names(attr=True):
+            if t in buffer._v_attrs:
+                traits[t] = buffer._v_attrs[t]
+        self.set(False, **traits)
+        return buffer
 
-    def _get_signal(self):
-        return self.buffer
+    # Ensure that all 'Traits' are synced with the file so we have that
+    # information stored away.
+    @on_trait_change('+attr')
+    def update_attrs(self, name, new):
+        self.buffer.setAttr(name, new)
 
     def _write(self, data):
         if data.ndim != 1 and data.shape[0] != 1:
             raise ValueError, "First dimension must be 1"
         self.buffer.append(data.ravel())
+
+    def _get_signal(self):
+        return self.buffer
+
+    def __repr__(self):
+        return '<FileMultiChannel {}>'.format(self.name)
+
+class FileChannel(FileMixin, Channel): pass
 
 class RAMChannel(Channel):
     '''Buffers data in memory without saving it to disk.
@@ -463,10 +503,10 @@ class RAMChannel(Channel):
 
 class MultiChannel(Channel):
 
-    channels = Int(8)
+    channels = Int(8, attr=True)
 
-    def _get_signal(self):
-        return self.buffer
+    #def _get_signal(self):
+    #    return self.buffer
 
     def _write(self, data):
         self.buffer.append(data)
@@ -483,18 +523,22 @@ class RAMMultiChannel(RAMChannel, MultiChannel):
         self.partial_idx = 0
         self._write = self._partial_write
 
-class FileMultiChannel(MultiChannel, FileChannel):
+class FileMultiChannel(FileChannel, MultiChannel):
 
-    channels = Int(8)
     name = 'FileMultiChannel'
 
     def _get_shape(self):
         return (self.channels, 0)
 
-    def _buffer_default(self):
-        buffer = super(FileMultiChannel, self)._buffer_default()
-        buffer.setAttr('channels', self.channels)
-        return buffer
+    #def _create_buffer(self):
+    #    buffer = super(FileMultiChannel, self)._create_buffer()
+    #    buffer.setAttr('channels', self.channels)
+    #    return buffer
+
+    #def _load_buffer(self):
+    #    buffer = super(FileMultiChannel, self)._load_buffer()
+    #    self.set(False, channels=buffer._v_attrs['channels'])
+    #    return buffer
 
 class FileSnippetChannel(FileChannel):
 

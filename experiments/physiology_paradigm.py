@@ -18,7 +18,8 @@ class ChannelSetting(HasTraits):
     differential    = Str
     visible         = Bool(True)
     bad             = Bool(False)
-    
+    mapped          = Int
+
     # Threshold for candidate spike used in on-line spike sorting
     spike_threshold = Float(0.0005)
     # Should spike_threshold trigger on +/-?
@@ -26,9 +27,9 @@ class ChannelSetting(HasTraits):
     
     # Windows used for candidate spike isolation and sorting.
     spike_windows = List(Tuple(Float, Float, Float), [])
-    spike_sort_summary = Property(Str, depends_on='spike_+')
+    sort_summary = Property(Str, depends_on='spike_+')
     
-    def _get_spike_sort_summary(self):
+    def _get_sort_summary(self):
         if not self.spike_sign:
             return u"\u00B1{} with {} windows".format(abs(self.spike_threshold),
                                                       len(self.spike_windows))
@@ -39,19 +40,19 @@ class ChannelSetting(HasTraits):
 channel_editor = TableEditor(
         show_row_labels=True,
         sortable=False,
+        reorderable=True,
         columns=[
             ObjectColumn(name='number', editable=False, width=10, label=''),
+            ObjectColumn(name='mapped', editable=True, width=10, label=''),
             CheckboxColumn(name='visible', width=10, label='V'), 
             CheckboxColumn(name='bad', width=10, label='B'),
             ObjectColumn(name='differential'),
-            ObjectColumn(name='spike_sort_summary', label='Sort?', width=20, 
+            ObjectColumn(name='sort_summary', label='Sort?', width=20,
                          editable=False),
             ]
         )
 
 class PhysiologyParadigm(HasTraits):
-
-    commutator_inhibit      = Bool(False, init=True, immediate=True)
 
     # Width of buttons in GUI
     WIDTH = -40
@@ -165,49 +166,52 @@ class PhysiologyParadigm(HasTraits):
     # oscilloscope for monitoring.  The first DAC channel (corresponding to
     # channel 9 in the RPvds file) is linked to the speaker.  Gain is multiplied
     # by a factor of 1000 before being applied to the corresponding channel.
-    monitor_ch_1        = Range(1, 16, 1, init=True, immediate=True)
-    monitor_ch_2        = Range(1, 16, 5, init=True, immediate=True)
-    monitor_ch_3        = Range(1, 16, 9, init=True, immediate=True)
-    monitor_ch_4        = Range(1, 16, 13, init=True, immediate=True)
-    monitor_gain_1      = Range(0, 100, 50, init=True, immediate=True)
-    monitor_gain_2      = Range(0, 100, 50, init=True, immediate=True)
-    monitor_gain_3      = Range(0, 100, 50, init=True, immediate=True)
-    monitor_gain_4      = Range(0, 100, 50, init=True, immediate=True)
+    monitor_ch_1        = Range(1, 16, 1)
+    monitor_ch_2        = Range(1, 16, 5)
+    monitor_ch_3        = Range(1, 16, 9)
+    monitor_ch_4        = Range(1, 16, 13)
+    monitor_gain_1      = Range(0, 100, 50)
+    monitor_gain_2      = Range(0, 100, 50)
+    monitor_gain_3      = Range(0, 100, 50)
+    monitor_gain_4      = Range(0, 100, 50)
 
     # Bandpass filter settings
-    monitor_fc_highpass = Range(0, 1e3, 300, init=True, immediate=True)
-    monitor_fc_lowpass  = Range(1e3, 5e3, 5e3, init=True, immediate=True)
+    monitor_fc_highpass = Range(0, 1e3, 300)
+    monitor_fc_lowpass  = Range(1e3, 5e3, 5e3)
 
     channel_settings    = List(Instance(ChannelSetting))
 
     def _channel_settings_default(self):
-        return [ChannelSetting(number=i) for i in range(1, 17)]
+        return [ChannelSetting(number=i, mapped=i) for i in range(1, 17)]
+
+    # Mapping of channels
+    mapped_channels = Property(depends_on='channel_settings.mapped')
+
+    @cached_property
+    def _get_mapped_channels(self):
+        return [ch.mapped for ch in self.channel_settings]
 
     # List of the channels visible in the plot
-    visible_channels = Property(depends_on='channel_settings.visible',
-            init=True, immediate=True)
+    visible_channels = Property(List, depends_on='channel_settings.visible')
 
     @cached_property
     def _get_visible_channels(self):
         settings = self.channel_settings
         return [i for i, ch in enumerate(settings) if ch.visible]
     
-    spike_thresholds = Property(depends_on='channel_settings.spike_threshold',
-                                init=True, immediate=True)
+    spike_thresholds = Property(depends_on='channel_settings.spike_threshold')
     
     def _get_spike_thresholds(self):
         return [ch.spike_threshold for ch in self.channel_settings]
     
-    spike_signs = Property(depends_on='channel_settings.spike_sign', 
-                           init=True, immediate=True)
+    spike_signs = Property(depends_on='channel_settings.spike_sign')
     
     def _get_spike_signs(self):
         return [ch.spike_sign for ch in self.channel_settings]
 
     # Generates the matrix that will be used to compute the differential for
     # the channels. This matrix will be uploaded to the RZ5.
-    diff_matrix = Property(depends_on='channel_settings.differential',
-                           init=True, immediate=True)
+    diff_matrix = Property(depends_on='channel_settings.differential')
 
     @cached_property
     def _get_diff_matrix(self):
@@ -254,13 +258,11 @@ class PhysiologyParadigm(HasTraits):
 
     physiology_view = View(
             VGroup(
-                Item('commutator_inhibit', label='Inhibit commutator?',
-                    show_label=True),
                 Include('filter_group'),
                 Include('monitor_group'),
                 Include('visible_group'),
                 Include('diff_group'),
                 Item('channel_settings', editor=channel_editor),
                 show_labels=False,
-                )
+                ),
             )
