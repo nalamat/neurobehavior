@@ -16,7 +16,8 @@ class SpikeOverlay(AbstractOverlay):
     fill_color = ColorTrait('red')
     line_color = ColorTrait('white')
 
-    spike_screen_offsets = Property(depends_on='plot.offsets')
+    #spike_screen_offsets = Property(depends_on='plot.offsets')
+    #spike_screen_offsets = DelegatesTo('plot', 'screen_offsets')
 
     @cached_property
     def _get_spike_screen_offsets(self):
@@ -24,18 +25,19 @@ class SpikeOverlay(AbstractOverlay):
         return self.plot.value_mapper.map_screen(spike_offsets)
 
     def overlay(self, component, gc, view_bounds=None, mode="normal"):
-        if len(self.plot.channel_visible) != 0:
+        plot = self.plot
+        if len(plot.channel_visible) != 0:
             with gc:
                 gc.clip_to_rect(component.x, component.y, component.width,
                         component.height)
                 gc.set_line_width(self.line_width)
                 gc.set_fill_color(self.fill_color_)
                 gc.set_stroke_color(self.line_color_)
-                for o, n in zip(self.spike_screen_offsets, self.plot.channel_visible):
+                for o, n in zip(plot.screen_offsets, plot.channel_visible):
                     spikes = self.spikes[n]
                     ts = spikes.timestamps[:]/spikes.fs
                     ts_offset = np.ones(len(ts))*o
-                    ts_screen = self.plot.index_mapper.map_screen(ts)
+                    ts_screen = plot.index_mapper.map_screen(ts)
                     points = np.column_stack((ts_screen, ts_offset))
                     gc.draw_marker_at_points(points, self.marker_size,
                             self.marker_.kiva_marker)
