@@ -1,20 +1,23 @@
-from os import environ
-from os.path import dirname
-import imp
-
 def load_settings():
     # Load the default settings
+    from os import environ
     from . import settings
     
-    # Load the computer-specific settings
-    path = environ['NEUROBEHAVIOR_SETTINGS']
-    extra_settings = imp.load_module('settings', open(path), dirname(path),
-		                     ('.py', 'r', imp.PY_SOURCE))
-    
-    # Update the setting defaults with the computer-specific settings
-    for setting in dir(extra_settings):
-        value = getattr(extra_settings, setting)
-        setattr(settings, setting, value)
+    try:
+        # Load the computer-specific settings
+        path = environ['NEUROBEHAVIOR_SETTINGS']
+        import imp
+        from os.path import dirname
+        extra_settings = imp.load_module('settings', open(path), dirname(path),
+                                         ('.py', 'r', imp.PY_SOURCE))
+        # Update the setting defaults with the computer-specific settings
+        for setting in dir(extra_settings):
+            value = getattr(extra_settings, setting)
+            setattr(settings, setting, value)
+    except KeyError:
+        import logging
+        log = logging.getLogger(__name__)
+        log.debug('No NEUROBEHAVIOR_SETTINGS defined')
     return settings
         
 _settings = load_settings()
@@ -24,12 +27,3 @@ def set_config(setting, value):
     
 def get_config(setting):
     return getattr(_settings, setting)        
-
-# __file__ is a special variable that is available in all Python files (when
-# loaded by the Python interpreter) that contains the path of the current file
-# or script. We extract the directory portion of the path and use that to
-# determine where the RCX files are stored. We keep components in source code
-# control as well to ensure that changes to the RCX files track changes to the
-# software.
-from os.path import join, abspath, dirname
-set_config('RCX_ROOT', join(abspath(dirname(__file__)), '../components'))
