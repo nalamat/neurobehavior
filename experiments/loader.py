@@ -167,7 +167,7 @@ def prepare_experiment(args, store_node):
     trial_setting.add_parameters(args.rove, paradigm_class)
 
     # Load the calibration data
-    from neurogen.calibration import Calibration
+    from neurogen.calibration import Calibration, EqualizedCalibration
 
     filename = get_config('CAL_PRIMARY')
     cal_primary = neurogen.load_mat_cal(filename, False)
