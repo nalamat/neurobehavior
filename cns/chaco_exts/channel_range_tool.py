@@ -1,6 +1,6 @@
-from enthought.traits.api import Float, Instance
+from enthought.traits.api import Float, Instance, on_trait_change
 from enthought.enable.api import BaseTool, KeySpec
-from enthought.chaco.tools.tool_history_mixin import ToolHistoryMixin
+#from enthought.chaco.tools.tool_history_mixin import ToolHistoryMixin
 
 class ChannelRangeTool(BaseTool):
 
@@ -34,9 +34,13 @@ class ChannelRangeTool(BaseTool):
 
     def panning_mouse_move(self, event):
         delta_screen = event.x-self._start_data_x
-        delta_data = self.component.index_mapper.map_data(delta_screen)
-        new_delay = self._start_delay + delta_data
+        data_0 = self.component.index_mapper.map_data(0)
+        data_d = self.component.index_mapper.map_data(delta_screen)
+        new_delay = self._start_delay+data_d-data_0
+        #new_delay = self._start_delay + delta_data
+        #print self._start_data_x, event.x, delta_screen, delta_data, self._start_delay, new_delay
         self.component.index_mapper.range.trig_delay = new_delay
+        #print self._start_delay
 
     def zoom_index(self, event):
         if event.mouse_wheel < 0:
@@ -104,13 +108,14 @@ class MultiChannelRangeTool(ChannelRangeTool):
 
     def zoom_in_value(self, factor):
         self.value_span *= factor
-        self._update_value_range()
+        #self._update_value_range()
 
     def zoom_out_value(self, factor):
         self.value_span /= factor
-        self._update_value_range()
+        #self._update_value_range()
 
-    def _update_value_range(self):
+    @on_trait_change('value_span, component.channel_visible')
+    def _update_span(self):
         span = self.value_span
         visible = len(self.component.channel_visible)
         self.component.value_mapper.range.high_setting = visible*span
