@@ -30,8 +30,8 @@ class BasicCharacterizationController(AbstractExperimentController):
         self.iface_audio = self.process.load_circuit(circuit, 'RZ6')
 
     def start_experiment(self, info):
-        self.init_context()
-        self.update_context()
+        #self.init_context()
+        #self.update_context()
         #self.init_paradigm(self.model.paradigm)
         self.iface_audio.trigger('A', 'high')
         self.state = 'running'
