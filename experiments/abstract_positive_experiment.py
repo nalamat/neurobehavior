@@ -102,9 +102,16 @@ class AbstractPositiveExperiment(AbstractExperiment):
 
     experiment_plot = Instance(Component)
     trial_log_adapter = TrialLogAdapter()
-    trial_log_editor = TabularEditor(editable=False, adapter=trial_log_adapter)
+    trial_log_editor = TabularEditor(editable=False, adapter=trial_log_adapter,
+            dclicked='selected_trial_event')
     trial_log_view = Property(depends_on='data.trial_log',
-                              editor=trial_log_editor)
+            editor=trial_log_editor)
+
+    selected_trial_event = Any
+    selected_trial = Property(Int, depends_on='selected_trial_event')
+
+    def _get_selected_trial(self):
+        return len(self.data.trial_log)-self.selected_trial_event.row-1
 
     @cached_property
     def _get_trial_log_view(self):
