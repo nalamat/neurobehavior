@@ -2,26 +2,38 @@ import numpy as np
 from enthought.enable.api import MarkerTrait, ColorTrait
 from enthought.chaco.api import AbstractOverlay
 from enthought.chaco.scatterplot import render_markers
-from enthought.traits.api import Instance, Any, Property, cached_property, Int, Float, List
+from enthought.traits.api import (Instance, Property, cached_property, Int,
+        Float, List, Bool, DelegatesTo, on_trait_change)
 from enthought.traits.ui.api import View, VGroup, Item
 
 class ThresholdOverlay(AbstractOverlay):
 
     plot = Instance('enthought.enable.api.Component')
-    #spikes = Any
 
-    line_width = Int(2)
+    line_width = Int(1)
     line_color = ColorTrait('red')
+
+    sort_thresholds = List(Float)
+    sort_channels = List(Int)
+    sort_signs = List(Bool)
+
+    th_screen = Property(depends_on='sort_+, plot.channel_visible, plot.offsets')
+
+    @on_trait_change('+', post_init=True)
+    def _sort_settings_changed(self):
+        self.plot.request_redraw()
     
-    thresholds = List(Float)
-    _th_screen = Property(depends_on='thresholds, plot.channel_visible')
-    
-    def _get__th_screen(self):
+    @cached_property
+    def _get_th_screen(self):
         bounds = []
-        for o, ch in zip(self.plot.offsets, self.plot.channel_visible):
-            lb = self.plot.value_mapper.map_screen(o+self.thresholds[ch])
-            ub = self.plot.value_mapper.map_screen(o-self.thresholds[ch])
-            bounds.append((lb, ub))
+        for ch in self.sort_channels:
+            if ch in self.plot.channel_visible:
+                i = self.plot.channel_visible.index(ch)
+                o = self.plot.offsets[i]
+                th = self.sort_thresholds[ch]
+                bounds.append(self.plot.value_mapper.map_screen(o+th))
+                if not self.sort_signs[ch]:
+                    bounds.append(self.plot.value_mapper.map_screen(o-th))
         return bounds
     
     def overlay(self, component, gc, view_bounds=None, mode="normal"):
@@ -31,15 +43,11 @@ class ThresholdOverlay(AbstractOverlay):
                                 component.height)
                 gc.set_line_width(self.line_width)
                 gc.set_stroke_color(self.line_color_)
-                
-                for ylb, yub in self._th_screen:
-                    xlb = component.x
-                    xub = component.x+component.width
-                    gc.move_to(xlb, ylb)
-                    gc.line_to(xub, ylb)
-                    gc.move_to(xlb, yub)
-                    gc.line_to(xub, yub)
-
+                xlb = component.x
+                xub = component.x+component.width
+                for y in self.th_screen:
+                    gc.move_to(xlb, y)
+                    gc.line_to(xub, y)
                 gc.stroke_path()                
                 
     traits_view = View(
