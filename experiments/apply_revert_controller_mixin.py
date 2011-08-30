@@ -154,6 +154,8 @@ class ApplyRevertControllerMixin(HasTraits):
 
     def _apply_context_value(self, name, value):
         try:
+            mesg = 'changed from {} to {}'.format(name, old_value, value)
+            self.log_event(name, mesg)
             getattr(self, 'set_{}'.format(name))(value)
             log.debug('Setting %s', name)
         except AttributeError, e:

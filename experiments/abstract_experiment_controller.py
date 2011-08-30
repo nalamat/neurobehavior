@@ -199,6 +199,18 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
 
     current_hw_att1 = Float(0)
     current_hw_att2 = Float(0)
+
+    status = Property(Str, depends_on='state, current_ttype')
+
+    def _get_status(self):
+        if self.state == 'disconnected':
+            return 'Error'
+        elif self.state == 'halted':
+            return 'Halted'
+        elif self.current_ttype is not None:
+            return self.current_ttype.lower().replace('_', ' ')
+        else:
+            return ''
     
     def handle_error(self, error):
         mesg = '{}\n\nDo you wish to stop the program?'.format(error)
@@ -449,9 +461,11 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
                 kwargs[key] = self.current_context[key]
         self.model.data.log_trial(**kwargs)
 
-    def log_event(self, ts, name, value):
-        self.model.data.log_event(ts, name, value)
-        log.debug("EVENT: %d, %s, %r", ts, name, value)
+    def log_event(self, name, message, ts=None):
+        if ts is None:
+            ts = self.get_ts()
+        self.model.data.log_event(ts, name, message)
+        log.debug("EVENT: %d, %s, %r", ts, name, message)
 
     def load_paradigm(self, info):
         instance = load_instance(PARADIGM_ROOT, PARADIGM_WILDCARD)
