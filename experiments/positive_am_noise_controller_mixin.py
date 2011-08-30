@@ -9,7 +9,8 @@ class PositiveAMNoiseControllerMixin(HasTraits):
     tone_carrier    = Instance(blocks.Block)
     modulator       = Instance(blocks.Block)
     envelope        = Instance(blocks.Block)
-    output          = Instance(Sink)
+    output_primary  = Instance(Sink)
+    output_secondary= Instance(Sink)
     
     def set_speaker_equalize(self, value):
         self.output_primary.equalize = value
@@ -26,10 +27,6 @@ class PositiveAMNoiseControllerMixin(HasTraits):
 
     def _envelope_default(self):
         return blocks.Cos2Envelope()
-
-    def _output_default(self):
-        return Sink(token=self.envelope.waveform, fs=self.iface_behavior.fs,
-                    calibration=Calibration(equalized_data))
 
     def set_fc(self, value):
         self.tone_carrier.frequency = value
@@ -52,11 +49,12 @@ class PositiveAMNoiseControllerMixin(HasTraits):
         return blocks.Cos2Envelope(token=self.modulator.waveform)
 
     def _output_primary_default(self):
-                    calibration=self.cal_secondary)
+        return Sink(token=self.envelope.waveform, fs=self.iface_behavior.fs,
+                calibration=self.cal_primary)
     
     def _output_secondary_default(self):
         return Sink(token=self.envelope.waveform, fs=self.iface_behavior.fs,
-                    calibration=self.cal_primary)
+                calibration=self.cal_secondary)
 
     def set_modulation_onset(self, value):
         if value == 0:
