@@ -18,275 +18,6 @@ import tables
 import logging
 log = logging.getLogger(__name__)
 
-class Timeseries(HasTraits):
-
-    updated = Event
-    fs = Float
-    t0 = Float(0)
-
-    series = List([])
-
-    def send(self, timestamps):
-        self.series.extend(timestamps.ravel())
-        self.updated = timestamps
-
-    def get_range(self, lb, ub):
-        timestamps = np.array(self.buffer)/self.fs 
-        mask = (timestamps>=lb)&(timestamps<ub)
-        return timestamps[mask]
-
-    def latest(self):
-        if len(self.series) > 0:
-            return self.series[-1]/self.fs
-        else:
-            return self.t0
-
-    def __getitem__(self, s):
-        return self.series[s]/self.fs
-
-    def __len__(self):
-        return len(self.series)
-
-#class FileTimeseries(self):
-#
-#    node    = Instance(tables.group.Group)
-#    name    = String('FileTimeseries')
-#    buffer  = Instance(tables.array.Array)
-#
-#    def _buffer_default(self):
-#        if self.name in self.node._v_children:
-#            return self._load_buffer()
-#        else:
-#            return self._create_buffer()
-
-class Channel(HasTraits):
-    '''
-    Base class for dealing with a continuous stream of data.  Subclasses are
-    responsible for implementing the data buffer (e.g. either a file-based or
-    memory-based buffer).
-
-    fs
-        Sampling frequency (number of samples per second)
-    t0
-        Time offset (i.e. time of first sample) relative to the start of
-        acquisition.  This typically defaults to zero; however, some subclasses
-        may discard old data (e.g.  :class:`RAMChannel`), so we need to factor
-        in the time offset when attempting to extract a given segment of the
-        waveform for analysis.  
-    signal
-        The sample sequence
-    '''
-
-    #metadata = Dict({'selections': None})
-
-    # Sampling frequency of the data stored in the buffer
-    fs = Float(attr=True)
-
-    # Time of first sample in the buffer.  Typically this is 0, but if we delay
-    # acquisition or discard "old" data (e.g. via a RAMBuffer), then we need to
-    # update t0.
-    t0 = Float(0, attr=True)
-
-    # Fired when new data is added
-    updated = Event
-   
-    signal = Property
-
-    def __getitem__(self, slice):
-        return self.signal.__getitem__(slice)
-
-    def get_data(self):
-        return self.signal
-
-    def _get_signal(self):
-        raise NotImplementedError, 'Use a subclass of Channel'
-
-    def to_index(self, time):
-        '''
-        Convert time to the corresponding index in the waveform.  Note that the
-        index may be negative if the time is less than t0.  Since Numpy allows
-        negative indices, be sure to check the value.
-        '''
-        return int((time-self.t0)*self.fs)
-
-    def to_samples(self, time):
-        '''
-        Convert time to number of samples.
-        '''
-        return int(time*self.fs)
-
-    def get_range_index(self, start, end, reference=0, check_bounds=False):
-        '''
-        Returns a subset of the range specified in samples
-
-        The samples must be speficied relative to start of data acquisition.
-
-        Parameters
-        ----------
-        start : num samples (int)
-            Start index in samples
-        end : num samples (int)
-            End index in samples
-        reference : num samples (int), optional
-            Time of trigger to reference start and end to
-        check_bounds : bool
-            Check that start and end fall within the valid data range
-        '''
-        t0_index = int(self.t0*self.fs)
-        lb = start-t0_index+reference
-        ub = end-t0_index+reference
-
-        if check_bounds:
-            if lb < 0:
-                raise ValueError, "start must be >= 0"
-            if ub >= len(self.signal):
-                raise ValueError, "end must be <= signal length"
-
-        if np.iterable(lb):
-            return [self.signal[lb:ub] for lb, ub in zip(lb, ub)]
-        else:
-            return self.signal[..., lb:ub]
-
-    def get_index(self, index, reference=0):
-        t0_index = int(self.t0*self.fs)
-        index = max(0, index-t0_index+reference)
-        return self.signal[..., index]
-
-    def get_range(self, start, end, reference=None):
-        '''
-        Returns a subset of the range.
-
-        Parameters
-        ----------
-        start : float, sec
-            Start time.
-        end : float, sec
-            End time.
-        reference : float, optional
-            Set to -1 to get the most recent range
-        '''
-        # Return an empty array of the appropriate dimensionality (whether it's
-        # single or multichannel)
-        if start == end:
-            return self.signal[..., 0:0]
-
-        # Otherwise, ensure that start time is greater than end 
-        if start > end:
-            raise ValueError("Start time must be < end time")
-
-        if reference is not None:
-            if reference == -1:
-                return self.get_recent_range(start, end)
-            else:
-                ref_idx = self.to_index(reference)
-        else:
-            ref_idx = 0
-
-        # Due to the two checks at the beginning of this function, we do not
-        # need to worry about start == inf and end == -inf
-        if start == -np.inf:
-            lb = self.t0
-        else:
-            lb = max(0, self.to_index(start)+ref_idx)
-        if end == np.inf:
-            ub = self.get_size()
-        else:
-            ub = max(0, self.to_index(end)+ref_idx)
-
-        return self.signal[..., lb:ub]
-
-    def get_recent_range(self, start, end=0):
-        '''
-        Returns a subset of the range, with start and end referenced to the most
-        recent sample.
-
-        Parameters
-        ==========
-        start
-            Start time
-        end
-            End time
-        '''
-        lb = min(-1, int(start*self.fs))
-        ub = min(-1, int(end*self.fs))
-        # This check is necessary to avoid raising an error in the HDF5
-        # (PyTables?) library if it attempts to slice an empty array.
-        if len(self.signal) == 0:
-            signal = np.array([])
-        else:
-            signal = self.signal[..., lb:ub]
-        ub_time = ub/self.fs
-        lb_time = ub_time-signal.shape[-1]/self.fs
-        return signal, lb_time, ub_time
-
-    def get_size(self):
-        return self.signal.shape[-1]
-
-    def get_bounds(self):
-        '''
-        Returns valid range of times as a tuple (lb, ub)
-        '''
-        return self.t0, self.t0 + self.get_size()/self.fs
-
-    def latest(self):
-        if self.get_size() > 0:
-            return self.signal[-1]/self.fs
-        else:
-            return self.t0
-
-    def send(self, data):
-        '''
-        Convenience method that allows us to use a Channel as a "sink" for a
-        processing pipeline.
-        '''
-        self.write(data)
-
-    def write(self, data):
-        '''
-        Write data to buffer.
-        '''
-        lb = self.get_size()
-        self._write(data)
-        ub = self.get_size()
-
-        # Updated has the upper and lower bound of the data that was added.
-        # Some plots will use this to determine whether the updated region of
-        # the data is within the visible region.  If not, no update is made.
-        self.updated = lb/self.fs, ub/self.fs
-
-    def summarize(self, timestamps, offset, duration, fun):
-        if len(timestamps) == 0:
-            return np.array([])
-
-        # Channel.to_samples(time) converts time (in seconds) to the
-        # corresponding number of samples given the sampling frequency of the
-        # channel.  If the trial begins at sample n, then we want to analyze
-        # contact during the interval [n+lb_index, n+ub_index).
-        lb_index = self.to_samples(offset)
-        ub_index = self.to_samples(offset+duration)
-        result = []
-
-        # Variable ts is the sample number at which the trial began and is a
-        # multiple of the contact sampling frequency.
-        # Channel.get_range_index(lb_sample, ub_sample, reference_sample)
-        # will return the specified range relative to the reference sample.
-        # Since we are interested in extracting the range [contact_offset,
-        # contact_offset+contact_dur) relative to the timestamp, we need to
-        # first convert the range to the number of samples (which we did
-        # above where we have it as [lb_index, ub_index)).  Since our
-        # reference index (the timestamp) is already in the correct units,
-        # we don't need to convert it.
-        if np.iterable(timestamps):
-            range = self.get_range_index(lb_index, ub_index, timestamps)
-            return np.array([fun(r) for r in range])
-            #for ts in timestamps:
-            #    range = self.get_range_index(lb_index, ub_index, ts)
-            #    result.append(fun(range))
-            #return np.array(result)
-        else:
-            range = self.get_range_index(lb_index, ub_index, timestamps)
-            return fun(range)
-
 class FileMixin(HasTraits):
     '''
     Mixin class that streams acquired data to a HDF5_ EArray.  Note that if no
@@ -345,57 +76,323 @@ class FileMixin(HasTraits):
     # experiment, which we seem to have settled on as the "standard" for running
     # appetitive experiments.
     expected_duration   = Float(1800) 
-    shape               = Property
-    buffer              = Instance(tables.array.Array)
+    _buffer             = Instance(tables.array.Array)
     signal              = Property
+    
+    def __init__(self, **traits):
+        HasTraits.__init__(self, **traits)
+        # Create the buffer once all traits are initialized
+        if self.name in self.node._v_children:
+            self._buffer = self._load_buffer()
+        else:
+            self._buffer = self._create_buffer()
 
     def _get_shape(self):
         return (0,)
 
-    def _buffer_default(self):
-        print self.name, self.node
-        if self.name in self.node._v_children:
-            return self._load_buffer()
-        else:
-            return self._create_buffer()
-
     def _create_buffer(self):
+        shape = self._get_shape()
+        log.debug('%s: creating buffer with shape %r', self, self._get_shape())
         atom = tables.Atom.from_dtype(np.dtype(self.dtype))
+        log.debug('%s: creating buffer with type %r', self, self.dtype)
         filters = tables.Filters(complevel=self.compression_level,
                 complib=self.compression_type, fletcher32=self.use_checksum,
                 shuffle=self.use_shuffle)
-        buffer = append_node(self.node, self.name, 'EArray', atom, self.shape,
-                expectedrows=int(self.fs*self.expected_duration),
-                filters=filters)
+        expected_rows = int(self.fs*self.expected_duration)
+        buffer = append_node(self.node, self.name, 'EArray', atom,
+                self._get_shape(), filters=filters,
+                expectedrows=expected_rows)
+        for k, v in self.trait_get(attr=True).items():
+            buffer._v_attrs[k] = v
         return buffer
 
-    def _load_buffer(self):
-        buffer = self.node._v_children[self.name] 
-        traits = {}
-        for t in self.trait_names(attr=True):
-            if t in buffer._v_attrs:
-                traits[t] = buffer._v_attrs[t]
-        self.set(False, **traits)
-        return buffer
+    #def _load_buffer(self):
+    #    buffer = self.node._v_children[self.name] 
+    #    traits = {}
+    #    for t in self.trait_names(attr=True):
+    #        if t in buffer._v_attrs:
+    #            traits[t] = buffer._v_attrs[t]
+    #    self.set(False, **traits)
+    #    return buffer
 
     # Ensure that all 'Traits' are synced with the file so we have that
     # information stored away.
-    @on_trait_change('+attr')
+    @on_trait_change('+attr', post_init=True)
     def update_attrs(self, name, new):
-        self.buffer.setAttr(name, new)
+        log.debug('%s: updating %s to %r', self, name, new)
+        self._buffer.setAttr(name, new)
 
     def _write(self, data):
-        if data.ndim != 1 and data.shape[0] != 1:
-            raise ValueError, "First dimension must be 1"
-        self.buffer.append(data.ravel())
-
-    def _get_signal(self):
-        return self.buffer
+        self._buffer.append(data)
 
     def __repr__(self):
-        return '<FileMultiChannel {}>'.format(self.name)
+        return '<HDF5Store {}>'.format(self.name)
 
-class FileChannel(FileMixin, Channel): pass
+    def append(self, data):
+        self._buffer.append(data)
+
+class Timeseries(HasTraits):
+
+    updated = Event
+    fs = Float(attr=True)
+    t0 = Float(0, attr=True)
+
+    def send(self, timestamps):
+        self.append(timestamps.ravel())
+        self.updated = timestamps
+
+    def get_range(self, lb, ub):
+        timestamps = np.array(self._buffer)/self.fs 
+        mask = (timestamps>=lb)&(timestamps<ub)
+        return timestamps[mask]
+
+    def latest(self):
+        if len(self._buffer) > 0:
+            return self._buffer[-1]/self.fs
+        else:
+            # TODO: This should be np.nan
+            return self.t0
+
+    def __getitem__(self, key):
+        return self._buffer[key]/self.fs
+
+    def __len__(self):
+        return len(self._buffer)
+
+class FileTimeseries(FileMixin, Timeseries):
+
+    name  = String('FileTimeseries')
+    dtype = Any(np.int16)
+
+class Channel(HasTraits):
+    '''
+    Base class for dealing with a continuous stream of data.  Subclasses are
+    responsible for implementing the data buffer (e.g. either a file-based or
+    memory-based buffer).
+
+    fs
+        Sampling frequency (number of samples per second)
+    t0
+        Time offset (i.e. time of first sample) relative to the start of
+        acquisition.  This typically defaults to zero; however, some subclasses
+        may discard old data (e.g.  :class:`RAMChannel`), so we need to factor
+        in the time offset when attempting to extract a given segment of the
+        waveform for analysis.  
+    signal
+        The sample sequence
+    '''
+
+    # Sampling frequency of the data stored in the buffer
+    fs = Float(attr=True)
+
+    # Time of first sample in the buffer.  Typically this is 0, but if we delay
+    # acquisition or discard "old" data (e.g. via a RAMBuffer), then we need to
+    # update t0.
+    t0 = Float(0, attr=True)
+
+    # Fired when new data is added
+    updated = Event
+   
+    signal = Property
+
+    def __getitem__(self, key):
+        '''
+        Delegates to the __getitem__ method on the buffer
+        '''
+        return self._buffer[key]
+
+    def get_data(self):
+        return self.signal
+
+    def to_index(self, time):
+        '''
+        Convert time to the corresponding index in the waveform.  Note that the
+        index may be negative if the time is less than t0.  Since Numpy allows
+        negative indices, be sure to check the value.
+        '''
+        return int((time-self.t0)*self.fs)
+
+    def to_samples(self, time):
+        '''
+        Convert time to number of samples.
+        '''
+        return int(time*self.fs)
+
+    def get_range_index(self, start, end, reference=0, check_bounds=False):
+        '''
+        Returns a subset of the range specified in samples
+
+        The samples must be speficied relative to start of data acquisition.
+
+        Parameters
+        ----------
+        start : num samples (int)
+            Start index in samples
+        end : num samples (int)
+            End index in samples
+        reference : num samples (int), optional
+            Time of trigger to reference start and end to
+        check_bounds : bool
+            Check that start and end fall within the valid data range
+        '''
+        t0_index = int(self.t0*self.fs)
+        lb = start-t0_index+reference
+        ub = end-t0_index+reference
+
+        if check_bounds:
+            if lb < 0:
+                raise ValueError, "start must be >= 0"
+            if ub >= len(self._buffer):
+                raise ValueError, "end must be <= signal length"
+
+        if np.iterable(lb):
+            return [self._buffer[lb:ub] for lb, ub in zip(lb, ub)]
+        else:
+            return self._buffer[..., lb:ub]
+
+    def get_index(self, index, reference=0):
+        t0_index = int(self.t0*self.fs)
+        index = max(0, index-t0_index+reference)
+        return self._buffer[..., index]
+
+    def get_range(self, start, end, reference=None):
+        '''
+        Returns a subset of the range.
+
+        Parameters
+        ----------
+        start : float, sec
+            Start time.
+        end : float, sec
+            End time.
+        reference : float, optional
+            Set to -1 to get the most recent range
+        '''
+        # Return an empty array of the appropriate dimensionality (whether it's
+        # single or multichannel)
+        if start == end:
+            return self._buffer[..., 0:0]
+
+        # Otherwise, ensure that start time is greater than end 
+        if start > end:
+            raise ValueError("Start time must be < end time")
+
+        if reference is not None:
+            if reference == -1:
+                return self.get_recent_range(start, end)
+            else:
+                ref_idx = self.to_index(reference)
+        else:
+            ref_idx = 0
+
+        # Due to the two checks at the beginning of this function, we do not
+        # need to worry about start == inf and end == -inf
+        if start == -np.inf:
+            lb = self.t0
+        else:
+            lb = max(0, self.to_index(start)+ref_idx)
+        if end == np.inf:
+            ub = self.get_size()
+        else:
+            ub = max(0, self.to_index(end)+ref_idx)
+
+        return self._buffer[..., lb:ub]
+
+    def get_recent_range(self, start, end=0):
+        '''
+        Returns a subset of the range, with start and end referenced to the most
+        recent sample.
+
+        Parameters
+        ==========
+        start
+            Start time
+        end
+            End time
+        '''
+        lb = min(-1, int(start*self.fs))
+        ub = min(-1, int(end*self.fs))
+        # This check is necessary to avoid raising an error in the HDF5
+        # (PyTables?) library if it attempts to slice an empty array.
+        if len(self._buffer) == 0:
+            signal = np.array([])
+        else:
+            signal = self._buffer[..., lb:ub]
+        ub_time = ub/self.fs
+        lb_time = ub_time-signal.shape[-1]/self.fs
+        return signal, lb_time, ub_time
+
+    def get_size(self):
+        return self._buffer.shape[-1]
+
+    def get_bounds(self):
+        '''
+        Returns valid range of times as a tuple (lb, ub)
+        '''
+        return self.t0, self.t0 + self.get_size()/self.fs
+
+    def latest(self):
+        if self.get_size() > 0:
+            return self._buffer[-1]/self.fs
+        else:
+            return self.t0
+
+    def send(self, data):
+        '''
+        Convenience method that allows us to use a Channel as a "sink" for a
+        processing pipeline.
+        '''
+        self.write(data)
+
+    def write(self, data):
+        '''
+        Write data to buffer.
+        '''
+        lb = self.get_size()
+        self._write(data)
+        ub = self.get_size()
+
+        # Updated has the upper and lower bound of the data that was added.
+        # Some plots will use this to determine whether the updated region of
+        # the data is within the visible region.  If not, no update is made.
+        self.updated = lb/self.fs, ub/self.fs
+
+    def summarize(self, timestamps, offset, duration, fun):
+        if len(timestamps) == 0:
+            return np.array([])
+
+        # Channel.to_samples(time) converts time (in seconds) to the
+        # corresponding number of samples given the sampling frequency of the
+        # channel.  If the trial begins at sample n, then we want to analyze
+        # contact during the interval [n+lb_index, n+ub_index).
+        lb_index = self.to_samples(offset)
+        ub_index = self.to_samples(offset+duration)
+        result = []
+
+        # Variable ts is the sample number at which the trial began and is a
+        # multiple of the contact sampling frequency.
+        # Channel.get_range_index(lb_sample, ub_sample, reference_sample)
+        # will return the specified range relative to the reference sample.
+        # Since we are interested in extracting the range [contact_offset,
+        # contact_offset+contact_dur) relative to the timestamp, we need to
+        # first convert the range to the number of samples (which we did
+        # above where we have it as [lb_index, ub_index)).  Since our
+        # reference index (the timestamp) is already in the correct units,
+        # we don't need to convert it.
+        if np.iterable(timestamps):
+            range = self.get_range_index(lb_index, ub_index, timestamps)
+            return np.array([fun(r) for r in range])
+        else:
+            range = self.get_range_index(lb_index, ub_index, timestamps)
+            return fun(range)
+
+class FileChannel(FileMixin, Channel):
+    '''
+    Use a HDF5 datastore for saving the channel
+    '''
+
+    name  = String('FileChannel')
+    dtype = Any(np.float32)
 
 class RAMChannel(Channel):
     '''Buffers data in memory without saving it to disk.
@@ -440,8 +437,8 @@ class RAMChannel(Channel):
         self.partial_idx = 0
         self._write = self._partial_write
 
-    def _get_signal(self):
-        return self.buffer
+    #def _get_signal(self):
+    #    return self.buffer
 
     def _partial_write(self, data):
         size = data.shape[-1]
@@ -505,12 +502,6 @@ class MultiChannel(Channel):
 
     channels = Int(8, attr=True)
 
-    #def _get_signal(self):
-    #    return self.buffer
-
-    def _write(self, data):
-        self.buffer.append(data)
-
 class RAMMultiChannel(RAMChannel, MultiChannel):
 
     def _buffer_default(self):
@@ -523,22 +514,12 @@ class RAMMultiChannel(RAMChannel, MultiChannel):
         self.partial_idx = 0
         self._write = self._partial_write
 
-class FileMultiChannel(FileChannel, MultiChannel):
+class FileMultiChannel(FileMixin, MultiChannel):
 
     name = 'FileMultiChannel'
 
     def _get_shape(self):
         return (self.channels, 0)
-
-    #def _create_buffer(self):
-    #    buffer = super(FileMultiChannel, self)._create_buffer()
-    #    buffer.setAttr('channels', self.channels)
-    #    return buffer
-
-    #def _load_buffer(self):
-    #    buffer = super(FileMultiChannel, self)._load_buffer()
-    #    self.set(False, channels=buffer._v_attrs['channels'])
-    #    return buffer
 
 class FileSnippetChannel(FileChannel):
 
@@ -546,6 +527,9 @@ class FileSnippetChannel(FileChannel):
     classifiers = Any
     timestamps = Any
     unique_classifiers = Set
+
+    def __getitem__(self, key):
+        return self._buffer[key]
 
     def _classifiers_default(self):
         atom = tables.Atom.from_dtype(np.dtype('int32'))
@@ -564,16 +548,16 @@ class FileSnippetChannel(FileChannel):
 
     def send(self, data, timestamps, classifiers):
         data.shape = (-1, self.snippet_size)
-        self.buffer.append(data)
+        self._buffer.append(data)
         self.classifiers.append(classifiers)
         self.timestamps.append(timestamps)
         self.unique_classifiers.update(set(classifiers))
         self.updated = True
 
     def get_recent(self, history=1, classifier=None):
-        if len(self.buffer) == 0:
+        if len(self._buffer) == 0:
             return np.array([]).reshape((-1, self.snippet_size))
-        spikes = self.buffer[-history:]
+        spikes = self._buffer[-history:]
         if classifier is not None:
             classifiers = self.classifiers[-history:]
             mask = classifiers[:] == classifier
