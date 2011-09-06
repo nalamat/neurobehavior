@@ -1,10 +1,11 @@
+from enthought.traits.api import HasTraits
 from tdt import DSPCircuit
 from cns import get_config
 from os.path import join
 
-class AversiveFMControllerMixin(object):
+class AversiveFMControllerMixin(HasTraits):
 
-    def _setup_circuit(self, info):
+    def _setup_circuit(self):
         # AversiveFMController needs to change the initialization sequence a
         # little (i.e. it needs to use different microcode and the microcode
         # does not contain int and trial buffers).
@@ -14,7 +15,6 @@ class AversiveFMControllerMixin(object):
                 src_type='int8', dest_type='int8', block_size=24)
         self.buffer_contact = self.iface_behavior.get_buffer('contact', 'r',
                 src_type='int8', dest_type='float32', block_size=24)
-        self.setup_shock(info)
 
     # We are overriding the three signal update methods (remind, warn, safe) to
     # work with the specific circuit we constructed

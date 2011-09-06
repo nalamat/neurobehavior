@@ -9,6 +9,22 @@ log = logging.getLogger(__name__)
 
 class AbstractAversiveController(AbstractExperimentController):
 
+    def _setup_shock(self):
+        # First, we need to load the circuit we need to control the shocker.
+        # We currently use DAC channel 12 of the RZ5 to control shock level;
+        # however, the RZ5 will already have a circuit loaded if we're using it
+        # for physiology.  The physiology circuit is already configured to
+        # control the shocker.  However, if we are not acquiring physiology, we
+        # need to load a circuit that allows us to control the shocker.
+        if not self.model.spool_physiology:
+            circuit = join(get_config('RCX_ROOT'), 'shock-controller')
+            self.iface_shock = self.process.load_circuit(circuit, 'RZ5')
+        else:
+            # This assumes that iface_physiology has already been initialized.
+            # In the current abstract_experiment_controller, setup_physiology is
+            # called before setup_experiment.
+            self.iface_shock = self.iface_physiology
+
     def _setup_circuit(self):
         # I have broken this out into a separate function because
         # AversiveFMController needs to change the initialization sequence a
@@ -24,6 +40,18 @@ class AbstractAversiveController(AbstractExperimentController):
                 src_type='int8', dest_type='int8', block_size=24)
         self.buffer_contact = self.iface_behavior.get_buffer('contact', 'r',
                 src_type='int8', dest_type='float32', block_size=24)
+
+    def _setup_pump(self):
+        # Pump will halt when it has infused the requested volume.  To allow it
+        # to infuse continuously, we set the volume to 0.
+        self.iface_pump.set_volume(0)
+        # Pump will start on a rising edge (e.g. the subject touches the spout)
+        # and stop on a falling edge (e.g. the subject leaves the spout).
+        self.iface_pump.set_trigger(start='rising', stop='falling')
+
+    def setup_experiment(self, info):
+        self._setup_shock()
+        self._setup_circuit()
 
         # Ensure that sampling frequencies are stored properly
         self.model.data.contact_digital.fs = self.buffer_TTL.fs
@@ -46,16 +74,6 @@ class AbstractAversiveController(AbstractExperimentController):
         # we just grab it and pass it along to the data buffer.
         self.pipeline_contact = self.model.data.contact_digital_mean
 
-    def setup_experiment(self, info):
-        self._setup_circuit()
-
-        # Pump will halt when it has infused the requested volume.  To allow it
-        # to infuse continuously, we set the volume to 0.
-        self.iface_pump.set_volume(0)
-        # Pump will start on a rising edge (e.g. the subject touches the spout)
-        # and stop on a falling edge (e.g. the subject leaves the spout).
-        self.iface_pump.set_trigger(start='rising', stop='falling')
-
     def start_experiment(self, info):
         self.initialize_context()
 
@@ -72,6 +90,7 @@ class AbstractAversiveController(AbstractExperimentController):
         # We want to start the circuit in the paused state (i.e. playing the
         # intertrial signal but not presenting trials)
         self.pause()
+        self.trigger_next()
         
         self.tasks.append((self.monitor_pump, 5))
         self.tasks.append((self.monitor_behavior, 1))
@@ -105,12 +124,6 @@ class AbstractAversiveController(AbstractExperimentController):
     def stop_experiment(self, info=None):
         self.model.analyzed.mask_mode = 'none'
 
-    def log_trial(self, ts_start, ts_end, ttype):
-        self.model.data.log_trial(ts_start=ts_start, ts_end=ts_end,
-                                  ttype=last_ttype,
-                                  speaker=self.current_speaker,
-                                  **self.current_context)
-
     def monitor_behavior(self):
         self.update_safe()
         self.pipeline_TTL.send(self.buffer_TTL.read())
@@ -120,7 +133,11 @@ class AbstractAversiveController(AbstractExperimentController):
         if ts_end > self.current_trial_ts:
             self.current_trial_ts = ts_end
             ts_start = self.get_trial_start_ts()
-            self.log_trial(ts_start, ts_end, self.current_ttype)
+            self.log_trial(
+                    ts_start=ts_start, 
+                    ts_end=ts_end,
+                    ttype=self.current_ttype
+                    )
             self.trigger_next()
 
     ############################################################################
@@ -176,6 +193,9 @@ class AbstractAversiveController(AbstractExperimentController):
         # the warn signal.  Since the safe signal is continuously being updated,
         # we don't need to update that.
 
+    def get_pause_state(self):
+        return self.iface_behavior.get_tag('paused?')
+
     def set_attenuation(self, value):
         self.iface_behavior.set_tag('att_A', value)
 
@@ -184,3 +204,9 @@ class AbstractAversiveController(AbstractExperimentController):
         self.current_ttype, self.current_setting = self.next_setting()
         self.evaluate_pending_expressions(self.current_setting)
         self.iface_behavior.trigger(1)
+
+    def set_shock_level(self, value):
+        # Programmable input ranges from 0 to 2.5 V corresponding to a 0 to 5 mA
+        # range.  Divide by 2.0 to convert mA to the corresponding shock level.
+        # When set to manual high, use the lower scale to read the meter.
+        self.iface_shock.set_tag('shock_level', value/2.0)
