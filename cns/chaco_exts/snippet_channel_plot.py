@@ -31,7 +31,7 @@ class SnippetChannelPlot(BaseChannelPlot):
 
     @cached_property
     def _get_value_data(self):
-        return self.channel.buffer[self.last_reset:][-self.history:]
+        return self.channel[self.last_reset:][-self.history:]
 
     @cached_property
     def _get_value_screen(self):
