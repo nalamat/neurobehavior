@@ -42,8 +42,8 @@ channel_editor = TableEditor(
         sortable=False,
         reorderable=True,
         columns=[
-            ObjectColumn(name='number', editable=False, width=10, label=''),
-            ObjectColumn(name='mapped', editable=True, width=10, label=''),
+            #ObjectColumn(name='number', editable=False, width=10, label=''),
+            ObjectColumn(name='mapped', editable=True, width=10, label='M'),
             CheckboxColumn(name='visible', width=10, label='V'), 
             CheckboxColumn(name='bad', width=10, label='B'),
             ObjectColumn(name='differential'),
