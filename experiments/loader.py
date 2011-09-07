@@ -218,14 +218,18 @@ def test_experiment(args):
     filename = os.path.join(tempfile.gettempdir(), tempname)
     log.debug("Creating temporary file %s for testing", filename)
     launch_experiment(args, filename, True)
-
     # Once the program exists, remove the temporary file
     os.unlink(filename)
     log.debug("Deleted temporary file %s", filename)
 
 def launch_experiment(args, filename, overwrite=False):
-    log.debug('Opening file %s for writing', filename)
-    handle = tables.openFile(filename, 'a')
+    if overwrite:
+        mode = 'w'
+        log.debug('Creating file %s for writing', filename)
+    else:
+        mode = 'a'
+        log.debug('Opening file %s for appending', filename)
+    handle = tables.openFile(filename, mode)
     model, controller = prepare_experiment(args, handle.root)
     model.configure_traits(handler=controller)
     handle.close()
