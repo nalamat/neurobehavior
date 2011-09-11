@@ -1,10 +1,4 @@
-from __future__ import with_statement
-
 import time
-import logging
-log = logging.getLogger('pipeline')
-logging.basicConfig(level=logging.DEBUG)
-
 import numpy as np
 
 ################################################################################

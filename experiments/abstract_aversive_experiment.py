@@ -1,6 +1,6 @@
 from numpy import clip
 
-from enthought.traits.api import Instance, on_trait_change
+from enthought.traits.api import Instance, on_trait_change, Float, Property
 from enthought.traits.ui.api import (View, Item, VGroup, HGroup, HSplit, Tabbed,
     Include)
 from enthought.enable.api import Component, ComponentEditor
@@ -10,12 +10,12 @@ from enthought.chaco.api import DataRange1D, LinearMapper, PlotLabel, \
 from cns.chaco_exts.channel_data_range import ChannelDataRange
 from cns.chaco_exts.channel_plot import ChannelPlot
 from cns.chaco_exts.ttl_plot import TTLPlot
+from cns.chaco_exts.timeseries_plot import TimeseriesPlot
+from cns.chaco_exts.epoch_plot import EpochPlot
 from cns.chaco_exts.dynamic_bar_plot import DynamicBarPlot, DynamicBarplotAxis
 from cns.chaco_exts.helpers import add_default_grids, add_time_axis
 
 from abstract_experiment import AbstractExperiment
-from abstract_aversive_paradigm import AbstractAversiveParadigm
-from abstract_aversive_controller import AbstractAversiveController
 
 import logging
 log = logging.getLogger(__name__)
@@ -28,8 +28,6 @@ from colors import color_names
 
 class TrialLogAdapter(TabularAdapter):
     
-    parameters = List([])
-
     # List of tuples (column_name, field )
     columns = [ ('P',       'parameter'),
                 #('S',       'speaker'),
@@ -38,6 +36,7 @@ class TrialLogAdapter(TabularAdapter):
                 ]
 
     parameter_width = Float(75)
+    contact_score_width = Float(50)
     reaction_width = Float(25)
     response_width = Float(25)
     speaker_width = Float(25)
@@ -50,8 +49,8 @@ class TrialLogAdapter(TabularAdapter):
     contact_score_text = Property
 
     def _get_parameter_text(self):
-        print self.object
-        return ', '.join('{}'.format(self.item[p]) for p in self.parameters)
+        parameters = self.object.parameters
+        return ', '.join('{}'.format(self.item[p]) for p in parameters)
 
     def _get_speaker_text(self):
         return self.item['speaker'][0].upper()
@@ -61,176 +60,81 @@ class TrialLogAdapter(TabularAdapter):
         return "{0}:{1:02}".format(*divmod(int(seconds), 60))
 
     def _get_bg_color(self):
-        if self.item['ttype'] == 'safe':
+        ttype = self.item['ttype']
+        if ttype == 'NOGO':
             return color_names['light green']
-        elif self.item['ttype'] == 'remind':
-            return color_names['gray']
-        else:
+        elif ttype == 'NOGO_REPEAT':
+            return color_names['dark green']
+        elif ttype == 'GO_REMIND':
+            return color_names['dark red']
+        elif ttype == 'GO':
             return color_names['light red']
 
     def _get_contact_score_image(self):
-        if self.object.on_spout_seq[-self.row]:
+        if self.object.on_spout_seq[-(self.row+1)]:
             return '@icons:tuple_node'  # a green icon
         else:
             return '@icons:dict_node'   # a red icon
 
     def _get_contact_score_text(self):
-        return str(self.object.contact_scores[-self.row])
-
-class ParInfoAdapter(TabularAdapter):
-
-    color_map  = Dict
-
-    columns = [ ('P', 'parameter'),
-                ('Hit %', 'hit_frac'), 
-                ('FA %', 'fa_frac'),
-                ('Safe #', 'safe_count'),
-                ('Warn #', 'warn_count'),
-                ('Hit #', 'hit_count'),
-                ('FA #', 'fa_count'),
-                ('d\'', 'dprime'),
-                ('C', 'criterion'),
-                ]
-
-
-trial_log_editor = TabularEditor(editable=False, adapter=TrialLogAdapter())
-par_info_editor = TabularEditor(editable=False, adapter=ParInfoAdapter())
+        return str(self.object.contact_scores[-(self.row+1)])
 
 class AbstractAversiveExperiment(AbstractExperiment):
 
-    trial_log_adapter = TrialLogAdapter()
-
     experiment_plot     = Instance(Component)
-    par_score_chart     = Instance(Component)
-    score_chart         = Instance(Component)
-    par_count_chart     = Instance(Component)
-    par_dprime_chart    = Instance(Component)
 
     @on_trait_change('data')
     def _update_experiment_plot(self):
-        index_range = ChannelDataRange()
+        index_range = ChannelDataRange(trig_delay=0)
         index_range.sources = [self.data.contact_digital]
         index_mapper = LinearMapper(range=index_range)
-        value_range = DataRange1D(low_setting=-0, high_setting=1)
+        container = OverlayPlotContainer(padding=[20, 20, 50, 5])
+        self._add_behavior_plots(index_mapper, container)
+        # Add axes and grids to the first plot
+        plot = container.components[0]
+        add_default_grids(plot, minor_index=0.25, major_index=1)
+        add_time_axis(plot, orientation='top')
+        self.experiment_plot = container
+
+    def _add_behavior_plots(self, index_mapper, container, alpha=0.25):
+        value_range = DataRange1D(low_setting=0, high_setting=1)
         value_mapper = LinearMapper(range=value_range)
-
-        container = OverlayPlotContainer(padding=50, spacing=50,
-                fill_padding=True, bgcolor='white')
-
         plot = TTLPlot(channel=self.data.trial_running, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(0.41, 0.88, 0.25, 0.5), rect_center=0.5,
                 rect_height=0.8)
         container.add(plot)
-
         plot = TTLPlot(channel=self.data.shock_running, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(0.88, 0.41, 0.25, 0.5), rect_center=0.5,
                 rect_height=0.8)
         container.add(plot)
-
         plot = TTLPlot(channel=self.data.warn_running, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(1.0, 0.25, 0.25, 0.75), rect_center=0.5,
                 rect_height=0.8)
         container.add(plot)
-
         plot = TTLPlot(channel=self.data.contact_digital, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(0.25, 0.41, 0.88, 0.75), rect_center=0.5,
                 rect_height=0.5)
         container.add(plot)
-
         plot = ChannelPlot(channel=self.data.contact_digital_mean, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 line_width=3)
         container.add(plot)
-
-        # Add axes and grids to the first plot
-        add_default_grids(plot, minor_index=0.25, major_index=1)
-        add_time_axis(plot)
-
-        self.experiment_plot = container
-
-    @on_trait_change('data')
-    def _update_plots(self):
-        # dPrime
-        bounds = lambda low, high, margin, tight: (low-0.5, high+0.5)
-        index_range = DataRange1D(bounds_func=bounds)
-        index_mapper = LinearMapper(range=index_range)
-        value_range = DataRange1D(low_setting=-1, high_setting=4)
-        value_mapper = LinearMapper(range=value_range)
-
-        plot = DynamicBarPlot(source=self.data,
-                label_trait='pars', value_trait='par_dprime', bgcolor='white',
-                padding=50, fill_padding=True, bar_width=0.9,
-                value_mapper=value_mapper, index_mapper=index_mapper)
-        index_range.add(plot.index)
-        add_default_grids(plot, major_value=1)
-        axis = DynamicBarplotAxis(plot, orientation='bottom',
-                source=self.data, label_trait='pars', title='Parameter')
-        plot.underlays.append(axis)
-        plot.underlays.append(PlotAxis(plot, orientation='left', title="d'"))
-        label = PlotLabel(component=plot, text="Sensitivity")
-        plot.underlays.append(label)
-        self.par_dprime_chart = plot
-
-        # Trial count
-        bounds = lambda low, high, margin, tight: (low-0.5, high+0.5)
-        index_range = DataRange1D(bounds_func=bounds)
-        index_mapper = LinearMapper(range=index_range)
-        value_range = DataRange1D(low_setting=0, high_setting='auto')
-        value_mapper = LinearMapper(range=value_range)
-
-        plot = DynamicBarPlot(source=self.data,
-                label_trait='pars', value_trait='par_warn_count', bgcolor='white',
-                padding=50, fill_padding=True, bar_width=0.9,
-                value_mapper=value_mapper, index_mapper=index_mapper)
-        index_range.add(plot.index)
-        value_range.add(plot.value)
-        add_default_grids(plot, major_value=5)
-        axis = DynamicBarplotAxis(plot, orientation='bottom',
-                source=self.data, label_trait='pars', title='Parameter')
-        plot.underlays.append(axis)
-        label = PlotLabel(component=plot, text="Trial Count")
-        plot.underlays.append(label)
-        plot.underlays.append(PlotAxis(plot, orientation='left'))
-        self.par_count_chart = plot
-
-        # par score chart
-        bounds = lambda low, high, margin, tight: (low-0.8, high+0.8)
-        index_range = DataRange1D(bounds_func=bounds)
-        index_mapper = LinearMapper(range=index_range)
-        value_range = DataRange1D(low_setting=0, high_setting=1)
-        value_mapper = LinearMapper(range=value_range)
-
-        chart = OverlayPlotContainer(bgcolor='white', fill_padding=True)
-
-        plot = DynamicBarPlot(source=self.data, label_trait='pars',
-                value_trait='par_hit_frac', bgcolor='white', padding=50,
-                fill_padding=True, bar_width=0.5, index_mapper=index_mapper,
-                value_mapper=value_mapper, index_offset=-0.2, alpha=0.5)
-        index_range.add(plot.index)
-
-        axis = DynamicBarplotAxis(plot, orientation='bottom',
-                source=self.data, label_trait='pars', title='Parameter')
-        plot.underlays.append(axis)
-        axis = PlotAxis(plot, orientation='left', title='Fraction')
-        plot.underlays.append(axis)
-        label = PlotLabel(component=plot, text="FA (red) and Hit (black)")
-        plot.underlays.append(label)
-        
-        add_default_grids(plot, major_value=0.2)
-        chart.add(plot)
-
-        plot = DynamicBarPlot(source=self.data, label_trait='pars',
-                value_trait='par_fa_frac', bgcolor='white', padding=50,
-                fill_padding=True, bar_width=0.5, fill_color=(1, 0, 0),
-                index_mapper=index_mapper, value_mapper=value_mapper,
-                index_offset=0.2, alpha=0.5)
-        index_range.add(plot.index)
-        chart.add(plot)
-        self.par_score_chart = chart
+        plot = TimeseriesPlot(series=self.data.reaction_ts, marker='diamond',
+                marker_color=(0, 1, 0, 1.0), marker_height=0.45,
+                index_mapper=index_mapper, value_mapper=value_mapper)
+        container.add(plot)
+        plot = EpochPlot(series=self.data.spout_epoch, marker='diamond',
+                marker_color=(.34, .54, .34, 1.0), marker_height=0.8,
+                index_mapper=index_mapper, value_mapper=value_mapper)
+        container.add(plot)
+        plot = EpochPlot(series=self.data.trial_epoch, marker='diamond',
+                marker_color=(.17, .54, .34, 1.0), marker_height=0.7,
+                index_mapper=index_mapper, value_mapper=value_mapper)
+        container.add(plot)
 
     traits_group = HSplit(
             VGroup(
@@ -256,47 +160,43 @@ class AbstractAversiveExperiment(AbstractExperiment):
                     ),
                 # Include the GUI from the paradigm
                 Tabbed(
-                   Item('paradigm', style='custom', show_label=False), 
-                   VGroup(
-                       VGroup(
-                           Item('object.data.mask_mode'),
-                           Item('object.data.include_last'), 
-                           Item('object.data.exclude_first'),
-                           Item('object.data.exclude_last'),
-                           label='Mask settings',
-                           show_border=True,
-                           ),
-                       VGroup(
-                            Item('object.data.contact_offset',
-                                label='Contact offset (s)'),
-                            Item('object.data.contact_dur', 
-                                label='Contact duration (s)'),
-                            Item('object.data.contact_reference'),
-                           label='Contact settings',
-                           show_border=True,
-                            ),
-                       label='Analysis Parameters',
-                       ),
+                    Item('paradigm', style='custom', show_label=False), 
                     Include('context_group'), # defined in abstract_experiment
-                   ),
+                    ),
                 show_labels=False,
                 ),
             VGroup(
                 Item('experiment_plot', editor=ComponentEditor(),
                     show_label=False, width=1000, height=150),
-                HGroup(
-                    Item('par_count_chart', show_label=False,
-                        editor=ComponentEditor(), width=150, height=150),
-                    Item('par_score_chart', editor=ComponentEditor(), width=150,
-                        height=150, show_label=False),
-                    Item('par_dprime_chart', editor=ComponentEditor(),
-                        width=150, height=150, show_label=False),
-                    ),
-                Item('object.data.par_info', editor=par_info_editor,
-                    label='Performance Statistics'),
+                Include('analysis_plot_group'),
                 show_labels=False,
                 ),
-            Item('object.data.summary_trial_log', editor=trial_log_editor,
-                    width=200),
+            Tabbed(
+                Item('object.data.summary_trial_log', width=200,
+                    editor=TabularEditor(editable=False,
+                        adapter=TrialLogAdapter())),
+                Include('analysis_settings_group'),
+                VGroup(
+                    VGroup(
+                        Item('object.data.mask_mode'),
+                        Item('object.data.include_last'), 
+                        Item('object.data.exclude_first'),
+                        Item('object.data.exclude_last'),
+                        label='Mask settings',
+                        show_border=True,
+                        ),
+                    VGroup(
+                         Item('object.data.contact_offset',
+                             label='Contact offset (s)'),
+                         Item('object.data.contact_dur', 
+                             label='Contact duration (s)'),
+                         Item('object.data.contact_reference'),
+                        label='Contact settings',
+                        show_border=True,
+                         ),
+                   label='Analysis Parameters',
+                   ),
+                show_labels=False,
+                ),
             show_labels=False,
             )

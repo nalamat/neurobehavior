@@ -5,7 +5,7 @@ from tdt import DSPCircuit
 from abstract_experiment_controller import AbstractExperimentController
 from abstract_experiment_controller import ExperimentToolBar
 
-from enthought.traits.api import Instance
+from enthought.traits.api import Instance, on_trait_change
 from enthought.traits.ui.api import View, HGroup, spring, Item
 
 class BasicCharacterizationToolbar(ExperimentToolBar):
@@ -24,15 +24,16 @@ class BasicCharacterizationToolbar(ExperimentToolBar):
 class BasicCharacterizationController(AbstractExperimentController):
 
     toolbar = Instance(BasicCharacterizationToolbar, (), toolbar=True)
+    iface_audio = Instance(DSPCircuit)
+
+    def _iface_audio_default(self):
+        circuit = join(get_config('RCX_ROOT'), 'basic_audio')
+        return self.process.load_circuit(circuit, 'RZ6')
 
     def setup_experiment(self, info):
-        circuit = join(get_config('RCX_ROOT'), 'basic_audio')
-        self.iface_audio = self.process.load_circuit(circuit, 'RZ6')
+        pass
 
     def start_experiment(self, info):
-        #self.init_context()
-        #self.update_context()
-        #self.init_paradigm(self.model.paradigm)
         self.iface_audio.trigger('A', 'high')
         self.state = 'running'
 
@@ -44,17 +45,23 @@ class BasicCharacterizationController(AbstractExperimentController):
         self.iface_audio.trigger('A', 'high')
         self.state = 'running'
 
+    @on_trait_change('model.paradigm.token_duration')
     def set_token_duration(self, value):
         self.iface_audio.cset_tag('token_dur_n', value, 's', 'n')
 
+    @on_trait_change('model.paradigm.trial_duration')
     def set_trial_duration(self, value):
         self.iface_audio.cset_tag('trial_dur_n', value, 's', 'n')
 
+    @on_trait_change('model.paradigm.center_frequency')
     def set_center_frequency(self, value):
+        print 'setting center frequency to ', value
         self.iface_audio.set_tag('t_freq', value)
         self.update_filter_settings()
 
+    @on_trait_change('model.paradigm.bandwidth_ratio')
     def set_bandwidth_ratio(self, value):
+        print 'setting bandwidth ratio to ', value
         if value == 0:
             self.iface_audio.set_tag('selector', 0)
         else:
@@ -69,22 +76,26 @@ class BasicCharacterizationController(AbstractExperimentController):
         self.iface_audio.set_tag('FiltHP', flow)
         self.iface_audio.set_tag('FiltLP', fhigh)
 
+    @on_trait_change('model.paradigm.modulation_frequency')
     def set_modulation_frequency(self, value):
         self.iface_audio.set_tag('m_freq', value)
 
+    @on_trait_change('model.paradigm.modulation_depth')
     def set_modulation_depth(self, value):
         amplitude = value/2.0
         offset = 1-amplitude
-        print amplitude, offset
         self.iface_audio.set_tag('m_amplitude', amplitude)
         self.iface_audio.set_tag('m_shift', offset)
 
+    @on_trait_change('model.paradigm.commutator_inhibit')
     def set_commutator_inhibit(self, value):
         self.iface_audio.set_tag('comm_inhibit', value)
 
+    @on_trait_change('model.paradigm.primary_attenuation')
     def set_primary_attenuation(self, value):
         self.iface_audio.set_tag('att_A', value)
 
+    @on_trait_change('model.paradigm.secondary_attenuation')
     def set_secondary_attenuation(self, value):
         self.iface_audio.set_tag('att_B', value)
 

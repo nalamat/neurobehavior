@@ -8,7 +8,6 @@ from enthought.traits.ui.api import View, HGroup, Item, VGroup, spring, \
     InstanceEditor, Group, TableEditor, ObjectColumn
 from enthought.traits.ui.tabular_adapter import TabularAdapter
 
-#import cns
 from cns import get_config
 import logging
 log = logging.getLogger(__name__)
@@ -109,7 +108,6 @@ class CohortViewHandler(FileHandler):
             animal = info.object._animal_factory()
             info.object.cohort.animals.append(animal)
             info.object.selected = animal
-            print info.object.selected
 
     def object_delete_changed(self, info):
         if info.initialized and info.object.selected is not None:
@@ -148,7 +146,6 @@ class CohortView(HasTraits):
             VGroup(
                 Group('object.cohort.description'),
                 HGroup(spring, 'add', 'delete', show_labels=False),
-                #HGroup(spring, 'add', show_labels=False),
                 Item('object.cohort.animals', editor=CohortEditor(),
                      show_label=False),
                 ),

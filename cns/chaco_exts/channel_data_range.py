@@ -12,7 +12,6 @@ class ChannelDataRange(DataRange1D):
     trig_delay      = Float(5)
     update_mode     = Enum('auto', 'auto full', 'triggered', 'triggered full')
     trigger         = Int(-1)
-
     scroll_period   = Float(20)
 
     def _span_changed(self):

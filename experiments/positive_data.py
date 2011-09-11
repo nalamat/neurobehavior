@@ -9,10 +9,9 @@ from enthought.traits.api import Instance, List, CFloat, Int, Float, Any, \
 from enthought.traits.ui.api import EnumEditor, VGroup, Item, View
 from datetime import datetime
 import numpy as np
-from cns.data.h5_utils import append_node, get_or_append_node
-from cns.pipeline import deinterleave, broadcast
+from cns.data.h5_utils import get_or_append_node
 
-from cns.channel import Timeseries, FileChannel
+from cns.channel import FileTimeseries, FileChannel, FileEpoch
 
 from enthought.traits.ui.api import CheckListEditor
 
@@ -53,11 +52,16 @@ edge_falling = lambda TTL: np.r_[0, np.diff(TTL.astype('i'))] == -1
 # V2.6 - 110605 - Added commutator inhibit TTL (comm_inhibit_TTL) to indicate
 # when commutator is being suppressed from spinning.
 # V2.7 - 110718 - Added microphone data buffer
-class PositiveData_0_1(AbstractExperimentData, SDTDataMixin):
-    '''
-    masked_trial_log is essentially a list of the trials, along with the parameters
-    and some basic analysis.
-    '''
+# V3.0 - 110909 - Added poke/signal/trial epoch and response ts sampled at the
+# maximum resolution of the system (i.e. the sampling rate of the DSP).  Also,
+# all logged timestamps now reflect the *maximum* resolution of the system
+# rather than the sampling rate of the TTL.
+
+class PositiveData(AbstractExperimentData, SDTDataMixin):
+
+    # VERSION is a reserved keyword in HDF5 files, so I avoid using it here.
+    OBJECT_VERSION = Float(3.0, store='attribute')
+
     mask_mode = Enum('none', 'include recent')
     mask_num = Int(25)
     masked_trial_log = Property(depends_on='mask_+, trial_log')
@@ -84,9 +88,6 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin):
     c_nogo_all = Int(0, context=True, label='Consecutive nogos')
     fa_rate = Float(0, context=True, label='Running FA rate (frac)')
 
-    # VERSION is a reserved keyword in HDF5 files, so I avoid using it here.
-    OBJECT_VERSION = Float(2.7, store='attribute')
-
     poke_TTL = Instance(FileChannel, 
             store='channel', store_path='contact/poke_TTL')
     spout_TTL = Instance(FileChannel, 
@@ -111,6 +112,12 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin):
             store='channel', store_path='contact/comm_inhibit_TTL')
 
     microphone = Instance(FileChannel, store='channel', store_path='microphone')
+
+    trial_epoch     = Instance(FileEpoch)
+    signal_epoch    = Instance(FileEpoch)
+    poke_epoch      = Instance(FileEpoch)
+    all_poke_epoch  = Instance(FileEpoch)
+    response_ts     = Instance(FileTimeseries)
 
     def _microphone_default(self):
         return FileChannel(node=self.store_node, name='microphone',
@@ -148,6 +155,26 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin):
 
     def _comm_inhibit_TTL_default(self):
         return self._create_channel('comm_inhibit_TTL', np.bool)
+
+    def _trial_epoch_default(self):
+        node = get_or_append_node(self.store_node, 'contact')
+        return FileEpoch(node=node, name='trial_epoch')
+
+    def _signal_epoch_default(self):
+        node = get_or_append_node(self.store_node, 'contact')
+        return FileEpoch(node=node, name='signal_epoch')
+
+    def _poke_epoch_default(self):
+        node = get_or_append_node(self.store_node, 'contact')
+        return FileEpoch(node=node, name='poke_epoch')
+
+    def _all_poke_epoch_default(self):
+        node = get_or_append_node(self.store_node, 'contact')
+        return FileEpoch(node=node, name='all_poke_epoch')
+
+    def _response_ts_default(self):
+        node = get_or_append_node(self.store_node, 'contact')
+        return FileTimeseries(node=node, name='response_ts')
 
     def log_trial(self, score=True, **kwargs):
         # Typically we want score to be True; however, for debugging purposes it
@@ -193,11 +220,11 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin):
         CR
             (nogo | early) & ~spout
         '''
-        poke_data = self.poke_TTL.get_range_index(ts_start, ts_end,
+        poke_data = self.poke_TTL.get_range_index(ts_start, ts_end+5,
                 check_bounds=True)
-        spout_data = self.spout_TTL.get_range_index(ts_start, ts_end,
+        spout_data = self.spout_TTL.get_range_index(ts_start, ts_end+5,
                 check_bounds=True)
-        react_data = self.reaction_TTL.get_range_index(ts_start, ts_end,
+        react_data = self.reaction_TTL.get_range_index(ts_start, ts_end+5,
                 check_bounds=True)
 
         # Did subject withdraw from nose-poke before or after he was allowed to
@@ -321,32 +348,34 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin):
 
     @cached_property
     def _get_poke_seq(self):
-        return self.resp_seq == 'poke'
+        return self.string_array_equal(self.resp_seq, 'poke')
 
     @cached_property
     def _get_spout_seq(self):
-        return self.resp_seq == 'spout'
+        return self.string_array_equal(self.resp_seq, 'spout')
 
     @cached_property
     def _get_nr_seq(self):
-        return self.resp_seq == 'no response'
+        return self.string_array_equal(self.resp_seq, 'no response')
 
     @cached_property
     def _get_late_seq(self):
-        return self.react_seq == 'late'
+        return self.string_array_equal(self.react_seq, 'late')
 
     @cached_property
     def _get_early_seq(self):
-        return self.react_seq == 'early'
+        return self.string_array_equal(self.react_seq, 'early')
 
     @cached_property
     def _get_normal_seq(self):
-        return self.react_seq == 'normal'
+        return self.string_array_equal(self.react_seq, 'normal')
 
     go_indices   = Property(Array('i'), depends_on='ttype_seq')
     nogo_indices = Property(Array('i'), depends_on='ttype_seq')
-    go_trial_count = Property(Int, store='attribute', depends_on='masked_trial_log')
-    nogo_trial_count = Property(Int, store='attribute', depends_on='masked_trial_log')
+    go_trial_count = Property(Int, store='attribute',
+            depends_on='masked_trial_log')
+    nogo_trial_count = Property(Int, store='attribute',
+            depends_on='masked_trial_log')
 
     def _get_indices(self, ttype):
         if len(self.ttype_seq):
@@ -377,10 +406,9 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin):
     def _get_global_fa_frac(self):
         fa = np.sum(self.fa_seq)
         cr = np.sum(self.cr_seq)
-        try:
-            return fa/(fa+cr)
-        except ZeroDivisionError:
+        if fa+cr == 0:
             return np.nan
+        return fa/(fa+cr)
 
     hit_seq         = Property(depends_on='masked_trial_log')
     miss_seq        = Property(depends_on='masked_trial_log')
@@ -403,6 +431,4 @@ class PositiveData_0_1(AbstractExperimentData, SDTDataMixin):
     @cached_property
     def _get_cr_seq(self):
         return ((self.nogo_seq & self.normal_seq) | self.early_seq) & \
-                ~self.spout_seq
-
-PositiveData = PositiveData_0_1
+                ~self.spout_seq               

@@ -45,6 +45,9 @@ def decimate_extremes(data, downsample):
     return data.min(last_dim), data.max(last_dim)
 
 class ExtremesChannelPlot(ChannelPlot):
+    
+    # Maximum number of screen pixels on either side of a channel to clip
+    pixel_clip      = Int(300)
 
     # Offset of all channels along the value axis
     channel_offset  = Float(0.25e-3)
@@ -113,8 +116,6 @@ class ExtremesChannelPlot(ChannelPlot):
         return self.value_mapper.map_screen(self.offsets)
 
     def _get_screen_points(self):
-        print 'getting points', self._screen_cache_valid
-        print 'cached data', self._cached_data.shape, self.channel_visible
         if not self._screen_cache_valid:
             if self._cached_data.shape[-1] == 0:
                 self._cached_screen_data = [], []
@@ -131,7 +132,6 @@ class ExtremesChannelPlot(ChannelPlot):
         return self._cached_screen_index, self._cached_screen_data
 
     def _compute_screen_points_normal(self):
-        print 'here'
         mapped = self._map_screen(self._cached_data)
         t = self.index_values[:mapped.shape[-1]]
         t_screen = self.index_mapper.map_screen(t)
@@ -145,7 +145,6 @@ class ExtremesChannelPlot(ChannelPlot):
 
     def _compute_screen_points_decimated(self):
         # We cache our prior decimations 
-        print 'getting', self._cached_data.shape
         if self._cached_min is not None:
             n_cached = self._cached_min.shape[-1]*self.dec_factor
             to_decimate = self._cached_data[..., n_cached:]
@@ -161,6 +160,8 @@ class ExtremesChannelPlot(ChannelPlot):
         channels, samples = self._cached_min.shape
         s_val_min = self._map_screen(self._cached_min)
         s_val_max = self._map_screen(self._cached_max)
+        #s_val_min = np.clip(s_val_min, -300, 300, s_val_min)
+        #s_val_max = np.clip(-s_val_max, 300, 300, s_val_max)
         self._cached_screen_data = s_val_min, s_val_max
 
         total_samples = self._cached_data.shape[-1]

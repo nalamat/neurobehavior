@@ -16,29 +16,29 @@ class AbstractAversiveParadigm(AbstractExperimentParadigm):
     signal, or a circuit that is specialized for a specific kind of signal (e.g.
     FM).
     '''
-    # Trait defines a drop-down selector if you provide it with a list of
-    # options
-    prevent_disarm = Bool(True, store='attribute', context=True,
-            label='Prevent disarming of aversive stimulus?')
+
+    kw = {'context': True, 'store': 'attribute', 'log': True}
+
+    prevent_disarm = Bool(True, label='Prevent disarm of aversive?', **kw)
 
     # By default, Range provides a slider as the GUI widget.  Note that you can
     # override the default widget if desired.
-    lick_th = Expression(0.75, label='Contact threshold')
-    aversive_delay = Expression(1, label='Aversive Stimulus Delay (s)')
-    aversive_duration = Expression(0.3, label='Aversive Stimulus Duration (s)')
-    trial_duration = Expression(1.0, label='Trial duration (s)') 
+    lick_th = Expression(0.75, label='Contact threshold', **kw)
+    aversive_delay = Expression(1, label='Aversive delay (s)', **kw)
+    aversive_duration = Expression(0.3, label='Aversive duration (s)', **kw)
+    trial_duration = Expression(1.0, label='Trial duration (s)', **kw) 
 
     shock_level = Range(0.0, 5.0, 0.5, label='Shock level (mA)', immediate=True,
-            store='attribute')
+            store='attribute', context=True)
 
-    _set_shock_a = Button('Level A', ignore=True)
-    _set_shock_b = Button('Level B', ignore=True)
-    _set_shock_c = Button('Level C',ignore=True)
-    _set_shock_off = Button('Off', ignore=True)
+    _set_shock_a = Button('Level A')
+    _set_shock_b = Button('Level B')
+    _set_shock_c = Button('Level C')
+    _set_shock_off = Button('Off')
 
-    shock_a = Float(2.75, ignore=True, store='attribute')
-    shock_b = Float(1.6, ignore=True, store='attribute')
-    shock_c = Float(0.5, ignore=True, store='attribute')
+    shock_a = Float(2.75, store='attribute')
+    shock_b = Float(1.6, store='attribute')
+    shock_c = Float(0.5, store='attribute')
 
     def __set_shock_a_fired(self):
         self.shock_level = self.shock_a
@@ -55,32 +55,12 @@ class AbstractAversiveParadigm(AbstractExperimentParadigm):
     #===========================================================================
     # The views available
     #===========================================================================
-    par_group = VGroup(
-            # Use the attribute called 'par_remind' and give it a label of
-            # 'Remind Parameter' in the GUI.  Create the appropriate widget for
-            # the "type" of the attribute.  
-            Item('remind', style='custom', label='Remind'),
-            Item('safe', style='custom', label='Safe'),
-            VGroup(
-                Item('order', label='Order'),
-                HGroup(Item('warn_sequence', show_label=False)),
-                show_border=True, 
-                label='Warn'
-                ),
-            show_border=True, 
-            label='Signal Parameters')
-
-    trial_group = VGroup(
-            Item('num_safe', label='Number of safe trials'),
-            Item('trial_duration', label='Trial duration (s)'),
-            )
 
     timing_group = VGroup(
-            trial_group, 
             'prevent_disarm',
+            'trial_duration',
             'aversive_delay',
             'aversive_duration',
-            'shock_level',
             'lick_th',
             show_border=True, 
             label='Trial settings',
@@ -94,14 +74,14 @@ class AbstractAversiveParadigm(AbstractExperimentParadigm):
             VGroup('_set_shock_off', show_labels=False),
             ),
         'shock_level',
+        show_border=True,
+        label='Shock settings'
         )
 
-    traits_view = View(
+    abstract_aversive_paradigm_group = VGroup(
+            Include('timing_group'), 
             Include('shock_group'),
-            Tabbed(
-                Include('par_group'), 
-                Include('timing_group'), 
-                Include('signal_group'),
-                ),
-            resizable=True,
-            title='Aversive Paradigm editor')
+            show_labels=False,
+            show_border=True,
+            label='Paradigm',
+            )

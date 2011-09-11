@@ -28,7 +28,8 @@ from .abstract_experiment_data import AbstractExperimentData
 from .constant_limits_paradigm_mixin import ConstantLimitsParadigmMixin
 from .constant_limits_controller_mixin import ConstantLimitsControllerMixin
 from .constant_limits_experiment_mixin import ConstantLimitsExperimentMixin
-from .constant_limits_data_mixin import ConstantLimitsDataMixin
+from .aversive_constant_limits_data_mixin import AversiveConstantLimitsDataMixin
+from .positive_constant_limits_data_mixin import PositiveConstantLimitsDataMixin
 
 # Mixin classes for selecting the next parameter via adaptive method
 from .maximum_likelihood_paradigm_mixin import MaximumLikelihoodParadigmMixin
@@ -45,7 +46,6 @@ from .temporal_integration_paradigm_mixin import TemporalIntegrationParadigmMixi
 from .temporal_integration_controller_mixin import TemporalIntegrationControllerMixin
 from .am_noise_paradigm_mixin import AMNoiseParadigmMixin
 from .positive_am_noise_controller_mixin import PositiveAMNoiseControllerMixin
-
-# FM paradigm
+from .aversive_am_noise_controller_mixin import AversiveAMNoiseControllerMixin
 from .fm_paradigm_mixin import FMParadigmMixin
 from .aversive_fm_controller_mixin import AversiveFMControllerMixin

@@ -37,18 +37,19 @@ class ThresholdOverlay(AbstractOverlay):
         return bounds
     
     def overlay(self, component, gc, view_bounds=None, mode="normal"):
-        if len(self.plot.channel_visible) != 0:
-            with gc:
-                gc.clip_to_rect(component.x, component.y, component.width,
-                                component.height)
-                gc.set_line_width(self.line_width)
-                gc.set_stroke_color(self.line_color_)
-                xlb = component.x
-                xub = component.x+component.width
-                for y in self.th_screen:
-                    gc.move_to(xlb, y)
-                    gc.line_to(xub, y)
-                gc.stroke_path()                
+        if len(self.plot.channel_visible) == 0:
+            return
+        with gc:
+            gc.clip_to_rect(component.x, component.y, component.width,
+                            component.height)
+            gc.set_line_width(self.line_width)
+            gc.set_stroke_color(self.line_color_)
+            xlb = component.x
+            xub = component.x+component.width
+            for y in self.th_screen:
+                gc.move_to(xlb, y)
+                gc.line_to(xub, y)
+            gc.stroke_path()                
                 
     traits_view = View(
         VGroup(

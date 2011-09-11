@@ -5,7 +5,7 @@ from cns.data import persistence
 import logging
 log = logging.getLogger(__name__)
 
-class BadCohortFile(BaseException):
+class BadCohortFile(Exception):
 
     def __init__(self, file):
         self.file = file
@@ -28,7 +28,6 @@ def load_cohort(id, filename):
 def save_cohort(cohort, filename):
     fh = tables.openFile(filename, 'a')
     node = persistence.add_or_update_object(cohort, fh.root)
-    #fh.flush()
     fh.close()
     return node
 
@@ -44,12 +43,7 @@ if __name__ == '__main__':
         a.status_log.append((datetime.date.today(), 'ON WATER'))
         a.status_log.append((datetime.date.today(), 'OFF WATER'))
         a.status_log.append((datetime.date.today(), 'OFF WATER'))
-        #add_or_update_animal(a, file.root)
         c = Cohort(animals=[a], description='Test Cohort')
         add_or_update_object(c, file.root)
-    #cohort = Cohort(animals=[Animal(parents='HH', 
-    #                                birth=datetime.date(2009, 11, 30),
-    #                                identifier='tail')])
-    #file = save_cohort(cohort, file)
     finally: file.close()
     file = tables.openFile('test.h5', 'a')

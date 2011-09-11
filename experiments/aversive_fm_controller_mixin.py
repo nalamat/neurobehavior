@@ -15,23 +15,31 @@ class AversiveFMControllerMixin(HasTraits):
                 src_type='int8', dest_type='int8', block_size=24)
         self.buffer_contact = self.iface_behavior.get_buffer('contact', 'r',
                 src_type='int8', dest_type='float32', block_size=24)
+        self.buffer_spout_start = self.iface_behavior.get_buffer('spout/', 'r',
+                src_type='int32', block_size=1)
+        self.buffer_spout_end = self.iface_behavior.get_buffer('spout\\', 'r',
+                src_type='int32', block_size=1)
 
-    # We are overriding the three signal update methods (remind, warn, safe) to
-    # work with the specific circuit we constructed
-    def update_remind(self):
+    def update_trial(self):
         pass
 
-    def update_warn(self):
-        pass
-
-    def update_safe(self):
+    def update_intertrial(self):
         pass
 
     def set_depth(self, value):
         self.iface_behavior.set_tag('depth', value)
 
     def set_cf(self, value):
-        self.iface_behavior.set_tag('cf', value)
+        coerced_value = self.cal_primary.get_nearest_frequency(value)
+        self.iface_behavior.set_tag('cf', coerced_value)
+        mesg = 'Coercing {} Hz to nearest calibrated frequency of {} Hz'
+        self.notify(mesg.format(value, coerced_value))
+        self.set_current_value('cf', coerced_value)
 
     def set_fm(self, value):
         self.iface_behavior.set_tag('fm', value)
+
+    def set_level(self, value):
+        cf = self.get_current_value('cf')
+        att = self.cal_primary.max_spl(cf)-level
+        self.iface_behavior.set_tag('att_A', att)

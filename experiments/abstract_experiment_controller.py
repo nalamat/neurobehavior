@@ -19,6 +19,7 @@ from cns.widgets.toolbar import ToolBar
 from enthought.savage.traits.ui.svg_button import SVGButton
 from cns.widgets import icons
 
+from PyQt4 import QtGui
 from PyQt4.QtGui import QApplication
 
 from enthought.traits.api import HasTraits, Dict, on_trait_change, Property, \
@@ -26,7 +27,6 @@ from enthought.traits.api import HasTraits, Dict, on_trait_change, Property, \
 
 from .apply_revert_controller_mixin import ApplyRevertControllerMixin
 
-#from PyQt4 import QtGui
 
 import logging
 log = logging.getLogger(__name__)
@@ -34,8 +34,6 @@ log = logging.getLogger(__name__)
 from cns import get_config
 from .utils import get_save_file, load_instance, dump_instance
 
-PARADIGM_ROOT = get_config('PARADIGM_ROOT')
-PARADIGM_WILDCARD = get_config('PARADIGM_WILDCARD')
 
 from physiology_experiment import PhysiologyExperiment
 from physiology_paradigm import PhysiologyParadigm
@@ -200,15 +198,15 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
     current_hw_att1 = Float(0)
     current_hw_att2 = Float(0)
 
-    status = Property(Str, depends_on='state, current_ttype')
+    status = Property(Str, depends_on='state, current_setting')
 
     def _get_status(self):
         if self.state == 'disconnected':
             return 'Error'
         elif self.state == 'halted':
             return 'Halted'
-        elif self.current_ttype is not None:
-            return self.current_ttype.lower().replace('_', ' ')
+        elif self.current_setting is not None:
+            return str(self.current_setting)
         else:
             return ''
     
@@ -220,9 +218,11 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
         # considered rude behavior in programming; however, experiments take
         # priority.
         self.info.ui.control.activateWindow()
-        QApplication.beep()
         if confirm(self.info.ui.control, mesg, 'Error while running') == YES:
             self.stop(self.info)
+
+    def notify(self, message):
+        self.system_tray.showMessage('Neurobehavior notification', message)
 
     def init(self, info):
         try:
@@ -247,16 +247,22 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
                 experiment.edit_traits(handler=handler, parent=None)
                 self.physiology_handler = handler
 
+            # Create a system tray for notification messages.  Using popups do
+            # not seem to work very well.  Either the popups are modal (in which
+            # case they block the program from continuing to run) or they
+            # dissappear below the main window.
+            #self.system_tray = QtGui.QSystemTrayIcon(icon, info.ui.control)
+            from os.path import dirname, join
+            icon_path = join(dirname(__file__), 'psi_uppercase.svg')
+            icon = QtGui.QIcon(icon_path)
+            self.system_tray = QtGui.QSystemTrayIcon()
+            self.system_tray.setIcon(icon)
+            self.system_tray.setVisible(True)
         except Exception, e:
             log.exception(e)
             self.state = 'disconnected'
             error(info.ui.control, str(e))
 
-        # Use this for non-blocking error messages
-        #self.system_tray = QtGui.QSystemTrayIcon(info.ui.control)
-        #self.system_tray.messageClicked.connect(self.message_clicked)
-        #self.system_tray.setVisible(True)
-        
     def close(self, info, is_ok):
         '''
         Prevent user from closing window while an experiment is running since
@@ -289,8 +295,6 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
                 #self.physiology_handler.close(info, True, True)
         return close
 
-    shadow_ = Any
-
     def start(self, info=None):
         '''
         Handles starting an experiment
@@ -313,12 +317,12 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
             # Now that the process is started, we can configure the circuit
             # (e.g. read/write to tags) and gather the information we need to
             # run the experiment.
+            self.initialize_context()
             self.start_experiment(info)
 
             # Save the start time in the model
             self.model.start_time = datetime.now()
             self.timer = Timer(100, self.run_tasks)
-
         except Exception, e:
             if self.state != 'halted':
                 self.stop_experiment(info)
@@ -402,9 +406,6 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
         '''
         raise NotImplementedError
 
-    def set_speaker_mode(self, value):
-        self.current_speaker_mode = value
-
     def set_attenuations(self, att1, att2, check=True):
         # TDT's built-in attenuators for the RZ6 function in 20 dB steps, so we
         # need to determine the next greater step size for the attenuator.  The
@@ -467,10 +468,30 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
         self.model.data.log_event(ts, name, message)
         log.debug("EVENT: %d, %s, %r", ts, name, message)
 
+    # Simplest way to load/save paradigms is via Python's pickle module which
+    # persists the object data to a binary file on disk.  Note that this file
+    # format is specific to Python's pickle module and will not be
+    # human-readable (or Matlab readable unless you want to write the
+    # appropriate converter).
+
     def load_paradigm(self, info):
-        instance = load_instance(PARADIGM_ROOT, PARADIGM_WILDCARD)
-        if instance is not None:
-            self.model.paradigm = instance
+        try:
+            PARADIGM_ROOT = get_config('PARADIGM_ROOT')
+            PARADIGM_WILDCARD = get_config('PARADIGM_WILDCARD')
+            instance = load_instance(PARADIGM_ROOT, PARADIGM_WILDCARD)
+            if instance is not None:
+                self.model.paradigm.copy_traits(instance)
+        except AttributeError:
+            mesg = '''
+            Unable to load paradigm.  This can be due to 1) the
+            paradigm saved in the file being incompatible with the version
+            currently running or 2) the paradigm was saved with an older version
+            of Python's pickle module.'''
+            import textwrap
+            mesg = textwrap.dedent(mesg).replace('\n', ' ').strip()
+            error(self.info.ui.control, mesg)
 
     def saveas_paradigm(self, info):
+        PARADIGM_ROOT = get_config('PARADIGM_ROOT')
+        PARADIGM_WILDCARD = get_config('PARADIGM_WILDCARD')
         dump_instance(self.model.paradigm, PARADIGM_ROOT, PARADIGM_WILDCARD)

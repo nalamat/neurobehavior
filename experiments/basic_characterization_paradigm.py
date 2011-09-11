@@ -1,9 +1,10 @@
 from abstract_experiment_paradigm import AbstractExperimentParadigm
 from enthought.traits.api import Range, Bool, Button, Any
-from enthought.traits.ui.api import View, VGroup, HGroup, Item
+from enthought.traits.ui.api import View, VGroup, HGroup, Item, RangeEditor
 
 class BasicCharacterizationParadigm(AbstractExperimentParadigm):
     
+    commutator_inhibit = Bool(False)
     mute_speakers = Button
     swap_speakers = Button
     _old_speaker_settings = Any(None)
@@ -27,15 +28,15 @@ class BasicCharacterizationParadigm(AbstractExperimentParadigm):
         self.primary_attenuation = secondary
         self.secondary_attenuation = primary
 
-    primary_attenuation     = Range(0, 120, 120, init=True, immediate=True)
-    secondary_attenuation   = Range(0, 120, 120, init=True, immediate=True)
+    primary_attenuation     = Range(0, 120, 120)
+    secondary_attenuation   = Range(0, 120, 120)
 
-    token_duration          = Range(0.01, 10.0, 1.0, init=True, immediate=True)
-    trial_duration          = Range(0.01, 20.0, 2.0, init=True, immediate=True)
-    center_frequency        = Range(100, 50e3, 5e3, init=True, immediate=True)
-    bandwidth_ratio         = Range(0.0, 2, 0.3, init=True, immediate=True)
-    modulation_frequency    = Range(0.0, 100, 5.0, init=True, immediate=True)
-    modulation_depth        = Range(0.0, 1.0, 0.0, init=True, immediate=True)
+    token_duration          = Range(0.01, 10.0, 1.0)
+    trial_duration          = Range(0.01, 20.0, 2.0)
+    center_frequency        = Range(100, 50e3, 5e3)
+    bandwidth_ratio         = Range(0.0, 2, 0.3)
+    modulation_frequency    = Range(0.0, 100, 5.0)
+    modulation_depth        = Range(0.0, 1.0, 0.0)
 
     traits_view = View(
             VGroup(
@@ -45,9 +46,10 @@ class BasicCharacterizationParadigm(AbstractExperimentParadigm):
                     'primary_attenuation',
                     'secondary_attenuation',
                     ),
+                'commutator_inhibit',
                 'trial_duration',
                 'token_duration',
-                'center_frequency',
+                Item('center_frequency'),
                 'bandwidth_ratio',
                 'modulation_frequency',
                 'modulation_depth'

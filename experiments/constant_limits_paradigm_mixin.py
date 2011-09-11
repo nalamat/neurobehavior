@@ -1,5 +1,6 @@
-from enthought.traits.api import HasTraits, Instance, Button, List, Trait, Bool
-from enthought.traits.ui.api import View, VGroup, HGroup, Item
+from enthought.traits.api import (HasTraits, Instance, Button, List, Trait,
+        Bool, Property)
+from enthought.traits.ui.api import View, VGroup, HGroup, Item, Include
 from copy import copy
 
 from cns import choice
@@ -9,68 +10,98 @@ from .evaluate import Expression
 
 class ConstantLimitsParadigmMixin(HasTraits):
 
-    remind_setting = Instance(TrialSetting, (), log=False, container=True,
-            context=True, label='Remind setting')
-    nogo_setting = Instance(TrialSetting, (), log=False, container=True,
-            context=True, label='Nogo setting')
+    editable_nogo = Bool(True)
 
-    go_settings = List(Instance(TrialSetting), container=True, context=True)
-    go_setting_order = Trait('shuffled set', choice.options, context=True,
-            label='Go setting order', log=True)
-    go_probability = Expression('0.5 if c_nogo < 5 else 1', store='attribute',
-            context=True, label='Go probability', log=True)
-    repeat_fa = Bool(True, store='attribute', context=True, 
-            label='Repeat nogo if FA?', log=True)
+    kw = { 'log': False, 'container': True, 'context': True, 'store': 'child' }
 
-    # GUI elements to facilitate adding and removing parameters from the
-    # go settings list.
+    trial_settings = List(Instance(TrialSetting), store='child')
+    remind_setting = Property(Instance(TrialSetting),
+            depends_on='trial_settings', **kw)
+    nogo_setting = Property(Instance(TrialSetting), 
+            depends_on='trial_settings', **kw)
+    go_settings = Property(List(Instance(TrialSetting)),
+            depends_on='trial_settings', **kw)
 
+    kw = { 'log': True, 'context': True, 'store': 'attribute' }
+
+    go_setting_order = Trait('shuffled set', choice.options, 
+            label='Go setting order', **kw)
+    go_probability = Expression('0.5 if c_nogo < 5 else 1', 
+            label='Go probability', **kw)
+    repeat_fa = Bool(True, label='Repeat nogo if FA?', **kw)
+
+    # GUI elements to facilitate adding and removing parameters from the go
+    # settings list.
     _add = Button()
     _remove = Button()
     _sort = Button()
-    _selected_setting = List(Instance(TrialSetting), ignore=True)
+    _selected_setting = List(Instance(TrialSetting), transient=True)
 
-    def _go_settings_default(self):
-        return [TrialSetting()]
+    def _get_nogo_setting(self):
+        if self.editable_nogo:
+            return self.trial_settings[0]
+        else:
+            return TrialSetting('NOGO')
+
+    def _get_remind_setting(self):
+        if self.editable_nogo:
+            return self.trial_settings[1]
+        else:
+            return self.trial_settings[0]
+
+    def _get_go_settings(self):
+        if self.editable_nogo:
+            return self.trial_settings[2:]
+        else:
+            return self.trial_settings[1:]
+
+    def _trial_settings_default(self):
+        if self.editable_nogo:
+            return [TrialSetting('NOGO'), 
+                    TrialSetting('GO_REMIND'),
+                    TrialSetting('GO')]
+        else:
+            return [TrialSetting('GO_REMIND'),
+                    TrialSetting('GO')]
 
     def __sort_fired(self):
-        self.go_settings.sort()
+        new_list = self.trial_settings[:2]
+        go_trials = self.trial_settings[2:]
+        go_trials.sort()
+        new_list.extend(go_trials)
+        self.trial_settings = new_list
     
     def __add_fired(self):
         # If a setting is selected, let's assume that the user wishes to
         # duplicate 
         if len(self._selected_setting) != 0:
             for setting in self._selected_setting:
-                new = TrialSetting()
-                new.copy_traits(setting)
-                self.go_settings.append(new)
+                new = setting.clone_traits()
+                new.ttype = 'GO'
+                self.trial_settings.append(new)
         else:
-            self.go_settings.append(TrialSetting())
+            self.trial_settings.append(TrialSetting('GO'))
         
     def __remove_fired(self):
         for setting in self._selected_setting:
-            self.go_settings.remove(setting)
+            if setting not in self.trial_settings[:2]:
+                self.trial_settings.remove(setting)
+        self._selected_setting = []
+
+    cl_trial_setting_group = VGroup(
+            HGroup('_add', '_remove', '_sort', show_labels=False),
+            Item('trial_settings', editor=trial_setting_editor,
+                 show_label=False))
 
     constant_limits_paradigm_mixin_group = VGroup(
         VGroup(
-            HGroup(
-                Item('remind_setting', style='custom', show_label=False),
-                label='Remind', show_border=True,
-                ),
-            HGroup(
-                Item('nogo_setting', style='custom', show_label=False),
-                label='Nogo', show_border=True,
-                ),
             Item('go_probability'),
             Item('go_setting_order'),
             Item('repeat_fa')
             ),
-        VGroup(
-            HGroup('_add', '_remove', '_sort', show_labels=False),
-            Item('go_settings', editor=trial_setting_editor,
-                 show_label=False),                
-            ),
+        Include('cl_trial_setting_group'),
         label='Constant limits',
+        show_border=True,
         )
     
     traits_view = View(constant_limits_paradigm_mixin_group)

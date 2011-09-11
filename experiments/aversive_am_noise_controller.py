@@ -26,6 +26,8 @@ class AversiveAMNoiseController(AbstractAversiveController):
     def set_modulation_frequency(self, value):
         self.modulator.frequency = value
 
+    def set_direction(self, value):
+
     def _compute_signal(self):
         direction = 'positive' if randint(0, 2) else 'negative'
         self.modulator.equalize_direction = direction

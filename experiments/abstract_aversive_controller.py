@@ -1,13 +1,19 @@
-from enthought.traits.api import Property
+from enthought.traits.api import Property, Int
 from cns.pipeline import deinterleave_bits
 from abstract_experiment_controller import AbstractExperimentController
 from cns import get_config
 from os.path import join
+import numpy as np
 
 import logging
 log = logging.getLogger(__name__)
 
 class AbstractAversiveController(AbstractExperimentController):
+
+    # Used to convert timestamp data (which should be stored at the maximum
+    # sampling frequency of the DSP) to the TTL and contact sampling frequency
+    # (critcal for computing lick_offset, etc).
+    fs_conversion = Int
 
     def _setup_shock(self):
         # First, we need to load the circuit we need to control the shocker.
@@ -40,6 +46,10 @@ class AbstractAversiveController(AbstractExperimentController):
                 src_type='int8', dest_type='int8', block_size=24)
         self.buffer_contact = self.iface_behavior.get_buffer('contact', 'r',
                 src_type='int8', dest_type='float32', block_size=24)
+        self.buffer_spout_start = self.iface_behavior.get_buffer('spout/', 'r',
+                src_type='int32', block_size=1)
+        self.buffer_spout_end = self.iface_behavior.get_buffer('spout\\', 'r',
+                src_type='int32', block_size=1)
 
     def _setup_pump(self):
         # Pump will halt when it has infused the requested volume.  To allow it
@@ -50,6 +60,7 @@ class AbstractAversiveController(AbstractExperimentController):
         self.iface_pump.set_trigger(start='rising', stop='falling')
 
     def setup_experiment(self, info):
+        self._setup_pump()
         self._setup_shock()
         self._setup_circuit()
 
@@ -60,6 +71,10 @@ class AbstractAversiveController(AbstractExperimentController):
         self.model.data.shock_running.fs = self.buffer_TTL.fs
         self.model.data.warn_running.fs = self.buffer_TTL.fs
 
+        self.model.data.trial_epoch.fs = self.iface_behavior.fs
+        self.model.data.spout_epoch.fs = self.iface_behavior.fs
+        self.model.data.reaction_ts.fs = self.iface_behavior.fs
+
         # Since several streams of data are compressed into individual bits
         # (which are transmitted to the computer as an 8-bit integer), we need
         # to decompress them (via int_to_TTL) and store them in the appropriate
@@ -69,14 +84,13 @@ class AbstractAversiveController(AbstractExperimentController):
                     self.model.data.shock_running,
                     self.model.data.warn_running, ]
         self.pipeline_TTL = deinterleave_bits(targets)
+        self.fs_conersion = self.iface_behavior.get_tag('TTL_d')
 
         # The buffer for contact_digital_mean does not need any processing, so
         # we just grab it and pass it along to the data buffer.
         self.pipeline_contact = self.model.data.contact_digital_mean
 
     def start_experiment(self, info):
-        self.initialize_context()
-
         # We monitor current_trial_end_ts to determine when a trial is over.
         # Let's grab the current value of trial_end_ts before we do anything
         # else.  If we grab it before starting the circuit, then it may not
@@ -87,13 +101,27 @@ class AbstractAversiveController(AbstractExperimentController):
         # initialize and "settle" before grabbing the relevant values.
         self.current_trial_ts = self.get_trial_end_ts()
 
+        # Sometimes the gerbil will not react until *after* the trial is over,
+        # in which case no new timestamp is stored (the value of the timestamp
+        # will reflect the prior trial).  Hence, we store a copy of the last
+        # reaction timestamp so we can check it with the timestamp of the
+        # current trial.  If it hasn't changed, then we know that the subject
+        # did not react.
+        self.current_react_ts = self.get_reaction_ts()
+
         # We want to start the circuit in the paused state (i.e. playing the
         # intertrial signal but not presenting trials)
         self.pause()
-        self.trigger_next()
-        
         self.tasks.append((self.monitor_pump, 5))
         self.tasks.append((self.monitor_behavior, 1))
+
+        # Since we need to make sure that the pump rate and safe signal are
+        # playing before the animal is put in the cage, we invalidate and
+        # configure the context *now*.  This is in contrast to the appetitive
+        # paradigm where the configuration can wait until trigger_next()
+        self.prepare_next()
+        self.fs_conversion = self.iface_behavior.get_tag('TTL_d')
+        self.process.trigger('A', 'high')
 
     def remind(self, info=None):
         # Pause circuit and see if trial is running. If trial is already
@@ -103,48 +131,69 @@ class AbstractAversiveController(AbstractExperimentController):
         self.remind_requested = True
         self.trigger_next()
 
-    def request_pause(self):
-        self.iface_behavior.trigger(2)
-        return self.get_pause_state()
-
-    def request_resume(self):
-        self.iface_behavior.trigger(3)
-
     def pause(self, info=None):
+        self.iface_behavior.trigger(2)
         self.log_event('pause', True)
         self.state = 'paused'
-        self.iface_behavior.trigger(2)
 
     def resume(self, info=None):
         self.log_event('pause', False)
         self.state = 'running'
-        self.iface_behavior.trigger(3)
         self.trigger_next()
 
     def stop_experiment(self, info=None):
-        self.model.analyzed.mask_mode = 'none'
+        self.model.data.mask_mode = 'none'
+        self.process.trigger('A', 'low')
 
     def monitor_behavior(self):
-        self.update_safe()
+        # Always refresh the intertrial buffer with new data
+        self.update_intertrial()
+
+        # Grab new data
         self.pipeline_TTL.send(self.buffer_TTL.read())
         self.pipeline_contact.send(self.buffer_contact.read())
+        self.model.data.spout_epoch.send(self.get_spout_epochs())
+
+        # Check to see if a trial just completed
         ts_end = self.get_trial_end_ts()
 
         if ts_end > self.current_trial_ts:
             self.current_trial_ts = ts_end
-            ts_start = self.get_trial_start_ts()
-            self.log_trial(
-                    ts_start=ts_start, 
-                    ts_end=ts_end,
-                    ttype=self.current_ttype
-                    )
-            self.trigger_next()
+
+            # Note that the ts_start and ts_end were originally recorded at the
+            # sampling frequency of the TTL data.  However, we now have switched
+            # to sampling ts_start and ts_end at a much higher resolution so we
+            # can better understand the timing of the system.  The high
+            # resolution ts_start and ts_end are stored in the trial_epoch array
+            # in the data file while the low resolution (sampled at the TTL
+            # rate) are stored in the trial log.
+            ts_end = np.floor(ts_end/self.fs_conversion)
+            ts_start = np.floor(self.get_trial_start_ts()/self.fs_conversion)
+            self.log_trial(ts_start=ts_start, ts_end=ts_end)
+
+            self.model.data.trial_epoch.send([self.get_trial_epoch()])
+            react_ts = self.get_reaction_ts()
+            if react_ts == self.current_react_ts:
+                # Subject did not react before end of trial
+                self.model.data.reaction_ts.send([np.nan])
+            else:
+                self.model.data.reaction_ts.send([react_ts])
+                self.current_react_ts = react_ts
+
+            # Only trigger the next trial if the system is running (if someone
+            # presents a manual reminder, then the system will be in the
+            # "paused" state)
+            if self.state == 'running':
+                self.trigger_next()
 
     ############################################################################
     # Code to apply parameter changes.  This is backend-specific.  If you want
     # to implement a new backend, you would subclass this and override the
-    # appropriate set_* methods.
+    # appropriate set_* and get_* methods.
     ############################################################################
+
+    def get_reaction_ts(self):
+        return self.iface_behavior.get_tag('react|')
 
     def get_trial_start_ts(self):
         return self.iface_behavior.get_tag('trial/')
@@ -152,15 +201,16 @@ class AbstractAversiveController(AbstractExperimentController):
     def get_trial_end_ts(self):
         return self.iface_behavior.get_tag('trial\\')
 
+    def get_trial_epoch(self):
+        return (self.get_trial_start_ts(), self.get_trial_end_ts())
+
+    def get_spout_epochs(self):
+        ends = self.buffer_spout_end.read().ravel()
+        starts = self.buffer_spout_start.read(len(ends)).ravel()
+        return zip(starts, ends)
+
     def get_ts(self):
         return self.iface_behavior.get_tag('zTime')
-
-    # Use a function called set_<parameter_name>.  This function will be called
-    # when you change that parameter via the GUI and then click on the Apply
-    # button.  These functions define how the change to the parameter should be
-    # handled.  Variable names come from the attribute in the paradigm (i.e. if
-    # a variable is called "par_seq_foo in the AversiveParadigm class, you would
-    # define a function called "set_par_seq_foo".
 
     def set_prevent_disarm(self, value):
         self.iface_behavior.set_tag('no_disarm', value)
@@ -174,35 +224,22 @@ class AbstractAversiveController(AbstractExperimentController):
     def set_lick_th(self, value):
         self.iface_behavior.set_tag('lick_th', value)
 
-    def set_pause_state(self, value):
-        self.iface_behavior.set_tag('pause_state', value)
-
-    def trigger_next(self):
-        if self.state == 'manual':
-            self.iface_behavior.set_tag('warn?', 1)
-        elif self.current_trial == self.current_num_safe + 1:
-            self.iface_behavior.set_tag('warn?', 1)
-        else:
-            self.iface_behavior.set_tag('warn?', 0)
-        self.iface_behavior.trigger(1)
-
     def set_trial_duration(self, value):
-        self.current_trial_duration = value
         self.iface_behavior.cset_tag('trial_dur_n', value, 's', 'n')
-        # Now that we've changed trial duration, we need to be sure to update
-        # the warn signal.  Since the safe signal is continuously being updated,
-        # we don't need to update that.
 
-    def get_pause_state(self):
-        return self.iface_behavior.get_tag('paused?')
+    def is_warn(self):
+        return self.current_setting.ttype.startswith('GO')
 
-    def set_attenuation(self, value):
-        self.iface_behavior.set_tag('att_A', value)
+    def prepare_next(self):
+        self.invalidate_context()
+        self.current_setting = self.next_setting()
+        self.evaluate_pending_expressions(self.current_setting)
+        self.update_intertrial()
+        self.update_trial()
+        self.iface_behavior.set_tag('warn?', self.is_warn())
 
     def trigger_next(self):
-        self.invalidate_context()
-        self.current_ttype, self.current_setting = self.next_setting()
-        self.evaluate_pending_expressions(self.current_setting)
+        self.prepare_next()
         self.iface_behavior.trigger(1)
 
     def set_shock_level(self, value):
@@ -210,3 +247,19 @@ class AbstractAversiveController(AbstractExperimentController):
         # range.  Divide by 2.0 to convert mA to the corresponding shock level.
         # When set to manual high, use the lower scale to read the meter.
         self.iface_shock.set_tag('shock_level', value/2.0)
+
+    def cancel_trigger(self):
+        self.iface_behavior.trigger(2)
+        return not self.trial_running()
+
+    def trial_running(self):
+        return self.iface_behavior.get_tag('trial_running')
+
+    def _context_updated_fired(self):
+        if self.cancel_trigger():
+            self.prepare_next()
+            if self.state == 'running':
+                self.trigger_next()
+
+    def set_trial_duration(self, value):
+        self.iface_behavior.cset_tag('trial_dur_n', value, 's', 'n')

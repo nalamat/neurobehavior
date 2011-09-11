@@ -37,10 +37,7 @@ class ChannelRangeTool(BaseTool):
         data_0 = self.component.index_mapper.map_data(0)
         data_d = self.component.index_mapper.map_data(delta_screen)
         new_delay = self._start_delay+data_d-data_0
-        #new_delay = self._start_delay + delta_data
-        #print self._start_data_x, event.x, delta_screen, delta_data, self._start_delay, new_delay
         self.component.index_mapper.range.trig_delay = new_delay
-        #print self._start_delay
 
     def zoom_index(self, event):
         if event.mouse_wheel < 0:

@@ -1,6 +1,7 @@
 from cns import get_config
 from enthought.traits.api import HasTraits, Instance, List, Any
-from cns.channel import (FileMultiChannel, FileChannel, FileSnippetChannel)
+from cns.channel import (FileMultiChannel, FileChannel, FileSnippetChannel,
+        FileTimeseries, FileEpoch)
 from cns.data.h5_utils import get_or_append_node
 import numpy as np
 
@@ -12,10 +13,12 @@ class PhysiologyData(HasTraits):
 
     # Raw physiology data
     raw = Instance(FileMultiChannel, store='channel')
+
     # Data after it has been referenced to a differential and band-pass filtered
     processed = Instance(FileMultiChannel, store='channel')
     sweep = Instance(FileChannel, store='channel')
-    ts = Instance('cns.channel.Timeseries', ())
+    ts = Instance(FileTimeseries)
+    epoch = Instance(FileEpoch)
     spikes = List(Instance(FileSnippetChannel))
 
     def _spikes_default(self):
@@ -39,6 +42,8 @@ class PhysiologyData(HasTraits):
         return FileMultiChannel(node=self.store_node, channels=CHANNELS,
                 name='processed', dtype=np.float32)
 
-    #def _ts_default(self):
-    #    return Timeseries(node=self.store_node, name='ts')
+    def _ts_default(self):
+        return FileTimeseries(node=self.store_node, name='ts', dtype=np.int32)
 
+    def _epoch_default(self):
+        return FileEpoch(node=self.store_node, name='epoch', dtype=np.int32)

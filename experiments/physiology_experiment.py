@@ -21,6 +21,7 @@ from cns.chaco_exts.channel_data_range import ChannelDataRange
 from cns.chaco_exts.timeseries_plot import TimeseriesPlot
 from cns.chaco_exts.extremes_channel_plot import ExtremesChannelPlot
 from cns.chaco_exts.ttl_plot import TTLPlot
+from cns.chaco_exts.epoch_plot import EpochPlot
 from cns.chaco_exts.channel_range_tool import MultiChannelRangeTool
 from cns.chaco_exts.channel_number_overlay import ChannelNumberOverlay
 from cns.chaco_exts.snippet_channel_plot import SnippetChannelPlot
@@ -39,6 +40,7 @@ def create_menubar():
     actions = ActionGroup(
             Action(name='Load settings', action='load_settings'),
             Action(name='Save settings as', action='saveas_settings'),
+            Action(name='Restore defaults', action='reset_settings'),
             )
     menu = Menu(actions, name='&Physiology')
     return MenuBar(menu)
@@ -204,7 +206,6 @@ class PhysiologyExperiment(HasTraits):
         self.physiology_window_3 = window
 
     def _channel_changed(self, new):
-        print 'updating channel'
         if new == 'raw':
             self.physiology_plot.channel = self.data.raw
         else:
@@ -230,19 +231,30 @@ class PhysiologyExperiment(HasTraits):
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 reference=0, fill_color=(0.25, 0.41, 0.88, 0.1),
                 line_color='transparent', rect_center=0.5, rect_height=1.0)
-        add_default_grids(plot, major_index=1, minor_index=0.25)
         container.add(plot)
+
+        # Create the epoch plot
+        plot = EpochPlot(series=self.data.epoch, marker='diamond',
+                marker_color=(.5, .5, .5, 1.0), marker_height=0.9,
+                marker_size=10,
+                index_mapper=index_mapper, value_mapper=value_mapper)
+        container.add(plot)
+
+        add_default_grids(plot, major_index=1, minor_index=0.25)
 
         # Hack alert.  Can we separate this out into a separate function?
         if self.parent is not None:
-            self.parent._add_behavior_plots(index_mapper, container)
+            try:
+                self.parent._add_behavior_plots(index_mapper, container)
+            except AttributeError:
+                pass
 
         # Create the neural plots
         value_mapper = LinearMapper(range=self.physiology_value_range)
         plot = ExtremesChannelPlot(channel=self.data.processed, 
                 index_mapper=index_mapper, value_mapper=value_mapper)
-        plot = ExtremesChannelPlot(channel=self.data.raw, 
-                index_mapper=index_mapper, value_mapper=value_mapper)
+        #plot = ExtremesChannelPlot(channel=self.data.raw, 
+        #        index_mapper=index_mapper, value_mapper=value_mapper)
         self.settings.sync_trait('visible_channels', plot, 'channel_visible', mutual=False)
 
         overlay = ChannelNumberOverlay(plot=plot)
@@ -265,11 +277,13 @@ class PhysiologyExperiment(HasTraits):
         self.sync_trait('visualize_spikes', overlay, 'visible')
         plot.overlays.append(overlay)
         self.spike_overlay = overlay
+        
+        # Create the threshold overlay plot
         overlay = ThresholdOverlay(plot=plot, visible=False)
         self.sync_trait('visualize_thresholds', overlay, 'visible')
         self.settings.sync_trait('spike_thresholds', overlay, 'sort_thresholds', mutual=False)
-        self.sync_trait('channel_sort', overlay, 'sort_channels', mutual=False)
         self.settings.sync_trait('spike_signs', overlay, 'sort_signs', mutual=False)
+        self.sync_trait('channel_sort', overlay, 'sort_channels', mutual=False)
         plot.overlays.append(overlay)
         self.threshold_overlay = overlay
 

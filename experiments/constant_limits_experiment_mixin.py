@@ -21,35 +21,14 @@ CHACO_AXES_PADDING = get_config('CHACO_AXES_PADDING')
 
 class ParInfoAdapter(TabularAdapter):
 
-    color_map  = Dict
-    parameters = List
-
-    columns = [ ('P', 'parameter'),
-                ('Hit %', 'hit_frac'), 
-                ('GO/NOGO', 'go_nogo_ratio'),
-                ('GO #', 'go'),
-                ('NOGO #', 'nogo'),
-                ('HIT #', 'hit'),
-                ('MISS #', 'miss'),
-                ('FA #', 'fa'),
-                ('CR #', 'cr'),
-                ('d\'', 'd'),
-                ('C', 'criterion'),
-                (u'WD x\u0304', 'mean_react'),
-                (u'WD x\u0303', 'median_react'),
-                (u'WD \u03C3\u2093', 'std_react'),
-                (u'RS x\u0304', 'mean_resp'),
-                (u'RS x\u0303', 'median_resp'),
-                (u'RS \u03C3\u2093', 'std_resp'),
-                ]
-
-    parameter_text = Property
+    color_map       = Dict
+    parameter_text  = Property
 
     def _get_parameter_text(self):
         return ', '.join('{}'.format(p) for p in self._get_parameters())
 
     def _get_parameters(self):
-        return [self.item[p] for p in self.parameters]
+        return [self.item[p] for p in self.object.parameters]
 
     def _get_bg_color(self):
         try:
@@ -79,52 +58,66 @@ class ConstantLimitsExperimentMixin(HasTraits):
     plot_index          = Str(plot_setting=True)
     plot_group          = List([], plot_setting=True)
     index_scale         = Enum('log', 'linear', plot_setting=True)
-    plot_1_value        = Str('par_go_count', plot_setting=True)
-    plot_2_value        = Str('par_hit_frac', plot_setting=True)
-    plot_3_value        = Str('par_dprime', plot_setting=True)
+    plot_1_value        = Str(plot_setting=True)
+    plot_2_value        = Str(plot_setting=True)
+    plot_3_value        = Str(plot_setting=True)
 
     parameter_info      = Dict
+    available_statistics = Dict
+
+    def _data_changed(self, data):
+        self.plot_1_value = data.PLOT_VALUES[0]
+        self.plot_2_value = data.PLOT_VALUES[1]
+        self.plot_3_value = data.PLOT_VALUES[2]
+
+        stats = []
+        columns = [('Parameter', 'parameter')]
+        for name, trait in data.traits(cl_statistic=True).items():
+            par_info_label = trait.par_info_label
+            if par_info_label is not None:
+                columns.append((trait.abbreviated_label, par_info_label))
+            stats.append((name, trait.label))
+        self.par_info_adapter.columns = columns
+        self.available_statistics = dict(stats)
 
     def _parameter_info_default(self):
-        return self.paradigm.get_parameter_info()
+        traits = self.paradigm.traits(log=True)
+        return dict((name, trait.label) for name, trait in traits.items())
     
-    @on_trait_change('data.parameters')
-    def update_adapter(self, value):
-        self.trial_log_adapter.parameters = value
-        self.par_info_adapter.parameters = value
-
     @on_trait_change('+plot_setting')
     def _generate_summary_plots(self):
-        # Clear the plot data
-        self.color_index = 0
-        self.color_map = {}
-        self.plot_data = {}
-        self.plot_range = { 'pars': DataRange1D() }
-
-        self.plot_1 = self._create_plot_container(self.plot_1_value)
-        self.plot_2 = self._create_plot_container(self.plot_2_value)
-        self.plot_3 = self._create_plot_container(self.plot_3_value)
-        self._update()
+        if self.traits_inited():
+            # Clear the plot data
+            self.color_index = 0
+            self.color_map = {}
+            self.plot_data = {}
+            self.plot_range = { 'pars': DataRange1D() }
+    
+            self.plot_1 = self._create_plot_container(self.plot_1_value)
+            self.plot_2 = self._create_plot_container(self.plot_2_value)
+            self.plot_3 = self._create_plot_container(self.plot_3_value)
+            self._update()
 
     def _create_plot_container(self, value):
         container_class = OverlayPlotContainer
         container_kw = dict(padding=CHACO_AXES_PADDING, spacing=5, bgcolor='white')
-        range_hint = self.data.PLOT_RANGE_HINTS.get(value, {})
-        value_range = DataRange1D(**range_hint)
+        value_trait = self.data.trait(value)
+        range_lb, range_ub = value_trait.expected_range
+        value_range = DataRange1D(low=range_lb, high=range_ub)
         self.plot_range[value] = value_range
         return container_class(**container_kw)
 
     def _add_default_axes_and_grids(self, plot, value):
-        value_title = self.data.available_statistics[value]
-        axis = PlotAxis(plot, orientation='left', title=value_title)
+        value_trait = self.data.trait(value)
+        axis = PlotAxis(plot, orientation='left', title=value_trait.label)
         plot.overlays.append(axis)
         
         index_title = self.paradigm.get_parameter_label(self.data.parameters[-1])
         axis = PlotAxis(plot, orientation='bottom', title=index_title)
         plot.overlays.append(axis)
 
-        grid_kw = self.data.PLOT_GRID_HINTS.get(value, {})
-        add_default_grids(plot, **grid_kw)
+        minor, major = value_trait.suggested_grid
+        add_default_grids(plot, minor_value=minor, major_value=major)
 
     @on_trait_change('data.trial_log')
     def _update(self):
@@ -219,7 +212,7 @@ class ConstantLimitsExperimentMixin(HasTraits):
                 if len(component.components) == 2:
                     self._add_default_axes_and_grids(p, value_name)
 
-    PLOT_VALUE_EDITOR   = EnumEditor(name='object.data.available_statistics')
+    PLOT_VALUE_EDITOR   = EnumEditor(name='available_statistics')
     PLOT_INDEX_EDITOR   = EnumEditor(name='parameter_info')
     PLOT_GROUP_EDITOR   = SetEditor(name='available_group',
                                     left_column_title='Available',

@@ -6,9 +6,9 @@ import datetime
 class Animal(HasTraits):
 
     nyu_id      = Int(store='attribute', label='Animal ID')
-    # Eventually we should switch over to animal_id, but we leave nyu_id
-    # in until experiments using older versions of the file are done
-    # running.
+
+    # Eventually we should switch over to animal_id, but we leave nyu_id in
+    # until experiments using older versions of the file are done running.
     animal_id   = Property(depends_on='nyu_id', store='attribute')
     identifier  = Str(store='attribute')
     sex         = Enum('U', 'M', 'F', store='attribute')
@@ -16,9 +16,8 @@ class Animal(HasTraits):
     parents     = Str(store='attribute')
     age         = Property(Int, depends_on='birth')
 
-    # Defining animal_id as a Property and providing the get/set methods
-    # which update nyu_id effectively makes animal_id an alias for
-    # nyu_id
+    # Defining animal_id as a Property and providing the get/set methods which
+    # update nyu_id effectively makes animal_id an alias for nyu_id
     def _get_animal_id(self):
         return self.nyu_id
     def _get_animal_id(self):
@@ -29,25 +28,25 @@ class Animal(HasTraits):
 
     processed   = Bool(False)
 
-    experiments = Property(List)
+    #experiments = Property(List)
     name        = Property(Str)
 
-    def _get_experiments(self):
-        try:
-            return self._experiments
-        except:
-            try:
-                from cns.data.persistence import get_objects
-                filter = {'_v_name': 'aversive_date*' }
-                exps = get_objects(self.store_node_source,
-                                   self.store_node_path+'/experiments',
-                                   filter=filter,
-                                   child='Data',
-                                   type=Experiment)
-                self._experiments = exps
-                return self._experiments
-            except AttributeError:
-                return []
+    #def _get_experiments(self):
+    #    try:
+    #        return self._experiments
+    #    except:
+    #        try:
+    #            from cns.data.persistence import get_objects
+    #            filter = {'_v_name': 'aversive_date*' }
+    #            exps = get_objects(self.store_node_source,
+    #                               self.store_node_path+'/experiments',
+    #                               filter=filter,
+    #                               child='Data',
+    #                               type=Experiment)
+    #            self._experiments = exps
+    #            return self._experiments
+    #        except AttributeError:
+    #            return []
     
     def _get_age(self):
         if self.birth is None:

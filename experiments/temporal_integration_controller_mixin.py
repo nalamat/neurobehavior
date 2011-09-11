@@ -37,8 +37,14 @@ class TemporalIntegrationControllerMixin(HasTraits):
         self.envelope.rise_time = value
 
     def set_fc(self, value):
-        self.tone_carrier.frequency = value
-        self.noise_carrier.fc = value
+        # Both cal_primary and cal_secondary should (hopefully) have the same
+        # calibrated set of frequencies
+        coerced_value = self.cal_primary.get_nearest_frequency(value)
+        self.tone_carrier.frequency = coerced_value
+        self.noise_carrier.fc = coerced_value
+        mesg = 'Coercing {} Hz to nearest calibrated frequency of {} Hz'
+        self.notify(mesg.format(value, coerced_value))
+        self.set_current_value('fc', coerced_value)
 
     def set_level(self, value):
         self.tone_carrier.level = value

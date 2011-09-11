@@ -1,5 +1,5 @@
 from enthought.traits.api import Instance
-from enthought.traits.ui.api import View, Include, VSplit, VGroup, Item, Include
+from enthought.traits.ui.api import View, Include, VSplit, VGroup, Item
 from enthought.enable.api import Component, ComponentEditor
 from experiments.evaluate import Expression
 
@@ -8,13 +8,13 @@ from experiments import (
         AbstractAversiveController,
         ConstantLimitsControllerMixin, 
         PumpControllerMixin,
-        AversiveFMControllerMixin,
+        AversiveNoiseMaskingControllerMixin,
 
         # Paradigm and mixins
         AbstractAversiveParadigm,
         ConstantLimitsParadigmMixin,
         PumpParadigmMixin,
-        FMParadigmMixin,
+        NoiseMaskingParadigmMixin,
 
         # The experiment
         AbstractAversiveExperiment,
@@ -26,44 +26,25 @@ from experiments import (
         )
 
 class Controller(
-        AversiveFMControllerMixin,
+        AversiveNoiseMaskingControllerMixin,
         ConstantLimitsControllerMixin,
         PumpControllerMixin,
         AbstractAversiveController):
-
-    def initial_setting(self):
-        return self.nogo_setting()
+    pass
 
 class Paradigm(
         AbstractAversiveParadigm, 
         PumpParadigmMixin,
         ConstantLimitsParadigmMixin,
-        FMParadigmMixin,
+        NoiseMaskingParadigmMixin,
         ):
 
-    editable_nogo = False
-    repeat_fa = False
-    go_probability = 'h_uniform(c_safe, 3, 7)'
-
     traits_view = View(
-            VGroup(
-                VGroup(
-                    VGroup(
-                        Item('go_probability', label='Warn probability'),
-                        Item('go_setting_order', label='Warn setting order'),
-                        ),
-                    Include('cl_trial_setting_group'),
-                    label='Constant limits',
-                    show_border=True,
-                    ),
-                Include('abstract_aversive_paradigm_group'),
-                label='Paradigm',
-                ),
-            VGroup(
-                Include('speaker_group'),
-                Include('signal_group'),
-                label='Signal',
-                ),
+            Include('constant_limits_paradigm_mixin_group'),
+            Include('signal_group'),
+            Include('abstract_aversive_paradigm_group'),
+            Include('pump_paradigm_mixin_syringe_group'),
+            Include('speaker_group'),
             )
 
 class Data(AversiveData, AversiveConstantLimitsDataMixin):

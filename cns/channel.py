@@ -138,13 +138,15 @@ class Timeseries(HasTraits):
     t0 = Float(0, attr=True)
 
     def send(self, timestamps):
-        self.append(timestamps.ravel())
-        self.updated = timestamps
+        self.append(timestamps)
+        self.updated = np.array(timestamps)/self.fs
 
     def get_range(self, lb, ub):
-        timestamps = np.array(self._buffer)/self.fs 
-        mask = (timestamps>=lb)&(timestamps<ub)
-        return timestamps[mask]
+        timestamps = self._buffer[:]
+        ilb = int(lb*self.fs)
+        iub = int(ub*self.fs)
+        mask = (timestamps>=ilb) & (timestamps<iub)
+        return timestamps[mask]/self.fs
 
     def latest(self):
         if len(self._buffer) > 0:
@@ -161,8 +163,41 @@ class Timeseries(HasTraits):
 
 class FileTimeseries(FileMixin, Timeseries):
 
-    name  = String('FileTimeseries')
-    dtype = Any(np.int16)
+    name  = 'FileTimeseries'
+    dtype = Any(np.int32)
+
+class Epoch(HasTraits):
+
+    updated = Event
+    fs = Float(attr=True)
+    t0 = Float(0, attr=True)
+
+    def get_range(self, lb, ub):
+        timestamps = self._buffer[:]
+        starts = timestamps[:,0]
+        ends = timestamps[:,1]
+        ilb = int(lb*self.fs)
+        iub = int(ub*self.fs)
+        start_mask = (starts >= ilb) & (starts < iub)
+        end_mask = (ends >= ilb) & (ends < iub)
+        mask = start_mask | end_mask
+        if mask.any():
+            return timestamps[mask,:]/self.fs
+        else:
+            return np.array([]).reshape((0,2))
+
+    def send(self, timestamps):
+        if len(timestamps):
+            self.append(timestamps)
+            self.updated = np.array(timestamps)/self.fs
+
+class FileEpoch(FileMixin, Epoch):
+
+    name  = 'FileEpoch'
+    dtype = Any(np.int32)
+    
+    def _get_shape(self):
+        return (0, 2)
 
 class Channel(HasTraits):
     '''
@@ -342,7 +377,7 @@ class Channel(HasTraits):
         Convenience method that allows us to use a Channel as a "sink" for a
         processing pipeline.
         '''
-        self.write(data)
+        self.write(data.ravel())
 
     def write(self, data):
         '''
@@ -391,7 +426,7 @@ class FileChannel(FileMixin, Channel):
     Use a HDF5 datastore for saving the channel
     '''
 
-    name  = String('FileChannel')
+    name  = 'FileChannel'
     dtype = Any(np.float32)
 
 class RAMChannel(Channel):
@@ -501,6 +536,9 @@ class RAMChannel(Channel):
 class MultiChannel(Channel):
 
     channels = Int(8, attr=True)
+
+    def send(self, data):
+        self.write(data)
 
 class RAMMultiChannel(RAMChannel, MultiChannel):
 

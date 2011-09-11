@@ -6,27 +6,22 @@ from enthought.enable.api import black_color_trait, LineStyle, MarkerTrait
 from enthought.traits.api import Instance, Float, Event, Bool, Enum, \
         on_trait_change, Str
 
-class TimeseriesPlot(ChannelPlot):
+class EpochPlot(ChannelPlot):
     '''
     Designed for efficiently handling time series data stored in a channel.
     Each time a Channel.updated event is fired, the new data is obtained and
     plotted.
     '''
 
-    series              = Instance('cns.channel.Timeseries')
+    series              = Instance('cns.channel.Epoch')
     marker              = MarkerTrait
     marker_size         = Float(4.0)
     marker_color        = black_color_trait
     marker_edge_color   = black_color_trait
     marker_edge_width   = Float(1.0)
     marker_height       = Float(0.5)
-
-    #_data_cache_valid       = Bool(False)
-    #_screen_cache_valid     = Bool(False)
-    ##rect_height             = Float(0.5)
-    ##rect_center             = Float(0.5)
-    ##label                   = Str("Timeseries")
-    ##text_rotation           = Float(np.pi/4)
+    line_color          = black_color_trait
+    line_style          = LineStyle
 
     def _gather_points(self):
         if not self._data_cache_valid:
@@ -57,7 +52,14 @@ class TimeseriesPlot(ChannelPlot):
         gc.set_line_width(self.marker_edge_width) 
         gc.set_line_join(0) # Curved
 
-        gc.draw_marker_at_points(points, self.marker_size,
+        starts = points[:,(0,2)]
+        ends = points[:,(1,2)]
+
+        gc.line_set(starts, ends)
+        gc.stroke_path()
+        gc.draw_marker_at_points(starts, self.marker_size,
+                self.marker_.kiva_marker)
+        gc.draw_marker_at_points(ends, self.marker_size,
                 self.marker_.kiva_marker)
 
         self._draw_default_axes(gc)
