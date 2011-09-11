@@ -21,7 +21,7 @@ from experiments import (
 
         # Data
         PositiveData,
-        ConstantLimitsDataMixin
+        PositiveConstantLimitsDataMixin
         )
 
 class Controller(
@@ -39,14 +39,20 @@ class Paradigm(
         ):
 
     traits_view = View(
-            Include('constant_limits_paradigm_mixin_group'),
-            Include('abstract_positive_paradigm_group'),
-            Include('speaker_group'),
-            Include('am_noise_group'),
-            Include('pump_paradigm_mixin_syringe_group'),
+            VGroup(
+                Include('constant_limits_paradigm_mixin_group'),
+                Include('abstract_positive_paradigm_group'),
+                Include('pump_paradigm_mixin_syringe_group'),
+                label='Paradigm',
+                ),
+            VGroup(
+                Include('speaker_group'),
+                Include('signal_group'),
+                label='Sound',
+                ),
             )
 
-class Data(PositiveData, ConstantLimitsDataMixin): pass
+class Data(PositiveData, PositiveConstantLimitsDataMixin): pass
 
 class Experiment(AbstractPositiveExperiment, ConstantLimitsExperimentMixin):
 

@@ -17,7 +17,8 @@ class PositiveAMNoiseControllerMixin(HasTraits):
         self.output_secondary.equalize = value
     
     def set_level(self, value):
-        self.carrier.level = value
+        self.noise_carrier.level = value
+        self.tone_carrier.level = value
     
     def _tone_carrier_default(self):
         return blocks.Tone(frequency=2e3)
@@ -69,18 +70,14 @@ class PositiveAMNoiseControllerMixin(HasTraits):
     def set_modulation_depth(self, value):
         self.modulator.depth = value
 
-    def set_duration(self, value):
+    def set_trial_duration(self, value):
         self.envelope.duration = value
         self.output_primary.duration = value
         self.output_secondary.duration = value
-        self.current_duration = value
         self.iface_behavior.cset_tag('signal_dur_n', value, 's', 'n')
 
     def set_fm(self, value):
         self.modulator.frequency = value
-
-    def set_nogo_parameter(self, value):
-        self.current_nogo_parameter = value
 
     def set_rp(self, value):
         self.noise_carrier.rp = value
@@ -90,8 +87,3 @@ class PositiveAMNoiseControllerMixin(HasTraits):
 
     def set_order(self, value):
         self.noise_carrier.order = value
-        
-    def _compute_signal(self):
-        self.envelope.duration = self.current_duration
-        self.output.duration = self.current_duration
-        return self.output.realize()

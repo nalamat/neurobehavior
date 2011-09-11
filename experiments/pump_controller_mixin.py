@@ -15,22 +15,15 @@ class PumpToolBar(ToolBar):
     '''
 
     kw               = dict(height=20, width=20, action=True)
-    pump_increase    = SVGButton(filename=icons.up, tooltip='Increase rate',
-                                 **kw)
-    pump_decrease    = SVGButton(filename=icons.down, 
-                                 tooltip='Decrease rate',**kw)
-    pump_override    = SVGButton(filename=icons.right2, 
+    pump_override    = SVGButton('Run', filename=icons.right2, 
                                  tooltip='Override', toggle=True, **kw)
-    pump_initialize  = SVGButton(filename=icons.start,
-                                 tooltip='Initialize', **kw)
-    pump_shutdown    = SVGButton(filename=icons.stop, tooltip='Shutdown',
-                                 **kw)
+    pump_trigger     = SVGButton('Trigger', filename=icons.start,
+                                 tooltip='Trigger', **kw)
     item_kw          = dict()
 
     traits_view = View(
             HGroup(Item('pump_override', **item_kw),
-                   Item('pump_increase', **item_kw),
-                   Item('pump_decrease', **item_kw),
+                   Item('pump_trigger', **item_kw),
                    enabled_when="object.handler.state<>'halted'",
                    show_labels=False,
                    ),
@@ -49,6 +42,9 @@ class PumpControllerMixin(HasTraits):
         ts = self.get_ts()
         self.model.data.log_water(ts, infused)
 
+    def pump_trigger(self, info):
+        self.iface_pump.run()
+
     def pump_override(self, info):
         if not self.pump_toggle:
             self.pump_trigger_cache = self.iface_pump.get_trigger()
@@ -63,39 +59,25 @@ class PumpControllerMixin(HasTraits):
             self.iface_pump.set_volume(self.pump_volume_cache)
             self.pump_toggle = False
 
-    def pump_increase(self, info):
-        rate = self.iface_pump.get_rate(unit='ml/min') 
-        rate += self.current_pump_rate_delta
-        self.model.paradigm.pump_rate = rate
-        self.apply_change(self.model.paradigm, 'pump_rate', new_rate)
-        del self.pending_changes[self.model.paradigm, 'pump_rate']
-        del self.old_values[self.model.paradigm, 'pump_rate']
-
-    def pump_decrease(self, info):
-        rate = self.iface_pump.get_rate(unit='ml/min') 
-        rate -= self.current_pump_rate_delta
-        self.model.paradigm.pump_rate = new_rate
-        self.apply_change(self.model.paradigm, 'pump_rate', new_rate)
-        del self.pending_changes[self.model.paradigm, 'pump_rate']
-        del self.old_values[self.model.paradigm, 'pump_rate']
-
     def set_pump_volume(self, value):
-        while self.iface_pump.get_status() != 'halted':
-            pass
+        self.iface_pump.pause()
         self.iface_pump.set_volume(value, unit='ul')
+        self.iface_pump.resume()
 
     def set_pump_rate(self, value):
-        while self.iface_pump.get_status() != 'halted':
-            pass
+        self.iface_pump.pause()
         self.iface_pump.set_rate(value, unit='ml/min')
+        self.iface_pump.resume()
 
     def set_pump_syringe_diameter(self, value):
-        while self.iface_pump.get_status() != 'halted':
-            pass
+        self.iface_pump.pause()
         self.iface_pump.set_diameter(value, unit='mm')
+        self.iface_pump.resume()
 
     def set_pump_rate_delta(self, value):
+        self.iface_pump.pause()
         self.current_pump_rate_delta = value
+        self.iface_pump.resume()
 
 if __name__ == '__main__':
     PumpToolBar().configure_traits()

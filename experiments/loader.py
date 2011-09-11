@@ -95,7 +95,7 @@ class ExperimentLauncher(CohortViewHandler):
             # we cannot load the settings for whatever reason, notify the user
             # and fall back to the default settings.
             paradigm_node = get_or_append_node(store_node, 'last_paradigm')
-            paradigm_name = get_experiment(self.args.type)['node_name']
+            paradigm_name = get_experiment(self.args.type).node_name
             paradigm_hash = paradigm_name + '_' + '_'.join(self.args.rove)
 
             paradigm = self.load_paradigm(info, paradigm_node, paradigm_hash)
@@ -164,7 +164,7 @@ def prepare_experiment(args, store_node):
 
     # Configure the TrialSetting/trial_setting_editor objects to contain the
     # parameters we wish to control in the experiment
-    trial_setting.add_parameters(args.rove, paradigm_class)
+    trial_setting.add_parameters(args.rove, paradigm_class, args.repeats)
 
     # Load the calibration data
     from neurogen.calibration import Calibration, EqualizedCalibration

@@ -13,14 +13,11 @@ class TemporalIntegrationParadigmMixin(HasTraits):
     duration = Expression(0.512, label='Duration (s)', **kw)
 
     temporal_integration_group = VGroup(
-            VGroup(
-                'duration',
-                'rise_fall_time',
-                'fc',
-                'bandwidth',
-                'level',
-                label='Signal',
-                show_border=True,
-                ),
-            label='Sound',
+            'duration',
+            'rise_fall_time',
+            'fc',
+            'bandwidth',
+            'level',
+            label='Signal',
+            show_border=True,
             )

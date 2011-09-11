@@ -1,3 +1,5 @@
+from __future__ import division
+
 import ast
 import numpy as np
 from enthought.traits.ui.api import (TextEditor, View, Item, BooleanEditor,
@@ -19,8 +21,7 @@ Available attributes for evaluating experiment parameters.
         Draw sample from exponential distribution with scale parameter (i.e.
         :math:`\\beta')
     clip(value, lb, ub)
-        Ensure value falls within
-        
+        Ensure value falls within bounds
     '''
 
 class EvaluationError(NameError): pass
@@ -31,6 +32,28 @@ def choice(sequence):
 
 def random_speaker(bias=0.5):
     return 'primary' if np.random.uniform() <= bias else 'secondary'
+
+def h_uniform(x, lb, ub):
+    '''
+    Assuming a uniform distribution, return the probability of an event occuring
+    at that given sample (i.e. the hazard probability).
+
+    >>> h_uniform(0, 3, 7)
+    0.0
+    >>> h_uniform(3, 3, 7)
+    0.25
+    >>> h_uniform(4, 3, 7)
+    0.3333333333333333
+    >>> h_uniform(6, 3, 7)
+    1.0
+    >>> h_uniform(7, 3, 7)
+    1.0
+    '''
+    if x < lb:
+        return 0.0
+    if x >= ub:
+        return 1.0
+    return 1.0/(ub-x)
 
 def get_dependencies(string):
     '''
@@ -67,6 +90,7 @@ class ParameterExpression(object):
             'choice':           choice,
             'toss':             lambda x: np.random.uniform() <= x,
             'random_speaker':   random_speaker,
+            'h_uniform':        h_uniform,
             }
 
     def __init__(self, value):
@@ -204,7 +228,10 @@ class Expression(TraitType):
     def validate(self, object, name, value):
         if isinstance(value, ParameterExpression):
             return value
-        self.error(object, name, value)
+        try:
+            return ParameterExpression(value)
+        except:
+            self.error(object, name, value)
 
     def create_editor(self):
         return ExpressionEditor()
@@ -256,10 +283,14 @@ class TestExpressions(unittest.TestCase):
         b = ParameterExpression('a+b')
         self.assertEqual(a, b)
 
+    def test_assignment(self):
+        obj = TestTraits()
+        obj.a = 'a+5'
+
 from enthought.traits.api import HasTraits, on_trait_change
 class TestTraits(HasTraits):
      
-    a = Instance(ParameterExpression, ('a+4',))
+    a = Expression('a+4')
 
     @on_trait_change('a')
     def print_change(self):
@@ -272,13 +303,11 @@ if __name__ == '__main__':
     #context = {}
     #evaluate_expressions(parameters, context)
     #print parameters, context
-    #import doctest
-    #doctest.testmod()
-    #unittest.main()
-    t = TestTraits()
-    print 'assinging'
-    t.a = ParameterExpression('b+4')
-    print 'assinging'
-    t.a = ParameterExpression('b+4')
-    print 'assinging'
-    t.a = ParameterExpression('b+4')
+    import doctest
+    doctest.testmod()
+    unittest.main()
+    #t = TestTraits()
+    #t.a = ParameterExpression('b+4')
+    #t.a = ParameterExpression('b+4')
+    #t.a = ParameterExpression('b+4')
+    #t.a = 'b+4'

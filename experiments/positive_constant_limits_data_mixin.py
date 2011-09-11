@@ -5,7 +5,7 @@ from scipy import stats
 from enthought.traits.api import (HasTraits, Property, cached_property,
         on_trait_change, List, Float)
 
-class ConstantLimitsDataMixin(HasTraits):
+class PositiveConstantLimitsDataMixin(HasTraits):
 
     par_go_mask     = Property(depends_on='masked_trial_log, parameters')
 
@@ -13,8 +13,61 @@ class ConstantLimitsDataMixin(HasTraits):
     def _get_par_go_mask(self):
         return [self.go_seq & m for m in self.par_mask]
 
-    par_go_count    = Property(depends_on='masked_trial_log, parameters')
-    par_nogo_count  = Property(depends_on='masked_trial_log, parameters')
+    par_go_count    = Property(depends_on='masked_trial_log, parameters',
+                               cl_statistic=True,
+                               par_info_label='go',
+                               abbreviated_label='Go #',
+                               label='Go count',
+                               expected_range=(0, 'auto'),
+                               suggested_grid=(1, 5))
+
+    par_nogo_count  = Property(depends_on='masked_trial_log, parameters',
+                               cl_statistic=True,
+                               par_info_label='nogo',
+                               abbreviated_label='Nogo #',
+                               label='Nogo count',
+                               expected_range=(0, 'auto'),
+                               suggested_grid=(1, 5))
+
+    par_hit_count   = Property(depends_on='masked_trial_log, parameters',
+                               cl_statistic=True,
+                               par_info_label='hit',
+                               abbreviated_label='Hit #',
+                               label='Hit count',
+                               expected_range=(0, 'auto'),
+                               suggested_grid=(1, 5))
+
+    par_miss_count  = Property(depends_on='masked_trial_log, parameters',
+                               cl_statistic=True,
+                               par_info_label='miss',
+                               abbreviated_label='Miss #',
+                               label='Miss count',
+                               expected_range=(0, 'auto'),
+                               suggested_grid=(1, 5))
+
+    par_fa_count    = Property(depends_on='masked_trial_log, parameters',
+                               cl_statistic=True,
+                               par_info_label='fa',
+                               abbreviated_label='FA #',
+                               label='False alarm count',
+                               expected_range=(0, 'auto'),
+                               suggested_grid=(1, 5))
+
+    par_cr_count    = Property(depends_on='masked_trial_log, parameters',
+                               cl_statistic=True,
+                               par_info_label='cr',
+                               abbreviated_label='CR #',
+                               label='Correct reject count',
+                               expected_range=(0, 'auto'),
+                               suggested_grid=(1, 5))
+
+    par_hit_frac    = Property(depends_on='masked_trial_log, parameters',
+                               cl_statistic=True,
+                               par_info_label='hit_frac',
+                               abbreviated_label='Hit %',
+                               label='Hit fraction',
+                               expected_range=(0, 1),
+                               suggested_grid=(0.05, 0.2))
 
     @cached_property
     def _get_par_go_count(self):
@@ -23,11 +76,6 @@ class ConstantLimitsDataMixin(HasTraits):
     @cached_property
     def _get_par_nogo_count(self):
         return self.par_fa_count+self.par_cr_count
-
-    par_hit_count   = Property(depends_on='masked_trial_log, parameters')
-    par_miss_count  = Property(depends_on='masked_trial_log, parameters')
-    par_fa_count    = Property(depends_on='masked_trial_log, parameters')
-    par_cr_count    = Property(depends_on='masked_trial_log, parameters')
 
     @cached_property
     def _get_par_hit_count(self):
@@ -44,8 +92,6 @@ class ConstantLimitsDataMixin(HasTraits):
     @cached_property
     def _get_par_cr_count(self):
         return self.apply_par_mask(np.sum, self.cr_seq)
-
-    par_hit_frac = Property(List(Float), depends_on='masked_trial_log, parameters')
 
     @cached_property
     def _get_par_hit_frac(self):
@@ -119,44 +165,4 @@ class ConstantLimitsDataMixin(HasTraits):
             data[parameter] = [p[i] for p in self.pars]
         return np.rec.fromarrays(data.values(), names=data.keys())
 
-    available_statistics = {
-            'par_cr_count': 'Correct rejects',
-            'par_fa_count': 'False alarms',
-            'par_hit_count': 'Hits',
-            'par_miss_count': 'Misses',
-            'par_go_count': 'GO trials',
-            'par_nogo_count': 'NOGO trials',
-            'par_dprime': 'd\'',
-            'par_criterion': 'C',
-            'par_hit_frac': 'Hit fraction',
-            'par_mean_reaction_time': 'Mean reaction time',
-            'par_mean_response_time': 'Mean response time',
-            }
-
-    PLOT_RANGE_HINTS = {
-                'par_cr_count'      : {'low_setting': 0, 'high_setting': 'auto'},
-                'par_fa_count'      : {'low_setting': 0, 'high_setting': 'auto'},
-                'par_hit_count'     : {'low_setting': 0, 'high_setting': 'auto'},
-                'par_miss_count'    : {'low_setting': 0, 'high_setting': 'auto'},
-                'par_go_count'      : {'low_setting': 0, 'high_setting': 'auto'},
-                'par_nogo_count'    : {'low_setting': 0, 'high_setting': 'auto'},
-                'par_dprime'        : {'low_setting': -1, 'high_setting': 3},
-                'par_criterion'     : {'low_setting': -2, 'high_setting': 2},
-                'par_hit_frac'      : {'low_setting': 0, 'high_setting': 1},
-                'par_mean_reaction_time': {'low_setting': 0, 'high_setting': 'auto'},
-                'par_mean_response_time': {'low_setting': 0, 'high_setting': 'auto'},
-                }
-
-    PLOT_GRID_HINTS = {
-                'par_cr_count'      : {'major_value': 5, 'minor_value': 1},
-                'par_fa_count'      : {'major_value': 5, 'minor_value': 1},
-                'par_hit_count'     : {'major_value': 5, 'minor_value': 1},
-                'par_miss_count'    : {'major_value': 5, 'minor_value': 1},
-                'par_go_count'      : {'major_value': 5, 'minor_value': 1},
-                'par_nogo_count'    : {'major_value': 5, 'minor_value': 1},
-                'par_dprime'        : {'major_value': 1, 'minor_value': 0.25},
-                'par_criterion'     : {},
-                'par_hit_frac'      : {'major_value': 0.2, 'minor_value': 0.05},
-                'par_mean_reaction_time': {'major_value': 1, 'minor_value': 0.025},
-                'par_mean_response_time': {'major_value': 1, 'minor_value': 0.025},
-                }
+    PLOT_VALUES = ('par_go_count', 'par_hit_frac', 'par_dprime')

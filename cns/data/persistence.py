@@ -9,6 +9,8 @@ import datetime
 import logging
 log = logging.getLogger(__name__)
 
+LIST_TYPES = type(()), type([])
+
 def next_id(element, name=''):
     try: 
         next_id = element._f_getAttr(name+'_NEXT_ID')
@@ -17,9 +19,6 @@ def next_id(element, name=''):
     log.debug("Storing next ID for %s in %s", name, element)
     element._f_setAttr(name+'_NEXT_ID', next_id + 1)
     return next_id
-
-#def get_np_dtype(trait):
-#    return dtype(zip(trait.col_names, trait.col_types))
 
 def get_traits(object, filter_readonly=False, filter_events=True, **metadata):
     '''
@@ -52,6 +51,11 @@ def store_attribute(node, object, name, trait):
         # that way instead.  It avoids cross-platform inconsistencies with the
         # POSIX timestamps.
         value = strftime(value)
+
+    # TODO: Hack alert!!!
+    if value.__class__.__name__ == 'ParameterExpression':
+        value = str(value)
+        log.debug('Converting ParameterExpression to string %s', value)
     node._f_setAttr(name, value)
 
 def store_array(node, object, name, trait):
@@ -85,19 +89,19 @@ def store_table(node, object, name, trait):
         table.truncate(0)
         table.append(value)
     except tables.NoSuchNodeError:
-        table = node._v_file.createTable(node._v_pathname, name, value)
+        if len(value) != 0:
+            table = node._v_file.createTable(node._v_pathname, name, value)
 
 def store_child(node, object, name, trait):
     value = getattr(object, name)
-
     try: 
         group_node = getattr(node, name)
     except tables.NoSuchNodeError:
         object_path = node._v_pathname
         group_node = node._v_file.createGroup(object_path, name)
-
-    if hasattr(value, '__iter__'): 
-        # This is a list of items
+    if trait.is_trait_type(List):
+        value = value[:]
+    if type(value) in LIST_TYPES:
         group_children = []
         for i, v in enumerate(value):
             log.debug("Adding or updating %s", v)
@@ -246,14 +250,6 @@ def guess_datetime_fmt(datetime_val):
         fmt = date_fmt
     return fmt
 
-#def strptime_arr(value, resolution=None):
-#    if len(value) == 0:
-#        return value
-#    if resolution is None:
-#        resolution = guess_str_resolution(value[0])
-#    fmt = get_date_fmt(resolution)
-#    return [datetime.datetime.strptime(v, fmt) for v in value]
-
 def strptime(value, resolution=None):
     if value is None or value == 'None':
         return None
@@ -266,7 +262,6 @@ def strptime(value, resolution=None):
     else:
         return value_datetime
 
-
 def strftime(value, resolution=None):
     if value is None:
         return 'None'
@@ -275,7 +270,6 @@ def strftime(value, resolution=None):
     else:
         fmt = get_date_fmt(resolution)
     return value.strftime(fmt)
-
 
 def append_metadata(obj, source):
     from os.path import abspath
@@ -473,7 +467,6 @@ def load_object(source, path=None, type=None):
                ('child', load_child),
                ('table', load_table),
                ('attribute', load_attribute),
-               ('parameter', load_parameter),
               )
 
     for mode, load in loaders:

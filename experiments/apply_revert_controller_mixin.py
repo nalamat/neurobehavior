@@ -31,6 +31,7 @@ class ApplyRevertControllerMixin(HasTraits):
     
     The function must have the following signature set_parameter_name(self, value)
     '''
+    trigger_requested = Bool(True)
 
     pending_changes = Bool(False)
     shadow_paradigm = Any
@@ -39,17 +40,24 @@ class ApplyRevertControllerMixin(HasTraits):
     context_labels = Dict
     context_log = Dict
     old_context = Dict
+    context_updated = Event
 
     # List of name, value, label tuples (used for displaying in the GUI)
     current_context_list = List
 
     @on_trait_change('model.paradigm.+container*.+context')
     def handle_change(self, instance, name, old, new):
-        print 'detected change', instance, name
         # When a paradigm value has changed while the experiment is running,
         # indicate that changes are pending
-        if self.state != 'halted':
-            log.debug('Detected change to %s', name)
+        if self.state == 'halted':
+            return
+
+        log.debug('Detected change to %s', name)
+        trait = instance.trait(name)
+        if trait.immediate:
+            print instance, name, old, new
+            self.set_current_value(name, new)
+        else:
             self.pending_changes = True
 
     def invalidate_context(self):
@@ -82,10 +90,8 @@ class ApplyRevertControllerMixin(HasTraits):
             # changes over.  We'll apply them as well if a trial is not
             # currently running.
             self.shadow_paradigm.copy_traits(self.model.paradigm)
-            if self.request_pause():
-                self.trigger_next()
-                self.request_resume()
             self.pending_changes = False
+            self.context_updated = True
         except Exception, e:
             # A problem occured when attempting to apply the context. 
             # the changes and notify the user.  Hopefully we never reach this
@@ -105,9 +111,15 @@ class ApplyRevertControllerMixin(HasTraits):
         Revert GUI fields to original values
         '''
         log.debug('Reverting requested changes')
-        self.model.paradigm = self.shadow_paradigm.clone_traits()
+        #self.model.paradigm = self.shadow_paradigm.clone_traits()
+        self.model.paradigm.copy_traits(self.shadow_paradigm)
         self.pending_changes = False
-    
+
+    def value_changed(self, name): 
+        new_value = self.get_current_value(name)
+        old_value = self.old_context.get(name, None)
+        return new_value != old_value
+
     def get_current_value(self, name):
         '''
         Get the current value of a context variable.  If the context variable
@@ -120,6 +132,9 @@ class ApplyRevertControllerMixin(HasTraits):
         except:
             evaluate_value(name, self.pending_expressions, self.current_context)
             return self.current_context[name]
+
+    def set_current_value(self, name, value):
+        self.current_context[name] = value
 
     def evaluate_pending_expressions(self, extra_context=None):
         '''
@@ -142,24 +157,19 @@ class ApplyRevertControllerMixin(HasTraits):
         Automatically apply changes as expressions are evaluated and their
         result added to the context
         '''
-        for name, value in event.added.items():
-            log.debug('Change detected to context variable %s', name)
+        names = event.added.keys()
+        names.extend(event.changed.keys())
+        for name in names:
             old_value = self.old_context.get(name, None)
-            if self.old_context.get(name, None) != value:
-                self._apply_context_value(name, value)
-        for name, value in event.changed.items():
-            log.debug('Change detected to context variable %s', name)
-            if self.old_context.get(name, None) != value:
-                self._apply_context_value(name, value)
-
-    def _apply_context_value(self, name, value):
-        try:
-            mesg = 'changed from {} to {}'.format(name, old_value, value)
-            self.log_event(name, mesg)
-            getattr(self, 'set_{}'.format(name))(value)
-            log.debug('Setting %s', name)
-        except AttributeError, e:
-            log.warn(str(e))
+            new_value = self.current_context.get(name)
+            if old_value != new_value:
+                mesg = 'changed {} from {} to {}'
+                log.debug(mesg.format(name, old_value, new_value))
+                try:
+                    getattr(self, 'set_{}'.format(name))(new_value)
+                    log.debug('Setting %s', name)
+                except AttributeError, e:
+                    log.debug(str(e))
 
     @on_trait_change('current_context_items')
     def _update_current_context_list(self):
@@ -168,7 +178,12 @@ class ApplyRevertControllerMixin(HasTraits):
             label = self.context_labels.get(name, '')
             changed = not self.old_context.get(name, None) == value
             log = self.context_log[name]
-            context.append((name, value, label, log, changed))
+            if type(value) in ((type([]), type(()))):
+                str_value = ', '.join('{}'.format(v) for v in value)
+                str_value = '[{}]'.format(str_value)
+            else:
+                str_value = '{}'.format(value)
+            context.append((name, str_value, label, log, changed))
         self.current_context_list = sorted(context)
         
     def initialize_context(self):
@@ -176,4 +191,8 @@ class ApplyRevertControllerMixin(HasTraits):
             for name, trait in instance.traits(context=True).items():
                 self.context_labels[name] = trait.label
                 self.context_log[name] = trait.log
+        # TODO: this is sort of a "hack" to ensure that the appropriate data for
+        # the trial type is included
+        self.context_labels['ttype'] = 'Trial type'
+        self.context_log['ttype'] = True
         self.shadow_paradigm = self.model.paradigm.clone_traits()

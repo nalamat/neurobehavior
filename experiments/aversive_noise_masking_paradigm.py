@@ -5,61 +5,9 @@ from enthought.traits.ui.api import VGroup, Item, TableEditor, ObjectColumn, \
 
 from abstract_aversive_paradigm import AbstractAversiveParadigm
 
-class TrialShockSetting(HasTraits):
-
-    parameter           = Float(store='attribute')
-    shock_level         = Float(store='attribute')
-    traits_view         = View('parameter', 'shock_level')
-
-    def __str__(self):
-        # When you call str(object), it returns a string that can be displayed
-        # in the GUI or command line.  The default string representation of an
-        # object is quite ugly (and uninformative).  We override the __str__
-        # special method to provide a more refined string describing what this
-        # setting is.
-        return "{0} dB SPL @ {1}".format(self.parameter, self.shock_level)
-
-    def __cmp__(self, other):
-        # Lists of Python objects are sorted using the special __cmp__ method.
-        # If you do not provide an implementation of the __cmp__ method, then
-        # sorting your list of settings likely will not work the way you expect!
-        # I believe the default sort order is based on the hash of the object.
-        # Since sorting is used by some of the selectors in cns.choice (e.g. for
-        # ascending or descending sequences), we need to ensure that a list of
-        # instances is sorted the way we want (by parameter).  Luckily, Python
-        # provides a built-in cmp function that can do most of the work for us.
-        # All we have to do is pass the parameter from this object and the
-        # object we are comparing to cmp and return the result.
-        return cmp(self.parameter, other.parameter)
-
-# A "factory" is a callable that returns a new instance.  A callable is
-# essentially something that can be followed by parenthesis, ().  Functions are
-# callables, classses are callables, etc.  When we call the class object,
-# TrialShockSetting (e.g. setting = TrialShockSetting()), we get an instance
-# back.  Hence, TrialShockSetting is a factory.
-table_editor = TableEditor(
-        reorderable=True,       # Can we reorder via the GUI?
-        editable=True,          # Can we edit the contents via the GUI?
-        deletable=True,         # Can we delete items?
-        show_toolbar=True,      
-        row_factory=TrialShockSetting,
-        selection_mode='cell',
-        columns=[
-            ObjectColumn(name='parameter', label='Tone level (dB SPL)',
-                         width=75),
-            ObjectColumn(name='shock_level', label='Shock level', width=75),
-            ]
-        )
-
 class AversiveNoiseMaskingParadigm(AbstractAversiveParadigm):
     # NOTE: Paradigms have no access to the controller, data, or experiment
     # classes!
-
-    # You may override defaults defined in a superclass simply by assigning the
-    # value here.
-    min_safe        = 1
-    max_safe        = 4
-    trial_duration  = 0.5
 
     # The AbstractAversiveParadigm uses a "default" parameter sequence.  We want
     # to include a shock setting, so we override that default.

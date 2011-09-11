@@ -1,12 +1,12 @@
 #!python
 
-import logging
 import os 
 import sys
 from experiments import loader
 import argparse
 import tempfile
 
+import logging
 log = logging.getLogger()
 
 class VerifyUniqueParameters(argparse.Action):
@@ -33,6 +33,9 @@ if __name__ == '__main__':
                         nargs='+', action=VerifyUniqueParameters, default=[])
     parser.add_argument('-a', '--analyze', help='Parameter(s) to analyze',
                         nargs='+', action=VerifyUniqueParameters, default=[])
+    parser.add_argument('--repeats', 
+                        help='Specify number of repeats for each trial setting',
+                        action='store_true', default=False)
 
     group = parser.add_mutually_exclusive_group()
     group.add_argument('-p', '--profile', dest='mode', action='store_const',
@@ -49,6 +52,7 @@ if __name__ == '__main__':
                         default=False)
     parser.add_argument('-s', '--server', help='Hardware server',
                         default='localhost:13013')
+    
     parser.add_argument('-c1', dest='calibration_1',
                         help=CALIBRATION_HELP.format('primary'))
     parser.add_argument('-c2', dest='calibration_2',

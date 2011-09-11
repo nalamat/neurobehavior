@@ -15,7 +15,7 @@ from cns.util.math import rcount
 
 def string_array_equal(a, string):
     if len(a) == 0:
-        return np.array([])
+        return np.array([], dtype='bool')
     else:
         return np.array(a) == string
 

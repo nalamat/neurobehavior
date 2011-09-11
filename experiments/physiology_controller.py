@@ -25,10 +25,10 @@ class PhysiologyController(Controller):
     # collisions if we are using more than one mixin.
     buffer_                 = Any
     iface_physiology        = Any
-    buffer_physiology_raw   = Any
-    buffer_physiology_proc  = Any
-    buffer_physiology_ts    = Any
-    buffer_physiology_ttl   = Any
+    buffer_raw              = Any
+    buffer_proc             = Any
+    buffer_ts               = Any
+    buffer_ttl              = Any
     physiology_ttl_pipeline = Any
     buffer_spikes           = List(Any)
     state                   = Enum('master', 'client')
@@ -69,15 +69,19 @@ class PhysiologyController(Controller):
         self.iface_physiology = self.process.load_circuit(circuit, 'RZ5')
 
         # Initialize the buffers that will be spooling the data
-        self.buffer_physiology_raw = self.iface_physiology.get_buffer('craw',
+        self.buffer_raw = self.iface_physiology.get_buffer('craw',
                 'r', src_type='int16', dest_type='float32', channels=CHANNELS,
                 block_size=1048)
-        self.buffer_physiology_filt = self.iface_physiology.get_buffer('cfilt',
+        self.buffer_filt = self.iface_physiology.get_buffer('cfilt',
                 'r', src_type='int16', dest_type='float32', channels=CHANNELS,
                 block_size=1048)
-        self.buffer_physiology_ts = self.iface_physiology.get_buffer('trig/',
+        self.buffer_ts = self.iface_physiology.get_buffer('trig/',
                 'r', src_type='int32', dest_type='int32', block_size=1)
-        self.buffer_physiology_ttl = self.iface_physiology.get_buffer('TTL',
+        self.buffer_ts_start = self.iface_physiology.get_buffer('trig/', 
+                'r', src_type='int32', dest_type='int32', block_size=1)
+        self.buffer_ts_end = self.iface_physiology.get_buffer('trig\\', 
+                'r', src_type='int32', dest_type='int32', block_size=1)
+        self.buffer_ttl = self.iface_physiology.get_buffer('TTL',
                 'r', src_type='int8', dest_type='int8', block_size=1)
 
         for i in range(CHANNELS):
@@ -94,10 +98,11 @@ class PhysiologyController(Controller):
             for src, dest in zip(self.buffer_spikes, data_spikes):
                 dest.fs = src.fs
                 dest.snippet_size = SPIKE_SNIPPET_SIZE-2
-        self.model.data.raw.fs = self.buffer_physiology_raw.fs
-        self.model.data.processed.fs = self.buffer_physiology_filt.fs
-        self.model.data.ts.fs = self.buffer_physiology_ts.fs
-        self.model.data.sweep.fs = self.buffer_physiology_ttl.fs
+        self.model.data.raw.fs = self.buffer_raw.fs
+        self.model.data.processed.fs = self.buffer_filt.fs
+        self.model.data.ts.fs = self.iface_physiology.fs
+        self.model.data.epoch.fs = self.iface_physiology.fs
+        self.model.data.sweep.fs = self.buffer_ttl.fs
 
         # Setup the pipeline
         targets = [self.model.data.sweep]
@@ -112,20 +117,24 @@ class PhysiologyController(Controller):
 
     def monitor_physiology(self):
         # Acquire raw physiology data
-        waveform = self.buffer_physiology_raw.read()
+        waveform = self.buffer_raw.read()
         self.model.data.raw.send(waveform)
 
         # Acquire filtered physiology data
-        waveform = self.buffer_physiology_filt.read()
+        waveform = self.buffer_filt.read()
         self.model.data.processed.send(waveform)
 
         # Acquire sweep data
-        ttl = self.buffer_physiology_ttl.read()
+        ttl = self.buffer_ttl.read()
         self.physiology_ttl_pipeline.send(ttl)
 
         # Get the timestamps
-        ts = self.buffer_physiology_ts.read()
+        ts = self.buffer_ts.read().ravel()
         self.model.data.ts.send(ts)
+
+        ends = self.buffer_ts_end.read().ravel()
+        starts = self.buffer_ts_start.read(len(ends)).ravel()
+        self.model.data.epoch.send(zip(starts, ends))
 
         # Get the spikes.  Each channel has a separate buffer for the spikes
         # detected online.
@@ -193,7 +202,7 @@ class PhysiologyController(Controller):
     def set_monitor_gain_4(self, value):
         self.iface_physiology.set_tag('ch4_out_sf', value*1e3)
 
-    @on_trait_change('model:settings:mapped_channels')
+    @on_trait_change('model.settings.mapped_channels')
     def set_mapped_channels(self, value):
         #self.iface_physiology.set_coefficients('ch_map', value)
         pass
@@ -202,24 +211,19 @@ class PhysiologyController(Controller):
     def set_diff_matrix(self, value):
         self.iface_physiology.set_coefficients('diff_map', value.ravel())
 
-    @on_trait_change('model:settings:channel_settings:spike_threshold')
-    def _update_threshold(self, channel, name, old, new):
-        if self.iface_physiology is not None:
-            tag_name = 'a_spike{}'.format(channel.number)
-            self.iface_physiology.set_tag(tag_name, new)
-            
-    @on_trait_change('model:settings:channel_settings:spike_windows')
-    def _update_windows(self, channel, name, old, new):
-        if self.iface_physiology is not None:
-            tag_name = 'c_spike{}'.format(channel.number)
-            self.iface_physiology.set_sort_windows(tag_name, new)
-            #history = len(self.model.data.physiology_spikes[channel].buffer)
-            #self.model.physiology_sort_plot.last_reset = history
+    #@on_trait_change('model.settings.channel_settings.spike_windows')
+    #def _update_windows(self, channel, name, old, new):
+    #    if name != 'model' and self.iface_physiology is not None:
+    #        tag_name = 'c_spike{}'.format(channel.number)
+    #        self.iface_physiology.set_sort_windows(tag_name, new)
         
     def load_settings(self, info):
         instance = load_instance(PHYSIOLOGY_ROOT, PHYSIOLOGY_WILDCARD)
         if instance is not None:
-            self.model.settings = instance
+            self.model.settings.copy_traits(instance)
 
     def saveas_settings(self, info):
         dump_instance(self.model.settings, PHYSIOLOGY_ROOT, PHYSIOLOGY_WILDCARD)
+
+    def reset_settings(self, info):
+        self.model.settings.reset_traits()

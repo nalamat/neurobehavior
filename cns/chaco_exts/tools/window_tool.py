@@ -356,7 +356,8 @@ class WindowTool(AbstractOverlay):
         Implements AbstractOverlay.
         """
         with gc:
-            gc.clip_to_rect(component.x, component.y, component.width-1, component.height-1)
+            c = component
+            gc.clip_to_rect(c.x, c.y, c.width-1, c.height-1)
             for window in self._windows:
                 window.line._draw(gc)
     

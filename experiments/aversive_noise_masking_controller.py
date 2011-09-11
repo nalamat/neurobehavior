@@ -16,25 +16,6 @@ from cns import get_config
 from os.path import join
 
 class AversiveNoiseMaskingController(AbstractAversiveController):
-    # NOTE: Paradigms have access to all the classes (paradigm, data,
-    # experiment, view) via self.model (experiment), self.model.paradigm,
-    # self.model.data, and self.info.ui (view).
-
-    # When the user hits the "Run" button, the paradigm is inspected.  If the
-    # attribute has the metadata init=True, the set_<attribute name> method on
-    # the controller is called with the value of the attribute.  Some set
-    # methods need to change a hardware configuration (e.g. a tag value in the
-    # RCX file, others simply need to store the current value in an attribute on
-    # the controller.  Likewise, these methods are called when the user changes
-    # a value via the GUI (when the experiment is running) and hits the apply
-    # button.
-
-    # At no point should your controller methods query the paradigm object
-    # (available via self.model.paradigm) because the values may reflect changes
-    # to the GUI that have not been applied yet.  If your controller needs a
-    # certain value, store the current (i.e. most recently "applied" value) in
-    # an attribute on the controller.  All of the set methods below follow this
-    # strategy.
 
     def setup_experiment(self, info=None):
         # Handle to the circuit itself.  You need to provide the absolute or
@@ -53,21 +34,6 @@ class AversiveNoiseMaskingController(AbstractAversiveController):
                 src_type='int8', dest_type='int8', block_size=24)
         self.buffer_contact = self.iface_behavior.get_buffer('contact', 'r',
                 src_type='int8', dest_type='float32', block_size=24)
-
-    def set_repeats(self, value):
-        self.current_repeats = value
-
-    def set_masker_duration(self, value):
-        self.current_masker_duration = value
-
-    def set_masker_amplitude(self, value):
-        self.current_masker_amplitude = value
-
-    def set_probe_duration(self, value):
-        self.current_probe_duration = value
-
-    def set_trial_duration(self, value):
-        self.current_trial_duration = value
 
     def update_safe(self):
         waveform = self.compute_waveform(self.current_safe.parameter,
@@ -107,12 +73,6 @@ class AversiveNoiseMaskingController(AbstractAversiveController):
         waveforms = [self.compute_waveform(par, position) \
                      for i in range(repetitions)]
 
-        # Equivalent approach to the above line
-        # waveforms = []
-        # for i in range(repetitions):
-        #     waveform = self.compute_waveform(par, position)
-        #     waveforms.append(waveform)
-
         # Concatenate brings together the list of waveforms into a single
         # waveform.
         waveform = concatenate(waveforms)
@@ -120,16 +80,16 @@ class AversiveNoiseMaskingController(AbstractAversiveController):
         # Buffer is a handle to the trial buffer on the RPvds
         self.buffer_trial.set(waveform)
 
-    def compute_waveform(self, parameter, position=0):
+    def compute_waveform(self, position=0):
         fs = self.iface_behavior.fs
 
         # Let's make local copies of the instance attributes (so the code is
         # more readable)
-        trial_duration = self.current_trial_duration
-        masker_duration = self.current_masker_duration
-        masker_amplitude = self.current_masker_amplitude  # added 3.8.11
-        probe_duration = self.current_probe_duration
-        probe_amplitude = parameter
+        trial_duration = self.get_current_value('trial_duration')
+        masker_duration = self.get_current_value('masker_duration')
+        masker_amplitude = self.get_current_value('masker_amplitude') # added 3.8.11
+        probe_duration = self.get_current_value('probe_duration')
+        probe_amplitude = self.get_current_value('parameter')
 
         # This assumes that the values entered in the GUI are reasonable.  No
         # error-checking is done.
@@ -157,14 +117,12 @@ class AversiveNoiseMaskingController(AbstractAversiveController):
         return waveform
 
     def update_remind(self):
-        repetitions = self.current_repeats
+        reps = self.get_current_value('repeats')
 
         position = random.randint(1, 4)
         self.current_position = position
-        par = self.current_remind.parameter
-        # This is a list comprehension.  We are computing #repetition tokens and
-        # have a list of that size.
-        waveforms = [self.compute_waveform(par, position) for i in range(repetitions)]
+
+        waveforms = [self.compute_waveform(par, position) for i in range(reps)]
         # Concatenate brings together those three (or whatever the nubmer is)
         # into a single waveform.
         waveform = concatenate(waveforms)

@@ -1,5 +1,5 @@
 from enthought.traits.api import Instance
-from enthought.traits.ui.api import View, Include, VSplit, VGroup, Item, Include
+from enthought.traits.ui.api import View, Include, VGroup, Item, Include
 from enthought.enable.api import Component, ComponentEditor
 from experiments.evaluate import Expression
 
@@ -8,13 +8,13 @@ from experiments import (
         AbstractAversiveController,
         ConstantLimitsControllerMixin, 
         PumpControllerMixin,
-        AversiveFMControllerMixin,
+        AversiveAMNoiseControllerMixin,
 
         # Paradigm and mixins
         AbstractAversiveParadigm,
         ConstantLimitsParadigmMixin,
         PumpParadigmMixin,
-        FMParadigmMixin,
+        AMNoiseParadigmMixin,
 
         # The experiment
         AbstractAversiveExperiment,
@@ -26,7 +26,7 @@ from experiments import (
         )
 
 class Controller(
-        AversiveFMControllerMixin,
+        AversiveAMNoiseControllerMixin,
         ConstantLimitsControllerMixin,
         PumpControllerMixin,
         AbstractAversiveController):
@@ -38,12 +38,14 @@ class Paradigm(
         AbstractAversiveParadigm, 
         PumpParadigmMixin,
         ConstantLimitsParadigmMixin,
-        FMParadigmMixin,
+        AMNoiseParadigmMixin,
         ):
 
     editable_nogo = False
     repeat_fa = False
     go_probability = 'h_uniform(c_safe, 3, 7)'
+    modulation_onset = 0.0
+    modulation_direction = 'positive if toss() else negative'
 
     traits_view = View(
             VGroup(

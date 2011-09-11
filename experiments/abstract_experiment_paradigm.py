@@ -58,11 +58,7 @@ class AbstractExperimentParadigm(HasTraits):
             store='attribute', context=True, log=True)
     speaker_equalize = Bool(False, label='Equalize speakers?',
             store='attribute', context=True, log=True)
-    #primary_gain = Float(0, label='Primary gain', store='attribute',
-    #        context=True, log=True)
-    #secondary_gain = Float(0, label='Secondary gain', store='attribute',
-    #        context=True, log=True)
-    fixed_attenuation = Bool(False, label='Fixed hardware attenuation?',
+    fixed_attenuation = Bool(False, label='Fixed attenuation?',
             context=True, log=True)
     expected_speaker_range = List(Instance(SpeakerRange), container=True,
             store='attribute', label='Expected speaker range', context=True)
@@ -109,8 +105,6 @@ class AbstractExperimentParadigm(HasTraits):
     speaker_group = VGroup(
             'speaker',
             'speaker_equalize',
-            #'primary_gain',
-            #'secondary_gain',
             Item('fixed_attenuation'),
             VGroup(
                 HGroup('_add_speaker_range', '_remove_speaker_range', 

@@ -381,14 +381,14 @@ def extract_data(input_files, filters, fields=None):
 
     Once extracted, these records can be indexed by column name and row:
 
-    >>> print data['sex']
+    >>> data['sex']
     ['M', 'M', 'M', 'M', 'M', 'F', 'F', 'F', 'F', 'F']
 
-    >>> print data[:3]['parameter']
+    >>> data[:3]['parameter']
     [parameter_1, parameter_2, parameter_3]
 
     >>> mask = data['parameter'] == parameter_1
-    >>> print data[mask][['id', 'trial_type']]
+    >>> data[mask][['id', 'trial_type']]
     [['Fluffy', trial_type_1],
      ['Tail',   trial_type_1]]
     '''

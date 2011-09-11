@@ -14,9 +14,10 @@ from enthought.chaco.api import DataRange1D, LinearMapper, \
 
 from cns.chaco_exts.channel_data_range import ChannelDataRange
 from cns.chaco_exts.ttl_plot import TTLPlot
+from cns.chaco_exts.timeseries_plot import TimeseriesPlot
+from cns.chaco_exts.epoch_plot import EpochPlot
 from cns.chaco_exts.extremes_channel_plot import ExtremesChannelPlot
 from cns.chaco_exts.timeseries_plot import TimeseriesPlot
-from cns.chaco_exts.dynamic_bar_plot import DynamicBarPlot, DynamicBarplotAxis
 from cns.chaco_exts.helpers import add_default_grids, add_time_axis
 from cns.chaco_exts.channel_range_tool import ChannelRangeTool
 
@@ -28,8 +29,6 @@ from enthought.traits.ui.api import TabularEditor
 from enthought.traits.ui.tabular_adapter import TabularAdapter
 
 class TrialLogAdapter(TabularAdapter):
-
-    parameters = List([])
 
     # List of tuples (column_name, field )
     columns = [ ('P',       'parameter'),
@@ -56,7 +55,8 @@ class TrialLogAdapter(TabularAdapter):
     time_text = Property
 
     def _get_parameter_text(self):
-        return ', '.join('{}'.format(self.item[p]) for p in self.parameters)
+        parameters = self.object.data.parameters
+        return ', '.join('{}'.format(self.item[p]) for p in parameters)
 
     def _get_speaker_text(self):
         return self.item['speaker'][0].upper()
@@ -157,11 +157,31 @@ class AbstractPositiveExperiment(AbstractExperiment):
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(0, 1, 1, alpha), line_color=(0, 1, 1, 1),
                 line_width=1, rect_height=0.1, rect_center=0.2)
-        container.add(plot)
+        container.add(plot) 
         plot = TTLPlot(channel=self.data.TO_TTL, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(1, 0, 0, alpha), line_color=(1, 0, 0, 1),
                 line_width=1, rect_height=0.1, rect_center=0.1)
+        container.add(plot)
+        plot = TimeseriesPlot(series=self.data.response_ts, marker='diamond',
+                marker_color=(0, 1, 0, 1.0), marker_height=0.45,
+                index_mapper=index_mapper, value_mapper=value_mapper)
+        container.add(plot)
+        plot = EpochPlot(series=self.data.all_poke_epoch, marker='diamond',
+                marker_color=(.34, .54, .34, 1.0), marker_height=0.8,
+                index_mapper=index_mapper, value_mapper=value_mapper)
+        container.add(plot)
+        plot = EpochPlot(series=self.data.poke_epoch, marker='diamond',
+                marker_color=(.17, .54, .34, 1.0), marker_height=0.7,
+                index_mapper=index_mapper, value_mapper=value_mapper)
+        container.add(plot)
+        plot = EpochPlot(series=self.data.signal_epoch, marker='diamond',
+                marker_color=(0.5, 0.5, 0.5, 1.0), marker_height=0.6, 
+                index_mapper=index_mapper, value_mapper=value_mapper)
+        container.add(plot)
+        plot = EpochPlot(series=self.data.trial_epoch, marker='diamond',
+                marker_color=(0.75, 0.25, 0.75, 1.0), marker_height=0.5, 
+                index_mapper=index_mapper, value_mapper=value_mapper)
         container.add(plot)
 
     @on_trait_change('data')
@@ -181,7 +201,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
     status_group = VGroup(
             Item('animal'),
             Item('handler.status'),
-            Item('handler.current_setting'),
+            #Item('handler.current_setting'),
             label='Experiment',
             show_border=True,
             style='readonly'
@@ -197,6 +217,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
     traits_group = HSplit(
             VGroup(
                 Item('handler.toolbar', style='custom'),
+                Item('handler.pump_toolbar', style='custom'),
                 Include('status_group'),
                 Tabbed(
                     Item('paradigm', style='custom', editor=InstanceEditor(),

@@ -75,45 +75,23 @@ class AversiveAnalysisMixin(SDTDataMixin):
     cr_seq = Property(depends_on='trial_log')
     hit_seq = Property(depends_on='trial_log')
     miss_seq = Property(depends_on='trial_log')
-    par_cr_count = Property(depends_on='trial_log')
-    par_fa_count = Property(depends_on='trial_log')
-    par_miss_count = Property(depends_on='trial_log')
-    par_hit_count = Property(depends_on='trial_log')
-    par_safe_count = Property(depends_on='trial_log')
-    par_warn_count = Property(depends_on='trial_log')
-    par_hit_frac = Property(depends_on='trial_log')
-    par_fa_frac = Property(depends_on='trial_log')
     global_fa_frac = Property(depends_on='trial_log')
 
-    # Summary table containing most of the statistics
-    par_info = Property(store='table', depends_on='trial_log')
+    go_seq = Property(depends_on='trial_log')
+    nogo_seq = Property(depends_on='trial_log')
+    yes_seq = Property(depends_on='trial_log')
 
-    #contact_scores = List
+    @cached_property
+    def _get_yes_seq(self):
+        return self.on_spout_seq
 
-    #@on_trait_change('new_trial')
-    #def compute_contact_score(self, trial_data):
-    #    contact = self.contact_digital
-    #    offset = self.contact_offset
-    #    dur = self.contact_dur
-    #    if self.contact_reference == 'trial start':
-    #        ts = trial_data['ts_start']
-    #    else:
-    #        ts = trial_data['ts_end']
-    #    score = contact.summarize(ts, offset, dur, np.mean)
-    #    self.contact_scores.append(score)
+    @cached_property
+    def _get_nogo_seq(self):
+        return self.safe_seq
 
-    #@on_trait_change('contact_ddur, contact_offset')
-    #def compute_contact_scores(self):
-    #    contact = self.contact_digital
-    #    offset = self.contact_offset
-    #    dur = self.contact_dur
-    #    if self.contact_reference == 'trial start':
-    #        ts = trial_data['ts_start']
-    #    else:
-    #        ts = trial_data['ts_end']
-    #    score = contact.summarize(ts, offset, dur, np.mean)
-    #    self.contact_scores.append(score)
-
+    @cached_property
+    def _get_go_seq(self):
+        return self.warn_seq
 
     @cached_property
     def _get_contact_scores(self):
@@ -149,38 +127,6 @@ class AversiveAnalysisMixin(SDTDataMixin):
         return self.warn_seq & self.on_spout_seq
 
     @cached_property
-    def _get_par_fa_count(self):
-        return self.apply_par_mask(np.sum, self.fa_seq)
-
-    @cached_property
-    def _get_par_cr_count(self):
-        return self.apply_par_mask(np.sum, self.cr_seq)
-
-    @cached_property
-    def _get_par_hit_count(self):
-        return self.apply_par_mask(np.sum, self.hit_seq)
-
-    @cached_property
-    def _get_par_miss_count(self):
-        return self.apply_par_mask(np.sum, self.miss_seq)
-
-    @cached_property
-    def _get_par_warn_count(self):
-        return self.apply_par_mask(np.sum, self.warn_seq)
-
-    @cached_property
-    def _get_par_safe_count(self):
-        return self.apply_par_mask(np.sum, self.safe_seq)
-
-    @cached_property
-    def _get_par_fa_frac(self):
-        return self.par_fa_count/self.par_safe_count
-
-    @cached_property
-    def _get_par_hit_frac(self):
-        return self.par_hit_count/self.par_warn_count
-
-    @cached_property
     def _get_global_fa_frac(self):
         try:
             fa = np.sum(self.fa_seq)
@@ -189,24 +135,7 @@ class AversiveAnalysisMixin(SDTDataMixin):
         except ZeroDivisionError:
             return np.nan
 
-    @cached_property
-    def _get_par_info(self):
-        data = {
-                'parameter':        [repr(p).strip(',()') for p in self.pars],
-                'safe_count':       self.par_safe_count,
-                'warn_count':       self.par_warn_count,
-                'fa_count':         self.par_fa_count,
-                'hit_count':        self.par_hit_count,
-                'hit_frac':         self.par_hit_frac,
-                'fa_frac':          self.par_fa_frac,
-                'dprime':           self.par_dprime,
-                'criterion':        self.par_criterion,
-                }
-        for i, parameter in enumerate(self.parameters):
-            data[parameter] = [p[i] for p in self.pars]
-        return np.rec.fromarrays(data.values(), names=data.keys())
-
-    summary_trial_log = Property(depends_on='trial_log')
-
     def _get_summary_trial_log(self):
         return self.trial_log[::-1]
+
+    summary_trial_log = Property(depends_on='trial_log')

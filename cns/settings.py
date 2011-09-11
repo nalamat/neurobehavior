@@ -30,12 +30,12 @@ def get_recent_cal(pattern):
         return None
 
 # We prefer that the calibration file name be in the format
-# YYMMDD_descriptor_primary.  For example:
+# YYMMDD_descriptor_speaker.  For example:
 # - 110627_1017_TDT_tweeter_primary
 # - 110627_1017_Madisound_XOver_secondary
 # - 110627_1012_Vifa_tweeter_primary
-CAL_PRIMARY_PATTERN = re.compile('\d{6}_[\w\d]+_primary')
-CAL_SECONDARY_PATTERN = re.compile('\d{6}_[\w\d]+_secondary')
+CAL_PRIMARY_PATTERN = re.compile('\d{6}_[\w\d]+_primary.mat')
+CAL_SECONDARY_PATTERN = re.compile('\d{6}_[\w\d]+_secondary.mat')
 
 # Find the most recent calibration files.  The assumption is that the files are
 # intelligently named.
@@ -93,15 +93,15 @@ logging_config = {
             # This is what gets printed out to the console 
             'console': {
                 'class': 'logging.StreamHandler',
-                'level': 'DEBUG',
                 'formatter': 'simple',
+                'level': 'DEBUG',
                 },
             # This is what gets saved to the file
             'file': {
                 'class': 'logging.FileHandler',
-                'level': 'DEBUG',
                 'formatter': 'time',
                 'filename': filename,
+                'level': 'WARNING',
                 }
             },
         # This is where you would change the logging level of specific modules.
@@ -113,22 +113,22 @@ logging_config = {
             # in the beginning of the experiment since we don't have any trials
             # yet.  Let's silence this module.
             'enthought.chaco.barplot': { 'level': 'CRITICAL', },
-            # The debug level for these modules are extremely noisy, so INFO is the best level
-            'tdt.dsp_buffer': { 'level': 'WARN', },
-            'tdt.dsp_circuit': { 'level': 'WARN', },
-            'neurogen': { 'level': 'DEBUG', },
-            'neurogen.blocks': { 'level': 'DEBUG', },
+            'experiments': { 'level': 'WARN' },
+            'tdt': { 'level': 'WARN' },
+            'cns': { 'level': 'WARN' },
+            'cns.data': { 'level': 'DEBUG' },
+            'neurogen': { 'level': 'WARN' },
             },
         'root': {
-            'level': 'DEBUG',
-            'handlers': ['console', 'file'],
+            'handlers': ['console'],
             },
         }
 logging.config.dictConfig(logging_config)
 
 # By convention, settings are in all caps.  Print these to the log file to
 # facilitate debugging other users' programs.
+#log = logging.getLogger(__name__)
 log = logging.getLogger()
-for k, v in globals().items():
+for k, v in sorted(globals().items()):
     if k == k.upper():
         log.debug("CNS SETTING %s : %r", k, v)

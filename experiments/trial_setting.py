@@ -1,13 +1,17 @@
 from enthought.traits.api import HasTraits, Enum, TraitError, Float, Int,\
-     List, Str
+     List, Str, TraitError
 from enthought.traits.ui.api import TableEditor, View, VGroup
 
 class TrialSetting(HasTraits):
     
-    _parameters = []
-    _labels = []
+    _parameters = ['ttype']
+    _labels = ['Type']
+
+    ttype = Enum('GO', 'NOGO', 'GO_REMIND', 'NOGO_REPEAT', label='Trial type',
+                 store='attribute', context=True, log=True)
     
-    def __init__(self, *parameters, **kwargs):
+    def __init__(self, ttype, *parameters, **kwargs):
+        kwargs['ttype'] = ttype
         for value, name in zip(parameters, self._parameters):
             kwargs[name] = value
         super(TrialSetting, self).__init__(**kwargs)
@@ -75,12 +79,26 @@ class TrialSetting(HasTraits):
 from enthought.traits.ui.api import TabularEditor
 from enthought.traits.ui.tabular_adapter import TabularAdapter
 
+from colors import color_names
+
+class TrialSettingAdapter(TabularAdapter):
+
+    def _get_bg_color(self):
+        ttype = self.item.ttype
+        if ttype == 'NOGO':
+            return color_names['light red']
+        elif ttype == 'GO_REMIND':
+            return color_names['dark green']
+        elif ttype == 'GO':
+            return color_names['light green']
+
 trial_setting_editor = TabularEditor(
     auto_update=True,
     editable=True, 
     multi_select=True,
     selected='_selected_setting',
-    adapter=TabularAdapter(width=100)
+    operations=['edit'],
+    adapter=TrialSettingAdapter(width=150)
 )
 
 def add_parameters(parameters, paradigm_class=None, repeats=True):
@@ -100,18 +118,26 @@ def add_parameters(parameters, paradigm_class=None, repeats=True):
             label = parameter
 
         trait = Float(label=label, context=True, store='attribute', log=False)
-        TrialSetting.add_class_trait(parameter, trait)
-        column = ((label, parameter))
-        columns.append(column)
-        labels.append(label)
+        try:
+            TrialSetting.add_class_trait(parameter, trait)
+            column = ((label, parameter))
+            columns.append(column)
+            labels.append(label)
+        except TraitError:
+            # The trait has already been defined, so we should just skip it
+            pass
 
     if repeats:
         # Repeats is a special variable that tells us how many times a single
         # TrialSetting object should be presented during a sequence
         trait = Int(1, label='Repeats', store='attribute', context=True, log=False)
-        column = (('Repeats', 'repeats'))
-        columns.append(column)
-        TrialSetting.add_class_trait('repeats', trait)
+        try:
+            TrialSetting.add_class_trait('repeats', trait)
+            column = (('Repeats', 'repeats'))
+            columns.append(column)
+        except TraitError:
+            # The trait has already been defined, so we should just skip it
+            pass
 
     trial_setting_editor.adapter.columns.extend(columns)
     TrialSetting._parameters.extend(parameters)

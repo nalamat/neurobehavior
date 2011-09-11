@@ -1,3 +1,7 @@
+import logging
+log = logging.getLogger(__name__)
+log.addHandler(logging.NullHandler())
+
 def load_settings():
     # Load the default settings
     from os import environ
@@ -15,8 +19,6 @@ def load_settings():
             value = getattr(extra_settings, setting)
             setattr(settings, setting, value)
     except KeyError:
-        import logging
-        log = logging.getLogger(__name__)
         log.debug('No NEUROBEHAVIOR_SETTINGS defined')
     return settings
         
@@ -26,4 +28,4 @@ def set_config(setting, value):
     setattr(_settings, setting, value)
     
 def get_config(setting):
-    return getattr(_settings, setting)        
+    return getattr(_settings, setting) 

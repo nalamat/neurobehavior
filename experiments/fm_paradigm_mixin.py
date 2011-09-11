@@ -8,7 +8,7 @@ class FMParadigmMixin(HasTraits):
     appropriate DSP circuit.
     '''
     
-    kw = {'context': True, 'store': 'attribute'}
+    kw = {'context': True, 'store': 'attribute', 'log': True}
 
     depth = Expression(200, label='Modulation depth (Hz)', **kw)
     cf = Expression(4000, label='Carrier frequency (Hz)', **kw)
