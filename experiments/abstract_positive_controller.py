@@ -240,7 +240,7 @@ class AbstractPositiveController(AbstractExperimentController):
         return zip(starts, ends)
 
     def get_response_ts(self):
-        return self.iface_behavior.get_tag('resp.')
+        return self.iface_behavior.get_tag('resp|')
 
     def get_trial_end_ts(self):
         return self.iface_behavior.get_tag('trial\\')
