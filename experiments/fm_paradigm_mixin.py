@@ -11,7 +11,7 @@ class FMParadigmMixin(HasTraits):
     kw = {'context': True, 'store': 'attribute', 'log': True}
 
     depth = Expression(200, label='Modulation depth (Hz)', **kw)
-    cf = Expression(4000, label='Carrier frequency (Hz)', **kw)
+    fc = Expression(4000, label='Carrier frequency (Hz)', **kw)
     fm = Expression(5, label='Modulation frequency (Hz)', **kw)
     level = Expression(0.0, label='Level (dB SPL)', **kw)
 
