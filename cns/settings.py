@@ -1,3 +1,11 @@
+'''
+Settings file
+
+Variable names in capital letters indicate that this is a setting that can be
+overridden in a custom settings.py file that NEUROBEHAVIOR_SETTINGS environment
+variable points to.
+'''
+
 import os, re, sys
 from os.path import dirname, join, abspath, getmtime
 
@@ -34,13 +42,13 @@ def get_recent_cal(pattern):
 # - 110627_1017_TDT_tweeter_primary
 # - 110627_1017_Madisound_XOver_secondary
 # - 110627_1012_Vifa_tweeter_primary
-CAL_PRIMARY_PATTERN = re.compile('\d{6}_[\w\d]+_primary.mat')
-CAL_SECONDARY_PATTERN = re.compile('\d{6}_[\w\d]+_secondary.mat')
+cal_primary_pattern = re.compile('\d{6}_[\w\d]+_primary.mat')
+cal_secondary_pattern = re.compile('\d{6}_[\w\d]+_secondary.mat')
 
 # Find the most recent calibration files.  The assumption is that the files are
 # intelligently named.
-CAL_PRIMARY     = get_recent_cal(CAL_PRIMARY_PATTERN)
-CAL_SECONDARY   = get_recent_cal(CAL_SECONDARY_PATTERN)
+CAL_PRIMARY     = get_recent_cal(cal_primary_pattern)
+CAL_SECONDARY   = get_recent_cal(cal_secondary_pattern)
 
 # Device configuration
 TDT_AUDIO = 'RZ6'
