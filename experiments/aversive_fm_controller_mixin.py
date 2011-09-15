@@ -21,7 +21,19 @@ class AversiveFMControllerMixin(HasTraits):
                 src_type='int32', block_size=1)
 
     def update_trial(self):
-        pass
+        fc = self.get_current_value('fc')
+        level = self.get_current_value('level')
+        speaker = self.get_current_speaker('speaker')
+        if speaker == 'primary':
+            att1 = self.cal_primary.get_attenuation(fc, level)
+            att2 = 120.0
+        elif speaker == 'secondary':
+            att1 = 120.0
+            att2 = self.cal_secondary.get_attenuation(fc, level)
+        elif speaker == 'both':
+            att1 = self.cal_primary.get_attenuation(fc, level)
+            att2 = self.cal_secondary.get_attenuation(fc, level)
+        self.set_attenuation(att1, att2)
 
     def update_intertrial(self):
         pass
@@ -29,7 +41,7 @@ class AversiveFMControllerMixin(HasTraits):
     def set_depth(self, value):
         self.iface_behavior.set_tag('depth', value)
 
-    def set_cf(self, value):
+    def set_fc(self, value):
         coerced_value = self.cal_primary.get_nearest_frequency(value)
         self.iface_behavior.set_tag('cf', coerced_value)
         mesg = 'Coercing {} Hz to nearest calibrated frequency of {} Hz'
