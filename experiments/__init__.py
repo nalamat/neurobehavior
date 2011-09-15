@@ -45,6 +45,7 @@ from .pump_paradigm_mixin import PumpParadigmMixin
 from .temporal_integration_paradigm_mixin import TemporalIntegrationParadigmMixin
 from .temporal_integration_controller_mixin import TemporalIntegrationControllerMixin
 from .am_noise_paradigm_mixin import AMNoiseParadigmMixin
+from .am_bbn_paradigm_mixin import AMBBNParadigmMixin
 from .positive_am_noise_controller_mixin import PositiveAMNoiseControllerMixin
 from .aversive_am_noise_controller_mixin import AversiveAMNoiseControllerMixin
 from .fm_paradigm_mixin import FMParadigmMixin
