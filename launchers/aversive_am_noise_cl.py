@@ -14,7 +14,7 @@ from experiments import (
         AbstractAversiveParadigm,
         ConstantLimitsParadigmMixin,
         PumpParadigmMixin,
-        AMNoiseParadigmMixin,
+        AMBBNParadigmMixin,
 
         # The experiment
         AbstractAversiveExperiment,
@@ -38,14 +38,14 @@ class Paradigm(
         AbstractAversiveParadigm, 
         PumpParadigmMixin,
         ConstantLimitsParadigmMixin,
-        AMNoiseParadigmMixin,
+        AMBBNParadigmMixin,
         ):
 
     editable_nogo = False
     repeat_fa = False
     go_probability = 'h_uniform(c_safe, 3, 7)'
     modulation_onset = 0.0
-    modulation_direction = 'positive if toss() else negative'
+    modulation_direction = "'positive' if toss() else 'negative'"
 
     traits_view = View(
             VGroup(
@@ -75,12 +75,5 @@ class Experiment(AbstractAversiveExperiment, ConstantLimitsExperimentMixin):
 
     data = Instance(Data, (), store='child')
     paradigm = Instance(Paradigm, (), store='child')
-
-    traits_view = View(
-            Include('traits_group'),
-            resizable=True,
-            height=0.9,
-            width=0.9,
-            handler=Controller)
 
 node_name = 'AversiveFMCLExperiment'
