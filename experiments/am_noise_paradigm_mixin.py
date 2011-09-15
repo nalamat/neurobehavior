@@ -12,11 +12,11 @@ class AMNoiseParadigmMixin(HasTraits):
     fm = Expression(5, label='Modulation frequency (Hz)', **kw)
     level = Expression(60.0, label='Spectrum Level (dB SPL)', **kw)
     seed = Expression(-1, label='Noise seed', **kw)
-    modulation_onset = Expression('uniform(0.1, 0.3)', 
-                                  label='Modulation onset (s)', **kw)
+    #modulation_onset = Expression('uniform(0.1, 0.3)', 
+    #                              label='Modulation onset (s)', **kw)
     modulation_depth = Expression(1.0, label='Modulation depth (frac)', **kw)
-    reaction_window_delay = Expression("modulation_onset+0.25",
-                                       label='Reaction window delay (s)', **kw)
+    #reaction_window_delay = Expression("modulation_onset+0.25",
+    #                                   label='Reaction window delay (s)', **kw)
     bandwidth = Expression(3e3, label='Bandwidth (Hz)', **kw)
     rs = Expression(60, label='Minimum attenuation in stop band (dB)', **kw)
     rp = Expression(4, label='Maximum ripple in pass band (dB)', **kw)
