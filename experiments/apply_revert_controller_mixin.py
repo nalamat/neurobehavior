@@ -167,7 +167,7 @@ class ApplyRevertControllerMixin(HasTraits):
                 log.debug(mesg.format(name, old_value, new_value))
                 try:
                     getattr(self, 'set_{}'.format(name))(new_value)
-                    log.debug('Setting %s', name)
+                    log.debug('setting %s', name)
                 except AttributeError, e:
                     log.debug(str(e))
 
