@@ -4,7 +4,6 @@ log.addHandler(logging.NullHandler())
 
 from .basic_characterization_controller import BasicCharacterizationController
 from .basic_characterization_paradigm import BasicCharacterizationParadigm
-#from .basic_characterization_experiment import BasicCharacterizationExperiment
 
 # Base paradigm classes
 from .abstract_positive_paradigm import AbstractPositiveParadigm
@@ -50,3 +49,5 @@ from .positive_am_noise_controller_mixin import PositiveAMNoiseControllerMixin
 from .aversive_am_noise_controller_mixin import AversiveAMNoiseControllerMixin
 from .fm_paradigm_mixin import FMParadigmMixin
 from .aversive_fm_controller_mixin import AversiveFMControllerMixin
+from .masking_paradigm_mixin import MaskingParadigmMixin
+from .aversive_masking_controller_mixin import AversiveMaskingControllerMixin

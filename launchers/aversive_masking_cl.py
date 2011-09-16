@@ -8,13 +8,13 @@ from experiments import (
         AbstractAversiveController,
         ConstantLimitsControllerMixin, 
         PumpControllerMixin,
-        AversiveNoiseMaskingControllerMixin,
+        AversiveMaskingControllerMixin,
 
         # Paradigm and mixins
         AbstractAversiveParadigm,
         ConstantLimitsParadigmMixin,
         PumpParadigmMixin,
-        NoiseMaskingParadigmMixin,
+        MaskingParadigmMixin,
 
         # The experiment
         AbstractAversiveExperiment,
@@ -26,7 +26,7 @@ from experiments import (
         )
 
 class Controller(
-        AversiveNoiseMaskingControllerMixin,
+        AversiveMaskingControllerMixin,
         ConstantLimitsControllerMixin,
         PumpControllerMixin,
         AbstractAversiveController):
@@ -36,16 +36,34 @@ class Paradigm(
         AbstractAversiveParadigm, 
         PumpParadigmMixin,
         ConstantLimitsParadigmMixin,
-        NoiseMaskingParadigmMixin,
+        MaskingParadigmMixin,
         ):
 
+    #go_probability = 'h_uniform(c_safe, 2, 5)'
+    #trial_duration = '0.8'
+    #aversive_delay = '0.1+probe_delay+probe_duration'
+
     traits_view = View(
-            Include('constant_limits_paradigm_mixin_group'),
-            Include('signal_group'),
-            Include('abstract_aversive_paradigm_group'),
-            Include('pump_paradigm_mixin_syringe_group'),
-            Include('speaker_group'),
+            VGroup(
+                VGroup(
+                    VGroup(
+                        Item('go_probability', label='Warn probability'),
+                        Item('go_setting_order', label='Warn setting order'),
+                        ),
+                    Include('cl_trial_setting_group'),
+                    label='Constant limits',
+                    show_border=True,
+                    ),
+                Include('abstract_aversive_paradigm_group'),
+                label='Paradigm',
+                ),
+            VGroup(
+                Include('speaker_group'),
+                Include('signal_group'),
+                label='Signal',
+                ),
             )
+
 
 class Data(AversiveData, AversiveConstantLimitsDataMixin):
     pass
@@ -55,11 +73,4 @@ class Experiment(AbstractAversiveExperiment, ConstantLimitsExperimentMixin):
     data = Instance(Data, (), store='child')
     paradigm = Instance(Paradigm, (), store='child')
 
-    traits_view = View(
-            Include('traits_group'),
-            resizable=True,
-            height=0.9,
-            width=0.9,
-            handler=Controller)
-
-node_name = 'AversiveFMCLExperiment'
+node_name = 'AversiveMaskingExperiment'
