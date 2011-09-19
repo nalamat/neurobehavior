@@ -31,18 +31,16 @@ class ChannelSetting(HasTraits):
     
     def _get_sort_summary(self):
         if not self.spike_sign:
-            return u"\u00B1{} with {} windows".format(abs(self.spike_threshold),
-                                                      len(self.spike_windows))
+            t = u"\u00B1{} with {} windows"
         else:
-            return "{:+} with {} windows".format(self.spike_threshold,
-                                                 len(self.spike_windows))
+            t = "{:+} with {} windows"
+        return t.format(self.spike_threshold, len(self.spike_windows))
 
 channel_editor = TableEditor(
         show_row_labels=True,
         sortable=False,
         reorderable=True,
         columns=[
-            #ObjectColumn(name='number', editable=False, width=10, label=''),
             ObjectColumn(name='mapped', editable=True, width=10, label='M'),
             CheckboxColumn(name='visible', width=10, label='V'), 
             CheckboxColumn(name='bad', width=10, label='B'),
@@ -169,11 +167,9 @@ class PhysiologyParadigm(HasTraits):
     monitor_ch_1        = Range(1, 16, 1)
     monitor_ch_2        = Range(1, 16, 5)
     monitor_ch_3        = Range(1, 16, 9)
-    monitor_ch_4        = Range(1, 16, 13)
     monitor_gain_1      = Range(0, 100, 50)
     monitor_gain_2      = Range(0, 100, 50)
     monitor_gain_3      = Range(0, 100, 50)
-    monitor_gain_4      = Range(0, 100, 50)
 
     # Bandpass filter settings
     monitor_fc_highpass = Range(0, 1e3, 300)
@@ -209,8 +205,8 @@ class PhysiologyParadigm(HasTraits):
     def _get_spike_signs(self):
         return [ch.spike_sign for ch in self.channel_settings]
 
-    # Generates the matrix that will be used to compute the differential for
-    # the channels. This matrix will be uploaded to the RZ5.
+    # Generates the matrix that will be used to compute the differential for the
+    # channels. This matrix will be uploaded to the RZ5.
     diff_matrix = Property(depends_on='channel_settings.differential')
 
     @cached_property
@@ -232,7 +228,6 @@ class PhysiologyParadigm(HasTraits):
                 Item('monitor_ch_1'),
                 Item('monitor_ch_2'),
                 Item('monitor_ch_3'),
-                Item('monitor_ch_4'),
                 show_labels=False,
                 ),
             VGroup(
@@ -240,7 +235,6 @@ class PhysiologyParadigm(HasTraits):
                 Item('monitor_gain_1'),
                 Item('monitor_gain_2'),
                 Item('monitor_gain_3'),
-                Item('monitor_gain_4'),
                 show_labels=False,
                 ),
             label='Monitor Settings',

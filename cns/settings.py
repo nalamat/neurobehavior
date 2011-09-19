@@ -121,14 +121,14 @@ logging_config = {
             # in the beginning of the experiment since we don't have any trials
             # yet.  Let's silence this module.
             'enthought.chaco.barplot': { 'level': 'CRITICAL', },
-            'experiments': { 'level': 'WARN' },
+            'experiments': { 'level': 'DEBUG' },
             'tdt': { 'level': 'WARN' },
             'cns': { 'level': 'WARN' },
             'cns.data': { 'level': 'DEBUG' },
             'neurogen': { 'level': 'WARN' },
             },
         'root': {
-            'handlers': ['console'],
+            'handlers': ['console', 'file'],
             },
         }
 logging.config.dictConfig(logging_config)
