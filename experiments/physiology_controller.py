@@ -138,9 +138,9 @@ class PhysiologyController(Controller):
 
         # Get the spikes.  Each channel has a separate buffer for the spikes
         # detected online.
+        snippet_shape = (-1, SPIKE_SNIPPET_SIZE)
         for i in range(CHANNELS):
-            data = self.buffer_spikes[i].read().reshape((-1,
-                SPIKE_SNIPPET_SIZE))
+            data = self.buffer_spikes[i].read().reshape(snippet_shape)
 
             # First sample of each snippet is the timestamp (as a 32 bit
             # integer) and last sample is the classifier (also as a 32 bit
@@ -150,17 +150,31 @@ class PhysiologyController(Controller):
             cl = data[:,-1].view('int32')
             self.model.data.spikes[i].send(snip, ts, cl)
 
-    @on_trait_change('model.settings.spike_thresholds')
-    def set_spike_thresholds(self, value):
-        for ch, threshold in enumerate(value):
-            name = 'a_spike{}'.format(ch+1)
-            self.iface_physiology.set_tag(name, threshold)
+    #@on_trait_change('model:settings:spike_thresholds')
+    #def set_spike_thresholds(self, instance, name, old, new):
+    #    print instance, name, old, new
+    #    value = new
+    #    for ch, threshold in enumerate(value):
+    #        name = 'a_spike{}'.format(ch+1)
+    #        self.iface_physiology.set_tag(name, threshold)
+
+    #@on_trait_change('model:settings:channel_settings:spike_windows')
+    #def _update_windows(self, channel, name, old, new):
+    #    if name != 'model' and self.iface_physiology is not None:
+    #        tag_name = 'c_spike{}'.format(channel.number)
+    #        self.iface_physiology.set_sort_windows(tag_name, new)
             
     @on_trait_change('model.settings.spike_signs')
     def set_spike_signs(self, value):
         for ch, sign in enumerate(value):
             name = 's_spike{}'.format(ch+1)
             self.iface_physiology.set_tag(name, sign)
+
+    @on_trait_change('model.settings.spike_thresholds')
+    def set_spike_thresholds(self, value):
+        for ch, threshold in enumerate(value):
+            name = 'a_spike{}'.format(ch+1)
+            self.iface_physiology.set_tag(name, threshold)
             
     @on_trait_change('model.settings.monitor_fc_highpass')
     def set_monitor_fc_highpass(self, value):
@@ -182,10 +196,6 @@ class PhysiologyController(Controller):
     def set_monitor_ch_3(self, value):
         self.iface_physiology.set_tag('ch3_out', value)
 
-    @on_trait_change('model.settings.monitor_ch_4')
-    def set_monitor_ch_4(self, value):
-        self.iface_physiology.set_tag('ch4_out', value)
-
     @on_trait_change('model.settings.monitor_gain_1')
     def set_monitor_gain_1(self, value):
         self.iface_physiology.set_tag('ch1_out_sf', value*1e3)
@@ -198,25 +208,15 @@ class PhysiologyController(Controller):
     def set_monitor_gain_3(self, value):
         self.iface_physiology.set_tag('ch3_out_sf', value*1e3)
 
-    @on_trait_change('model.settings.monitor_gain_4')
-    def set_monitor_gain_4(self, value):
-        self.iface_physiology.set_tag('ch4_out_sf', value*1e3)
-
-    @on_trait_change('model.settings.mapped_channels')
-    def set_mapped_channels(self, value):
-        #self.iface_physiology.set_coefficients('ch_map', value)
-        pass
+    #@on_trait_change('model.settings.mapped_channels')
+    #def set_mapped_channels(self, value):
+    #    #self.iface_physiology.set_coefficients('ch_map', value)
+    #    pass
 
     @on_trait_change('model.settings.diff_matrix')
     def set_diff_matrix(self, value):
         self.iface_physiology.set_coefficients('diff_map', value.ravel())
 
-    #@on_trait_change('model.settings.channel_settings.spike_windows')
-    #def _update_windows(self, channel, name, old, new):
-    #    if name != 'model' and self.iface_physiology is not None:
-    #        tag_name = 'c_spike{}'.format(channel.number)
-    #        self.iface_physiology.set_sort_windows(tag_name, new)
-        
     def load_settings(self, info):
         instance = load_instance(PHYSIOLOGY_ROOT, PHYSIOLOGY_WILDCARD)
         if instance is not None:
@@ -225,5 +225,13 @@ class PhysiologyController(Controller):
     def saveas_settings(self, info):
         dump_instance(self.model.settings, PHYSIOLOGY_ROOT, PHYSIOLOGY_WILDCARD)
 
-    def reset_settings(self, info):
-        self.model.settings.reset_traits()
+    @on_trait_change('model.channel_mode')
+    def _channel_mode_changed(self, new):
+        if new == 'TDT':
+            offset = 0
+        elif new =='TBSI':
+            offset = 1
+        else:
+            offset = 2
+        self.iface_physiology.set_tag('ch_offset', offset*16+1)
+

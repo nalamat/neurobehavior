@@ -162,15 +162,15 @@ class PhysiologyExperiment(HasTraits):
     physiology_plot          = Instance(Component)
     physiology_index_range   = Instance(ChannelDataRange)
     physiology_value_range   = Instance(DataRange1D, ())
+    channel_span             = Float(0.5e-3)
 
-    physiology_channel_span  = Float(0.5e-3)
-
-    physiology_window_1      = Instance(SortWindow)
-    physiology_window_2      = Instance(SortWindow)
-    physiology_window_3      = Instance(SortWindow)
-    channel_sort = Property(depends_on='physiology_window_+.channel')
+    sort_window_1            = Instance(SortWindow)
+    sort_window_2            = Instance(SortWindow)
+    sort_window_3            = Instance(SortWindow)
+    channel_sort             = Property(depends_on='sort_window_+.channel')
 
     channel                 = Enum('processed', 'raw')
+    channel_mode            = Enum('TDT', 'TBSI', 'Test')
 
     # Overlays
     spike_overlay            = Instance(SpikeOverlay)
@@ -186,7 +186,7 @@ class PhysiologyExperiment(HasTraits):
     def _get_channel_sort(self):
         channels = []
         for i in range(3):
-            window = getattr(self, 'physiology_window_{}'.format(i+1))
+            window = getattr(self, 'sort_window_{}'.format(i+1))
             # The GUI representation starts at 1, the program representation
             # starts at 0.  For 16 channels, the GUI displays the numbers 1
             # through 16 which corresponds to 0 through 15 in the code.  We need
@@ -194,16 +194,16 @@ class PhysiologyExperiment(HasTraits):
             channels.append(window.channel-1)
         return channels
 
-    @on_trait_change('data')
+    @on_trait_change('data, settings.channel_settings')
     def _physiology_sort_plots(self):
         settings = self.settings.channel_settings
         channels = self.data.spikes
         window = SortWindow(channel=1, settings=settings, channels=channels)
-        self.physiology_window_1 = window
+        self.sort_window_1 = window
         window = SortWindow(channel=5, settings=settings, channels=channels)
-        self.physiology_window_2 = window
+        self.sort_window_2 = window
         window = SortWindow(channel=9, settings=settings, channels=channels)
-        self.physiology_window_3 = window
+        self.sort_window_3 = window
 
     def _channel_changed(self, new):
         if new == 'raw':
@@ -253,8 +253,6 @@ class PhysiologyExperiment(HasTraits):
         value_mapper = LinearMapper(range=self.physiology_value_range)
         plot = ExtremesChannelPlot(channel=self.data.processed, 
                 index_mapper=index_mapper, value_mapper=value_mapper)
-        #plot = ExtremesChannelPlot(channel=self.data.raw, 
-        #        index_mapper=index_mapper, value_mapper=value_mapper)
         self.settings.sync_trait('visible_channels', plot, 'channel_visible', mutual=False)
 
         overlay = ChannelNumberOverlay(plot=plot)
@@ -319,6 +317,7 @@ class PhysiologyExperiment(HasTraits):
             HGroup(
                 Item('show_channel_number', label='Show channel number'),
                 Item('channel'),
+                Item('channel_mode'),
                 ),
             Item('settings', style='custom',
                 editor=InstanceEditor(view='physiology_view')),
@@ -335,7 +334,7 @@ class PhysiologyExperiment(HasTraits):
             Item('object.physiology_index_range.span',
                 label='X span',
                 editor=RangeEditor(low=0.1, high=30.0)),
-            Item('physiology_channel_span', label='Y span',
+            Item('channel_span', label='Y span',
                 editor=RangeEditor(low=0, high=5e-3)),
             Item('object.physiology_index_range.trig_delay',
                 label='Trigger delay'),
@@ -355,9 +354,9 @@ class PhysiologyExperiment(HasTraits):
                             Item('visualize_thresholds', label='Show sort threshold?'),
                             show_border=True,
                             ),
-                        Item('physiology_window_1', style='custom', width=250),
-                        Item('physiology_window_2', style='custom', width=250),
-                        Item('physiology_window_3', style='custom', width=250),
+                        Item('sort_window_1', style='custom', width=250),
+                        Item('sort_window_2', style='custom', width=250),
+                        Item('sort_window_3', style='custom', width=250),
                         show_labels=False,
                         label='Sort settings'
                         ),

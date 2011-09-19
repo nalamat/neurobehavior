@@ -55,13 +55,11 @@ class BasicCharacterizationController(AbstractExperimentController):
 
     @on_trait_change('model.paradigm.center_frequency')
     def set_center_frequency(self, value):
-        print 'setting center frequency to ', value
         self.iface_audio.set_tag('t_freq', value)
         self.update_filter_settings()
 
     @on_trait_change('model.paradigm.bandwidth_ratio')
     def set_bandwidth_ratio(self, value):
-        print 'setting bandwidth ratio to ', value
         if value == 0:
             self.iface_audio.set_tag('selector', 0)
         else:
