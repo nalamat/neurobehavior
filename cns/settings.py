@@ -9,15 +9,16 @@ variable points to.
 import os, re, sys
 from os.path import dirname, join, abspath, getmtime
 
-BASE_DIRECTORY      = os.environ['NEUROBEHAVIOR_BASE']
-LOG_ROOT            = join(BASE_DIRECTORY, 'logs') # where log files should be stored
-TEMP_ROOT           = join(BASE_DIRECTORY, 'temp') # location for temporary files
-DATA_ROOT           = join(BASE_DIRECTORY, 'data') # location for data files
-COHORT_ROOT         = DATA_ROOT                    # location for cohort files
-CAL_ROOT            = join(BASE_DIRECTORY, 'calibration') # calibration files
-SETTINGS_ROOT       = join(BASE_DIRECTORY, 'settings')
-PARADIGM_ROOT       = join(SETTINGS_ROOT, 'paradigm')
-PHYSIOLOGY_ROOT     = join(SETTINGS_ROOT, 'physiology')
+BASE_DIRECTORY  = os.environ['NEUROBEHAVIOR_BASE']
+LOG_ROOT        = join(BASE_DIRECTORY, 'logs')        # log files
+TEMP_ROOT       = join(BASE_DIRECTORY, 'temp')        # temp files
+DATA_ROOT       = join(BASE_DIRECTORY, 'data')        # data files
+COHORT_ROOT     = DATA_ROOT                           # cohort files
+CAL_ROOT        = join(BASE_DIRECTORY, 'calibration') # calibration files
+SETTINGS_ROOT   = join(BASE_DIRECTORY, 'settings')
+PARADIGM_ROOT   = join(SETTINGS_ROOT, 'paradigm')
+PHYSIOLOGY_ROOT = join(SETTINGS_ROOT, 'physiology')
+
 COHORT_WILDCARD     = 'Cohort files (*.cohort.hd5)|*.cohort.hd5|'
 PARADIGM_WILDCARD   = 'Paradigm settings (*.par)|*.par|'
 PHYSIOLOGY_WILDCARD = 'Physiology settings (*.phy)|*.phy|'
@@ -50,11 +51,6 @@ cal_secondary_pattern = re.compile('\d{6}_[\w\d]+_secondary.mat')
 CAL_PRIMARY     = get_recent_cal(cal_primary_pattern)
 CAL_SECONDARY   = get_recent_cal(cal_secondary_pattern)
 
-# Device configuration
-TDT_AUDIO = 'RZ6'
-TDT_BEHAVIOR = 'RZ6'
-TDT_PHYSIOLOGY = 'RZ5'
-
 # Physiology settings
 PHYSIOLOGY_CHANNELS = 16
 
@@ -81,8 +77,10 @@ SYRINGE_DATA = {
 # software.
 RCX_ROOT = join(abspath(dirname(__file__)), '../components')
 
-# Ensure that ETS toolkit will default to Qt4 if we load it
+# Ensure that ETS toolkit will default to PyQt4 and use the PyQt (instead of
+# the less stable PySide backend) if we load it
 os.environ['ETS_TOOLKIT'] = 'qt4' 
+os.environ['QT_API'] = 'pyqt'
 
 import logging.config
 from time import strftime
