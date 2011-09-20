@@ -23,7 +23,6 @@ import re
 import tables
 import logging
 from datetime import datetime
-from rec import flatten_recarray
 from matplotlib import mlab
 
 log = logging.getLogger(__name__)
