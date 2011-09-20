@@ -46,10 +46,10 @@ class ChannelRangeTool(BaseTool):
             self.zoom_out_index(self.index_factor)
 
     def zoom_out_index(self, factor):
-        self.component.index_mapper.range.span *= factor
+        self.component.index_mapper.range.span /= factor
 
     def zoom_in_index(self, factor):
-        self.component.index_mapper.range.span /= factor
+        self.component.index_mapper.range.span *= factor
 
     def zoom_value(self, event):
         if event.mouse_wheel < 0:
@@ -58,12 +58,12 @@ class ChannelRangeTool(BaseTool):
             self.zoom_out_value(self.value_factor)
 
     def zoom_out_value(self, factor):
-        self.component.value_mapper.range.low_setting *= factor
-        self.component.value_mapper.range.high_setting *= factor
-
-    def zoom_in_value(self, factor):
         self.component.value_mapper.range.low_setting /= factor
         self.component.value_mapper.range.high_setting /= factor
+
+    def zoom_in_value(self, factor):
+        self.component.value_mapper.range.low_setting *= factor
+        self.component.value_mapper.range.high_setting *= factor
 
     def panning_left_up(self, event):
         self._end_pan(event)
@@ -105,11 +105,9 @@ class MultiChannelRangeTool(ChannelRangeTool):
 
     def zoom_in_value(self, factor):
         self.value_span *= factor
-        #self._update_value_range()
 
     def zoom_out_value(self, factor):
         self.value_span /= factor
-        #self._update_value_range()
 
     @on_trait_change('value_span, component.channel_visible')
     def _update_span(self):
