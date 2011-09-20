@@ -8,7 +8,6 @@
 .. moduleauthor:: Brad Buran <bburan@alum.mit.edu>
 '''
 
-from cns.data.h5_utils import append_node
 from enthought.traits.api import HasTraits, Property, Array, Int, Event, \
     Instance, on_trait_change, Bool, Any, String, Float, cached_property, List, Str, \
     DelegatesTo, Enum, Dict, Set
@@ -98,13 +97,12 @@ class FileMixin(HasTraits):
         filters = tables.Filters(complevel=self.compression_level,
                 complib=self.compression_type, fletcher32=self.use_checksum,
                 shuffle=self.use_shuffle)
-        expected_rows = int(self.fs*self.expected_duration)
-        buffer = append_node(self.node, self.name, 'EArray', atom,
-                self._get_shape(), filters=filters,
-                expectedrows=expected_rows)
+        earray = self.node._v_file.createEArray(self.node._v_pathname,
+                self.name, atom, self._get_shape(), filters=filters,
+                expectedrows=int(self.fs*self.expected_duration))
         for k, v in self.trait_get(attr=True).items():
-            buffer._v_attrs[k] = v
-        return buffer
+            earray._v_attrs[k] = v
+        return earray
 
     #def _load_buffer(self):
     #    buffer = self.node._v_children[self.name] 
@@ -571,15 +569,17 @@ class FileSnippetChannel(FileChannel):
 
     def _classifiers_default(self):
         atom = tables.Atom.from_dtype(np.dtype('int32'))
-        array = append_node(self.node, self.name + '_classifier', 'EArray', atom,
-                (0,), expectedrows=int(self.fs*self.expected_duration))
-        return array
+        earray = self.node._v_file.createEArray(self.node._v_pathname,
+                self.name + '_classifier', atom, (0,),
+                expectedrows=int(self.fs*self.expected_duration))
+        return earray
 
     def _timestamps_default(self):
         atom = tables.Atom.from_dtype(np.dtype('int32'))
-        array = append_node(self.node, self.name + '_ts', 'EArray', atom,
-                (0,), expectedrows=int(self.fs*self.expected_duration))
-        return array
+        earray = self.node._v_file.createEArray(self.node._v_pathname,
+                self.name + '_ts', atom, (0,),
+                expectedrows=int(self.fs*self.expected_duration))
+        return earray
     
     def _get_shape(self):
         return (0, self.snippet_size)
