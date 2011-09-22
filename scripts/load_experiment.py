@@ -3,10 +3,11 @@
 import logging
 from time import strftime
 from cns import get_config
+from os import path
 
 time_format = '[%(asctime)s] :: %(name)s - %(levelname)s - %(message)s'
 simple_format = '%(name)s - %(levelname)s - %(message)s'
-filename = join(get_config('LOG_ROOT'), strftime('%Y%m%d_%H%M.log'))
+filename = path.join(get_config('LOG_ROOT'), strftime('%Y%m%d_%H%M.log'))
 
 logging_config = {
         'version': 1,
