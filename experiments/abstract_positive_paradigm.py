@@ -10,10 +10,6 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm):
 
     pump_rate = Expression(1.5, label='Pump rate (ml/min)', **kw)
     reward_volume = Expression(25, label='Reward volume (ul)', **kw)
-
-    # Needs to be CBool because Pytables returns numpy.bool_ type which gets
-    # rejected by Bool trait
-    trial_duration = Expression(1.2, label='Trial duration (s)', **kw)
     signal_offset_delay = Expression(0.5, label='Signal offset delay (s)', **kw)
     intertrial_duration = Expression(0.1, label='Intertrial duration (s)', **kw)
     reaction_window_delay = Expression(0, label='Withdraw delay (s)', **kw)
