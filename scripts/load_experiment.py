@@ -33,7 +33,8 @@ if __name__ == '__main__':
                         help='The type of experiment to launch')
 
     parser.add_argument('-r', '--rove', help='Parameter(s) to rove',
-                        nargs='+', action=VerifyUniqueParameters, default=[])
+                        nargs='+', action=VerifyUniqueParameters, default=[],
+                        required=True)
     parser.add_argument('-a', '--analyze', help='Parameter(s) to analyze',
                         nargs='+', action=VerifyUniqueParameters, default=[])
     parser.add_argument('--repeats', 
