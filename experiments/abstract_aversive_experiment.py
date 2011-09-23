@@ -101,7 +101,7 @@ class AbstractAversiveExperiment(AbstractExperiment):
         value_mapper = LinearMapper(range=value_range)
         plot = TTLPlot(channel=self.data.trial_running, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
-                fill_color=color_names['light green'], center=0.5,
+                fill_color=(1.0, 0.25, 0.25, 0.75), center=0.5,
                 rect_height=0.8)
         container.add(plot)
         plot = TTLPlot(channel=self.data.shock_running, reference=0,
@@ -111,7 +111,7 @@ class AbstractAversiveExperiment(AbstractExperiment):
         container.add(plot)
         plot = TTLPlot(channel=self.data.warn_running, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
-                fill_color=color_names['light red'], rect_center=0.5,
+                fill_color=(0.41, 0.88, 0.25, 0.5), rect_center=0.5,
                 rect_height=0.8)
         container.add(plot)
         plot = TTLPlot(channel=self.data.contact_digital, reference=0,
