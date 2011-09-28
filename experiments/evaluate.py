@@ -2,9 +2,8 @@ from __future__ import division
 
 import ast
 import numpy as np
-from enthought.traits.ui.api import (TextEditor, View, Item, BooleanEditor,
-        CompoundEditor)
-from enthought.traits.api import Callable, HasTraits, Instance
+from enthought.traits.ui.api import TextEditor
+from enthought.traits.api import Callable, HasTraits
 
 '''
 Available attributes for evaluating experiment parameters.
@@ -217,13 +216,12 @@ def evaluate_expressions(expressions, current_context):
         name = expressions.keys()[0]
         evaluate_value(name, expressions, current_context)
 
-class ExpressionEditor(TextEditor):
-
-    evaluate = Callable(ParameterExpression)
-
 from enthought.traits.api import TraitType
 
 class Expression(TraitType):
+
+    info_text = 'a Python value or expression'
+    default_value = ParameterExpression('None')
 
     def validate(self, object, name, value):
         if isinstance(value, ParameterExpression):
@@ -232,13 +230,6 @@ class Expression(TraitType):
             return ParameterExpression(value)
         except:
             self.error(object, name, value)
-
-    def create_editor(self):
-        return ExpressionEditor()
-
-    def init(self):
-        if not isinstance(self.default_value, ParameterExpression):
-            self.default_value = ParameterExpression(self.default_value)
 
 import unittest
 
@@ -288,14 +279,14 @@ class TestExpressions(unittest.TestCase):
         obj.a = 'a+5'
 
 from enthought.traits.api import HasTraits, on_trait_change
+
 class TestTraits(HasTraits):
      
-    a = Expression('a+4')
+    a = Expression('a+4', context=True)
 
     @on_trait_change('a')
     def print_change(self):
         print 'changed'
-
 
 if __name__ == '__main__':
     #parameters = {'a': ParameterExpression('1'), 'b': ParameterExpression('a')}

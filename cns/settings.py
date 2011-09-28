@@ -6,7 +6,7 @@ overridden in a custom settings.py file that NEUROBEHAVIOR_SETTINGS environment
 variable points to.
 '''
 
-import os, re, sys
+import os, re, sys, logging
 from os.path import dirname, join, abspath, getmtime
 
 BASE_DIRECTORY  = os.environ['NEUROBEHAVIOR_BASE']
@@ -81,55 +81,6 @@ RCX_ROOT = join(abspath(dirname(__file__)), '../components')
 # the less stable PySide backend) if we load it
 os.environ['ETS_TOOLKIT'] = 'qt4' 
 os.environ['QT_API'] = 'pyqt'
-
-import logging.config
-from time import strftime
-
-time_format = '[%(asctime)s] %(processName)s:%(threadName)s :: %(name)s - %(levelname)s - %(message)s'
-simple_format = '%(name)s - %(levelname)s - %(message)s'
-filename = join(LOG_ROOT, strftime('%Y%m%d_%H%M.log'))
-
-logging_config = {
-        'version': 1,
-        'formatters': {
-            'time': { 'format': time_format },
-            'simple': { 'format': simple_format },
-            },
-        'handlers': {
-            # This is what gets printed out to the console 
-            'console': {
-                'class': 'logging.StreamHandler',
-                'formatter': 'simple',
-                'level': 'DEBUG',
-                },
-            # This is what gets saved to the file
-            'file': {
-                'class': 'logging.FileHandler',
-                'formatter': 'time',
-                'filename': filename,
-                'level': 'WARNING',
-                }
-            },
-        # This is where you would change the logging level of specific modules.
-        # This is very helpful when you are trying to debug a very specific
-        # module and want to turn off the messages from other modules.
-        'loggers': {
-            # This module complains if you pass zero-length data to it for
-            # plotting.  However, we initialize the plots with zero-length data
-            # in the beginning of the experiment since we don't have any trials
-            # yet.  Let's silence this module.
-            'enthought.chaco.barplot': { 'level': 'CRITICAL', },
-            'experiments': { 'level': 'DEBUG' },
-            'tdt': { 'level': 'WARN' },
-            'cns': { 'level': 'WARN' },
-            'cns.data': { 'level': 'DEBUG' },
-            'neurogen': { 'level': 'WARN' },
-            },
-        'root': {
-            'handlers': ['console', 'file'],
-            },
-        }
-logging.config.dictConfig(logging_config)
 
 # By convention, settings are in all caps.  Print these to the log file to
 # facilitate debugging other users' programs.
