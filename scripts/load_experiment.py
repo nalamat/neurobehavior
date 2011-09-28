@@ -106,7 +106,10 @@ if __name__ == '__main__':
 
     except Exception, e:
         from os import isatty
-        log.exception(e)
+        import sys, traceback
+        traceback.print_exc(file=sys.stdout)
+        #print e
+        #log.exception(e)
         # Now, if we are running from a terminal, don't exit until the user hits
         # enter so they have time to read the error message.  Note that the
         # error message will be properly logged as well.
