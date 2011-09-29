@@ -66,7 +66,7 @@ class AbstractExperimentParadigm(HasTraits):
     _add_speaker_range = Button('Add')
     _remove_speaker_range = Button('Remove')
     _sort_speaker_range = Button('Sort')
-    _selected_speaker_range = List
+    _selected_speaker_range = List(transient=True)
     
     def __sort_speaker_range_fired(self):
         self.expected_speaker_range.sort()
@@ -107,10 +107,13 @@ class AbstractExperimentParadigm(HasTraits):
             'speaker_equalize',
             Item('fixed_attenuation'),
             VGroup(
-                HGroup('_add_speaker_range', '_remove_speaker_range', 
-                       '_sort_speaker_range', show_labels=False,
-                       enabled_when='fixed_attenuation'),
-                Item('expected_speaker_range', editor=speaker_range_editor, 
+                HGroup(
+                    '_add_speaker_range', 
+                    '_remove_speaker_range', 
+                    '_sort_speaker_range', 
+                    show_labels=False,
+                    enabled_when='fixed_attenuation'),
+                Item('expected_speaker_range', editor=speaker_range_editor,
                      enabled_when='fixed_attenuation', show_label=False),
                 ),
             label='Speaker',

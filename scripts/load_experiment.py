@@ -1,8 +1,58 @@
 #!python
 
+import logging
+from time import strftime
+from cns import get_config
+from os import path
+
+time_format = '[%(asctime)s] :: %(name)s - %(levelname)s - %(message)s'
+simple_format = '%(name)s - %(levelname)s - %(message)s'
+filename = path.join(get_config('LOG_ROOT'), strftime('%Y%m%d_%H%M.log'))
+
+logging_config = {
+        'version': 1,
+        'formatters': {
+            'time': { 'format': time_format },
+            'simple': { 'format': simple_format },
+            },
+        'handlers': {
+            # This is what gets printed out to the console 
+            'console': {
+                'class': 'logging.StreamHandler',
+                'formatter': 'simple',
+                'level': 'DEBUG',
+                },
+            # This is what gets saved to the file
+            'file': {
+                'class': 'logging.FileHandler',
+                'formatter': 'time',
+                'filename': filename,
+                'level': 'WARNING',
+                }
+            },
+        # This is where you would change the logging level of specific modules.
+        # This is very helpful when you are trying to debug a very specific
+        # module and want to turn off the messages from other modules.
+        'loggers': {
+            # This module complains if you pass zero-length data to it for
+            # plotting.  However, we initialize the plots with zero-length data
+            # in the beginning of the experiment since we don't have any trials
+            # yet.  Let's silence this module.
+            'enthought.chaco.barplot': { 'level': 'CRITICAL', },
+            'experiments': { 'level': 'DEBUG' },
+            'tdt': { 'level': 'WARN' },
+            'cns': { 'level': 'WARN' },
+            'cns.data': { 'level': 'DEBUG' },
+            'neurogen': { 'level': 'WARN' },
+            },
+        'root': {
+            'handlers': ['console', 'file'],
+            },
+        }
+logging.config.dictConfig(logging_config)
+
 import sys
 import argparse
-import logging
 log = logging.getLogger()
 
 class VerifyUniqueParameters(argparse.Action):
@@ -107,7 +157,10 @@ if __name__ == '__main__':
 
     except Exception, e:
         from os import isatty
-        log.exception(e)
+        import sys, traceback
+        traceback.print_exc(file=sys.stdout)
+        #print e
+        #log.exception(e)
         # Now, if we are running from a terminal, don't exit until the user hits
         # enter so they have time to read the error message.  Note that the
         # error message will be properly logged as well.
