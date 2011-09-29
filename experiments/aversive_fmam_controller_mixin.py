@@ -87,6 +87,8 @@ class AversiveFMAMControllerMixin(HasTraits):
             att = self.cal_secondary.get_attenuation(fc, value)
             self.iface_behavior.set_tag('att2', att)
             self.iface_behavior.set_tag('att1', 120.0)
+        else:
+            raise ValueError, 'Unsupported speaker mode %r' % speaker
 
     def set_speaker_equalize(self, value):
         if value:

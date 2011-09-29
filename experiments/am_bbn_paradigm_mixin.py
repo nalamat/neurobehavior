@@ -16,6 +16,7 @@ class AMBBNParadigmMixin(HasTraits):
 
     # This defines what is visible via the GUI
     signal_group = VGroup(
+            'fm',
             'modulation_depth',
             'modulation_onset',
             'level',

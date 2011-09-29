@@ -1,6 +1,9 @@
 #!python
 
+import sys
+import argparse
 import logging
+import logging.config
 from time import strftime
 from cns import get_config
 from os import path
@@ -51,18 +54,26 @@ logging_config = {
         }
 logging.config.dictConfig(logging_config)
 
-import sys
-import argparse
 log = logging.getLogger()
 
 class VerifyUniqueParameters(argparse.Action):
 
     def __call__(self, parser, args, values, option_string=None):
         if len(set(values)) != len(values):
-            sys.exit('Parameter list cannot contain duplicates')
+            mesg = 'Parameter list cannot contain duplicates'
+            raise argparse.ArgumentTypeError(mesg)
         else:
             setattr(args, self.dest, values)
-            
+
+class VerifyCalibration(argparse.Action):
+
+    def __call__(self, parser, args, values, option_string=None):
+        for filename in values:
+            if not path.isfile(filename):
+                mesg = '{} must be a file'
+                raise argparse.ArgumentTypeError(mesg.format(filename))
+        setattr(args, self.dest, values)
+
 CALIBRATION_HELP = '''Path to file containing calibration data for {} speaker.
 If this option is not specified, the most recent calibration file available
 will be used for the experiment.'''
@@ -71,10 +82,10 @@ FILE_HELP = '''File to store current experiment to'''
 
 LIB_ROOT_HELP = '''Although virtualenv is recommended as the best tool for
 managing stable and developmental verisons of Neurobehavior on a single
-computer, less programmers coming from Matlab tend to prefer the approach of
-creating a copy of the program to a new folder each time and having the program
-update the system path (e.g. Matlab-style) based on its current directory.  This
-option is not supported.  Use at your own risk.'''
+computer, programmers coming from Matlab tend to prefer the approach of creating
+a copy of the program to a new folder each time and having the program update
+the system path (e.g. Matlab-style) based on its current directory.  This option
+is not supported.  Use at your own risk.'''
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Launch experiment")
@@ -106,11 +117,17 @@ if __name__ == '__main__':
                         default=False)
     parser.add_argument('-s', '--server', help='Hardware server',
                         default='localhost:13013')
-    
-    parser.add_argument('-c1', dest='calibration_1',
-                        help=CALIBRATION_HELP.format('primary'))
-    parser.add_argument('-c2', dest='calibration_2',
-                        help=CALIBRATION_HELP.format('secondary'))
+
+    parser.add_argument('--paradigm', help='Paradigm settings file to load')
+    #parser.add_argument('--physiology', help='Physiology settings file to load')
+
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('--cal', action=VerifyCalibration, nargs=2, default=None,
+            help='Calibration files to use for primary and secondary speaker')
+    group.add_argument('--att', action='store_true', 
+            help='Treat signal level as an attenuation value')
+    parser.add_argument('--equalized', action='store_true',
+            help='Use equalized calibration?', default=False)
 
     parser.add_argument('--modify-path', action='store_true',
             dest='modify_path', default=False, help=LIB_ROOT_HELP)
@@ -159,8 +176,6 @@ if __name__ == '__main__':
         from os import isatty
         import sys, traceback
         traceback.print_exc(file=sys.stdout)
-        #print e
-        #log.exception(e)
         # Now, if we are running from a terminal, don't exit until the user hits
         # enter so they have time to read the error message.  Note that the
         # error message will be properly logged as well.
