@@ -165,11 +165,24 @@ class ApplyRevertControllerMixin(HasTraits):
             if old_value != new_value:
                 mesg = 'changed {} from {} to {}'
                 log.debug(mesg.format(name, old_value, new_value))
-                try:
-                    getattr(self, 'set_{}'.format(name))(new_value)
+
+                # I used to have this in a try/except block (i.e. using the
+                # Python idiom of "it's better to ask for forgiveness than 
+                # permission).  However, it quickly became apparent that this
+                # was masking Exceptions that may be raised in the body of the
+                # setter functions.  We should let these exceptions bubble to
+                # the surface so the user has more information about what
+                # happened.
+                setter = 'set_{}'.format(name)
+                if hasattr(self, setter):
+                    getattr(self, setter)(new_value)
                     log.debug('setting %s', name)
-                except AttributeError, e:
-                    log.debug(str(e))
+                else:
+                    log.debug('no setter for %s', name)
+                #try:
+                #    getattr(self, 'set_{}'.format(name))(new_value)
+                #except AttributeError, e:
+                #    log.debug(str(e))
 
     @on_trait_change('current_context_items')
     def _update_current_context_list(self):
