@@ -408,14 +408,19 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
         '''
         raise NotImplementedError
 
-    def set_attenuations(self, att1, att2, check=True):
+    def set_attenuations(self, att1, att2, check=True, mode='split'):
         # TDT's built-in attenuators for the RZ6 function in 20 dB steps, so we
         # need to determine the next greater step size for the attenuator.  The
         # maximum hardware attenuation is 60 dB.
         log.debug('Attempting to change attenuation to %r and %r', att1, att2)
 
-        if att1 is not None:
+        if mode == 'split':
             hw1, sw1 = RZ6.split_attenuation(att1)
+            hw2, sw2 = RZ6.split_attenuation(att2)
+        elif mode == 'full':
+            hw1, hw2 = att1, att2
+
+        if att1 is not None:
             if hw1 != self.current_hw_att1:
                 if check and self.get_current_value('fixed_attenuation'):
                     raise ValueError, 'Cannot change primary attenuation'
@@ -425,7 +430,6 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
                 log.debug('Updated primary attenuation to %.2f', hw1)
 
         if att2 is not None:
-            hw2, sw2 = RZ6.split_attenuation(att2)
             if hw2 != self.current_hw_att2:
                 if check and self.get_current_value('fixed_attenuation'):
                     raise ValueError, 'Cannot change secondary attenuation'
