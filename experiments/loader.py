@@ -170,11 +170,11 @@ def prepare_experiment(args, store_node):
     from neurogen.calibration import Calibration, EqualizedCalibration
 
     filename = get_config('CAL_PRIMARY')
-    cal_primary = neurogen.load_mat_cal(filename, False)
+    cal_primary = neurogen.load_mat_cal(filename, True)
     log.debug('Loaded calibration file %s for primary', filename)
 
     filename = get_config('CAL_SECONDARY')
-    cal_secondary = neurogen.load_mat_cal(filename, False)
+    cal_secondary = neurogen.load_mat_cal(filename, True)
     log.debug('Loaded calibration file %s for secondary', filename)
 
     controller_args = {}
