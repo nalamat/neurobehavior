@@ -195,8 +195,10 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
     
     physiology_handler = Instance(PhysiologyController)
 
-    current_hw_att1 = Float(0)
-    current_hw_att2 = Float(0)
+    # A value less than 0 indicates that the hardware attenuators have not been
+    # configured yet and should be.
+    current_hw_att1 = Float(-1)
+    current_hw_att2 = Float(-1)
 
     status = Property(Str, depends_on='state, current_setting')
 
