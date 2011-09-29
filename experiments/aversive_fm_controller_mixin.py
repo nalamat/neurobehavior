@@ -21,19 +21,22 @@ class AversiveFMControllerMixin(HasTraits):
                 src_type='int32', block_size=1)
 
     def update_trial(self):
-        fc = self.get_current_value('fc')
-        level = self.get_current_value('level')
-        speaker = self.get_current_speaker('speaker')
-        if speaker == 'primary':
-            att1 = self.cal_primary.get_attenuation(fc, level)
-            att2 = 120.0
-        elif speaker == 'secondary':
-            att1 = 120.0
-            att2 = self.cal_secondary.get_attenuation(fc, level)
-        elif speaker == 'both':
-            att1 = self.cal_primary.get_attenuation(fc, level)
-            att2 = self.cal_secondary.get_attenuation(fc, level)
-        self.set_attenuation(att1, att2)
+        pass
+        #fc = self.get_current_value('fc')
+        #level = self.get_current_value('level')
+        #att1 = self.cal_primary.get_attenuation(fc, level)
+        #self.set_attenuations(att1, 120.0)
+
+        #if speaker == 'primary':
+        #    att1 = self.cal_primary.get_attenuation(fc, level)
+        #    att2 = 120.0
+        #elif speaker == 'secondary':
+        #    att1 = 120.0
+        #    att2 = self.cal_secondary.get_attenuation(fc, level)
+        #elif speaker == 'both':
+        #    att1 = self.cal_primary.get_attenuation(fc, level)
+        #    att2 = self.cal_secondary.get_attenuation(fc, level)
+        #self.set_attenuation(att1, att2)
 
     def update_intertrial(self):
         pass
@@ -43,15 +46,21 @@ class AversiveFMControllerMixin(HasTraits):
 
     def set_fc(self, value):
         coerced_value = self.cal_primary.get_nearest_frequency(value)
-        self.iface_behavior.set_tag('cf', coerced_value)
+        self.iface_behavior.set_tag('fc', coerced_value)
         mesg = 'Coercing {} Hz to nearest calibrated frequency of {} Hz'
         self.notify(mesg.format(value, coerced_value))
-        self.set_current_value('cf', coerced_value)
+        self.set_current_value('fc', coerced_value)
 
     def set_fm(self, value):
         self.iface_behavior.set_tag('fm', value)
 
     def set_level(self, value):
-        cf = self.get_current_value('cf')
-        att = self.cal_primary.max_spl(cf)-level
-        self.iface_behavior.set_tag('att_A', att)
+        fc = self.get_current_value('fc')
+        att = self.cal_primary.get_attenuation(fc, value)
+        self.iface_behavior.set_tag('att1', att)
+
+    def set_speaker_equalize(self, value):
+        if value:
+            firdata = self.cal_primary.fir_coefficients
+            self.iface_behavior.set_coefficients('fir1', firdata)
+        # Need to unset somehow?

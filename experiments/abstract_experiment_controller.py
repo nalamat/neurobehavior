@@ -419,7 +419,7 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
                     raise ValueError, 'Cannot change primary attenuation'
                 self.iface_behavior.set_tag('att1', hw1)
                 self.current_hw_att1 = hw1
-                self.output_primary.hw_attenuation = hw1
+                #self.output_primary.hw_attenuation = hw1
                 log.debug('Updated primary attenuation to %.2f', hw1)
 
         if att2 is not None:
@@ -429,7 +429,7 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
                     raise ValueError, 'Cannot change secondary attenuation'
                 self.iface_behavior.set_tag('att2', hw2)
                 self.current_hw_att2 = hw2
-                self.output_secondary.hw_attenuation = hw2
+                #self.output_secondary.hw_attenuation = hw2
                 log.debug('Updated secondary attenuation to %.2f', hw2)
 
     def set_expected_speaker_range(self, value):
@@ -495,3 +495,24 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
         PARADIGM_ROOT = get_config('PARADIGM_ROOT')
         PARADIGM_WILDCARD = get_config('PARADIGM_WILDCARD')
         dump_instance(self.model.paradigm, PARADIGM_ROOT, PARADIGM_WILDCARD)
+
+    def load_calibration(self, info):
+        directory = get_config('CAL_ROOT')
+        fd = FileDialog(action='open', default_directory=directory)
+        if fd.open() == OK and fd.path <> '':
+            pass
+
+
+    calibration_window = Any
+
+    def show_calibration(self, info):
+        # TODO: add logic to bring calibration window back to front if the user
+        # calls this function again rather than generating a second popup
+        if self.calibration_window is None:
+            from calibration_plot import CalibrationPlot
+            calibrations = [self.cal_primary, self.cal_secondary]
+            self.calibration_window = CalibrationPlot(calibrations=calibrations)
+        self.calibration_window.edit_traits()
+
+    def show_signal(self, info):
+        pass

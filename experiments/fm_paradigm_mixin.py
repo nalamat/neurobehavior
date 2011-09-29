@@ -16,7 +16,7 @@ class FMParadigmMixin(HasTraits):
     level = Expression(0.0, label='Level (dB SPL)', **kw)
 
     signal_group = VGroup(
-            'cf',
+            'fc',
             'fm',
             'depth',
             'level',
