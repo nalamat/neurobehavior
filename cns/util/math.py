@@ -83,24 +83,6 @@ def dprime(n_nogo, n_go, n_fa, n_hit, clip=0.01):
     c = (z_hit+z_fa)/2
     return d
 
-#def nextpow2(i):
-#    '''Returns the nearest number >= i that is a power of 2
-#    '''
-#    n = 2
-#    while n<i: n=n*2
-#    return n
-#
-#def gcd(a, b):
-#    '''Returns greatest common denominator of a and b
-#    '''
-#    while b: a, b = b, a%b
-#    return a
-#
-#def lcm(a, b):
-#    '''Returns least common multiple of a and b
-#    '''
-#    return a*b/gcd(a, b)
-
 if __name__ == '__main__':
     import doctest
     doctest.testmod()
