@@ -1,6 +1,27 @@
 import time
 import numpy as np
 
+'''
+Generators and Coroutines
+-------------------------
+The code below uses generators and coroutines, which are considered an advanced
+feature of Python.  While I have made effort to avoid using more arcane featurs
+of Python, coroutines are extremely useful in the context of real-time data
+processing and visualization.  Coroutines can be thought of as "pipelines"
+(hence the name of the module) that continuously recieve data.  Once enough data
+is buffered, the algorithm is run and processed data is removed from the buffer
+and passed to the next target.
+
+Before attempting to understand the code here, I suggest you review an advanced
+tutorial on coroutines_ and `PEP 342`_.
+
+.. _coroutines: http://www.dabeaz.com/coroutines/
+.. _`PEP 342`: http://www.python.org/dev/peps/pep-0342/
+
+Note that these functions fall into two categories.  Pipelines and sources.
+Sources generate data, pipelines consume data.
+'''
+
 ################################################################################
 # UTILITY FUNCTIONS
 ################################################################################
@@ -33,7 +54,8 @@ def rand_source(count, size, sleep):
     A random number generator that produces samples at a fixed time interval.
 
     This is mainly used for debugging and testing purposes.  Do not use this as
-    a source of random numbers!
+    a source of random numbers since I make no guarantee about maintaining seed
+    or state across calls!
 
     Parameters
     ----------
@@ -51,6 +73,7 @@ def rand_source(count, size, sleep):
     # module-level to the minimum needed for what we typically expect will be
     # needed during an experiment.
     import time
+    state = 
     for i in range(count):
         yield np.random.randn(size)
         time.sleep(sleep)
@@ -60,6 +83,9 @@ def rand_source(count, size, sleep):
 ################################################################################
 @pipeline
 def lfilter(b, a, target):
+    '''
+    Incremential linear filter
+    '''
     from scipy.signal import lfilter
     margin = len(b)
     n = margin*2
