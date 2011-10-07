@@ -84,8 +84,8 @@ LIB_ROOT_HELP = '''Although virtualenv is recommended as the best tool for
 managing stable and developmental verisons of Neurobehavior on a single
 computer, programmers coming from Matlab tend to prefer the approach of creating
 a copy of the program to a new folder each time and having the program update
-the system path (e.g. Matlab-style) based on its current directory.  This option
-is not supported.  Use at your own risk.'''
+the system path based on its current directory.  This option is not throughly
+tested.  Use at your own risk.'''
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Launch experiment")
