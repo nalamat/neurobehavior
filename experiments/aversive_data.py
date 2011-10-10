@@ -18,7 +18,26 @@ class AversiveData(AbstractExperimentData, AversiveAnalysisMixin):
     analysis of this data is made.
     '''
     
-    OBJECT_VERSION = Float(3, store='attribute')
+    OBJECT_VERSION = Float(3.1, store='attribute')
+
+    mask_mode = Enum('none', 'include recent')
+    mask_num = Int(25)
+    masked_trial_log = Property(depends_on='mask_+, trial_log')
+
+    def _get_masked_trial_log(self):
+        if self.mask_mode == 'none':
+            return self.trial_log
+        else:
+            # Count gos backwards from the end of the array
+            if len(self.trial_log) == 0:
+                return self.trial_log
+            go_seq = self.string_array_equal(self.trial_log['ttype'], 'GO')
+            go_number = go_seq[::-1].cumsum()
+            try:
+                index = np.nonzero(go_number > self.mask_num)[0][0]
+                return self.trial_log[-index:]
+            except IndexError:
+                return self.trial_log
 
     # Safe and nogo are synonymous.  We just make both available for analysis
     # purposes.
