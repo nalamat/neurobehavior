@@ -202,19 +202,11 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
 
     status = Property(Str, depends_on='state, current_setting')
 
-    # Address of the hardware server
-    address = Trait(None, Tuple(Str, Int))
+    # Address of the hardware server.  If None, defaults to the non-network
+    # aware version of the TDTPy library.
+    address = Trait(None, None, Tuple(Str, Int))
 
     def _process_default(self):
-        print self.address
-        print self.address
-        print self.address
-        print self.address
-        print self.address
-        print self.address
-        print self.address
-        print self.address
-        print 'creating project'
         return DSPProject(address=self.address)
 
     def _get_status(self):
