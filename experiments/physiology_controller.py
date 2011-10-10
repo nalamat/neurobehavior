@@ -70,7 +70,7 @@ class PhysiologyController(Controller):
 
         # Initialize the buffers that will be spooling the data
         self.buffer_raw = self.iface_physiology.get_buffer('craw',
-                'r', src_type='int16', dest_type='float32', channels=CHANNELS,
+                'r', src_type='float32', dest_type='float32', channels=CHANNELS,
                 block_size=1048)
         self.buffer_filt = self.iface_physiology.get_buffer('cfilt',
                 'r', src_type='int16', dest_type='float32', channels=CHANNELS,
