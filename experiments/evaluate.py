@@ -54,6 +54,12 @@ def h_uniform(x, lb, ub):
         return 1.0
     return 1.0/(ub-x)
 
+def toss(x=0.5):
+    '''
+    Flip a coin weighted by x
+    '''
+    return np.random.uniform() <= x
+
 def get_dependencies(string):
     '''
     Parse a Python expression to determine what names are required to evaluate
@@ -87,7 +93,7 @@ class ParameterExpression(object):
             'exponential':      np.random.exponential,
             'clip':             np.clip,
             'choice':           choice,
-            'toss':             lambda x: np.random.uniform() <= x,
+            'toss':             toss,
             'random_speaker':   random_speaker,
             'h_uniform':        h_uniform,
             }

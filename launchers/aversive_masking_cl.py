@@ -32,6 +32,9 @@ class Controller(
         AbstractAversiveController):
     pass
 
+    def initial_setting(self):
+        return self.nogo_setting()
+
 class Paradigm(
         AbstractAversiveParadigm, 
         PumpParadigmMixin,

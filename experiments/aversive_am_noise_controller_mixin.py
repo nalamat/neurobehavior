@@ -5,11 +5,11 @@ import numpy as np
 
 class AversiveAMNoiseControllerMixin(HasTraits):
 
-    int_carrier    = Instance(blocks.Block)
-    trial_carrier  = Instance(blocks.Block)
+    int_carrier     = Instance(blocks.Block)
+    trial_carrier   = Instance(blocks.Block)
     trial_modulator = Instance(blocks.Block)
-    output_int     = Instance(Sink)
-    output_trial   = Instance(Sink)
+    output_int      = Instance(Sink)
+    output_trial    = Instance(Sink)
 
     def _output_int_default(self):
         return Sink(token=self.int_carrier.waveform, fs=self.iface_behavior.fs,
@@ -63,7 +63,7 @@ class AversiveAMNoiseControllerMixin(HasTraits):
         self.trial_modulator.depth = value
 
     def set_modulation_direction(self, value):
-        self.trial_modulator.direction = value
+        self.trial_modulator.equalize_direction = value
 
     def set_trial_duration(self, value):
         super(AversiveAMNoiseControllerMixin, self).set_trial_duration(value)
@@ -89,11 +89,20 @@ class AversiveAMNoiseControllerMixin(HasTraits):
         #offset = self.buffer_int.total_samples_written  
         samples = self.buffer_int.available()
         att, waveform, clip, floor = self.output_int.realize_samples(samples)
-        self.iface_behavior.set_tag('att_A', att)
         self.buffer_int.write(waveform)
 
     def update_trial(self):
-        if self.is_warn():
-            att, waveform, clip, floor = self.output_trial.realize()
-            self.iface_behavior.set_tag('att_A', att)
-            self.buffer_trial.set(waveform)
+        speaker = self.get_current_value('speaker')
+        if speaker == 'primary':
+            self.output_trial.calibration = self.cal_primary
+            att1, waveform, clip, floor = self.output_trial.realize()
+            att2 = 120.0
+        elif speaker == 'secondary':
+            self.output_trial.calibration = self.cal_secondary
+            att2, waveform, clip, floor = self.output_trial.realize()
+            att1 = 120.0
+        else:
+            raise ValueError, 'Unsupported speaker mode %r' % speaker
+
+        self.set_attenuations(att1, att2, mode='full')
+        self.buffer_trial.set(waveform)

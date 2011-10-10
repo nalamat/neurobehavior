@@ -11,11 +11,13 @@ from enthought.chaco.api import (LinearMapper, DataRange1D,
 from enthought.chaco.tools.api import ZoomTool, PanTool
 
 from tdt import DSPCircuit
-from cns import RCX_ROOT
+from cns import get_config
 from cns.chaco_exts.helpers import add_default_grids
 from cns.chaco_exts.tools.window_tool import WindowTool
 from cns.channel import FileSnippetChannel
 from cns.data.h5_utils import get_temp_file
+
+RCX_ROOT = get_config('RCX_ROOT')
 
 class Demo(HasTraits):
 
@@ -36,14 +38,14 @@ class DemoController(Controller):
     tool = Any
 
     def _button_fired(self):
-        hoops = self.tool.get_hoops()
-        coeffs = np.zeros((32, 3))
+        hoops = self.tool.windows
+        coeffs = np.zeros((30, 3))
         for i, hoop in enumerate(hoops):
             x = round(hoop[0]*self.snippet_source.fs)
             coeffs[x] = hoop[1], hoop[2], i+1
             print x, hoop[1], hoop[2], i+1
-        self.iface.set_coefficients('spike1_c', coeffs.ravel())
-        self.plot.last_reset = len(self.snippet_store.buffer)
+        #self.iface.set_coefficients('c_spike1', coeffs.ravel())
+        #self.plot.last_reset = len(self.snippet_store.buffer)
 
     def _container_default(self):
         container = OverlayPlotContainer(padding=[50, 50, 50, 50])
@@ -62,9 +64,6 @@ class DemoController(Controller):
         plot.overlays.append(axis)
 
         plot.overlays.append(ZoomTool(plot, axis='value'))
-        #plot.tools.append(PanTool(plot, axis='value'))
-
-        #plot.overlays.append(BetterZoom(plot))
 
         self.tool = WindowTool(component=plot)
         plot.overlays.append(self.tool)
@@ -85,6 +84,7 @@ class DemoController(Controller):
         #        classifier=2, line_color='blue')
         #container.add(plot)
 
+	print 'adding container'
         return container
 
     def _snippet_store_default(self):
@@ -95,7 +95,7 @@ class DemoController(Controller):
     def init(self, info):
         filename = join(RCX_ROOT, 'physiology')
         self.iface = DSPCircuit(filename, 'RZ5')
-        self.iface.set_tag('spike1_a', 1e-4)
+        self.iface.set_tag('a_spike1', 1e-4)
         self.snippet_source = self.iface.get_buffer('spike1', 'r',
                 block_size=32)
         self.snippet_store.fs = self.snippet_source.fs
