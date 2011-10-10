@@ -47,7 +47,7 @@ from .am_noise_paradigm_mixin import AMNoiseParadigmMixin
 from .am_bbn_paradigm_mixin import AMBBNParadigmMixin
 from .positive_am_noise_controller_mixin import PositiveAMNoiseControllerMixin
 from .aversive_am_noise_controller_mixin import AversiveAMNoiseControllerMixin
-from .fm_paradigm_mixin import FMParadigmMixin
-from .aversive_fm_controller_mixin import AversiveFMControllerMixin
+from .fmam_paradigm_mixin import FMAMParadigmMixin
+from .aversive_fmam_controller_mixin import AversiveFMAMControllerMixin
 from .masking_paradigm_mixin import MaskingParadigmMixin
 from .aversive_masking_controller_mixin import AversiveMaskingControllerMixin

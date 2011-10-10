@@ -41,7 +41,6 @@ class Paradigm(
         AMBBNParadigmMixin,
         ):
 
-    editable_nogo = False
     repeat_fa = False
     go_probability = 'h_uniform(c_safe, 3, 7)'
     modulation_onset = 0.0

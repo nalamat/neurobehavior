@@ -72,11 +72,11 @@ class AbstractExperimentData(PumpDataMixin):
 
     @cached_property
     def _get_par_seq(self):
-        try:
+        if len(self.masked_trial_log) != 0:
             arr = np.empty(len(self.masked_trial_log), dtype=object)
             arr[:] = zip(*[self.masked_trial_log[p] for p in self.parameters])
             return arr
-        except Exception, e:
+        else:
             return np.array([])
 
     def channel_from_buffer(self, buffer, channel_name):

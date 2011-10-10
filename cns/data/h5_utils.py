@@ -34,6 +34,7 @@ name_lookup = {'group':     'Group',
 
 def get_temp_file():
     from cns import get_config
+    from os.path import join
     filename = join(get_config('TEMP_ROOT'), 'test_experiment.hd5')
     datafile = tables.openFile(filename, 'w')
     return datafile

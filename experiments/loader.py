@@ -12,7 +12,7 @@ from enthought.traits.api import Any, Trait, TraitError, Bool, Str
 from enthought.traits.ui.api import View, Item, VGroup, HGroup, Spring
 from experiments import trial_setting
 from enthought.traits.api import Float
-import neurogen
+from neurogen import calibration
 
 import logging
 log = logging.getLogger(__name__)
@@ -166,20 +166,27 @@ def prepare_experiment(args, store_node):
     # parameters we wish to control in the experiment
     trial_setting.add_parameters(args.rove, paradigm_class, args.repeats)
 
-    # Load the calibration data
-    from neurogen.calibration import Calibration, EqualizedCalibration
+    # The user wants to specify values in terms of dB attenuation rather than a
+    # calibrated dB SPL standard.  Prepare the calibration accordingly.
+    if args.att:
+        cal1 = calibration.Attenuation()
+        cal2 = calibration.Attenuation()
+    else:
+        if args.cal is not None:
+            cal1_filename, cal2_filename = args.cal
+        else:
+            cal1_filename = get_config('CAL_PRIMARY')
+            cal2_filename = get_config('CAL_SECONDARY')
 
-    filename = get_config('CAL_PRIMARY')
-    cal_primary = neurogen.load_mat_cal(filename, False)
-    log.debug('Loaded calibration file %s for primary', filename)
+        cal1 = calibration.load_mat_cal(cal1_filename, args.equalized)
+        log.debug('Loaded calibration file %s for primary', filename)
 
-    filename = get_config('CAL_SECONDARY')
-    cal_secondary = neurogen.load_mat_cal(filename, False)
-    log.debug('Loaded calibration file %s for secondary', filename)
+        cal2 = calibration.load_mat_cal(cal2_filename, args.equalized)
+        log.debug('Loaded calibration file %s for secondary', filename)
 
     controller_args = {}
-    controller_args['cal_primary'] = cal_primary
-    controller_args['cal_secondary'] = cal_secondary
+    controller_args['cal_primary'] = cal1
+    controller_args['cal_secondary'] = cal2
     
     log.debug('store_node: %s', store_node)
     log.debug('data_node: %s', data_node)

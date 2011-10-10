@@ -86,10 +86,6 @@ class AversiveConstantLimitsDataMixin(HasTraits):
     def _get_par_safe_count(self):
         return self.apply_par_mask(np.sum, self.safe_seq)
 
-    #@cached_property
-    #def _get_par_fa_frac(self):
-    #    return self.par_fa_count/self.par_safe_count
-
     @cached_property
     def _get_par_hit_frac(self):
         return self.par_hit_count/self.par_warn_count
@@ -100,9 +96,10 @@ class AversiveConstantLimitsDataMixin(HasTraits):
                 'safe_count':       self.par_safe_count,
                 'warn_count':       self.par_warn_count,
                 'fa_count':         self.par_fa_count,
+                'cr_count':         self.par_cr_count,
                 'hit_count':        self.par_hit_count,
+                'miss_count':       self.par_miss_count,
                 'hit_frac':         self.par_hit_frac,
-                #'fa_frac':          self.par_fa_frac,
                 'dprime':           self.par_dprime,
                 'criterion':        self.par_criterion,
 
@@ -111,35 +108,13 @@ class AversiveConstantLimitsDataMixin(HasTraits):
                 'safe':             self.par_safe_count,
                 'warn':             self.par_warn_count,
                 'fa':               self.par_fa_count,
+                'cr':               self.par_cr_count,
                 'hit':              self.par_hit_count,
+                'miss':             self.par_miss_count,
                 'd':                self.par_dprime,
                 }
         for i, parameter in enumerate(self.parameters):
             data[parameter] = [p[i] for p in self.pars]
         return np.rec.fromarrays(data.values(), names=data.keys())
-
-    #STATISTICS = {
-    #        'hit_frac':     ('Hit %', 'Hit fraction', 
-    #                         {'low_setting': 0, 'high_setting': 1}, 
-    #                         {'major_value': 0.2, 'minor_value': 0.05}),
-    #        'fa_frac':      ('FA %', 'FA fraction', 
-    #                         {'low_setting': 0, 'high_setting': 1}, 
-    #                         {'major_value': 0.2, 'minor_value': 0.05}),
-    #        'safe_count':   ('Safe #', 'Safe count', 
-    #                         {'low_setting': 0, 'high_setting': 'auto'}, 
-    #                         {'major_value': 10, 'minor_value': 2}),
-    #        'warn_count':   ('Warn #', 'Warn count', 
-    #                         {'low_setting': 0, 'high_setting': 'auto'}, 
-    #                         {'major_value': 10, 'minor_value': 2}),
-    #        'hit_count':    ('Hit #', 'Hit count', 
-    #                         {'low_setting': 0, 'high_setting': 'auto'}, 
-    #                         {'major_value': 10, 'minor_value': 2}),
-    #        'fa_count':     ('FA #', 'FA count', 
-    #                         {'low_setting': 0, 'high_setting': 'auto'}, 
-    #                         {'major_value': 10, 'minor_value': 2}),
-    #        'dprime':       ('d\'', 'd\'', 
-    #                         {'low_setting': -1, 'high_setting': 3}, 
-    #                         {'major_value': 1, 'minor_value': .25}),
-    #        }
 
     PLOT_VALUES = ('par_warn_count', 'par_hit_frac', 'par_dprime')
