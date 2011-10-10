@@ -179,10 +179,10 @@ def prepare_experiment(args, store_node):
             cal2_filename = get_config('CAL_SECONDARY')
 
         cal1 = calibration.load_mat_cal(cal1_filename, args.equalized)
-        log.debug('Loaded calibration file %s for primary', filename)
+        log.debug('Loaded calibration file %s for primary', cal1_filename)
 
         cal2 = calibration.load_mat_cal(cal2_filename, args.equalized)
-        log.debug('Loaded calibration file %s for secondary', filename)
+        log.debug('Loaded calibration file %s for secondary', cal2_filename)
 
     controller_args = {
             'cal_primary':      cal1,
@@ -213,6 +213,7 @@ def prepare_experiment(args, store_node):
     elif len(args.rove) > 0:
         model.plot_index = args.rove[0]
         model.plot_group=args.rove[1:]
+    print controller_args
     controller = controller_class(**controller_args)
     return model, controller
 
