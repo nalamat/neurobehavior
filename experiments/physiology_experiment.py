@@ -386,6 +386,7 @@ if __name__ == '__main__':
     from cns import get_config
     from os.path import join
     from tdt import DSPProject
+
     tempfile = join(get_config('TEMP_ROOT'), 'test_physiology.h5')
     datafile = tables.openFile(tempfile, 'w')
     data = PhysiologyData(store_node=datafile.root)

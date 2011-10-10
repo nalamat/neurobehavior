@@ -7,10 +7,15 @@ import logging.config
 from time import strftime
 from cns import get_config
 from os import path
-
 time_format = '[%(asctime)s] :: %(name)s - %(levelname)s - %(message)s'
 simple_format = '%(name)s - %(levelname)s - %(message)s'
-filename = path.join(get_config('LOG_ROOT'), strftime('%Y%m%d_%H%M.log'))
+
+if not path.exists(get_config('LOG_ROOT')):
+    import tempfile
+    fh = tempfile.NamedTemporaryFile(delete=False)
+    filename = fh.name
+else:
+    filename = path.join(get_config('LOG_ROOT'), strftime('%Y%m%d_%H%M.log'))
 
 logging_config = {
         'version': 1,
@@ -53,7 +58,6 @@ logging_config = {
             },
         }
 logging.config.dictConfig(logging_config)
-
 log = logging.getLogger()
 
 class VerifyUniqueParameters(argparse.Action):
@@ -189,3 +193,6 @@ if __name__ == '__main__':
         # error message will be properly logged as well.
         if isatty(sys.stdout.fileno()):
             raw_input("Hit enter to exit")
+
+    finally:
+        print "Log file saved to ", filename
