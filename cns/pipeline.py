@@ -73,7 +73,6 @@ def rand_source(count, size, sleep):
     # module-level to the minimum needed for what we typically expect will be
     # needed during an experiment.
     import time
-    state = 
     for i in range(count):
         yield np.random.randn(size)
         time.sleep(sleep)
