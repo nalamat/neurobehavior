@@ -385,7 +385,10 @@ if __name__ == '__main__':
     import tables
     from cns import get_config
     from os.path import join
+    from tdt import DSPProject
     tempfile = join(get_config('TEMP_ROOT'), 'test_physiology.h5')
     datafile = tables.openFile(tempfile, 'w')
     data = PhysiologyData(store_node=datafile.root)
-    PhysiologyExperiment(data=data).configure_traits()
+    addr = ('localhost', 13131)
+    controller = PhysiologyController(process=DSPProject(address=addr))
+    PhysiologyExperiment(data=data).configure_traits(handler=controller)

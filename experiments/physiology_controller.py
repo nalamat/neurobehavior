@@ -32,7 +32,7 @@ class PhysiologyController(Controller):
     physiology_ttl_pipeline = Any
     buffer_spikes           = List(Any)
     state                   = Enum('master', 'client')
-    process                 = Instance(DSPProject, ())
+    process                 = Instance(DSPProject)
     timer                   = Instance(Timer)
     parent                  = Any
 
@@ -234,4 +234,3 @@ class PhysiologyController(Controller):
         else:
             offset = 2
         self.iface_physiology.set_tag('ch_offset', offset*16+1)
-

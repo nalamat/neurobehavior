@@ -74,6 +74,12 @@ class VerifyCalibration(argparse.Action):
                 raise argparse.ArgumentTypeError(mesg.format(filename))
         setattr(args, self.dest, values)
 
+class VerifyServer(argparse.Action):
+
+    def __call__(self, parser, args, value, option_string=None):
+        host, port = value.split(':')
+        setattr(args, self.dest, (host, int(port)))
+
 CALIBRATION_HELP = '''Path to file containing calibration data for {} speaker.
 If this option is not specified, the most recent calibration file available
 will be used for the experiment.'''
@@ -86,6 +92,9 @@ computer, programmers coming from Matlab tend to prefer the approach of creating
 a copy of the program to a new folder each time and having the program update
 the system path based on its current directory.  This option is not throughly
 tested.  Use at your own risk.'''
+
+SERVER_HELP = '''TDT RPC server address (in the format hostname:port).  For
+example, localhost:13131 or regina.cns.nyu.edu:13131.'''
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Launch experiment")
@@ -110,15 +119,14 @@ if __name__ == '__main__':
                        const='test', help='Test experiment') 
     group.add_argument('-i', '--inspect', dest='mode', action='store_const',
                        const='inspect', help='Print available parameters')
-    group.add_argument('-f', '--file', type=str)
+    group.add_argument('-f', '--file', type=str, help="File to save data to")
 
     parser.add_argument('-n', '--neural', dest='physiology',
                         action='store_true', help='Acquire neurophysiology',
                         default=False)
-    parser.add_argument('-s', '--server', help='Hardware server',
-                        default='localhost:13013')
+    parser.add_argument('--address', help=SERVER_HELP, action=VerifyServer)
 
-    parser.add_argument('--paradigm', help='Paradigm settings file to load')
+    #parser.add_argument('--paradigm', help='Paradigm settings file to load')
     #parser.add_argument('--physiology', help='Physiology settings file to load')
 
     group = parser.add_mutually_exclusive_group()

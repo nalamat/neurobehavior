@@ -12,7 +12,7 @@ from enthought.pyface.timer.api import Timer
 from enthought.etsconfig.api import ETSConfig
 from enthought.traits.api import (Any, Instance, Enum, Dict, on_trait_change, 
         HasTraits, List, Button, Bool, Tuple, Callable, Int, Property,
-        cached_property, Undefined, Event, TraitError, Str, Float)
+        cached_property, Undefined, Event, TraitError, Str, Float, Trait)
 from enthought.traits.ui.api import Controller, View, HGroup, Item, spring
 
 from cns.widgets.toolbar import ToolBar
@@ -186,7 +186,7 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
     # with the DSPs.  All circuits must be loaded and buffers initialized before
     # the process is started (so the process can appropriately allocate the
     # required shared memory resources).
-    process         = Instance(DSPProject, ())
+    process         = Instance(DSPProject)
     system_tray     = Any
 
     # Calibration objects
@@ -201,6 +201,21 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
     current_hw_att2 = Float(-1)
 
     status = Property(Str, depends_on='state, current_setting')
+
+    # Address of the hardware server
+    address = Trait(None, Tuple(Str, Int))
+
+    def _process_default(self):
+        print self.address
+        print self.address
+        print self.address
+        print self.address
+        print self.address
+        print self.address
+        print self.address
+        print self.address
+        print 'creating project'
+        return DSPProject(address=self.address)
 
     def _get_status(self):
         if self.state == 'disconnected':
@@ -414,13 +429,14 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
         # maximum hardware attenuation is 60 dB.
         log.debug('Attempting to change attenuation to %r and %r', att1, att2)
 
-        if mode == 'split':
-            hw1, sw1 = RZ6.split_attenuation(att1)
-            hw2, sw2 = RZ6.split_attenuation(att2)
-        elif mode == 'full':
-            hw1, hw2 = att1, att2
-
         if att1 is not None:
+            if mode == 'split':
+                hw1, sw1 = RZ6.split_attenuation(att1)
+            elif mode == 'full':
+                hw1 = att1
+            else:
+                raise ValueError, 'Unsupported mode %s' % mode
+
             if hw1 != self.current_hw_att1:
                 if check and self.get_current_value('fixed_attenuation'):
                     raise ValueError, 'Cannot change primary attenuation'
@@ -430,6 +446,13 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
                 log.debug('Updated primary attenuation to %.2f', hw1)
 
         if att2 is not None:
+            if mode == 'split':
+                hw2, sw2 = RZ6.split_attenuation(att2)
+            elif mode == 'full':
+                hw2 = att2
+            else:
+                raise ValueError, 'Unsupported mode %s' % mode
+
             if hw2 != self.current_hw_att2:
                 if check and self.get_current_value('fixed_attenuation'):
                     raise ValueError, 'Cannot change secondary attenuation'

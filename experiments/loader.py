@@ -184,9 +184,11 @@ def prepare_experiment(args, store_node):
         cal2 = calibration.load_mat_cal(cal2_filename, args.equalized)
         log.debug('Loaded calibration file %s for secondary', filename)
 
-    controller_args = {}
-    controller_args['cal_primary'] = cal1
-    controller_args['cal_secondary'] = cal2
+    controller_args = {
+            'cal_primary':      cal1,
+            'cal_secondary':    cal2,
+            'address':          args.address,
+            }
     
     log.debug('store_node: %s', store_node)
     log.debug('data_node: %s', data_node)
