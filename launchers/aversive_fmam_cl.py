@@ -8,13 +8,13 @@ from experiments import (
         AbstractAversiveController,
         ConstantLimitsControllerMixin, 
         PumpControllerMixin,
-        AversiveFMControllerMixin,
+        AversiveFMAMControllerMixin,
 
         # Paradigm and mixins
         AbstractAversiveParadigm,
         ConstantLimitsParadigmMixin,
         PumpParadigmMixin,
-        FMParadigmMixin,
+        FMAMParadigmMixin,
 
         # The experiment
         AbstractAversiveExperiment,
@@ -26,7 +26,7 @@ from experiments import (
         )
 
 class Controller(
-        AversiveFMControllerMixin,
+        AversiveFMAMControllerMixin,
         ConstantLimitsControllerMixin,
         PumpControllerMixin,
         AbstractAversiveController):
@@ -38,7 +38,7 @@ class Paradigm(
         AbstractAversiveParadigm, 
         PumpParadigmMixin,
         ConstantLimitsParadigmMixin,
-        FMParadigmMixin,
+        FMAMParadigmMixin,
         ):
 
     editable_nogo = False
