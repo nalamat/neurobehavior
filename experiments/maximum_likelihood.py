@@ -26,12 +26,12 @@ class MaximumLikelihood(object):
 
     def __init__(self, a, m, k):
         '''
-        a
-            alpha, the false alarm rate
-        m
-            midpoint of the function
-        k
-            slope of the function
+        a : array-like
+            alpha, the false alarm rates
+        m : array-like
+            midpoints of the function
+        k : array-like
+            slopes of the function
         '''
         sa = len(a)
         sm = len(m)
@@ -45,17 +45,35 @@ class MaximumLikelihood(object):
         self.r_history = []
 
     def update_estimate(self, x, yes):
+        '''
+        Update the maximum likelihood estimate with a new trial
+
+        x : int or float
+            Stimulus value
+        yes : bool
+            True if subject indicated they heard the stimulus, False otherwise
+        '''
+
         p = self.p(x, yes)
         self.t_history.append(x)
         self.r_history.append(yes)
         self.p_history = np.concatenate((self.p_history, p[np.newaxis]))
         
     def best_coefficients(self):
+        '''
+        Given current trial history, compute the ML coefficients
+
+        Returns a three-tuple (a, m, k)
+        '''
         p = self.p_history.prod(axis=0)
         ai, mi, ki = np.unravel_index(p.argmax(), self.shape)
         return self.a[ai, 0, 0], self.m[0, mi, 0], self.k[0, 0, ki]
 
     def sweetpoint(self, a, m, k):
+        '''
+        Stimulus value at which the variance (i.e. error) of the threshold
+        estimate is at a minimum
+        '''
         return sweetpoint(a, m, k)
 
     def p(self, x, yes=True):
