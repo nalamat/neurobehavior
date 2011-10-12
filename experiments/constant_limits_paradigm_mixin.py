@@ -8,6 +8,17 @@ from cns import choice
 from .trial_setting import TrialSetting, trial_setting_editor
 from .evaluate import Expression
 
+# Right now the constant limits paradigm requires that there be one and only one
+# GO_REMIND and one and only one NOGO.  However, there is no reason why one
+# cannot have multiple reminds and/or nogos.  Until someone implements the
+# error-checking and control logic for handling multiple reminds/nogos, I have
+# put in several checks to ensure that the user cannot add an extra nogo or
+# remind.  For example, whenever the trial_settings changes, I have a function
+# that scans the list to remove duplicate reminds and nogos and add a nogo and
+# remind back in if they are missing.  Also, in the add/remove events, I do not
+# allow the user to add another nogo/remind or remove the existing nogo/remind.
+# Likewise, I do not allow the user to remove the last GO from the list.
+
 class ConstantLimitsParadigmMixin(HasTraits):
 
     editable_nogo = Bool(True)
@@ -24,6 +35,10 @@ class ConstantLimitsParadigmMixin(HasTraits):
 
     kw = { 'log': True, 'context': True, 'store': 'attribute' }
 
+    #remind_setting_order = Trait('shuffled set', choice.options, 
+    #        label='Remind setting order', **kw)
+    #nogo_setting_order = Trait('shuffled set', choice.options, 
+    #        label='Nogo setting order', **kw)
     go_setting_order = Trait('shuffled set', choice.options, 
             label='Go setting order', **kw)
     go_probability = Expression('0.5 if c_nogo < 5 else 1', 
@@ -37,43 +52,73 @@ class ConstantLimitsParadigmMixin(HasTraits):
     _sort = Button()
     _selected_setting = List(Instance(TrialSetting), transient=True)
 
+    def _trial_settings_changed(self, settings):
+        nogo_found = False
+        for ts in settings:
+            if nogo_found and ts.ttype == 'NOGO':
+                # This is a duplicate nogo.  We need to remove it.
+                settings.remove(ts)
+            elif not nogo_found and ts.ttype == 'NOGO':
+                # We've found our nogo!
+                nogo_found = True
+        if not nogo_found:
+            # The list is missing a nogo.  Let's add it.
+            settings.append(TrialSetting('NOGO'))
+
+        remind_found = False
+        for ts in settings:
+            if remind_found and ts.ttype == 'GO_REMIND':
+                # This is a duplicate remind.  We need to remove it.
+                settings.remove(ts)
+            elif not remind_found and ts.ttype == 'GO_REMIND':
+                # We've found our remind!
+                remind_found = True
+        if not remind_found:
+            # The list is missing a remind.  Let's add it.
+            settings.append(TrialSetting('GO_REMIND'))
+
+        go_found = False
+        for ts in settings:
+            if not go_found and ts.ttype == 'GO':
+                # We've found our remind!
+                go_found = True
+        if not go_found:
+            # The list is missing a go.  Let's add it.
+            settings.append(TrialSetting('GO'))
+
+
     def _get_nogo_setting(self):
-        if self.editable_nogo:
-            return self.trial_settings[0]
-        else:
-            return TrialSetting('NOGO')
+        ts = [t for t in self.trial_settings if t.ttype == 'NOGO']
+        if len(ts) > 1:
+            raise ValueError, "Only one nogo can be specified!"
+        elif len(ts) < 1:
+            raise ValueError, "One nogo must be specified!"
+        return ts[0]
 
     def _get_remind_setting(self):
-        if self.editable_nogo:
-            return self.trial_settings[1]
-        else:
-            return self.trial_settings[0]
+        ts = [t for t in self.trial_settings if t.ttype == 'GO_REMIND']
+        if len(ts) > 1:
+            raise ValueError, "Only one remind can be specified!"
+        elif len(ts) < 1:
+            raise ValueError, "One remind must be specified!"
+        return ts[0]
 
     def _get_go_settings(self):
-        if self.editable_nogo:
-            return self.trial_settings[2:]
-        else:
-            return self.trial_settings[1:]
+        ts = [t for t in self.trial_settings if t.ttype == 'GO']
+        if len(ts) < 1:
+            raise ValueError, "At least one go must be specified"
+        return ts
 
     def _trial_settings_default(self):
-        if self.editable_nogo:
-            return [TrialSetting('NOGO'), 
-                    TrialSetting('GO_REMIND'),
-                    TrialSetting('GO')]
-        else:
-            return [TrialSetting('GO_REMIND'),
-                    TrialSetting('GO')]
+        return [TrialSetting('NOGO'), TrialSetting('GO_REMIND'),
+                TrialSetting('GO')]
 
     def __sort_fired(self):
-        new_list = self.trial_settings[:2]
-        go_trials = self.trial_settings[2:]
-        go_trials.sort()
-        new_list.extend(go_trials)
-        self.trial_settings = new_list
+        self.trial_settings.sort()
     
     def __add_fired(self):
-        # If a setting is selected, let's assume that the user wishes to
-        # duplicate 
+        # If some settings are selected, let's assume that the user wishes to
+        # duplicate these
         if len(self._selected_setting) != 0:
             for setting in self._selected_setting:
                 new = setting.clone_traits()
@@ -84,7 +129,14 @@ class ConstantLimitsParadigmMixin(HasTraits):
         
     def __remove_fired(self):
         for setting in self._selected_setting:
-            if setting not in self.trial_settings[:2]:
+            # If the ttype is a NOGO or GO_REMIND, we do not remove these
+            # because these are the only NOGO/GO_REMIND values in the list (this
+            # is enforced by the __add_fired and _trial_settings_changed logic
+            # in this class).  Likewise, if the length of trial_settings is 3,
+            # this means that the user is trying to remove the only go that
+            # remains in the list.  We must have at least one go, so we disallow
+            # this attempt.
+            if setting.ttype == 'GO' and len(self.trial_settings) > 3:
                 self.trial_settings.remove(setting)
         self._selected_setting = []
 
@@ -97,6 +149,8 @@ class ConstantLimitsParadigmMixin(HasTraits):
         VGroup(
             Item('go_probability'),
             Item('go_setting_order'),
+            #Item('nogo_setting_order'),
+            #Item('remind_setting_order'),
             Item('repeat_fa')
             ),
         Include('cl_trial_setting_group'),
@@ -108,5 +162,9 @@ class ConstantLimitsParadigmMixin(HasTraits):
 
 if __name__ == '__main__':
     from trial_setting import add_parameters
-    add_parameters(['test'])
-    ConstantLimitsParadigmMixin().configure_traits()
+    add_parameters(['test1'], repeats=False)
+    par = ConstantLimitsParadigmMixin()
+    #par.trial_settings = [TrialSetting('GO'), TrialSetting('GO'),
+    #                      TrialSetting('NOGO'), TrialSetting('NOGO')]
+    par.trial_settings = []
+    par.configure_traits()

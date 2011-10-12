@@ -10,10 +10,8 @@ class TrialSetting(HasTraits):
     ttype = Enum('GO', 'NOGO', 'GO_REMIND', 'NOGO_REPEAT', label='Trial type',
                  store='attribute', context=True, log=True)
     
-    def __init__(self, ttype, *parameters, **kwargs):
+    def __init__(self, ttype, **kwargs):
         kwargs['ttype'] = ttype
-        for value, name in zip(parameters, self._parameters):
-            kwargs[name] = value
         super(TrialSetting, self).__init__(**kwargs)
         
     # How should the object appear under various contexts (GUI, command line, etc)
@@ -106,6 +104,11 @@ def add_parameters(parameters, paradigm_class=None, repeats=True):
     Modifies the TrialSetting class on-the fly to control the parameters we want
     '''
 
+    # Since add_parameters may be called several times during the lifetime of
+    # the program, we need to make sure we're not duplicating an existing
+    # parameter.
+    parameters = [p for p in parameters if p not in TrialSetting.class_traits()]
+
     columns = []
     labels = []
     for parameter in parameters:
@@ -139,10 +142,35 @@ def add_parameters(parameters, paradigm_class=None, repeats=True):
             # The trait has already been defined, so we should just skip it
             pass
 
+    #columns.append(('Type', 'ttype'))
     trial_setting_editor.adapter.columns.extend(columns)
     TrialSetting._parameters.extend(parameters)
     TrialSetting._labels.extend(labels)
 
+import unittest
+
+class TestTrialSetting(unittest.TestCase):
+
+    def setUp(self):
+        add_parameters(['x', 'y'])
+
+    def testEquality(self):
+        self.assertEqual(TrialSetting('NOGO'), TrialSetting('NOGO'))
+        self.assertEqual(TrialSetting('NOGO', x=1), TrialSetting('NOGO', x=1))
+        self.assertNotEqual(TrialSetting('NOGO'), TrialSetting('GO'))
+        self.assertNotEqual(TrialSetting('NOGO', x=1), TrialSetting('GO', x=1))
+
+    def testIdentity(self):
+        self.assertFalse(TrialSetting('NOGO') is TrialSetting('NOGO'))
+
+    def testList(self):
+        settings = [TrialSetting('NOGO'), TrialSetting('GO', x=1),
+                    TrialSetting('GO', x=1), TrialSetting('GO', x=2)]
+        settings.remove(TrialSetting('GO', x=1))
+        self.assertEqual(len(settings), 3)
+        print settings
+
 if __name__ == '__main__':
-    add_parameters(['x', 'y'])
-    s = TrialSetting()
+    #add_parameters(['x', 'y'])
+    #s = TrialSetting()
+    unittest.main()
