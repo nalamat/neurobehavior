@@ -52,7 +52,7 @@ class AbstractExperiment(HasTraits):
     duration            = Property(store='attribute')
     date                = Property(store='attribute', depends_on='start_time')
 
-    spool_physiology         = Bool(False)
+    spool_physiology    = Bool(False)
 
     def _get_date(self):
         if self.start_time is None:

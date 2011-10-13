@@ -245,7 +245,7 @@ class PhysiologyExperiment(HasTraits):
         # Hack alert.  Can we separate this out into a separate function?
         if self.parent is not None:
             try:
-                self.parent._add_behavior_plots(index_mapper, container)
+                self.parent._add_experiment_plots(index_mapper, container)
             except AttributeError:
                 pass
 
