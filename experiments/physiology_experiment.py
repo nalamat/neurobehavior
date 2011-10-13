@@ -19,7 +19,7 @@ from cns.chaco_exts.tools.window_tool import WindowTool
 from cns.chaco_exts.helpers import add_default_grids, add_time_axis
 from cns.chaco_exts.channel_data_range import ChannelDataRange
 from cns.chaco_exts.timeseries_plot import TimeseriesPlot
-from cns.chaco_exts.extremes_channel_plot import ExtremesChannelPlot
+from cns.chaco_exts.extremes_multi_channel_plot import ExtremesMultiChannelPlot
 from cns.chaco_exts.ttl_plot import TTLPlot
 from cns.chaco_exts.epoch_plot import EpochPlot
 from cns.chaco_exts.channel_range_tool import MultiChannelRangeTool
@@ -251,7 +251,7 @@ class PhysiologyExperiment(HasTraits):
 
         # Create the neural plots
         value_mapper = LinearMapper(range=self.physiology_value_range)
-        plot = ExtremesChannelPlot(channel=self.data.processed, 
+        plot = ExtremesMultiChannelPlot(channel=self.data.processed, 
                 index_mapper=index_mapper, value_mapper=value_mapper)
         self.settings.sync_trait('visible_channels', plot, 'channel_visible', mutual=False)
 

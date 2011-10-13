@@ -3,6 +3,7 @@ from enthought.traits.ui.api import View, Item, HGroup, spring
 from abstract_experiment_controller import AbstractExperimentController
 from abstract_experiment_controller import ExperimentToolBar
 from cns.pipeline import deinterleave_bits
+from tdt.device import RZ6
 
 from cns import get_config
 from os.path import join
@@ -40,14 +41,39 @@ class AbstractPositiveController(AbstractExperimentController):
     toolbar = Instance(PositiveExperimentToolBar, (), toolbar=True)
     fs_conversion = Int
 
+    def set_attenuations(self, att1, att2, check=True):
+        # TDT's built-in attenuators for the RZ6 function in 20 dB steps, so we
+        # need to determine the next greater step size for the attenuator.  The
+        # maximum hardware attenuation is 60 dB.
+        log.debug('Attempting to change attenuation to %r and %r', att1, att2)
+
+        if att1 is None:
+            att1 = self.current_hw_att1
+        if att2 is None:
+            att2 = self.current_hw_att2
+        hw1, sw1 = RZ6.split_attenuation(att1)
+        hw2, sw2 = RZ6.split_attenuation(att2)
+
+        if hw1 != self.current_hw_att1:
+            if check and self.get_current_value('fixed_attenuation'):
+                raise ValueError, 'Cannot change primary attenuation'
+            self.current_hw_att1 = hw1
+            self.output_primary.hw_attenuation = hw1
+            log.debug('Updated primary attenuation to %.2f', hw1)
+        if hw2 != self.current_hw_att2:
+            if check and self.get_current_value('fixed_attenuation'):
+                raise ValueError, 'Cannot change primary attenuation'
+            self.current_hw_att2 = hw2
+            self.output_primary.hw_attenuation = hw2
+            log.debug('Updated primary attenuation to %.2f', hw2)
+        att_bits = RZ6.atten_to_bits(att1, att2)
+        self.iface_behavior.set_tag('att_bits', att_bits)
+
     def setup_experiment(self, info):
         circuit = join(get_config('RCX_ROOT'), 'positive-behavior-v2')
         self.iface_behavior = self.process.load_circuit(circuit, 'RZ6')
 
-        # primary speaker
-        self.buffer_out1 = self.iface_behavior.get_buffer('out1', 'w')
-        # secondary speaker
-        self.buffer_out2 = self.iface_behavior.get_buffer('out2', 'w')
+        self.buffer_out = self.iface_behavior.get_buffer('out', 'w')
         self.buffer_TTL1 = self.iface_behavior.get_buffer('TTL', 'r',
                 src_type='int8', dest_type='int8', block_size=24)
         self.buffer_TTL2 = self.iface_behavior.get_buffer('TTL2', 'r',
@@ -56,9 +82,10 @@ class AbstractPositiveController(AbstractExperimentController):
                 'r', src_type='int32', dest_type='int32', block_size=1)
         self.buffer_poke_end = self.iface_behavior.get_buffer('poke_all\\', 'r',
                 src_type='int32', dest_type='int32', block_size=1)
+
         # microphone
-        #self.buffer_mic = self.iface_behavior.get_buffer('mic', 'r')
-        #self.model.data.microphone.fs = self.buffer_mic.fs
+        self.buffer_mic = self.iface_behavior.get_buffer('mic', 'r')
+        self.model.data.microphone.fs = self.buffer_mic.fs
 
         self.fs_conversion = self.iface_behavior.get_tag('TTL_d')
 
@@ -122,6 +149,7 @@ class AbstractPositiveController(AbstractExperimentController):
     # Master controller
     ############################################################################
     def monitor_behavior(self):
+        self.model.data.microphone.send(self.buffer_mic.read())
         self.pipeline_TTL1.send(self.buffer_TTL1.read())
         self.pipeline_TTL2.send(self.buffer_TTL2.read())
         ts_end = self.get_trial_end_ts()
@@ -269,6 +297,12 @@ class AbstractPositiveController(AbstractExperimentController):
             self.iface_behavior.set_tag('pump_trig_ms', 200)
             self.set_pump_volume(value)
 
+    def set_mic_fhp(self, value):
+        self.iface_behavior.set_tag('FiltHP', value)
+
+    def set_mic_flp(self, value):
+        self.iface_behavior.set_tag('FiltLP', value)
+
     def _context_updated_fired(self):
         if self.cancel_trigger():
             self.trigger_next()
@@ -285,30 +319,20 @@ class AbstractPositiveController(AbstractExperimentController):
         # The outputs will automatically handle scaling the waveform given
         # the current hardware attenuation settings.
         if speaker == 'primary':
-            att1, waveform1, clip1, floor1 = self.output_primary.realize()
-            att2, waveform2 = None, np.zeros(len(waveform1))
-            clip2, floor2 = False, False
+            self.iface_behavior.set_tag('speaker', 0)
+            att1, waveform, clip, floor = self.output_primary.realize()
+            att2 = None
         elif speaker == 'secondary':
-            att2, waveform2, clip2, floor2 = self.output_secondary.realize()
-            att1, waveform1 = None, np.zeros(len(waveform2))
-            clip1, floor1 = False, False
-        elif speaker == 'both':
-            att1, waveform1, clip1, floor1 = self.output_primary.realize()
-            att2, waveform2, clip2, floor2 = self.output_secondary.realize()
+            self.iface_behavior.set_tag('speaker', 1)
+            att2, waveform, clip, floor = self.output_secondary.realize()
+            att1 = None
 
         clip_mesg = 'The {} output exceeds the maximum limits of the system'
         floor_mesg = 'The {} output is below the noise floor of the system'
+
         message = ''
-        if clip1:
-            message += clip_mesg.format('primary')
-        if clip2:
-            message += clip_mesg.format('secondary')
-        #if floor1:
-        #    message += floor_mesg.format('primary')
-        #if floor2:
-        #    message += floor_mesg.format('secondary')
-        #if clip1 or clip2 or floor1 or floor2:
-        if clip1 or clip2:
+        if clip:
+            message += clip_mesg.format(speaker)
             mesg = '''
             The current experiment settings will produce a distorted signal.
             Please review your settings carefully and correct any discrepancies
@@ -323,7 +347,5 @@ class AbstractPositiveController(AbstractExperimentController):
         # not changed.  If it has, indeed, changed and fixed_attenuation is
         # True, then an error will be raised.
         self.set_attenuations(att1, att2)
-
-        self.buffer_out1.set(waveform1)
-        self.buffer_out2.set(waveform2)
+        self.buffer_out.set(waveform)
         self.iface_behavior.trigger(1)

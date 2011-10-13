@@ -17,7 +17,7 @@ class ChannelPlot(BaseChannelPlot):
 
     # When decimating, how many samples should be extracted per point?
     dec_points = Int(2)
-    dec_factor = Property(depends_on='index_mapper.updated, dec_points')
+    dec_factor = Property(depends_on='index_mapper.updated, dec_points, channel.fs')
 
     def _invalidate_screen(self):
         self._screen_cache_valid = False
