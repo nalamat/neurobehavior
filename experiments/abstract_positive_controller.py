@@ -64,7 +64,7 @@ class AbstractPositiveController(AbstractExperimentController):
             if check and self.get_current_value('fixed_attenuation'):
                 raise ValueError, 'Cannot change primary attenuation'
             self.current_hw_att2 = hw2
-            self.output_primary.hw_attenuation = hw2
+            self.output_secondary.hw_attenuation = hw2
             log.debug('Updated primary attenuation to %.2f', hw2)
         att_bits = RZ6.atten_to_bits(att1, att2)
         self.iface_behavior.set_tag('att_bits', att_bits)
