@@ -1,4 +1,4 @@
-from enthought.traits.api import CBool
+from enthought.traits.api import Float
 from enthought.traits.ui.api import View, VGroup, Include
 
 from .abstract_experiment_paradigm import AbstractExperimentParadigm
@@ -18,7 +18,12 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm):
     timeout_duration = Expression(1, label='TO duration (s)', **kw)
     poke_duration = Expression(0.2, label='Poke duration (s)', **kw)
 
+    mic_fhp = Float(100, label='Microphone highpass cutoff (Hz)', **kw)
+    mic_flp = Float(40e3, label='Microphone lowpass cutoff (Hz)', **kw)
+
     abstract_positive_paradigm_group = VGroup(
+            'mic_fhp',
+            'mic_flp',
             'trial_duration',
             'signal_offset_delay',
             'intertrial_duration',

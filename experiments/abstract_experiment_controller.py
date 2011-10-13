@@ -432,7 +432,7 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
             if hw1 != self.current_hw_att1:
                 if check and self.get_current_value('fixed_attenuation'):
                     raise ValueError, 'Cannot change primary attenuation'
-                self.iface_behavior.set_tag('att1', hw1)
+                #self.iface_behavior.set_tag('att1', hw1)
                 self.current_hw_att1 = hw1
                 #self.output_primary.hw_attenuation = hw1
                 log.debug('Updated primary attenuation to %.2f', hw1)
@@ -448,7 +448,7 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
             if hw2 != self.current_hw_att2:
                 if check and self.get_current_value('fixed_attenuation'):
                     raise ValueError, 'Cannot change secondary attenuation'
-                self.iface_behavior.set_tag('att2', hw2)
+                #self.iface_behavior.set_tag('att2', hw2)
                 self.current_hw_att2 = hw2
                 #self.output_secondary.hw_attenuation = hw2
                 log.debug('Updated secondary attenuation to %.2f', hw2)
