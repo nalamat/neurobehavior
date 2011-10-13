@@ -24,11 +24,20 @@ class BasicCharacterizationToolbar(ExperimentToolBar):
 class BasicCharacterizationController(AbstractExperimentController):
 
     toolbar = Instance(BasicCharacterizationToolbar, (), toolbar=True)
-    iface_audio = Instance(DSPCircuit)
+    iface_audio = Instance('tdt.DSPCircuit')
+    buffer_mic = Instance('tdt.DSPBuffer')
 
     def _iface_audio_default(self):
         circuit = join(get_config('RCX_ROOT'), 'basic_audio')
         return self.process.load_circuit(circuit, 'RZ6')
+
+    def _buffer_mic_default(self):
+        mic = self.iface_audio.get_buffer('mic', 'r')
+        self.model.data.microphone.fs = mic.fs
+        return mic
+
+    def monitor_mic(self):
+        self.model.data.microphone.send(self.buffer_mic.read())
 
     def setup_experiment(self, info):
         pass
@@ -36,6 +45,7 @@ class BasicCharacterizationController(AbstractExperimentController):
     def start_experiment(self, info):
         self.iface_audio.trigger('A', 'high')
         self.state = 'running'
+        self.tasks.append((self.monitor_mic, 1))
 
     def pause(self, info):
         self.iface_audio.trigger('A', 'low')

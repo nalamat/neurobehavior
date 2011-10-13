@@ -89,14 +89,14 @@ class AbstractAversiveExperiment(AbstractExperiment):
         index_range.sources = [self.data.contact_digital]
         index_mapper = LinearMapper(range=index_range)
         container = OverlayPlotContainer(padding=[20, 20, 50, 5])
-        self._add_behavior_plots(index_mapper, container)
+        self._add_experiment_plots(index_mapper, container)
         # Add axes and grids to the first plot
         plot = container.components[0]
         add_default_grids(plot, minor_index=0.25, major_index=1)
         add_time_axis(plot, orientation='top')
         self.experiment_plot = container
 
-    def _add_behavior_plots(self, index_mapper, container, alpha=0.25):
+    def _add_experiment_plots(self, index_mapper, container, alpha=0.25):
         value_range = DataRange1D(low_setting=0, high_setting=1)
         value_mapper = LinearMapper(range=value_range)
         plot = TTLPlot(channel=self.data.trial_running, reference=0,
