@@ -24,7 +24,6 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm):
     abstract_positive_paradigm_group = VGroup(
             'mic_fhp',
             'mic_flp',
-            'trial_duration',
             'signal_offset_delay',
             'intertrial_duration',
             'reaction_window_delay',
