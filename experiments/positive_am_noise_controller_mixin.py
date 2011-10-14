@@ -70,7 +70,7 @@ class PositiveAMNoiseControllerMixin(HasTraits):
     def set_modulation_depth(self, value):
         self.modulator.depth = value
 
-    def set_trial_duration(self, value):
+    def set_duration(self, value):
         self.envelope.duration = value
         self.output_primary.duration = value
         self.output_secondary.duration = value

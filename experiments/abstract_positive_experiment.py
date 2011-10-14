@@ -102,6 +102,7 @@ class TrialLogAdapter(TabularAdapter):
 
 class AbstractPositiveExperiment(AbstractExperiment):
 
+    microphone_plot = Instance(Component)
     experiment_plot = Instance(Component)
     trial_log_adapter = TrialLogAdapter()
     trial_log_editor = TabularEditor(editable=False, adapter=trial_log_adapter,
@@ -187,11 +188,12 @@ class AbstractPositiveExperiment(AbstractExperiment):
         container.add(plot)
 
         # set up microphone plot
-        value_range = DataRange1D(low_setting=-40, high_setting=20)
+        value_range = DataRange1D(low_setting=0, high_setting=80)
         value_mapper = LinearMapper(range=value_range)
         plot = RMSChannelPlot(channel=self.data.microphone,
                 index_mapper=index_mapper, value_mapper=value_mapper,
-                line_color=(0, 0, 0, 1))
+                line_color=(0, 0, 0, 0.25))
+        self.microphone_plot = plot
         container.add(plot)
 
     @on_trait_change('data')
@@ -228,6 +230,8 @@ class AbstractPositiveExperiment(AbstractExperiment):
             VGroup(
                 Item('handler.toolbar', style='custom'),
                 Item('handler.pump_toolbar', style='custom'),
+                Item('object.microphone_plot.sensitivity'),
+                Item('object.microphone_plot.input_gain'),
                 Include('status_group'),
                 Tabbed(
                     Item('paradigm', style='custom', editor=InstanceEditor(),
