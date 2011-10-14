@@ -10,7 +10,7 @@ from enthought.enable.api import Component, ComponentEditor
 from abstract_experiment import AbstractExperiment
 
 from enthought.chaco.api import DataRange1D, LinearMapper, \
-        OverlayPlotContainer
+        OverlayPlotContainer, LogMapper
 
 from cns.chaco_exts.channel_data_range import ChannelDataRange
 from cns.chaco_exts.ttl_plot import TTLPlot
@@ -18,7 +18,7 @@ from cns.chaco_exts.timeseries_plot import TimeseriesPlot
 from cns.chaco_exts.channel_plot import ChannelPlot
 from cns.chaco_exts.epoch_plot import EpochPlot
 from cns.chaco_exts.extremes_channel_plot import ExtremesChannelPlot
-from cns.chaco_exts.extremes_channel_plot import ExtremesChannelPlot
+from cns.chaco_exts.rms_channel_plot import RMSChannelPlot
 from cns.chaco_exts.timeseries_plot import TimeseriesPlot
 from cns.chaco_exts.helpers import add_default_grids, add_time_axis
 from cns.chaco_exts.channel_range_tool import ChannelRangeTool
@@ -187,11 +187,11 @@ class AbstractPositiveExperiment(AbstractExperiment):
         container.add(plot)
 
         # set up microphone plot
-        value_range = DataRange1D(low_setting=-5, high_setting=5)
+        value_range = DataRange1D(low_setting=-40, high_setting=20)
         value_mapper = LinearMapper(range=value_range)
-        plot = ExtremesChannelPlot(channel=self.data.microphone,
+        plot = RMSChannelPlot(channel=self.data.microphone,
                 index_mapper=index_mapper, value_mapper=value_mapper,
-                line_color=(0.2, 0.2, 0.2, 0.75))
+                line_color=(0, 0, 0, 1))
         container.add(plot)
 
     @on_trait_change('data')

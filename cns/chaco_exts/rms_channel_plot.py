@@ -13,8 +13,6 @@ def decimate_rms(data, downsample):
     if data.shape[-1] == 0:
         return [], []
 
-    downsample *= 100
-
     # Determine the "fragment" size that we are unable to decimate.  A
     # downsampling factor of 5 means that we perform the operation in chunks of
     # 5 samples.  If we have only 13 samples of data, then we cannot decimate
@@ -30,45 +28,12 @@ def decimate_rms(data, downsample):
     else:
         shape = (-1, downsample)
     data = data[..., :-offset].reshape(shape).copy()
-    return np.abs(data).max(last_dim)
+    dec = np.mean((data**2), axis=last_dim)**0.5
+    return 20*np.log10(dec)
 
-def decimate_simple(data, downsample):
-    if data.shape[-1] == 0:
-        return [], []
-    # Determine the "fragment" size that we are unable to decimate.  A
-    # downsampling factor of 5 means that we perform the operation in chunks of
-    # 5 samples.  If we have only 13 samples of data, then we cannot decimate
-    # the last 3 samples and will simply discard them. 
-    last_dim = data.ndim
-    offset = data.shape[-1] % downsample
-    return data[..., ::downsample]
-
-def decimate_extremes(data, downsample):
-    # If data is empty, return imediately
-    if data.shape[-1] == 0:
-        return [], []
-
-    # Determine the "fragment" size that we are unable to decimate.  A
-    # downsampling factor of 5 means that we perform the operation in chunks of
-    # 5 samples.  If we have only 13 samples of data, then we cannot decimate
-    # the last 3 samples and will simply discard them. 
-    last_dim = data.ndim
-    offset = data.shape[-1] % downsample
-
-    # Force a copy to be made, which speeds up min()/max().  Apparently min/max
-    # make a copy of a reshaped array before performing the operation, so we
-    # force it now so the copy only occurs once.
-    if data.ndim == 2:
-        shape = (len(data), -1, downsample)
-    else:
-        shape = (-1, downsample)
-    data = data[..., :-offset].reshape(shape).copy()
-    return data.min(last_dim), data.max(last_dim)
-
-class ExtremesChannelPlot(ChannelPlot):
+class RMSChannelPlot(ChannelPlot):
     
-    _cached_min     = Any
-    _cached_max     = Any
+    _cached_dec     = Any
 
     # At what point should we switch from generating a decimated plot to a
     # regular line plot?
@@ -77,22 +42,20 @@ class ExtremesChannelPlot(ChannelPlot):
 
     def _dec_points_changed(self):
         # Flush the downsampled cache since it is no longer valid
-        self._cached_min = None
-        self._cached_max = None
+        self._cached_dec = None
 
     @cached_property
     def _get_draw_mode(self):
         return 'ptp' if self.dec_factor >= self.dec_threshold else 'normal'
 
     def _index_mapper_updated(self):
-        super(ExtremesChannelPlot, self)._index_mapper_updated()
-        self._cached_min = None
-        self._cached_max = None
+        super(RMSChannelPlot, self)._index_mapper_updated()
+        self._cached_dec = None
 
     def _get_screen_points(self):
         if not self._screen_cache_valid:
             if self._cached_data.shape[-1] == 0:
-                self._cached_screen_data = [], []
+                self._cached_screen_data = []
                 self._cached_screen_index = []
             else:
                 if self.draw_mode == 'normal':
@@ -114,22 +77,17 @@ class ExtremesChannelPlot(ChannelPlot):
 
     def _compute_screen_points_decimated(self):
         # We cache our prior decimations 
-        if self._cached_min is not None:
-            n_cached = self._cached_min.shape[-1]*self.dec_factor
+        if self._cached_dec is not None:
+            n_cached = self._cached_dec.shape[-1]*self.dec_factor
             to_decimate = self._cached_data[..., n_cached:]
-            mins, maxes = decimate_extremes(to_decimate, self.dec_factor)
-            self._cached_min = np.hstack((self._cached_min, mins))
-            self._cached_max = np.hstack((self._cached_max, maxes))
+            dec = decimate_rms(to_decimate, self.dec_factor)
+            self._cached_dec = np.hstack((self._cached_dec, dec))
         else:
-            ptp = decimate_extremes(self._cached_data, self.dec_factor)
-            self._cached_min = ptp[0]
-            self._cached_max = ptp[1]
+            self._cached_dec = decimate_rms(self._cached_data, self.dec_factor)
 
         # Now, map them to the screen
-        samples = self._cached_min.shape[-1]
-        s_val_min = self._map_screen(self._cached_min)
-        s_val_max = self._map_screen(self._cached_max)
-        self._cached_screen_data = s_val_min, s_val_max
+        samples = self._cached_dec.shape[-1]
+        self._cached_screen_data = self._map_screen(self._cached_dec)
 
         total_samples = self._cached_data.shape[-1]
         t = self.index_values[:total_samples:self.dec_factor][:samples]
@@ -147,15 +105,8 @@ class ExtremesChannelPlot(ChannelPlot):
         gc.set_line_width(self.line_width) 
 
         gc.begin_path()
-        if self.draw_mode == 'normal':
-            idx, val = points
-            gc.lines(np.c_[idx, val])
-        else:
-            idx, (mins, maxes) = points
-            starts = np.column_stack((idx, mins))
-            ends = np.column_stack((idx, maxes))
-            gc.line_set(starts, ends)
-
+        idx, val = points
+        gc.lines(np.c_[idx, val])
         gc.stroke_path()
         self._draw_default_axes(gc)
         gc.restore_state()
