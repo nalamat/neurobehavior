@@ -7,7 +7,7 @@ class AMNoiseParadigmMixin(HasTraits):
     kw = {'context': True, 'store': 'attribute', 'log': True}
     fc = Expression(3e3, label='Center frequency (Hz)', **kw)
     modulation_onset = Expression('uniform(0.2, 0.4)', label='Modulation onset (s)')
-    trial_duration = Expression(1.2, label='Signal duration (s)', **kw)
+    duration = Expression(1.2, label='Signal duration (s)', **kw)
     rise_fall_time = Expression(0.15, label='Ramp time (s)', **kw)
     fm = Expression(5, label='Modulation frequency (Hz)', **kw)
     level = Expression(60.0, label='Spectrum Level (dB SPL)', **kw)
@@ -23,7 +23,7 @@ class AMNoiseParadigmMixin(HasTraits):
     # This defines what is visible via the GUI
     signal_group = VGroup(
             VGroup(
-                #'duration',
+                'duration',
                 'rise_fall_time',
                 'fm',
                 'fc',
