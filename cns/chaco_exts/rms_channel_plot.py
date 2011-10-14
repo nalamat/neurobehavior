@@ -2,7 +2,7 @@ from __future__ import division
 
 import numpy as np
 from channel_plot import ChannelPlot
-from enthought.traits.api import Any, Property, cached_property, Int
+from enthought.traits.api import Any, Property, cached_property, Int, Float
 from enthought.traits.ui.api import View, Item
 
 import logging
@@ -28,8 +28,7 @@ def decimate_rms(data, downsample):
     else:
         shape = (-1, downsample)
     data = data[..., :-offset].reshape(shape).copy()
-    dec = np.mean((data**2), axis=last_dim)**0.5
-    return 20*np.log10(dec)
+    return np.mean((data**2), axis=last_dim)**0.5
 
 class RMSChannelPlot(ChannelPlot):
     
@@ -39,6 +38,11 @@ class RMSChannelPlot(ChannelPlot):
     # regular line plot?
     dec_threshold = Int(6)
     draw_mode = Property(depends_on='dec_threshold, dec_factor')
+
+    dec_points = 1
+
+    sensitivity = Float(5e-5)   # Volts/Pa
+    input_gain = Float(57.0)    # In dB
 
     def _dec_points_changed(self):
         # Flush the downsampled cache since it is no longer valid
@@ -81,9 +85,12 @@ class RMSChannelPlot(ChannelPlot):
             n_cached = self._cached_dec.shape[-1]*self.dec_factor
             to_decimate = self._cached_data[..., n_cached:]
             dec = decimate_rms(to_decimate, self.dec_factor)
+            dec = 20*np.log10(dec/self.sensitivity) - self.input_gain
             self._cached_dec = np.hstack((self._cached_dec, dec))
         else:
-            self._cached_dec = decimate_rms(self._cached_data, self.dec_factor)
+            dec = decimate_rms(self._cached_data, self.dec_factor)
+            dec = 20*np.log10(dec/self.sensitivity) - self.input_gain
+            self._cached_dec = dec
 
         # Now, map them to the screen
         samples = self._cached_dec.shape[-1]
@@ -102,12 +109,16 @@ class RMSChannelPlot(ChannelPlot):
         gc.save_state()
         gc.clip_to_rect(self.x, self.y, self.width, self.height)
         gc.set_stroke_color(self.line_color_)
+        gc.set_fill_color(self.line_color_)
         gc.set_line_width(self.line_width) 
 
         gc.begin_path()
         idx, val = points
         gc.lines(np.c_[idx, val])
-        gc.stroke_path()
+        gc.line_to(idx[-1], self.y)
+        gc.line_to(idx[0], self.y)
+        #gc.stroke_path()
+        gc.fill_path()
         self._draw_default_axes(gc)
         gc.restore_state()
 

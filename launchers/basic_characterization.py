@@ -3,7 +3,7 @@ from enthought.traits.ui.api import View, Include, VSplit, VGroup, Item
 from enthought.enable.api import Component, ComponentEditor
 from cns.channel import FileChannel
 from enthought.chaco.api import DataRange1D, LinearMapper
-from cns.chaco_exts.extremes_channel_plot import ExtremesChannelPlot
+from cns.chaco_exts.rms_channel_plot import RMSChannelPlot
 
 
 from experiments import (
@@ -19,9 +19,9 @@ class Paradigm(BasicCharacterizationParadigm): pass
 class Experiment(AbstractExperiment):
 
     def _add_experiment_plots(self, index_mapper, container, alpha=0.25):
-        value_range = DataRange1D(low_setting=-5, high_setting=5)
+        value_range = DataRange1D(low_setting=-20, high_setting=80)
         value_mapper = LinearMapper(range=value_range)
-        plot = ExtremesChannelPlot(channel=self.data.microphone,
+        plot = RMSChannelPlot(channel=self.data.microphone,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 line_color=(0.2, 0.2, 0.2, 0.50))
         container.add(plot)
