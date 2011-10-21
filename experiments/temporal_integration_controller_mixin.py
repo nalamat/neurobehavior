@@ -6,7 +6,6 @@ from neurogen.sink import Sink
 
 class TemporalIntegrationControllerMixin(HasTraits):
 
-    silence_carrier  = Instance(blocks.Block)
     noise_carrier    = Instance(blocks.Block)
     tone_carrier     = Instance(blocks.Block)
     envelope         = Instance(blocks.Block)
@@ -21,9 +20,6 @@ class TemporalIntegrationControllerMixin(HasTraits):
         return Sink(token=self.envelope.waveform, fs=self.iface_behavior.fs,
                     calibration=self.cal_secondary)
     
-    def _silence_carrier(self):
-        return blocks.Silence()
-
     def _tone_carrier_default(self):
         return blocks.Tone(frequency=2e3)
 
