@@ -7,27 +7,24 @@ from enthought.chaco.api import DataRange1D, LinearMapper, \
 
 from cns.chaco_exts.channel_data_range import ChannelDataRange
 from cns.chaco_exts.ttl_plot import TTLPlot
+from cns.chaco_exts.helpers import add_default_grids, add_time_axis
+from cns.chaco_exts.rms_channel_plot import RMSChannelPlot
 
 from abstract_experiment import AbstractExperiment
-from positive_stage1_paradigm import PositiveStage1Paradigm
 from positive_stage1_controller import PositiveStage1Controller
 from positive_stage1_data import PositiveStage1Data
 
 class PositiveStage1Experiment(AbstractExperiment):
 
-    data        = Instance(PositiveStage1Data)
-    paradigm    = Instance(PositiveStage1Paradigm, ())
-
-    contact_plot = Any
-    contact_plot_index_range = Instance(ChannelDataRange, ())
-    contact_plot_range = DelegatesTo('contact_plot_index_range', 'range')
-    contact_plot_interval = DelegatesTo('contact_plot_index_range', 'interval')
+    microphone_plot = Instance(Component)
+    data            = Instance(PositiveStage1Data)
+    contact_plot    = Any
 
     def _data_default(self):
         return PositiveStage1Data(store_node=self.store_node)
 
     def _data_changed(self):
-        index_range = self.contact_plot_index_range
+        index_range = ChannelDataRange(trig_delay=0)
         index_range.add(self.data.spout_TTL)
         index_mapper = LinearMapper(range=index_range)
         value_range = DataRange1D(low_setting=-0, high_setting=1)
@@ -74,13 +71,19 @@ class PositiveStage1Experiment(AbstractExperiment):
                 orientation='vertical', line_color='lightgray',
                 line_style='solid', grid_interval=1)
         plot.underlays.append(grid)
-        axis = PlotAxis(component=plot, title="Time (s)",
-                        orientation="top", ticks_visible=True)
-        plot.underlays.append(axis)
-        tick_formatter = lambda s: "{0}:{1:02}".format(*divmod(int(s), 60))
-        axis = PlotAxis(component=plot, title="Time (min:sec)",
-                tick_label_formatter=tick_formatter, orientation="bottom")
-        plot.underlays.append(axis)
+
+        add_time_axis(plot)
+        add_default_grids(plot, major_index=1, minor_index=0.25)
+
+        # set up microphone plot
+        value_range = DataRange1D(low_setting=0, high_setting=80)
+        value_mapper = LinearMapper(range=value_range)
+        plot = RMSChannelPlot(channel=self.data.microphone,
+                index_mapper=index_mapper, value_mapper=value_mapper,
+                line_color=(0, 0, 0, 0.25))
+        self.microphone_plot = plot
+        container.add(plot)
+
 
         self.contact_plot = container
 
@@ -110,14 +113,8 @@ class PositiveStage1Experiment(AbstractExperiment):
                     Item('paradigm', style='custom'),
                     show_labels=False,
                     ),
-                VGroup(
-                    HGroup(
-                        Item('contact_plot_range', label='Range'), 
-                        Item('contact_plot_interval', label='Scroll interval'),
-                        ),
-                    Item('contact_plot', editor=ComponentEditor(),
-                        show_label=False, width=600, height=600),
-                    ),
+                Item('contact_plot', editor=ComponentEditor(),
+                    show_label=False, width=600, height=600),
                 ),
             resizable=True,
             close_result=False,

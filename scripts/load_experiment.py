@@ -108,7 +108,7 @@ if __name__ == '__main__':
 
     parser.add_argument('-r', '--rove', help='Parameter(s) to rove',
                         nargs='+', action=VerifyUniqueParameters, default=[],
-                        required=True)
+                        required=False)
     parser.add_argument('-a', '--analyze', help='Parameter(s) to analyze',
                         nargs='+', action=VerifyUniqueParameters, default=[])
     parser.add_argument('--repeats', 

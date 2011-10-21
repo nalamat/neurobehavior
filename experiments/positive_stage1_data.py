@@ -7,9 +7,11 @@ from abstract_experiment_data import AbstractExperimentData
 
 class PositiveStage1Data(AbstractExperimentData):
 
-    def _create_channel(self, name, dtype):
-        contact_node = get_or_append_node(self.store_node, 'contact')
-        return FileChannel(node=contact_node, name=name, dtype=dtype)
+    microphone = Instance(FileChannel, store='channel', store_path='microphone')
+
+    def _microphone_default(self):
+        return FileChannel(node=self.store_node, name='microphone',
+                dtype=np.float32)
 
     override_TTL = Instance(FileChannel, 
             store='channel', store_path='contact/override_TTL')
