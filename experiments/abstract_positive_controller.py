@@ -1,4 +1,4 @@
-from enthought.traits.api import Str, Property, Instance, Int
+from enthought.traits.api import Str, Property, Instance, Int, Float
 from enthought.traits.ui.api import View, Item, HGroup, spring
 from abstract_experiment_controller import AbstractExperimentController
 from abstract_experiment_controller import ExperimentToolBar
@@ -41,6 +41,9 @@ class AbstractPositiveController(AbstractExperimentController):
     toolbar = Instance(PositiveExperimentToolBar, (), toolbar=True)
     fs_conversion = Int
 
+    current_hw_att1 = Float(120)
+    current_hw_att2 = Float(120)
+
     def set_attenuations(self, att1, att2, check=True):
         # TDT's built-in attenuators for the RZ6 function in 20 dB steps, so we
         # need to determine the next greater step size for the attenuator.  The
@@ -62,10 +65,10 @@ class AbstractPositiveController(AbstractExperimentController):
             log.debug('Updated primary attenuation to %.2f', hw1)
         if hw2 != self.current_hw_att2:
             if check and self.get_current_value('fixed_attenuation'):
-                raise ValueError, 'Cannot change primary attenuation'
+                raise ValueError, 'Cannot change secondary attenuation'
             self.current_hw_att2 = hw2
             self.output_secondary.hw_attenuation = hw2
-            log.debug('Updated primary attenuation to %.2f', hw2)
+            log.debug('Updated secondary attenuation to %.2f', hw2)
         att_bits = RZ6.atten_to_bits(att1, att2)
         self.iface_behavior.set_tag('att_bits', att_bits)
 
