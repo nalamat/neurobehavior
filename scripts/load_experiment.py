@@ -5,17 +5,19 @@ import argparse
 import logging
 import logging.config
 from time import strftime
-from cns import get_config
 from os import path
 time_format = '[%(asctime)s] :: %(name)s - %(levelname)s - %(message)s'
 simple_format = '%(name)s - %(levelname)s - %(message)s'
 
-if not path.exists(get_config('LOG_ROOT')):
+# Set up the logging file.  If a path has been defined, save the file to that
+# path.  If not, save the logging data to a temporary file.
+try:
+    from cns import get_config
+    filename = path.join(get_config('LOG_ROOT'), strftime('%Y%m%d_%H%M.log'))
+except ImportError:
     import tempfile
     fh = tempfile.NamedTemporaryFile(delete=False)
     filename = fh.name
-else:
-    filename = path.join(get_config('LOG_ROOT'), strftime('%Y%m%d_%H%M.log'))
 
 logging_config = {
         'version': 1,
