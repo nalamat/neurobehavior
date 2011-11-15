@@ -50,7 +50,7 @@ logging_config = {
             # yet.  Let's silence this module.
             'enthought.chaco.barplot': { 'level': 'CRITICAL', },
             'experiments': { 'level': 'DEBUG' },
-            'tdt': { 'level': 'WARN' },
+            'tdt': { 'level': 'INFO' },
             'cns': { 'level': 'WARN' },
             'cns.data': { 'level': 'DEBUG' },
             'neurogen': { 'level': 'WARN' },

@@ -11,6 +11,7 @@ class PositiveAMNoiseControllerMixin(HasTraits):
     envelope        = Instance(blocks.Block)
     output_primary  = Instance(Sink)
     output_secondary= Instance(Sink)
+
     
     def set_speaker_equalize(self, value):
         self.output_primary.equalize = value
