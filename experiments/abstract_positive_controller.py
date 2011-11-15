@@ -73,7 +73,7 @@ class AbstractPositiveController(AbstractExperimentController):
         self.iface_behavior.set_tag('att_bits', att_bits)
 
     def setup_experiment(self, info):
-        circuit = join(get_config('RCX_ROOT'), 'positive-behavior-v2')
+        circuit = join(get_config('RCX_ROOT'), 'positive-behavior-v3')
         self.iface_behavior = self.process.load_circuit(circuit, 'RZ6')
 
         self.buffer_out = self.iface_behavior.get_buffer('out', 'w')
