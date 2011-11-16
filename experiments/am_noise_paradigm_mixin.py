@@ -6,11 +6,11 @@ class AMNoiseParadigmMixin(HasTraits):
     
     kw = {'context': True, 'store': 'attribute', 'log': True}
     fc = Expression(3e3, label='Center frequency (Hz)', **kw)
-    modulation_onset = Expression('uniform(0.2, 0.4)', label='Modulation onset (s)')
-    duration = Expression(1.2, label='Signal duration (s)', **kw)
-    rise_fall_time = Expression(0.15, label='Ramp time (s)', **kw)
+    modulation_onset = Expression('0.3', label='Modulation onset (s)', **kw)
+    duration = Expression(1.3, label='Signal duration (s)', **kw)
+    rise_fall_time = Expression(0.25, label='Ramp time (s)', **kw)
     fm = Expression(5, label='Modulation frequency (Hz)', **kw)
-    level = Expression(60.0, label='Spectrum Level (dB SPL)', **kw)
+    level = Expression(55.0, label='Spectrum Level (dB SPL)', **kw)
     seed = Expression(-1, label='Noise seed', **kw)
     modulation_depth = Expression(1.0, label='Modulation depth (frac)', **kw)
     bandwidth = Expression(3e3, label='Bandwidth (Hz)', **kw)
