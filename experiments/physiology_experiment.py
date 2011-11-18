@@ -390,6 +390,6 @@ if __name__ == '__main__':
     tempfile = join(get_config('TEMP_ROOT'), 'test_physiology.h5')
     datafile = tables.openFile(tempfile, 'w')
     data = PhysiologyData(store_node=datafile.root)
-    addr = ('localhost', 13131)
-    controller = PhysiologyController(process=DSPProject(address=addr))
+    #addr = ('localhost', 13131)
+    controller = PhysiologyController(process=DSPProject())
     PhysiologyExperiment(data=data).configure_traits(handler=controller)
