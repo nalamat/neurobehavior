@@ -189,6 +189,9 @@ class Epoch(HasTraits):
             self.append(timestamps)
             self.updated = np.array(timestamps)/self.fs
 
+    def __getitem__(self, key):
+        return self._buffer[key]/self.fs
+
 class FileEpoch(FileMixin, Epoch):
 
     name  = 'FileEpoch'
