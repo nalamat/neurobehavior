@@ -1,0 +1,7 @@
+111115 - Removed "live" virtualenvironment that was used by FAM to run the
+appetitive experiments on G5.
+
+Neurobehavior - 615c006a247e
+Neurogen - 1e0477ffc955
+New Era - 8dc72a8fb031
+TDTPy - ea88c23800b6

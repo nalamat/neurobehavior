@@ -70,7 +70,7 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
         if self.mask_mode == 'none':
             return self.trial_log
         else:
-            # Count gos backwards from the end of the array
+            # Count goes backwards from the end of the array
             if len(self.trial_log) == 0:
                 return self.trial_log
 
@@ -224,21 +224,28 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
                 check_bounds=True)
         spout_data = self.spout_TTL.get_range_index(ts_start, ts_end+5,
                 check_bounds=True)
-        react_data = self.reaction_TTL.get_range_index(ts_start, ts_end+5,
+        response_data = self.response_TTL.get_range_index(ts_start, ts_end+5,
                 check_bounds=True)
 
-        # Did subject withdraw from nose-poke before or after he was allowed to
-        # react?
-        if ~react_data.any():
+        reaction = 'normal'
+        reaction_type = 'none'
+        
+        # lb is poke start, ub is end of response delay, both in sec
+        lb_sec = self.trial_epoch[-1,0]
+        ub_sec = self.poke_epoch[-1,1]
+        TTL = self.poke_TTL.get_range(lb_sec, ub_sec)
+        if len(ts(edge_rising(TTL))):
             reaction = 'early'
-        elif poke_data[react_data].all():
-            reaction = 'late'
-        else:
-            reaction = 'normal'
+            reaction_type = 'poke'
+
+        TTL = self.spout_TTL.get_range(lb_sec, ub_sec)
+        if len(ts(edge_rising(TTL))):
+            reaction = 'early'
+            reaction_type = 'spout'
 
         # Regardless of whether or not the subject reacted early, what was his
         # response?
-        if spout_data.any():
+        if spout_data[response_data].any():
             response = 'spout'
         elif poke_data[-1] == 1:
             response = 'poke'
@@ -262,7 +269,7 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
         except:
             response_time = np.nan
 
-        return dict(reaction=reaction, response=response,
+        return dict(reaction=reaction, response=response, reaction_type=reaction_type,
                 response_time=response_time, reaction_time=reaction_time)
 
     # Splits masked_trial_log into individual sequences as needed
@@ -417,18 +424,17 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
 
     @cached_property
     def _get_hit_seq(self):
-        return self.go_seq & self.normal_seq & self.spout_seq
+        return self.go_seq & self.spout_seq
 
     @cached_property
     def _get_miss_seq(self):
-        return self.go_seq & (self.poke_seq | self.nr_seq) & self.normal_seq
+        return self.go_seq & (self.poke_seq | self.nr_seq) 
 
     @cached_property
+
     def _get_fa_seq(self):
-        return (self.early_seq & self.spout_seq) | \
-               (self.nogo_seq & self.normal_seq & self.spout_seq)
+        return self.nogo_seq & self.spout_seq
 
     @cached_property
     def _get_cr_seq(self):
-        return ((self.nogo_seq & self.normal_seq) | self.early_seq) & \
-                ~self.spout_seq               
+        return self.nogo_seq & ~self.spout_seq               
