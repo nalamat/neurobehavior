@@ -183,7 +183,8 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
         if score:
             ts_start = kwargs['ts_start']
             ts_end = kwargs['ts_end']
-            kwargs.update(self.compute_response(ts_start, ts_end))
+            response = kwargs['response']
+            kwargs.update(self.compute_response(ts_start, ts_end, response))
             kwargs['start'] = ts_start/self.poke_TTL.fs
             kwargs['end'] = ts_end/self.poke_TTL.fs
 
@@ -201,7 +202,7 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
         # the gerbil false alarms (which they almost certainly do)
         self.c_hit = self.rcount(self.hit_seq[self.go_seq|self.fa_seq])
 
-    def compute_response(self, ts_start, ts_end):
+    def compute_response(self, ts_start, ts_end, response):
         '''
         Available sequences
         -------------------
@@ -229,7 +230,8 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
 
         reaction = 'normal'
         reaction_type = 'none'
-        
+
+        # SCORING OF RESPONSE TIME
         # lb is poke start, ub is end of response delay, both in sec
         lb_sec = self.trial_epoch[-1,0]
         ub_sec = self.poke_epoch[-1,1]
@@ -243,20 +245,12 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
             reaction = 'early'
             reaction_type = 'spout'
 
-        # Regardless of whether or not the subject reacted early, what was his
-        # response?
-        if spout_data[response_data].any():
-            response = 'spout'
-        elif poke_data[-1] == 1:
-            response = 'poke'
-        else:
-            response = 'no response'
-
         # How quickly did he react?
         try:
             reaction_time = ts(edge_falling(poke_data))[0]/self.poke_TTL.fs
         except:
             reaction_time = np.nan
+        # END SCORING OF ACTUAL RESPONSE
 
         # How quickly did he provide his answer?
         try:
@@ -269,7 +263,7 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
         except:
             response_time = np.nan
 
-        return dict(reaction=reaction, response=response, reaction_type=reaction_type,
+        return dict(reaction=reaction, reaction_type=reaction_type,
                 response_time=response_time, reaction_time=reaction_time)
 
     # Splits masked_trial_log into individual sequences as needed

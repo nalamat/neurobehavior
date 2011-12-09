@@ -93,6 +93,7 @@ class TrialLogAdapter(TabularAdapter):
         # on the colors).  I wanted a spout response to have a green icon
         # associated with it (so that green on green means HIT, red on green
         # means MISS), etc.
+        print self.item
         if self.item['response'] == 'spout':
             return '@icons:tuple_node'  # a green icon
         elif self.item['response'] == 'poke':

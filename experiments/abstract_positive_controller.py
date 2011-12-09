@@ -159,7 +159,9 @@ class AbstractPositiveController(AbstractExperimentController):
         self.model.data.all_poke_epoch.send(self.get_all_poke_epochs())
 
         if ts_end > self.current_trial_end_ts:
-            # Trial is over.  Process new data and set up for next trial.
+            # Trial is over because the end timestamp in the circuit has
+            # changed.  Download all necessary data from the RPvds circuit and
+            # set up for the new trial.
             self.current_trial_end_ts = ts_end
             ts_start = self.get_trial_start_ts()
 
@@ -169,6 +171,25 @@ class AbstractPositiveController(AbstractExperimentController):
             self.model.data.signal_epoch.send([self.get_signal_epoch()])
             self.model.data.trial_epoch.send([self.get_trial_epoch()])
             self.model.data.response_ts.send([self.get_response_ts()])
+
+            # Find out what the response was
+            poke = self.iface_behavior.get_tag('resp_poke?')
+            spout = self.iface_behavior.get_tag('resp_spout?')
+            to = self.iface_behavior.get_tag('fa?')
+            print 'POKE', poke
+            print 'SPOUT', spout
+            print 'TO', to
+            if to:
+                response = 'spout'
+            elif poke and not spout:
+                response = 'poke'
+            elif spout and not poke:
+                response = 'spout'
+            elif not (spout or poke):
+                response = 'no response'
+            else:
+                raise ValueError, "Unknown response type!"
+            print "The response was", response
 
             while True:
                 try:
@@ -191,6 +212,7 @@ class AbstractPositiveController(AbstractExperimentController):
                             ts_end=np.floor(ts_end/self.fs_conversion),
                             primary_hw_attenuation=self.current_hw_att1,
                             secondary_hw_attenuation=self.current_hw_att2,
+                            response=response,
                             )
                     break
                 except ValueError, e:
