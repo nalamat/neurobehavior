@@ -16,13 +16,13 @@ class ExtremesMultiChannelPlot(ExtremesChannelPlot):
     offsets = Property(depends_on='channel_+, value_mapper.updated')
     screen_offsets = Property(depends_on='offsets')
 
-    def _offset_changed(self):
+    def _channel_offset_changed(self):
         self._invalidate_screen()
 
-    def _visible_changed(self):
+    def _channel_visible_changed(self):
         self._invalidate_screen()
 
-    def _spacing_changed(self):
+    def _channel_spacing_changed(self):
         self._invalidate_screen()
 
     @cached_property

@@ -12,12 +12,13 @@ class ChannelPlot(BaseChannelPlot):
     plotted.
     '''
 
-    _data_cache_valid = Bool(False)
-    _screen_cache_valid = Bool(False)
-
     # When decimating, how many samples should be extracted per pixel?
     dec_points = Int(2)
     dec_factor = Property(depends_on='index_mapper.updated, dec_points, channel.fs')
+
+    def _invalidate_data(self):
+        self._data_cache_valid = False
+        self.invalidate_and_redraw()
 
     def _invalidate_screen(self):
         self._screen_cache_valid = False
@@ -64,10 +65,14 @@ class ChannelPlot(BaseChannelPlot):
         data_width = (range.high-range.low)*self.channel.fs
         return np.floor((data_width/screen_width)/self.dec_points)
 
+    def _preprocess_data(self, data):
+        return data
+
     def _gather_points(self):
         if not self._data_cache_valid:
             range = self.index_mapper.range
-            self._cached_data = self.channel.get_range(range.low, range.high)
+            data = self.channel.get_range(range.low, range.high)
+            self._cached_data = self._preprocess_data(data)
             self._data_cache_valid = True
             self._screen_cache_valid = False
 
@@ -108,12 +113,3 @@ class ChannelPlot(BaseChannelPlot):
         self._draw_default_axes(gc)
         gc.restore_state()
 
-    def _data_changed(self, bounds):
-        # We need to be smart about the "data changed" event.  If we're not
-        # tracking the index range, then the data that has changed *may* be
-        # off-screen.  In which case, we're doing a *lot* of work to redraw the
-        # exact same picture.
-        if self.index_range.mask_data(np.array(bounds)).any():
-            self._new_bounds_cache = bounds
-            self._data_cache_valid = False
-            self.invalidate_and_redraw()
