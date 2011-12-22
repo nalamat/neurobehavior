@@ -3,9 +3,12 @@ from datetime import datetime, timedelta
 from cns.data.persistence import add_or_update_object_node
 from cns.data.h5_utils import get_or_append_node
 
+import subprocess
+from os import path
+
 from tdt import DSPProject
 from tdt.device import RZ6
-from cns import get_config
+from cns import get_config, get_settings
 
 from enthought.pyface.api import error, confirm, YES, ConfirmationDialog
 from enthought.pyface.timer.api import Timer
@@ -33,7 +36,6 @@ log = logging.getLogger(__name__)
 
 from cns import get_config
 from .utils import get_save_file, load_instance, dump_instance
-
 
 from physiology_experiment import PhysiologyExperiment
 from physiology_paradigm import PhysiologyParadigm
@@ -261,8 +263,7 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
             # case they block the program from continuing to run) or they
             # dissappear below the main window.
             #self.system_tray = QtGui.QSystemTrayIcon(icon, info.ui.control)
-            from os.path import dirname, join
-            icon_path = join(dirname(__file__), 'psi_uppercase.svg')
+            icon_path = path.join(path.dirname(__file__), 'psi_uppercase.svg')
             icon = QtGui.QIcon(icon_path)
             self.system_tray = QtGui.QSystemTrayIcon()
             self.system_tray.setIcon(icon)
@@ -311,15 +312,30 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
         Subclasses must implement `start_experiment`
         '''
         try:
-            # setup_experiment should load the necessary circuits and
-            # initialize the buffers. This data is required before the
-            # hardware process is launched since the shared memory, locks and
-            # pipelines must be created.
+            # Get the current revision of the program code so that we can
+            # properly determine the version used to run the code.  I'm not sure
+            # what happens if Hg is not installed on the computer.  However, we
+            # currently don't have to deal with that use-case.
+            dir = path.abspath(path.dirname(__file__))
+            rev_id = subprocess.check_output('hg id {}'.format(dir))
+            node._v_attrs['neurobehavior_revision'] = rev_id
+
+            # This will actually store a pickled copy of the calibration data
+            # that can *only* be recovered with Python (and a copy of the
+            # Neurobehavior module)
+            node._v_attrs['cal_1'] = self.cal_primary
+            node._v_attrs['cal_2'] = self.cal_secondary
+
+            # setup_experiment should load the necessary circuits and initialize
+            # the buffers. This data is required before the hardware process is
+            # launched since the shared memory, locks and pipelines must be
+            # created.
             self.setup_experiment(info)
 
             # Start the harware process
             self.process.start()
 
+            # Sorta a hack
             if self.model.spool_physiology:
                 self.physiology_handler.start()
 

@@ -13,14 +13,24 @@ from enthought.traits.api import HasTraits, Property, Array, Int, Event, \
     DelegatesTo, Enum, Dict, Set
 import numpy as np
 import tables
+from scipy import signal
 
 import logging
 log = logging.getLogger(__name__)
 
 class FileMixin(HasTraits):
     '''
-    Mixin class that streams acquired data to a HDF5_ EArray.  Note that if no
-    buffer is availale, then one will be created automatically.
+    Mixin class that uses a HDF5_ EArray as the backend for the buffer.  If the
+    array does not exist, it will be created automatically.  Note that this does
+    have some performance implications since data may have to be transferred
+    between the hard disk and RAM.
+
+    By default, this will create the node.  If the node already exists, use the
+    `from_node` classmethod to return an instance of the class.
+
+    IMPORTANT! When using this mixin with most subclasses of Channel, the
+    FileMixin typically must appear first in the list otherwise you may have
+    some MRO issues.
 
     .. _HDF5: http://www.hdfgroup.org/HDF5/
 
@@ -28,9 +38,10 @@ class FileMixin(HasTraits):
     ==========
     dtype
         Default is float64.  It is a good idea to set dtype appropriately for
-        the waveform (e.g. use bool for TTL data) to minimize file size.  Note
-        that Matlab does not currently support the HDF5 BITFIELD (e.g. boolean)
-        type and will be unable to read waveforms stored in this format.
+        the waveform (e.g. use a boolean dtype for TTL data) to minimize file
+        size.  Note that Matlab does not currently support the HDF5 BITFIELD
+        (e.g. boolean) type and will be unable to read waveforms stored in this
+        format.
     node
         A HDF5 node that will host the array
     name
@@ -68,28 +79,35 @@ class FileMixin(HasTraits):
     # float64 (double-precision float).
     dtype               = Any
 
-    node                = Instance(tables.group.Group)
-    name                = String('FileChannel')
-
     # Duration is in seconds.  The default corresponds to a 30 minute
     # experiment, which we seem to have settled on as the "standard" for running
     # appetitive experiments.
     expected_duration   = Float(1800) 
-    _buffer             = Instance(tables.array.Array)
     signal              = Property
     
-    def __init__(self, **traits):
-        HasTraits.__init__(self, **traits)
-        # Create the buffer once all traits are initialized
-        if self.name in self.node._v_children:
-            self._buffer = self._load_buffer()
-        else:
-            self._buffer = self._create_buffer()
+    # The actual source where the data is stored.  Node is the HDF5 Group that
+    # the EArray is stored under while name is the name of the EArray.
+    node                = Instance(tables.group.Group)
+    name                = String('FileChannel')
+    _buffer             = Instance(tables.array.Array)
+
+    @classmethod
+    def from_node(cls, node):
+        '''
+        Create an instance of the class from an existing node
+        '''
+        props = cls.class_trait_names(attr=True) 
+        kwargs = dict((name, node._v_attrs[name]) for name in props)
+        kwargs['node'] = node._v_parent
+        kwargs['name'] = node._v_name
+        kwargs['_buffer'] = node
+        kwargs['dtype'] = node.dtype
+        return cls(**kwargs)
 
     def _get_shape(self):
         return (0,)
 
-    def _create_buffer(self):
+    def _buffer_default(self):
         shape = self._get_shape()
         log.debug('%s: creating buffer with shape %r', self, self._get_shape())
         atom = tables.Atom.from_dtype(np.dtype(self.dtype))
@@ -104,15 +122,6 @@ class FileMixin(HasTraits):
             earray._v_attrs[k] = v
         return earray
 
-    #def _load_buffer(self):
-    #    buffer = self.node._v_children[self.name] 
-    #    traits = {}
-    #    for t in self.trait_names(attr=True):
-    #        if t in buffer._v_attrs:
-    #            traits[t] = buffer._v_attrs[t]
-    #    self.set(False, **traits)
-    #    return buffer
-
     # Ensure that all 'Traits' are synced with the file so we have that
     # information stored away.
     @on_trait_change('+attr', post_init=True)
@@ -123,11 +132,49 @@ class FileMixin(HasTraits):
     def _write(self, data):
         self._buffer.append(data)
 
+    def append(self, data):
+        self._buffer.append(data)
+
     def __repr__(self):
         return '<HDF5Store {}>'.format(self.name)
 
-    def append(self, data):
-        self._buffer.append(data)
+    def chunk_samples(self, chunk_bytes):
+        # Compute number of samples per channel to load based on the preferred
+        # memory size of the chunk.  The data is stored in 32-bit format, which
+        # translates to 4 bytes/sample.  Then, coerce the number of samples in
+        # each chunk to a multiple of the chunksize of the underlying data (it
+        # is much faster to load data in multiples of the native chunksize from
+        # the disk rather than splitting some reads across chunks ...
+        file_chunksize = self._buffer.chunkshape[-1]
+        bytes = np.nbytes[self.dtype]
+        chunk_samples = chunk_bytes/self.channels/bytes
+        chunk_samples = int(chunk_samples/file_chunksize)*file_chunksize
+        print 'Preferred chunksize is {} mb'.format(chunk_bytes/10e6)
+        print 'Actual chunksize is {} mb'.format(chunk_samples*bytes*16/10e6)
+        return chunk_samples
+
+    def chunk_iter(self, chunk_bytes, channels=None):
+        '''
+        Return an iterable that yields the data in segments based on the
+        requested memory size (in bytes) that each segment should be.  This will
+        be coerced to a multiple of the underlying chunkshape for efficiency
+        reasons.
+
+        TODO: Set this up for arbitrary dimensions
+        '''
+        chunk_samples = self.chunk_samples(chunk_bytes)
+        samples = self._buffer.shape[-1]
+        n_chunks = int(np.ceil(samples/chunk_samples))
+
+        # Create a special slice object that returns all channels
+        if channels is None:
+            channels = slice(None)
+
+        print 'Breaking down {} samples into {} chunks'.format(samples, n_chunks)
+        for chunk in range(n_chunks):
+            i = chunk*chunk_samples
+            print 'Yielding chunk {} of {}'.format(chunk, n_chunks)
+            yield self[channels, i:i+chunk_samples]
 
 class Timeseries(HasTraits):
 
@@ -202,20 +249,30 @@ class FileEpoch(FileMixin, Epoch):
 
 class Channel(HasTraits):
     '''
-    Base class for dealing with a continuous stream of data.  Subclasses are
-    responsible for implementing the data buffer (e.g. either a file-based or
-    memory-based buffer).
+    Base class for dealing with a continuous stream of data sampled at a fixed
+    rate, fs (cycles per time unit), starting at time t0 (time unit).  This
+    class is not meant to be used directly since it does not implement a backend
+    for storing the data.  Subclasses are responsible for implementing the data
+    buffer (e.g. either a file-based or memory-based buffer).
 
     fs
-        Sampling frequency (number of samples per second)
+        Sampling frequency
     t0
         Time offset (i.e. time of first sample) relative to the start of
         acquisition.  This typically defaults to zero; however, some subclasses
         may discard old data (e.g.  :class:`RAMChannel`), so we need to factor
         in the time offset when attempting to extract a given segment of the
         waveform for analysis.  
-    signal
-        The sample sequence
+
+    Two events are supported.
+
+    added
+        New data has been added. If listeners have been caching the results of
+        prior computations, they can assume that older data in the cache is
+        valid. 
+    changed
+        The underlying dataset has changed.  Any cached results based on the
+        dataset must be cleared.
     '''
 
     # Sampling frequency of the data stored in the buffer
@@ -226,16 +283,19 @@ class Channel(HasTraits):
     # update t0.
     t0 = Float(0, attr=True)
 
-    # Fired when new data is added
-    updated = Event
+    added = Event
+    changed = Event
    
     signal = Property
 
-    def __getitem__(self, key):
+    def __getitem__(self, slice):
         '''
         Delegates to the __getitem__ method on the buffer
+
+        Subclasses can add additional data preprocessing by overriding this
+        method.  See `MultiChannel` for an example.
         '''
-        return self._buffer[key]
+        return self._buffer[slice]
 
     def get_data(self):
         return self.signal
@@ -282,14 +342,14 @@ class Channel(HasTraits):
                 raise ValueError, "end must be <= signal length"
 
         if np.iterable(lb):
-            return [self._buffer[lb:ub] for lb, ub in zip(lb, ub)]
+            return [self[lb:ub] for lb, ub in zip(lb, ub)]
         else:
-            return self._buffer[..., lb:ub]
+            return self[..., lb:ub]
 
     def get_index(self, index, reference=0):
         t0_index = int(self.t0*self.fs)
         index = max(0, index-t0_index+reference)
-        return self._buffer[..., index]
+        return self[..., index]
 
     def get_range(self, start, end, reference=None):
         '''
@@ -307,7 +367,7 @@ class Channel(HasTraits):
         # Return an empty array of the appropriate dimensionality (whether it's
         # single or multichannel)
         if start == end:
-            return self._buffer[..., 0:0]
+            return self[..., 0:0]
 
         # Otherwise, ensure that start time is greater than end 
         if start > end:
@@ -332,7 +392,7 @@ class Channel(HasTraits):
         else:
             ub = max(0, self.to_index(end)+ref_idx)
 
-        return self._buffer[..., lb:ub]
+        return self[..., lb:ub]
 
     def get_recent_range(self, start, end=0):
         '''
@@ -391,7 +451,7 @@ class Channel(HasTraits):
         # Updated has the upper and lower bound of the data that was added.
         # Some plots will use this to determine whether the updated region of
         # the data is within the visible region.  If not, no update is made.
-        self.updated = lb/self.fs, ub/self.fs
+        self.added = lb/self.fs, ub/self.fs
 
     def summarize(self, timestamps, offset, duration, fun):
         if len(timestamps) == 0:
@@ -431,7 +491,8 @@ class FileChannel(FileMixin, Channel):
     dtype = Any(np.float32)
 
 class RAMChannel(Channel):
-    '''Buffers data in memory without saving it to disk.
+    '''
+    Buffers data in memory without saving it to disk.
 
     Uses a ringbuffer algorithm designed for efficient reads (writes are not as
     efficient, but should still be fairly quick).  The assumption is that this
@@ -538,8 +599,70 @@ class MultiChannel(Channel):
 
     channels = Int(8, attr=True)
 
+    def get_channel_range(self, channel, lb, ub):
+        return self.get_range(lb, ub)[channel]
+
     def send(self, data):
         self.write(data)
+
+class ProcessedMultiChannel(MultiChannel):
+
+    # Channels in the list should use zero-based indexing (e.g. the first
+    # channel is 0).
+    bad_channels        = List(Int)
+    freq_lp             = Float(5e3)
+    freq_hp             = Float(300)
+    diff_matrix         = Property(depends_on='bad_channels')
+    filter_coefficients = Property(depends_on='freq_+')
+    ntaps               = Property(depends_on='filter_coefficients')
+
+    @on_trait_change('filter_coefficients, diff_matrix')
+    def _fire_update(self):
+        # Objects listening for the updated event expect a tuple indicating the
+        # affected range.  Since changes to the filter coefficients or the
+        # differential matrix affect the entire dataset, we report that the
+        # entire dataset has changed.  Sometimes listeners do not need to
+        # respond to an updated event if they are not interested in that
+        # particular time-range.
+        self.changed = True
+
+    @cached_property
+    def _get_diff_matrix(self):
+        matrix = np.identity(self.channels)
+        weight = 1.0/(self.channels-1-len(self.bad_channels))
+        for r in range(self.channels):
+            if r in self.bad_channels:
+                matrix[r, r] = 0
+            else:
+                for i in range(self.channels):
+                    if (not i in self.bad_channels) and (i != r):
+                        matrix[r, i] = -weight
+        return matrix
+
+    @cached_property
+    def _get_filter_coefficients(self):
+        Wp = np.array([self.freq_hp, self.freq_lp])/(0.5*self.fs)
+        return signal.iirfilter(8, Wp, 60, 2, ftype='butter', btype='band')
+
+    @cached_property
+    def _get_ntaps(self):
+        b, a = self.filter_coefficients
+        return max(len(b), len(a))
+
+    def __getitem__(self, slice):
+        # TODO: Add code to use filtfilt as well as stabilize the edges of the
+        # filtered array with extra data that has not been requested.  This is
+        # relatively straightforward, but I need to think through the requisite
+        # logic first and run it by a signals person.
+        ch_slice, time_slice = slice
+        data = self._buffer[:, time_slice]
+        data = self.diff_matrix.dot(data)
+        data = data[ch_slice]
+        b, a = self.filter_coefficients
+        return signal.lfilter(b, a, data)
+
+class ProcessedFileMultiChannel(FileMixin, ProcessedMultiChannel):
+    pass
 
 class RAMMultiChannel(RAMChannel, MultiChannel):
 
@@ -562,10 +685,10 @@ class FileMultiChannel(FileMixin, MultiChannel):
 
 class FileSnippetChannel(FileChannel):
 
-    snippet_size = Int
-    classifiers = Any
-    timestamps = Any
-    unique_classifiers = Set
+    snippet_size        = Int
+    classifiers         = Any
+    timestamps          = Any
+    unique_classifiers  = Set
 
     def __getitem__(self, key):
         return self._buffer[key]
@@ -607,3 +730,41 @@ class FileSnippetChannel(FileChannel):
 
     def get_recent_average(self, count=1, classifier=None):
         return self.get_recent(count, classifier).mean(0)
+
+class SnippetChannel(Channel):
+
+    snippet_size        = Int
+    timestamps          = Array(dtype='int32')
+    classifiers         = Array(dtype='int32')
+    unique_classifiers  = Property(Set, depends_on='classifiers')
+
+    @cached_property
+    def _get_unique_classifiers(self):
+        return np.unique(self.classifiers)
+
+    def __getitem__(self, key):
+        return self._buffer[key]
+
+    def send(self, data, timestamps, classifiers):
+        data.shape = (-1, self.snippet_size)
+        self._buffer.append(data)
+        self.classifiers.append(classifiers)
+        self.timestamps.append(timestamps)
+        self.unique_classifiers.update(set(classifiers))
+        self.updated = True
+
+    def get_recent(self, history=1, classifier=None):
+        if len(self._buffer) == 0:
+            return np.array([]).reshape((-1, self.snippet_size))
+        spikes = self._buffer[-history:]
+        if classifier is not None:
+            classifiers = self.classifiers[-history:]
+            mask = classifiers[:] == classifier
+            return spikes[mask]
+        return spikes
+
+    def get_recent_average(self, count=1, classifier=None):
+        return self.get_recent(count, classifier).mean(0)
+
+    def __len__(self):
+        return len(self._buffer)

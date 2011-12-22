@@ -6,7 +6,7 @@ from base_channel_plot import BaseChannelPlot
 
 class SnippetChannelPlot(BaseChannelPlot):
 
-    last_reset = Int(0)
+    last_reset  = Int(0)
     history = Int(20)
     classifier = Int(0)
 
