@@ -180,7 +180,7 @@ class AbstractAversiveController(AbstractExperimentController):
                 self.model.data.reaction_ts.send([react_ts])
                 self.current_react_ts = react_ts
 
-            # Only trigger the next trial if the system is running (if someone
+            # Only trigger StimulusInfothe next trial if the system is running (if someone
             # presents a manual reminder, then the system will be in the
             # "paused" state)
             if self.state == 'running':
@@ -263,3 +263,70 @@ class AbstractAversiveController(AbstractExperimentController):
 
     def set_trial_duration(self, value):
         self.iface_behavior.cset_tag('trial_dur_n', value, 's', 'n')
+
+    def update_intertrial(self):
+	'''
+	Must be defined in a subclass
+	
+	See docstring for update_trial
+	'''
+	raise NotImplementedError
+
+    def update_trial(self):
+	'''
+	Must be defined in a subclass.
+
+	Ultimately, the waveform must be uploaded to the TDT stimulus
+	generation DSP (i.e. the RZ6) by this function.  The waveform can be
+	generated using neurogen or via a "script" approach.
+
+	The relevant variables needed are:
+
+        self.iface_behavior
+	    Reference to the DSPCircuit wrapper for the TDT stimulus generation DSP 
+	self.iface_behavior.fs
+	    Sampling frequency of the stimulus generation DSP (same value as
+	    that returned by GetSFreq()
+	self.buffer_int
+	    Reference to the hardware buffer on the stimulus generation DSP
+	    responsible for holding the intertrial waveform (can be set to a
+	    string of zeros for silence).
+	self.buffer_trial
+	    Reference to the hardware buffer on the stimulus generation DSP
+	    responsible for holding the trial waveform (note that this applies
+	    to both the safe/nogo and warn/go trials).
+	self.cal_primary
+	    Reference to the calibration for the primary speaker.  See the
+	    documentation in neurogen.calibration.Calibration for more
+	    information.
+	self.cal_secondary
+	    Reference to the calibration for the secondary speaker.
+
+	To get the current value of the parameters defined in your paradigm class:
+
+	center_frequency = self.get_current_value('center_frequency')
+	modulation_depth = self.get_current_value('modulation_depth')
+
+	Very important!  If you modify the current value of one of these
+	parameters in this method, you must be sure to update the value so it
+	is correctly saved in the trial log.  To do so:
+
+	self.set_current_value('center_frequency', 4e3)
+
+	To update the hardware attenuators, use the set_attenuations method.  
+
+	self.set_attenuations(att1, att2, mode='full')
+
+	By default, the buffer will switch immediately from the intertrial
+	buffer to the beginning of the trial buffer when all conditions for
+	starting a trial have been met.  However, you can ensure that this
+	switch occurs only at certain points in the intertrial buffer by
+	setting the `intertrial_n` tag in the DSPCircuit.  If your intertrial
+	buffer repeats every 100 samples, then you can ensure that the
+	transition only occurs at the end of a given period:
+	
+	self.iface_behavior.set_tag('intertrial_n', 100)
+
+	But this has not been rigorously tested.
+	'''
+	raise NotImplementedError
