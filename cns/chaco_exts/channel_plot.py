@@ -11,10 +11,12 @@ class ChannelPlot(BaseChannelPlot):
     Each time a Channel.updated event is fired, the new data is obtained and
     plotted.
     '''
+    _data_cache_valid       = Bool(False)
+    _screen_cache_valid     = Bool(False)
 
     # When decimating, how many samples should be extracted per pixel?
     dec_points = Int(2)
-    dec_factor = Property(depends_on='index_mapper.updated, dec_points, channel.fs')
+    dec_factor = Property(depends_on='index_mapper.updated, dec_points, source.fs')
 
     def _invalidate_data(self):
         self._data_cache_valid = False
@@ -33,14 +35,14 @@ class ChannelPlot(BaseChannelPlot):
         Compute array of index values (i.e. the time of each sample that could
         be displayed in the visible range)
         '''
-        if self.channel is not None:
-            fs = self.channel.fs
+        if self.source is not None:
+            fs = self.source.fs
             # Channels contain continuous data starting at t0.  We do not want
             # to compute time values less than t0.
-            if self.index_range.low > self.channel.t0:
+            if self.index_range.low > self.source.t0:
                 low = int(self.index_range.low*fs)
             else:
-                low = int(self.channel.t0*fs)
+                low = int(self.source.t0*fs)
             high = int(self.index_range.high*fs)
             self.index_values = np.arange(low, high)/fs
             self._data_cache_valid = False
@@ -62,7 +64,7 @@ class ChannelPlot(BaseChannelPlot):
         screen_min, screen_max = self.index_mapper.screen_bounds
         screen_width = screen_max-screen_min # in pixels
         range = self.index_range
-        data_width = (range.high-range.low)*self.channel.fs
+        data_width = (range.high-range.low)*self.source.fs
         return np.floor((data_width/screen_width)/self.dec_points)
 
     def _preprocess_data(self, data):
@@ -71,7 +73,7 @@ class ChannelPlot(BaseChannelPlot):
     def _gather_points(self):
         if not self._data_cache_valid:
             range = self.index_mapper.range
-            data = self.channel.get_range(range.low, range.high)
+            data = self.source.get_range(range.low, range.high)
             self._cached_data = self._preprocess_data(data)
             self._data_cache_valid = True
             self._screen_cache_valid = False

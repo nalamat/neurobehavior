@@ -99,39 +99,39 @@ class AbstractAversiveExperiment(AbstractExperiment):
     def _add_experiment_plots(self, index_mapper, container, alpha=0.25):
         value_range = DataRange1D(low_setting=0, high_setting=1)
         value_mapper = LinearMapper(range=value_range)
-        plot = TTLPlot(channel=self.data.trial_running, reference=0,
+        plot = TTLPlot(source=self.data.trial_running, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(1.0, 0.25, 0.25, 0.75), center=0.5,
                 rect_height=0.8)
         container.add(plot)
-        plot = TTLPlot(channel=self.data.shock_running, reference=0,
+        plot = TTLPlot(source=self.data.shock_running, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(0.88, 0.41, 0.25, 0.5), rect_center=0.5,
                 rect_height=0.8)
         container.add(plot)
-        plot = TTLPlot(channel=self.data.warn_running, reference=0,
+        plot = TTLPlot(source=self.data.warn_running, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(0.41, 0.88, 0.25, 0.5), rect_center=0.5,
                 rect_height=0.8)
         container.add(plot)
-        plot = TTLPlot(channel=self.data.contact_digital, reference=0,
+        plot = TTLPlot(source=self.data.contact_digital, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(0.25, 0.41, 0.88, 0.75), rect_center=0.5,
                 rect_height=0.5)
         container.add(plot)
-        plot = ChannelPlot(channel=self.data.contact_digital_mean, reference=0,
+        plot = ChannelPlot(source=self.data.contact_digital_mean, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 line_width=3)
         container.add(plot)
-        plot = TimeseriesPlot(series=self.data.reaction_ts, marker='diamond',
+        plot = TimeseriesPlot(source=self.data.reaction_ts, marker='diamond',
                 marker_color=(0, 1, 0, 1.0), marker_height=0.45,
                 index_mapper=index_mapper, value_mapper=value_mapper)
         container.add(plot)
-        plot = EpochPlot(series=self.data.spout_epoch, marker='diamond',
+        plot = EpochPlot(source=self.data.spout_epoch, marker='diamond',
                 marker_color=(.34, .54, .34, 1.0), marker_height=0.8,
                 index_mapper=index_mapper, value_mapper=value_mapper)
         container.add(plot)
-        plot = EpochPlot(series=self.data.trial_epoch, marker='diamond',
+        plot = EpochPlot(source=self.data.trial_epoch, marker='diamond',
                 marker_color=(.17, .54, .34, 1.0), marker_height=0.7,
                 index_mapper=index_mapper, value_mapper=value_mapper)
         container.add(plot)

@@ -33,7 +33,6 @@ class ChannelDataRange(DataRange1D):
         they use this data range, the assumption is that they've decided they
         want tracking.
         '''
-        #span = self.span-self.trig_delay
         span = self.span
         if self.update_mode == 'auto':
             # Update the bounds as soon as the data scrolls into the next span
@@ -84,16 +83,16 @@ class ChannelDataRange(DataRange1D):
 
     def _sources_changed(self, old, new):
         for source in old:
-            source.on_trait_change(self.refresh, 'updated', remove=True)
+            source.on_trait_change(self.refresh, 'added', remove=True)
         for source in new:
-            source.on_trait_change(self.refresh, 'updated')
+            source.on_trait_change(self.refresh, 'added')
         self.refresh()
 
     def _sources_items_changed(self, event):
         for source in event.removed:
-            source.on_trait_change(self.refresh, 'updated', remove=True)
+            source.on_trait_change(self.refresh, 'added', remove=True)
         for source in event.added:
-            source.on_trait_change(self.refresh, 'updated')
+            source.on_trait_change(self.refresh, 'added')
         self.refresh()
 
     def _timeseries_changed(self, old, new):

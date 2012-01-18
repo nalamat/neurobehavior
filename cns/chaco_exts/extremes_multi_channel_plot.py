@@ -1,10 +1,14 @@
 from __future__ import division
 
+from enthought.traits.api import Instance
+
 import numpy as np
 from extremes_channel_plot import ExtremesChannelPlot
 from enthought.traits.api import List, Float, Property, cached_property
 
 class ExtremesMultiChannelPlot(ExtremesChannelPlot):
+
+    source = Instance('cns.channel.MultiChannel')
     
     # Offset of all channels along the value axis
     channel_offset  = Float(0.25e-3)

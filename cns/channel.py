@@ -107,7 +107,7 @@ class FileMixin(HasTraits):
     def _get_shape(self):
         return (0,)
 
-    def _buffer_default(self):
+    def __buffer_default(self):
         shape = self._get_shape()
         log.debug('%s: creating buffer with shape %r', self, self._get_shape())
         atom = tables.Atom.from_dtype(np.dtype(self.dtype))
@@ -213,7 +213,7 @@ class FileTimeseries(FileMixin, Timeseries):
 
 class Epoch(HasTraits):
 
-    updated = Event
+    added = Event
     fs = Float(attr=True)
     t0 = Float(0, attr=True)
 
@@ -234,7 +234,7 @@ class Epoch(HasTraits):
     def send(self, timestamps):
         if len(timestamps):
             self.append(timestamps)
-            self.updated = np.array(timestamps)/self.fs
+            self.added = np.array(timestamps)/self.fs
 
     def __getitem__(self, key):
         return self._buffer[key]/self.fs
@@ -271,8 +271,11 @@ class Channel(HasTraits):
         prior computations, they can assume that older data in the cache is
         valid. 
     changed
-        The underlying dataset has changed.  Any cached results based on the
-        dataset must be cleared.
+        The underlying dataset has changed, but the time-range has not.
+
+    In general, the changed event roughly corresponds to changes in the Y-axis (i.e. the
+    signal) while added roughly corresponds to changes in the X-axis (i.e.
+    addition of additional samples).
     '''
 
     # Sampling frequency of the data stored in the buffer
@@ -283,8 +286,8 @@ class Channel(HasTraits):
     # update t0.
     t0 = Float(0, attr=True)
 
-    added = Event
-    changed = Event
+    added       = Event
+    changed     = Event
    
     signal = Property
 

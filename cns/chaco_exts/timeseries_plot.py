@@ -8,12 +8,14 @@ from enthought.traits.api import Instance, Float, Event, Bool, Enum, \
 
 class TimeseriesPlot(ChannelPlot):
     '''
-    Designed for efficiently handling time series data stored in a channel.
-    Each time a Channel.updated event is fired, the new data is obtained and
-    plotted.
+    Designed for efficiently handling time series data (specifically,
+    timestamps), stored in a channel.  Each time a Channel.updated event is
+    fired, the new data is obtained and plotted.
     '''
 
-    series              = Instance('cns.channel.Timeseries')
+    # Override the default type of Channel defined in BaseChannelPlot
+    source              = Instance('cns.channel.Timeseries')
+
     marker              = MarkerTrait
     marker_size         = Float(4.0)
     marker_color        = black_color_trait
@@ -21,19 +23,12 @@ class TimeseriesPlot(ChannelPlot):
     marker_edge_width   = Float(1.0)
     marker_height       = Float(0.5)
 
-    #_data_cache_valid       = Bool(False)
-    #_screen_cache_valid     = Bool(False)
-    ##rect_height             = Float(0.5)
-    ##rect_center             = Float(0.5)
-    ##label                   = Str("Timeseries")
-    ##text_rotation           = Float(np.pi/4)
-
-    def _gather_points(self):
-        if not self._data_cache_valid:
-            range = self.index_mapper.range
-            self._cached_data = self.series.get_range(range.low, range.high)
-            self._data_cache_valid = True
-            self._screen_cache_valid = False
+    #def _gather_points(self):
+    #    if not self._data_cache_valid:
+    #        range = self.index_mapper.range
+    #        self._cached_data = self.series.get_range(range.low, range.high)
+    #        self._data_cache_valid = True
+    #        self._screen_cache_valid = False
 
     def _get_screen_points(self):
         if not self._screen_cache_valid:
