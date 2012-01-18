@@ -8,14 +8,14 @@ class BaseChannelPlot(BaseXYPlot):
     methods shared by all subclasses.
     '''
 
-    channel                 = Instance('cns.channel.Channel')
+    source                  = Instance('cns.channel.Channel')
     fill_color              = black_color_trait
     line_color              = black_color_trait
     line_width              = Float(1.0)
     line_style              = LineStyle
     data_changed            = Event
 
-    def _channel_changed(self, old, new):
+    def _source_changed(self, old, new):
         # We need to call _update_index_mapper when fs changes since this method
         # precomputes the index value based on the sampling frequency of the
         # channel.
@@ -36,7 +36,7 @@ class BaseChannelPlot(BaseXYPlot):
         data_lb, data_ub = bounds
         s_lb, s_ub = self.index_range.low, self.index_range.high
         if (s_lb <= data_lb < s_ub) or (s_lb <= data_ub < s_ub):
-            self._invalidate_data(data_lb, data_ub)
+            self._invalidate_data()
 
     def _data_changed(self):
-        self._invalidate_data(data_lb, data_ub)
+        self._invalidate_data()

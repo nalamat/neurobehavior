@@ -3,22 +3,22 @@
 from scipy import signal
 import numpy as np
 
-from enable.api import Component, ComponentEditor
-from chaco.api import LinearMapper, DataRange1D, OverlayPlotContainer
-from traitsui.api import VGroup, HGroup, Item, Include, View, \
+from enthought.enable.api import Component, ComponentEditor
+from enthought.chaco.api import LinearMapper, DataRange1D, OverlayPlotContainer
+from enthought.traits.ui.api import VGroup, HGroup, Item, Include, View, \
         InstanceEditor, RangeEditor, HSplit, Tabbed, Controller
-from traits.api import Instance, HasTraits, Float, DelegatesTo, \
+from enthought.traits.api import Instance, HasTraits, Float, DelegatesTo, \
      Bool, on_trait_change, Int, on_trait_change, Any, Range, Event, Property,\
      Tuple, List, cached_property, Str
 
 # Used for displaying the checkboxes for channel/plot visibility config
-from traitsui.api import TableEditor, ObjectColumn
-from traitsui.extras.checkbox_column import CheckboxColumn
-from traitsui.menu import MenuBar, Menu, ActionGroup, Action
+from enthought.traits.ui.api import TableEditor, ObjectColumn
+from enthought.traits.ui.extras.checkbox_column import CheckboxColumn
+from enthought.traits.ui.menu import MenuBar, Menu, ActionGroup, Action
 
 # Used for the trial log display
-from traitsui.api import TabularEditor
-from traitsui.tabular_adapter import TabularAdapter
+from enthought.traits.ui.api import TabularEditor
+from enthought.traits.ui.tabular_adapter import TabularAdapter
 
 from cns.channel import ProcessedFileMultiChannel, FileChannel
 from cns.chaco_exts.helpers import add_default_grids, add_time_axis

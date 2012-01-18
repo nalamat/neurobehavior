@@ -312,12 +312,14 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
         Subclasses must implement `start_experiment`
         '''
         try:
+            node = info.object.data_node
+
             # Get the current revision of the program code so that we can
             # properly determine the version used to run the code.  I'm not sure
             # what happens if Hg is not installed on the computer.  However, we
             # currently don't have to deal with that use-case.
             dir = path.abspath(path.dirname(__file__))
-            rev_id = subprocess.check_output('hg id {}'.format(dir))
+            rev_id = subprocess.check_output('hg id --cwd {}'.format(dir))
             node._v_attrs['neurobehavior_revision'] = rev_id
 
             # This will actually store a pickled copy of the calibration data

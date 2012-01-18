@@ -112,7 +112,7 @@ class SortWindow(HasTraits):
         index_mapper = LinearMapper(range=DataRange1D(low=0, high=0.0012))
         value_mapper = LinearMapper(range=DataRange1D(low=-0.00025, high=0.00025))
         plot = SnippetChannelPlot(history=20,
-                channel=self.channels[self.channel-1],
+                source=self.channels[self.channel-1],
                 value_mapper=value_mapper, 
                 index_mapper=index_mapper,
                 bgcolor='white', padding=[60, 5, 5, 20])
@@ -221,20 +221,19 @@ class PhysiologyExperiment(HasTraits):
 
         # Create the index range shared by all the plot components
         self.physiology_index_range = ChannelDataRange(span=5, trig_delay=1,
-                timeseries=self.data.ts,
-                sources=[self.data.processed])
+                timeseries=self.data.ts, sources=[self.data.processed])
 
         # Create the TTL plot
         index_mapper = LinearMapper(range=self.physiology_index_range)
         value_mapper = LinearMapper(range=DataRange1D(low=0, high=1))
-        plot = TTLPlot(channel=self.data.sweep,
+        plot = TTLPlot(source=self.data.sweep,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 reference=0, fill_color=(0.25, 0.41, 0.88, 0.1),
                 line_color='transparent', rect_center=0.5, rect_height=1.0)
         container.add(plot)
 
         # Create the epoch plot
-        plot = EpochPlot(series=self.data.epoch, marker='diamond',
+        plot = EpochPlot(source=self.data.epoch, marker='diamond',
                 marker_color=(.5, .5, .5, 1.0), marker_height=0.9,
                 marker_size=10,
                 index_mapper=index_mapper, value_mapper=value_mapper)
@@ -251,7 +250,7 @@ class PhysiologyExperiment(HasTraits):
 
         # Create the neural plots
         value_mapper = LinearMapper(range=self.physiology_value_range)
-        plot = ExtremesMultiChannelPlot(channel=self.data.processed, 
+        plot = ExtremesMultiChannelPlot(source=self.data.processed, 
                 index_mapper=index_mapper, value_mapper=value_mapper)
         self.settings.sync_trait('visible_channels', plot, 'channel_visible', mutual=False)
 
