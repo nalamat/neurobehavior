@@ -3,7 +3,7 @@ from enthought.etsconfig.api import ETSConfig
 from enthought.traits.ui.api import View, HGroup, Item, Controller, VGroup
 from enthought.traits.api import Instance, Bool, HasTraits, Button, Tuple, Float
 from enthought.savage.traits.ui.svg_button import SVGButton
-from cns.widgets import icons
+from cns.widgets.icons import icons
 
 from new_era import PumpInterface
 
@@ -15,9 +15,9 @@ class PumpToolBar(ToolBar):
     '''
 
     kw               = dict(height=20, width=20, action=True)
-    pump_override    = SVGButton('Run', filename=icons.right2, 
+    pump_override    = SVGButton('Run', filename=icons['right2'], 
                                  tooltip='Override', toggle=True, **kw)
-    pump_trigger     = SVGButton('Trigger', filename=icons.start,
+    pump_trigger     = SVGButton('Trigger', filename=icons['start'],
                                  tooltip='Trigger', **kw)
     item_kw          = dict()
 
