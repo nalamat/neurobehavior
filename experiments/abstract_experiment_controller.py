@@ -20,10 +20,12 @@ from enthought.traits.ui.api import Controller, View, HGroup, Item, spring
 
 from cns.widgets.toolbar import ToolBar
 from enthought.savage.traits.ui.svg_button import SVGButton
-from cns.widgets import icons
+from cns.widgets.icons import icons
 
-from PyQt4 import QtGui
-from PyQt4.QtGui import QApplication
+# Enthought supports both the PySide and Qt4 backend.  PySide is essentially a
+# rewrite of PyQt4.  These backends are not compatible with each other, so we
+# need to be sure to import the backend that Enthought has decided to use.
+from enthought.qt import QtGui
 
 from enthought.traits.api import HasTraits, Dict, on_trait_change, Property, \
         cached_property
@@ -46,19 +48,19 @@ class ExperimentToolBar(ToolBar):
 
     size    = 24, 24
     kw      = dict(height=size[0], width=size[1], action=True)
-    apply   = SVGButton('Apply', filename=icons.apply,
+    apply   = SVGButton('Apply', filename=icons['apply'],
                         tooltip='Apply settings', **kw)
-    revert  = SVGButton('Revert', filename=icons.undo,
+    revert  = SVGButton('Revert', filename=icons['undo'],
                         tooltip='Revert settings', **kw)
-    start   = SVGButton('Run', filename=icons.start,
+    start   = SVGButton('Run', filename=icons['start'],
                         tooltip='Begin experiment', **kw)
-    pause   = SVGButton('Pause', filename=icons.pause,
+    pause   = SVGButton('Pause', filename=icons['pause'],
                         tooltip='Pause', **kw)
-    resume  = SVGButton('Resume', filename=icons.resume,
+    resume  = SVGButton('Resume', filename=icons['resume'],
                         tooltip='Resume', **kw)
-    stop    = SVGButton('Stop', filename=icons.stop,
+    stop    = SVGButton('Stop', filename=icons['stop'],
                         tooltip='stop', **kw)
-    remind  = SVGButton('Remind', filename=icons.warn,
+    remind  = SVGButton('Remind', filename=icons['warn'],
                         tooltip='Remind', **kw)
     item_kw = dict(show_label=False)
 
@@ -514,9 +516,11 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
             PARADIGM_ROOT = get_config('PARADIGM_ROOT')
             PARADIGM_WILDCARD = get_config('PARADIGM_WILDCARD')
             instance = load_instance(PARADIGM_ROOT, PARADIGM_WILDCARD)
+            print instance
             if instance is not None:
                 self.model.paradigm.copy_traits(instance)
-        except AttributeError:
+        except AttributeError, e:
+            log.exception(e)
             mesg = '''
             Unable to load paradigm.  This can be due to 1) the
             paradigm saved in the file being incompatible with the version
