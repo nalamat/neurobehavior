@@ -2,7 +2,9 @@
 
 from scipy import signal
 import numpy as np
+from os import path
 
+from enthought.pyface.api import FileDialog, OK, error
 from enthought.enable.api import Component, ComponentEditor
 from enthought.chaco.api import LinearMapper, DataRange1D, OverlayPlotContainer
 from enthought.traits.ui.api import VGroup, HGroup, Item, Include, View, \
@@ -165,10 +167,17 @@ class ChannelSetting(HasTraits):
     bad         = Bool(False)
     extract     = Bool(False)
     std         = Float(np.nan)
+    th_std          = Float(5.0)
+    artifact_std    = Float(10.0)
 
     # Convert to uV for displaying on-screen
     std_uv      = Property(Float, depends_on='std')
-    threshold   = Property(Float, depends_on='std')
+
+    # Threshold to use for spike extraction
+    threshold   = Property(Float, depends_on='std, th_std')
+
+    # Threshold to use for artifact reject (based on deviation above noise floor)
+    artifact_threshold = Property(Float, depends_on='std, artifact_std')
 
     # Array of event times (as indices)
     spikes      = Instance('cns.channel.SnippetChannel')
@@ -180,11 +189,11 @@ class ChannelSetting(HasTraits):
 
     @cached_property
     def _get_threshold(self):
-        return 5*self.std
+        return self.th_std*self.std
 
     @cached_property
-    def _get_n_spikes(self):
-        return len(self.spikes)
+    def _get_artifact_threshold(self):
+        return self.artifact_std*self.std
 
 channel_editor = TableEditor(
     columns=[ 
@@ -192,8 +201,8 @@ channel_editor = TableEditor(
         CheckboxColumn(name='visible', width=10, label='V'), 
         CheckboxColumn(name='bad', width=10, label='B'),
         CheckboxColumn(name='extract', width=10, label='E?'),
-        ObjectColumn(name='n_spikes', width=25, label='# spikes',
-                     editable=False),
+        ObjectColumn(name='th_std', width=10, label='T?'),
+        ObjectColumn(name='artifact_std', width=10, label='A?'),
         ObjectColumn(name='std_uv', width=75, label=u'\u03C3 (\u03BCV)',
                      editable=False),
         ]
@@ -236,7 +245,7 @@ class PhysiologyReviewController(Controller):
     def compute_std(self, info):
         node = self.model.physiology_data
         channels = self.model.extract_channels
-        chunk_samples = node.chunk_samples(CHUNK_SIZE)
+        chunk_samples = node.chunk_samples(CHUNK_SIZE)*0.1
         chunk = node[:,chunk_samples:2*chunk_samples]
         print '... processing done'
         stdevs = np.median(np.abs(chunk)/0.6745, axis=1)
@@ -248,6 +257,21 @@ class PhysiologyReviewController(Controller):
     def threshold_spikes(self, info):
         node = self.model.physiology_data
         channels = self.model.extract_channels
+
+        if not len(channels):
+            error(info.ui.control, 'Must specify at least one channel to extract',
+                  title='No channels selected')
+            return
+
+        dialog = FileDialog(action="save as", wildcard='HDF5 file (*.hd5)')
+        dialog.open()
+        if dialog.return_code == OK:
+            filename = path.join(dialog.directory, dialog.filename)
+            print 'Saving to', filename
+        else:
+            print 'Action aborted'
+            return
+
         # Pull out the thresholds we need, ensure that the resulting threshold
         # array is 2D (np.take returns a 1D array, np.newaxis adds a second
         # axis) and transform it.  Since each channel is stored as a separate
@@ -260,7 +284,7 @@ class PhysiologyReviewController(Controller):
         # ch0 [[s0 s1 s2 s3 s4 s5 ... ]      [[ 0.32 ] 
         # ch1  [s0 s1 s2 s3 s4 s5 ... ]  >=   [ 0.37 ]
         # ch2  [s0 s1 s2 s3 s4 s5 ... ]]      [ 0.25 ]]
-        #
+         
         thresholds = np.take(self.model.thresholds, channels)[np.newaxis].T
         chunk_samples = node.chunk_samples(CHUNK_SIZE)
 
@@ -268,7 +292,7 @@ class PhysiologyReviewController(Controller):
         sp_indices = []
         sp_waveforms = []
 
-        with tables.openFile('test.hd5', 'w') as fh:
+        with tables.openFile(filename, 'w') as fh:
 
             # First, create the nodes in the HDF5 file to store the data we
             # extract.
@@ -339,6 +363,7 @@ class PhysiologyReview(HasTraits):
     extract_channels    = Property(depends_on='channel_settings.extract')
     visible_channels    = Property(depends_on='channel_settings.+')
     thresholds          = Property(depends_on='channel_settings.threshold')
+    artifact_thresholds = Property(depends_on='channel_settings.artifact_threshold')
 
     #freq_lp             = DelegatesTo('physiology_data')
     #freq_hp             = DelegatesTo('physiology_data')
@@ -365,6 +390,9 @@ class PhysiologyReview(HasTraits):
 
     def _get_thresholds(self):
         return [ch.threshold for ch in self.channel_settings]
+
+    def _get_artifact_thresholds(self):
+        return [ch.artifact_threshold for ch in self.channel_settings]
 
     def _channel_settings_default(self):
         return [ChannelSetting(index=i+1) for i in range(16)]
@@ -395,7 +423,7 @@ class PhysiologyReview(HasTraits):
             try:
                 node = self.data_node.contact._f_getChild(name)
                 channel = FileChannel.from_node(node)
-                plot = TTLPlot(channel=channel, index_mapper=index_mapper,
+                plot = TTLPlot(source=channel, index_mapper=index_mapper,
                                value_mapper=value_mapper, **format)
                 container.add(plot)
                 setting = PlotSetting(plot=plot, name=name)
@@ -406,7 +434,7 @@ class PhysiologyReview(HasTraits):
         # Add the multichannel neurophysiology to the container.  This is done
         # last so it appears on *top* of the TTL plots.
         value_mapper = LinearMapper(range=DataRange1D())
-        plot = ExtremesMultiChannelPlot(channel=self.physiology_data,
+        plot = ExtremesMultiChannelPlot(source=self.physiology_data,
                                         index_mapper=index_mapper,
                                         value_mapper=value_mapper)
         
@@ -430,11 +458,18 @@ class PhysiologyReview(HasTraits):
         add_default_grids(plot, major_index=1, minor_index=0.25)
         add_time_axis(plot, orientation='bottom')
 
-        overlay = ThresholdOverlay(plot=plot, sort_signs=[False]*16)
+        overlay = ThresholdOverlay(plot=plot, sort_signs=[False]*16, line_color='green')
         self.sync_trait('thresholds', overlay, 'sort_thresholds', mutual=False)
         self.sync_trait('extract_channels', overlay, 'sort_channels',
                         mutual=False)
         plot.overlays.append(overlay)
+
+        overlay = ThresholdOverlay(plot=plot, sort_signs=[False]*16, line_color='red')
+        self.sync_trait('artifact_thresholds', overlay, 'sort_thresholds', mutual=False)
+        self.sync_trait('extract_channels', overlay, 'sort_channels',
+                        mutual=False)
+        plot.overlays.append(overlay)
+
 
         return container
 
@@ -473,7 +508,7 @@ class PhysiologyReview(HasTraits):
                 ActionGroup(
                     Action(name='Export KlustaKwik', action='export_klustakwik'),
                     Action(name='Compute noise floor', action='compute_std'),
-                    Action(name='Threshold spikes', action='threshold_spikes'),
+                    Action(name='Extract spikes', action='extract_spikes'),
                 ),
                 name='&File',
             ),
