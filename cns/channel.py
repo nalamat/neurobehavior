@@ -92,12 +92,16 @@ class FileMixin(HasTraits):
     _buffer             = Instance(tables.array.Array)
 
     @classmethod
-    def from_node(cls, node):
+    def from_node(cls, node, **kwargs):
         '''
         Create an instance of the class from an existing node
         '''
-        props = cls.class_trait_names(attr=True) 
-        kwargs = dict((name, node._v_attrs[name]) for name in props)
+
+        # If the attribute (e.g. fs or t0) are not provided, load the value of
+        # the attribute from the node attributes
+        for name in cls.class_trait_names(attr=True):
+            if name not in kwargs:
+                kwargs[name] = node._v_attrs[name]
         kwargs['node'] = node._v_parent
         kwargs['name'] = node._v_name
         kwargs['_buffer'] = node
@@ -139,42 +143,83 @@ class FileMixin(HasTraits):
         return '<HDF5Store {}>'.format(self.name)
 
     def chunk_samples(self, chunk_bytes):
-        # Compute number of samples per channel to load based on the preferred
-        # memory size of the chunk.  The data is stored in 32-bit format, which
-        # translates to 4 bytes/sample.  Then, coerce the number of samples in
-        # each chunk to a multiple of the chunksize of the underlying data (it
-        # is much faster to load data in multiples of the native chunksize from
-        # the disk rather than splitting some reads across chunks ...
+        '''
+        Compute number of samples per channel to load based on the preferred
+        memory size of the chunk (as indicated by chunk_bytes).  The data is
+        stored in 32-bit format, which translates to 4 bytes/sample.  Then,
+        coerce the number of samples in each chunk to a multiple of the
+        chunksize of the underlying data (it is much faster to load data in
+        multiples of the native chunksize from the disk rather than splitting
+        some reads across chunks ...
+
+        A good default is 10 MB (i.e. 10e3 bytes)
+        '''
         file_chunksize = self._buffer.chunkshape[-1]
         bytes = np.nbytes[self.dtype]
         chunk_samples = chunk_bytes/self.channels/bytes
         chunk_samples = int(chunk_samples/file_chunksize)*file_chunksize
-        print 'Preferred chunksize is {} mb'.format(chunk_bytes/10e6)
-        print 'Actual chunksize is {} mb'.format(chunk_samples*bytes*16/10e6)
         return chunk_samples
 
-    def chunk_iter(self, chunk_bytes, channels=None):
+    def n_chunks(self, chunk_bytes):
+        chunk_samples = self.chunk_samples(chunk_bytes)
+        samples = self._buffer.shape[-1]
+        return int(np.ceil(samples/chunk_samples))
+
+    def chunk_iter(self, chunk_bytes, channels=None, loverlap=0, roverlap=0):
         '''
         Return an iterable that yields the data in segments based on the
         requested memory size (in bytes) that each segment should be.  This will
         be coerced to a multiple of the underlying chunkshape for efficiency
         reasons.
 
+        chunk_bytes
+            Total size of chunk (in bytes).  The size of the underlying datatype
+            (e.g. 16-bit or 32-bit float) and total number of channels will be
+            factored in.  Important!  Even if you only request a subset of the
+            channels, this currently assumes that all channels are being loaded
+            into memory before discarding the ones that are not requested.
+
+        channels
+            Channels to extract
+
+        loverlap
+            Number of samples on the left to overlap with prior chunk (used to
+            handle extraction of features that cross chunk boundaries)
+        roverlap
+            Number of samples on the right to overlap with the next chunk (used
+            to handle extraction of features that cross chunk boundaries)
+
         TODO: Set this up for arbitrary dimensions
         '''
-        chunk_samples = self.chunk_samples(chunk_bytes)
-        samples = self._buffer.shape[-1]
-        n_chunks = int(np.ceil(samples/chunk_samples))
+        n_samples = self.chunk_samples(chunk_bytes)
+        n_chunks = self.n_chunks(chunk_bytes)
 
         # Create a special slice object that returns all channels
         if channels is None:
             channels = slice(None)
 
-        print 'Breaking down {} samples into {} chunks'.format(samples, n_chunks)
         for chunk in range(n_chunks):
-            i = chunk*chunk_samples
-            print 'Yielding chunk {} of {}'.format(chunk, n_chunks)
-            yield self[channels, i:i+chunk_samples]
+            i = chunk*n_samples
+            lb = i-loverlap
+            ub = i+n_samples+roverlap
+
+            # If we are on the first chunk or last chunk, we have some
+            # special-case handling to take care of.
+            lpadding, rpadding = 0, 0
+            if lb < 0:
+                lpadding = np.abs(lb)
+                lb = 0
+            if ub > self.n_samples:
+                rpadding = ub-self.n_samples
+                ub = self.n_samples
+
+            chunk_samples = self[channels, lb:ub]
+            n_channels = chunk_samples.shape[0]
+            if lpadding or rpadding:
+                yield np.c_[np.ones((n_channels, lpadding)) * np.nan,
+                            chunk_samples,
+                            np.ones((n_channels, rpadding)) * np.nan]
+            yield chunk_samples
 
 class Timeseries(HasTraits):
 
@@ -187,7 +232,9 @@ class Timeseries(HasTraits):
         self.updated = np.array(timestamps)/self.fs
 
     def get_range(self, lb, ub):
-        timestamps = self._buffer[:]
+        print self._buffer
+        print self._buffer.shape
+        timestamps = self._buffer.read()
         ilb = int(lb*self.fs)
         iub = int(ub*self.fs)
         mask = (timestamps>=ilb) & (timestamps<iub)
@@ -273,9 +320,9 @@ class Channel(HasTraits):
     changed
         The underlying dataset has changed, but the time-range has not.
 
-    In general, the changed event roughly corresponds to changes in the Y-axis (i.e. the
-    signal) while added roughly corresponds to changes in the X-axis (i.e.
-    addition of additional samples).
+    In general, the changed event roughly corresponds to changes in the Y-axis
+    (i.e. the signal) while added roughly corresponds to changes in the X-axis
+    (i.e.  addition of additional samples).
     '''
 
     # Sampling frequency of the data stored in the buffer
@@ -296,12 +343,13 @@ class Channel(HasTraits):
         Delegates to the __getitem__ method on the buffer
 
         Subclasses can add additional data preprocessing by overriding this
-        method.  See `MultiChannel` for an example.
+        method.  See `ProcessedFileMultiChannel` for an example.
         '''
         return self._buffer[slice]
 
-    def get_data(self):
-        return self.signal
+    # Do we use this?
+    #def get_data(self):
+    #    return self.signal
 
     def to_index(self, time):
         '''
@@ -485,6 +533,10 @@ class Channel(HasTraits):
             range = self.get_range_index(lb_index, ub_index, timestamps)
             return fun(range)
 
+    @property
+    def n_samples(self):
+        return self._buffer.shape[-1]
+
 class FileChannel(FileMixin, Channel):
     '''
     Use a HDF5 datastore for saving the channel
@@ -613,11 +665,15 @@ class ProcessedMultiChannel(MultiChannel):
     # Channels in the list should use zero-based indexing (e.g. the first
     # channel is 0).
     bad_channels        = List(Int)
-    freq_lp             = Float(5e3)
-    freq_hp             = Float(300)
+    freq_lp             = Float(6e3)
+    freq_hp             = Float(600)
+    filter_order        = Float(8.0)
     diff_matrix         = Property(depends_on='bad_channels')
-    filter_coefficients = Property(depends_on='freq_+')
-    ntaps               = Property(depends_on='filter_coefficients')
+    filter_coefficients = Property(depends_on='filter_order, freq_+')
+    filter_zpk          = Property(depends_on='filter_order, freq_+')
+
+    ntaps               = Property(depends_on='filter_order')
+    filter_window       = Property(depends_on='ntaps')      
 
     @on_trait_change('filter_coefficients, diff_matrix')
     def _fire_update(self):
@@ -645,24 +701,116 @@ class ProcessedMultiChannel(MultiChannel):
     @cached_property
     def _get_filter_coefficients(self):
         Wp = np.array([self.freq_hp, self.freq_lp])/(0.5*self.fs)
-        return signal.iirfilter(8, Wp, 60, 2, ftype='butter', btype='band')
+        return signal.iirfilter(self.filter_order, Wp, 60, 2, ftype='butter',
+                                btype='band', output='ba')
+
+    @cached_property
+    def _get_filter_zpk(self):
+        Wp = np.array([self.freq_hp, self.freq_lp])/(0.5*self.fs)
+        return signal.iirfilter(self.filter_order, Wp, 60, 2, ftype='butter',
+                                btype='band', output='zpk')
 
     @cached_property
     def _get_ntaps(self):
-        b, a = self.filter_coefficients
-        return max(len(b), len(a))
+        return 2*self.filter_order+1
 
-    def __getitem__(self, slice):
-        # TODO: Add code to use filtfilt as well as stabilize the edges of the
-        # filtered array with extra data that has not been requested.  This is
-        # relatively straightforward, but I need to think through the requisite
-        # logic first and run it by a signals person.
-        ch_slice, time_slice = slice
+    @cached_property
+    def _get_filter_window(self):
+        return signal.hamming(self.ntaps)
+
+    def __getitem__(self, data_slice):
+        # We need to stabilize the edges of the chunk with extra data from
+        # adjacent chunks.  Expand the time slice to obtain this extra data.
+        ch_slice, time_slice = data_slice
+        time_slice, start_edge, end_edge = expand_slice(time_slice,
+                                                        self.n_samples,
+                                                        self.ntaps)
+
+        # Because we need the full waveform for referencing, we load the entire
+        # array from disk.
         data = self._buffer[:, time_slice]
         data = self.diff_matrix.dot(data)
+
+        # For the filtering, we do not need the full waveform, so we can throw
+        # out the extra channels by slicing along the second axis
         data = data[ch_slice]
         b, a = self.filter_coefficients
-        return signal.lfilter(b, a, data)
+        filtered = signal.filtfilt(b, a, data, padtype=None)
+        return filtered[..., start_edge:end_edge]
+
+def expand_slice(s, samples, overlap):
+    '''
+    Expand the requested slice to include extra data.  Handles boundary
+    conditions.
+
+    s
+        Slice to expand
+    samples
+        Total number of elements in the array
+    overlap
+        Number of elements to expand slice by
+
+    The expanded slice will have overlap appended to both ends.  If the overlap
+    extends beyond the boundaries of the array to be sliced, the overlap will be
+    truncated.
+
+    >>> x = np.arange(100)
+    >>> s1 = np.s_[10:50]
+    >>> s2, lb, ub = expand_slice(s1, len(x), 10)
+    >>> len(x[s1])
+    40
+    >>> len(x[s2])
+    60
+    >>> len(x[s2][lb:ub])
+    40
+    >>> np.all(x[s2][lb:ub]==x[s1])
+    True
+
+    >>> s1 = np.s_[5:45]
+    >>> s2, lb, ub = expand_slice(s1, len(x), 10)
+    >>> lb
+    5
+    >>> ub
+    -10
+    >>> len(x[s1])
+    40
+    >>> len(x[s2])
+    55
+    >>> np.all(x[s2][lb:ub]==x[s1])
+    True
+
+    >>> s1 = np.s_[57:97]
+    >>> s2, lb, ub = expand_slice(s1, len(x), 10)
+    >>> lb
+    10
+    >>> ub
+    -3
+    >>> len(x[s1])
+    40
+    >>> len(x[s2])
+    53
+    >>> np.all(x[s2][lb:ub]==x[s1])
+    True
+    '''
+    start, stop, step = s.indices(samples)
+    start = start-overlap*step
+    stop = stop+overlap*step
+
+    # Make sure we're havent adjusted the slice beyond the bounds of the
+    # data array.  The *_edge variables indicate how much data we need to
+    # truncate from the final array before returning it.
+    if start < 0:
+        start_edge = overlap+start 
+        start = 0
+    else:
+        start_edge = overlap
+    if stop > samples:
+        stop_edge = stop-samples-overlap
+        stop = samples
+    else:
+        stop_edge = -overlap
+
+    return slice(start, stop, step), start_edge, stop_edge
 
 class ProcessedFileMultiChannel(FileMixin, ProcessedMultiChannel):
     pass
@@ -771,3 +919,7 @@ class SnippetChannel(Channel):
 
     def __len__(self):
         return len(self._buffer)
+
+if __name__ == '__main__':
+    import doctest
+    doctest.testmod()
