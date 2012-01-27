@@ -32,7 +32,6 @@ from enthought.traits.api import HasTraits, Dict, on_trait_change, Property, \
 
 from .apply_revert_controller_mixin import ApplyRevertControllerMixin
 
-
 import logging
 log = logging.getLogger(__name__)
 
