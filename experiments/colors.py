@@ -10,7 +10,6 @@ color_names = {
     'white': '#FFFFFF',
           }
 
-
 def dec_to_255(colors):
     return [tuple(c*255.0 for c in color) for color in colors]
 
