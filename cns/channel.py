@@ -70,26 +70,27 @@ class FileMixin(HasTraits):
     # According to http://www.pytables.org/docs/manual-1.4/ch05.html the best
     # compression method is LZO with a compression level of 1 and shuffling, but
     # it really depends on the type of data we are collecting.
-    compression_level   = Int(0)
-    compression_type    = Enum(None, 'lzo', 'zlib', 'bzip', 'blosc')
-    use_checksum        = Bool(False)
-    use_shuffle         = Bool(False)
+    compression_level   = Int(0, transient=True)
+    compression_type    = Enum(None, 'lzo', 'zlib', 'bzip', 'blosc',
+                               transient=True)
+    use_checksum        = Bool(False, transient=True)
+    use_shuffle         = Bool(False, transient=True)
     
     # It is important to implement dtype appropriately, otherwise it defaults to
     # float64 (double-precision float).
-    dtype               = Any
+    dtype               = Any(transient=True)
 
     # Duration is in seconds.  The default corresponds to a 30 minute
     # experiment, which we seem to have settled on as the "standard" for running
     # appetitive experiments.
-    expected_duration   = Float(1800) 
+    expected_duration   = Float(1800, transient=True) 
     signal              = Property
     
     # The actual source where the data is stored.  Node is the HDF5 Group that
     # the EArray is stored under while name is the name of the EArray.
-    node                = Instance(tables.group.Group)
-    name                = String('FileChannel')
-    _buffer             = Instance(tables.array.Array)
+    node                = Instance(tables.group.Group, transient=True)
+    name                = String('FileChannel', transient=True)
+    _buffer             = Instance(tables.array.Array, transient=True)
 
     @classmethod
     def from_node(cls, node, **kwargs):
@@ -326,17 +327,15 @@ class Channel(HasTraits):
     '''
 
     # Sampling frequency of the data stored in the buffer
-    fs = Float(attr=True)
+    fs = Float(attr=True, transient=True)
 
     # Time of first sample in the buffer.  Typically this is 0, but if we delay
     # acquisition or discard "old" data (e.g. via a RAMBuffer), then we need to
     # update t0.
-    t0 = Float(0, attr=True)
+    t0 = Float(0, attr=True, transient=True)
 
     added       = Event
     changed     = Event
-   
-    signal = Property
 
     def __getitem__(self, slice):
         '''
@@ -346,10 +345,6 @@ class Channel(HasTraits):
         method.  See `ProcessedFileMultiChannel` for an example.
         '''
         return self._buffer[slice]
-
-    # Do we use this?
-    #def get_data(self):
-    #    return self.signal
 
     def to_index(self, time):
         '''
@@ -589,9 +584,6 @@ class RAMChannel(Channel):
         self.partial_idx = 0
         self._write = self._partial_write
 
-    #def _get_signal(self):
-    #    return self.buffer
-
     def _partial_write(self, data):
         size = data.shape[-1]
         if size > self.samples:
@@ -668,12 +660,29 @@ class ProcessedMultiChannel(MultiChannel):
     freq_lp             = Float(6e3)
     freq_hp             = Float(600)
     filter_order        = Float(8.0)
+    filter_instable     = Property(depends_on='filter_order, freq_+')
+
+    # We would want to change filter mode to lfilter for plotting since it's
+    # significantly faster, but for data analysis we would use filtfilt.
+    filter_mode         = Enum('filtfilt', 'lfilter')
+    _filter             = Property(depends_on='filter_mode')
+
+    diff_mode           = Enum('all_good')
     diff_matrix         = Property(depends_on='bad_channels')
     filter_coefficients = Property(depends_on='filter_order, freq_+')
     filter_zpk          = Property(depends_on='filter_order, freq_+')
 
     ntaps               = Property(depends_on='filter_order')
     filter_window       = Property(depends_on='ntaps')      
+
+    @cached_property
+    def _get__filter(self):
+        return getattr(signal, self.filter_mode)
+
+    @cached_property
+    def _get_filter_instable(self):
+        b, a = self.filter_coefficients
+        return not np.all(np.abs(np.roots(a)) < 1)
 
     @on_trait_change('filter_coefficients, diff_matrix')
     def _fire_update(self):
@@ -731,11 +740,11 @@ class ProcessedMultiChannel(MultiChannel):
         data = self._buffer[:, time_slice]
         data = self.diff_matrix.dot(data)
 
-        # For the filtering, we do not need the full waveform, so we can throw
+        # For the filtering, we do not need all the channels, so we can throw
         # out the extra channels by slicing along the second axis
         data = data[ch_slice]
         b, a = self.filter_coefficients
-        filtered = signal.filtfilt(b, a, data, padtype=None)
+        filtered = self._filter(b, a, data)
         return filtered[..., start_edge:end_edge]
 
 def expand_slice(s, samples, overlap):

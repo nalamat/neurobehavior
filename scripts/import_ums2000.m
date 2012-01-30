@@ -47,8 +47,8 @@ function [spikes] = import_ums2000(filename, sort, varargin)
     spikes.info.detect.align_sample = double(align_sample);
     spikes.info.detect.cov = double(h5read(filename, '/covariance_matrix'));
     spikes.info.detect.dur = [spikes.spiketimes(end)];
-    stds = double(h5readatt(filename, '/', 'std'));
-    thresh = double(h5readatt(filename, '/', 'threshold'));
+    stds = double(h5read(filename, '/noise_std'));
+    thresh = double(h5read(filename, '/threshold'));
     
     extract_indices = spikes.info.detect.extract_indices;
     window_samples = spikes.info.detect.window_samples;
@@ -98,13 +98,9 @@ function [spikes] = import_ums2000(filename, sort, varargin)
     
     if sort,
         spikes = ss_align(spikes);
-        size(spikes.waveforms)
         spikes = ss_kmeans(spikes);
-        size(spikes.waveforms)
         spikes = ss_energy(spikes);
-        size(spikes.waveforms)
         spikes = ss_aggregate(spikes);
-        size(spikes.waveforms)
     end
 
     % Whoa, when I looked up how to use regular expressions in Matlab, someone
