@@ -86,7 +86,7 @@ function [spikes] = import_spikes(filename, varargin)
     % 1xN is required by some of UMS2000's functions for no good reason
     % other than the fact it was written in Matlab.
     
-    extracted_channels = h5readatt(filename, '/', 'extracted_channels');
+    extracted_channels = h5read(filename, '/extracted_channels');
     spikes.info.detect.extracted_channels = double(extracted_channels');
     
     % Indices of the threshold crossing in the raw waveform.  To compute
@@ -174,7 +174,7 @@ function [spikes] = import_spikes(filename, varargin)
         % Multiply by 10 because the timestamps were saved at 10% of the
         % physiology clock speed.  Need to automate this computation in the
         % future.
-        valid_range = double(h5readatt(filename, '/', 'experiment_range_ts')) .* 10;
+        valid_range = double(h5read(filename, '/experiment_range_ts')) .* 10;
         start = find(timestamps >= valid_range(1), 1, 'first');
         stop = find(timestamps < valid_range(2), 1, 'last');
     else
