@@ -415,39 +415,38 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
         '''
         raise NotImplementedError
 
-    def set_attenuations(self, att1, att2, check=True, mode='split'):
-        # TDT's built-in attenuators for the RZ6 function in 20 dB steps, so we
-        # need to determine the next greater step size for the attenuator.  The
-        # maximum hardware attenuation is 60 dB.
-        log.debug('Attempting to change attenuation to %r and %r', att1, att2)
+    #def set_attenuations(self, att1, att2, check=True, mode='split'):
+    #    # TDT's built-in attenuators for the RZ6 function in 20 dB steps, so we
+    #    # need to determine the next greater step size for the attenuator.  The
+    #    # maximum hardware attenuation is 60 dB.
+    #    log.debug('Attempting to change attenuation to %r and %r', att1, att2)
 
-        if att1 is not None:
-            if mode == 'split':
-                hw1, sw1 = RZ6.split_attenuation(att1)
-            elif mode == 'full':
-                hw1 = att1
-            else:
-                raise ValueError, 'Unsupported mode %s' % mode
+    #    if att1 is not None:
+    #        if mode == 'split':
+    #            hw1, sw1 = RZ6.split_attenuation(att1)
+    #        elif mode == 'full':
+    #            hw1 = att1
+    #        else:
+    #            raise ValueError, 'Unsupported mode %s' % mode
+    #        if hw1 != self.current_hw_att1:
+    #            if check and self.get_current_value('fixed_attenuation'):
+    #                raise ValueError, 'Cannot change primary attenuation'
+    #            self.current_hw_att1 = hw1
+    #            log.debug('Updated primary attenuation to %.2f', hw1)
 
-            if hw1 != self.current_hw_att1:
-                if check and self.get_current_value('fixed_attenuation'):
-                    raise ValueError, 'Cannot change primary attenuation'
-                self.current_hw_att1 = hw1
-                log.debug('Updated primary attenuation to %.2f', hw1)
+    #    if att2 is not None:
+    #        if mode == 'split':
+    #            hw2, sw2 = RZ6.split_attenuation(att2)
+    #        elif mode == 'full':
+    #            hw2 = att2
+    #        else:
+    #            raise ValueError, 'Unsupported mode %s' % mode
 
-        if att2 is not None:
-            if mode == 'split':
-                hw2, sw2 = RZ6.split_attenuation(att2)
-            elif mode == 'full':
-                hw2 = att2
-            else:
-                raise ValueError, 'Unsupported mode %s' % mode
-
-            if hw2 != self.current_hw_att2:
-                if check and self.get_current_value('fixed_attenuation'):
-                    raise ValueError, 'Cannot change secondary attenuation'
-                self.current_hw_att2 = hw2
-                log.debug('Updated secondary attenuation to %.2f', hw2)
+    #        if hw2 != self.current_hw_att2:
+    #            if check and self.get_current_value('fixed_attenuation'):
+    #                raise ValueError, 'Cannot change secondary attenuation'
+    #            self.current_hw_att2 = hw2
+    #            log.debug('Updated secondary attenuation to %.2f', hw2)
 
     def set_expected_speaker_range(self, value):
         self._update_attenuators()
@@ -517,7 +516,7 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
         directory = get_config('CAL_ROOT')
         fd = FileDialog(action='open', default_directory=directory)
         if fd.open() == OK and fd.path <> '':
-            pass
+            print fd.path
 
     calibration_window = Any
 

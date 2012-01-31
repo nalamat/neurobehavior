@@ -27,61 +27,15 @@ class AbstractAversiveParadigm(AbstractExperimentParadigm):
     aversive_delay = Expression(1, label='Aversive delay (s)', **kw)
     aversive_duration = Expression(0.3, label='Aversive duration (s)', **kw)
     trial_duration = Expression(1.0, label='Trial duration (s)', **kw) 
+    shock_level = Expression(0.0, label='Shock level (mA)', **kw)
 
-    shock_level = Range(0.0, 5.0, 0.5, label='Shock level (mA)', immediate=True,
-            store='attribute', context=True)
-
-    _set_shock_a = Button('Level A')
-    _set_shock_b = Button('Level B')
-    _set_shock_c = Button('Level C')
-    _set_shock_off = Button('Off')
-
-    shock_a = Float(2.75, store='attribute')
-    shock_b = Float(1.6, store='attribute')
-    shock_c = Float(0.5, store='attribute')
-
-    def __set_shock_a_fired(self):
-        self.shock_level = self.shock_a
-
-    def __set_shock_b_fired(self):
-        self.shock_level = self.shock_b
-
-    def __set_shock_c_fired(self):
-        self.shock_level = self.shock_c
-
-    def __set_shock_off_fired(self):
-        self.shock_level = 0
-    
-    #===========================================================================
-    # The views available
-    #===========================================================================
-
-    timing_group = VGroup(
+    abstract_aversive_paradigm_group = VGroup(
             'prevent_disarm',
             'trial_duration',
             'aversive_delay',
             'aversive_duration',
+            'shock_level',
             'lick_th',
-            show_border=True, 
-            label='Trial settings',
-            )
-
-    shock_group = VGroup(
-        HGroup(
-            VGroup('_set_shock_a', 'shock_a', show_labels=False),
-            VGroup('_set_shock_b', 'shock_b', show_labels=False),
-            VGroup('_set_shock_c', 'shock_c', show_labels=False),
-            VGroup('_set_shock_off', show_labels=False),
-            ),
-        'shock_level',
-        show_border=True,
-        label='Shock settings'
-        )
-
-    abstract_aversive_paradigm_group = VGroup(
-            Include('timing_group'), 
-            Include('shock_group'),
-            show_labels=False,
             show_border=True,
             label='Paradigm',
             )
