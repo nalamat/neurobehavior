@@ -7,15 +7,16 @@ import numpy as np
 from os import path
 import re
 
-from pyface.api import FileDialog, OK, error, ProgressDialog
+from pyface.api import FileDialog, OK, error, ProgressDialog, ImageResource
 from enable.api import Component, ComponentEditor
 from chaco.api import LinearMapper, DataRange1D, OverlayPlotContainer
 from chaco.tools.api import LineSegmentTool
 from traitsui.api import VGroup, HGroup, Item, Include, View, \
-        InstanceEditor, RangeEditor, HSplit, Tabbed, Controller, ShellEditor
+        InstanceEditor, RangeEditor, HSplit, Tabbed, Controller, ShellEditor, \
+        ToolBar
 from traits.api import Instance, HasTraits, Float, DelegatesTo, \
      Bool, on_trait_change, Int, on_trait_change, Any, Range, Event, Property,\
-     Tuple, List, cached_property, Str, Dict
+     Tuple, List, cached_property, Str, Dict, Enum, Button, File
 
 # Used for displaying the checkboxes for channel/plot visibility config
 from traitsui.api import TableEditor, ObjectColumn
@@ -38,7 +39,9 @@ from cns.chaco_exts.threshold_overlay import ThresholdOverlay
 from cns.chaco_exts.timeseries_plot import TimeseriesPlot
 
 from experiments.colors import color_names
-from extract_spikes import extract_spikes
+from extract_spikes import extract_spikes, decimate_waveform
+
+is_none = lambda x: x is None
 
 fill_alpha = 0.25
 line_alpha = 0.55
@@ -97,7 +100,6 @@ CHANNEL_FORMAT = {
         'rect_center':  0.1,
     },
 }
-
 
 class TrialLogAdapter(TabularAdapter):
 
@@ -192,14 +194,15 @@ class ChannelSetting(HasTraits):
     th_std          = Float(-5.0)
     # Standard deviations above the noise floor to reject candidate 
     artifact_std    = Float(20.0)
-    # Convert to uV for displaying on-screen
+    # Convert to mV for displaying on-screen
     std_mv          = Property(Float, depends_on='std')
     # Thresholds to use for spike extraction (can be NaN or Inf)
     threshold       = Property(Float, depends_on='std, th_std')
     # Threshold to use for artifact reject (based on deviation above noise floor)
     artifact_threshold = Property(Float, depends_on='std, artifact_std')
-    # Timeseries of extracted features
-    event_times     = Instance('cns.channel.Timeseries')
+    # Channel type
+    classification = Enum('None', 'single-unit', 'multi-unit', 'artifact',
+                          'hash', 'gross discharge')
 
     @cached_property
     def _get_gui_index(self):
@@ -219,14 +222,15 @@ class ChannelSetting(HasTraits):
 
 channel_editor = TableEditor(
     columns=[ 
-        ObjectColumn(name='gui_index', width=10, label='#', editable=False),
-        CheckboxColumn(name='visible', width=10, label='V'), 
-        CheckboxColumn(name='bad', width=10, label='B'),
-        CheckboxColumn(name='extract', width=10, label='E?'),
-        ObjectColumn(name='th_std', width=10, label='T'),
-        ObjectColumn(name='artifact_std', width=10, label='A'),
-        ObjectColumn(name='std_mv', width=75, label=u'\u03C3 (mV)',
+        ObjectColumn(name='gui_index', width=5, label='#', editable=False),
+        CheckboxColumn(name='visible', width=5, label='V'), 
+        CheckboxColumn(name='bad', width=5, label='B'),
+        CheckboxColumn(name='extract', width=5, label='E'),
+        ObjectColumn(name='th_std', width=5, label='T'),
+        ObjectColumn(name='artifact_std', width=5, label='A'),
+        ObjectColumn(name='std_mv', width=25, label=u'\u03C3 (mV)',
                      format='%.3f', editable=False),
+        ObjectColumn(name='classification', width=50, label='Classification'),
         ],
     dclick='channel_dclicked',
     )
@@ -261,49 +265,107 @@ class PhysiologyReviewController(Controller):
         info.object.data_node = fh.root.data
         self.load_settings(info)
 
-    def load_settings(self, info):
-        node = info.object.data_node.physiology.raw
-        settings = info.object.channel_settings
-        channel = info.object.physiology_data
-        try:
-            channel.freq_lp = node._v_attrs['review_freq_lp']
-            channel.freq_hp = node._v_attrs['review_freq_hp']
-            channel.filter_order = node._v_attrs['review_filter_order']
-            if 'bad_channels' in node._v_attrs:
-                info.object.bad_channels = node._v_attrs['bad_channels']-1
-            channel.diff_mode = node._v_attrs['review_diff_mode'] 
-            extract_channels = node._v_attrs['review_extract_channels'] 
-            for setting, extract in zip(settings, extract_channels):
-                setting.extract = extract
-            threshold_stds = node._v_attrs['review_threshold_stds'] 
-            for setting, th_std in zip(settings, threshold_stds):
-                setting.th_std = th_std
-            rej_threshold_stds = node._v_attrs['review_rej_threshold_stds'] 
-            for setting, rej_threshold_std in zip(settings, rej_threshold_stds):
-                setting.artifact_std = rej_threshold_std
-        except AttributeError:
-            pass
+    def open_batchfile(self, info):
+        dialog = FileDialog(action="open", 
+                            wildcard='Batch file (*.bat)|*.bat|')
+        dialog.open()
+        if dialog.return_code != OK:
+            return
+        # Save the full path to the batchfile.  Don't open it (we'll open it
+        # each time we need to add to it).
+        info.object.batchfile = dialog.path
+
+    def create_batchfile(self, info):
+        dialog = FileDialog(action="save as", 
+                            wildcard='Batch file (*.bat)|*.bat|')
+        dialog.open()
+        if dialog.return_code != OK:
+            return
+        if not dialog.path.endswith('bat'):
+            dialog.path += '.bat'
+        # Save the full path to the batchfile.  Don't open it (we'll open it
+        # each time we need to add to it).
+        info.object.batchfile = dialog.path
 
     def save_settings(self, info):
-        node = info.object.data_node.physiology.raw
+        print 'SAVING SETTINGS'
         settings = info.object.channel_settings
-        channel = info.object.physiology_data
-        node._v_attrs['review_freq_lp'] = channel.freq_lp
-        node._v_attrs['review_freq_hp'] = channel.freq_hp
-        node._v_attrs['review_filter_order'] = channel.filter_order
-        if len(channel.bad_channels):
-            node._v_attrs['bad_channels'] = np.array(channel.bad_channels)+1
-        node._v_attrs['review_diff_mode'] = channel.diff_mode
-        extract_channels = np.array([s.extract for s in settings])
-        node._v_attrs['review_extract_channels'] = extract_channels
-        threshold_stds = np.array([s.th_std for s in settings])
-        node._v_attrs['review_threshold_stds'] = threshold_stds
-        rej_threshold_stds = np.array([s.artifact_std for s in settings])
-        node._v_attrs['review_rej_threshold_stds'] = rej_threshold_stds
+        node = info.object.data_node.physiology
+        channel = info.object.channel
+
+        # If the channel_metadata table already exists, remove it.
+        try:
+            node.channel_metadata._f_remove()
+        except tables.NoSuchNodeError:
+            pass
+
+        # Save the list of ChannelSetting objects to a table in the HDF5 file.
+        # First, we create a Numpy record array (essentially a 2D array with
+        # named columns) that will be passed to the createTable function.
+        records = []
+        for setting in settings:
+            records.append(setting.trait_get().values())
+        records = np.rec.fromrecords(records, names=setting.trait_get().keys())
+        table = node._v_file.createTable(node, 'channel_metadata', records)
+
+        # Save the filtering/referencing settings as attributes in the table
+        # node
+        table._v_attrs['freq_lp'] = channel.freq_lp
+        table._v_attrs['freq_hp'] = channel.freq_hp
+        table._v_attrs['filter_order'] = channel.filter_order
+        table._v_attrs['filter_type'] = channel.filter_type
+        table._v_attrs['filter_pass'] = channel.filter_pass
+        table._v_attrs['filter_mode'] = channel.filter_mode
+        table._v_attrs['diff_mode'] = channel.diff_mode
+
+    def load_settings(self, info):
+        try:
+            channel = info.object.channel
+            table = info.object.data_node.physiology.channel_metadata
+
+            # This returns a Numpy record array
+            records = table.read()
+
+            # First, get a list of the traits in the ChannelSetting object that
+            # we need to set.  Some of the traits cannot be set directly (e.g.
+            # the "Property" traits such as artifact_threshold are dynamically
+            # computed since they are derived from other traits in the class),
+            # so we need to ensure we only pull out the "editable" traits from
+            # the channel_metadata table.
+            traits = ChannelSetting.class_trait_names(transient=is_none)
+
+            # Pull out the columns from the record array 
+            records = records[traits]
+
+            # Now, create a list of channelsetting objects!
+            settings = []
+            for record in records:
+                kwargs = dict(zip(traits, record))
+                setting = ChannelSetting(**kwargs)
+                settings.append(setting)
+            info.object.channel_settings = settings
+
+            # Load the filtering/referencing data
+            channel.freq_lp = table._v_attrs['freq_lp']
+            channel.freq_hp = table._v_attrs['freq_hp']
+            channel.filter_order = table._v_attrs['filter_order']
+            channel.filter_mode = table._v_attrs['filter_mode']
+            channel.filter_type = table._v_attrs['filter_type']
+            channel.filter_pass = table._v_attrs['filter_pass']
+            channel.diff_mode = table._v_attrs['diff_mode'] 
+        except tables.NoSuchNodeError:
+            # Means that we don't have any saved setting data for this file
+            pass
+
+    def revert_settings(self, info):
+        reset = ['freq_lp', 'freq_hp', 'filter_order', 'diff_mode']
+        info.object.channel.reset_traits(reset)
+        settings = info.object._channel_settings_default()
+        info.object.channel_settings = settings
 
     def compute_std(self, info):
         lb = int(info.object.trial_data[0]['ts_start'])
-        node = info.object.physiology_data
+        node = info.object.channel
         channels = info.object.extract_channels
         chunk_samples = int(node.chunk_samples(CHUNK_SIZE))
         chunk = node[:,lb:lb+chunk_samples]
@@ -331,11 +393,11 @@ class PhysiologyReviewController(Controller):
 
         # Compile our referencing and filtering instructions
         processing = {}
-        processing['freq_lp'] = info.object.physiology_data.freq_lp
-        processing['freq_hp'] = info.object.physiology_data.freq_hp
-        processing['filter_order'] = info.object.physiology_data.filter_order
-        processing['bad_channels'] = info.object.physiology_data.bad_channels
-        processing['diff_mode'] = info.object.physiology_data.diff_mode
+        processing['freq_lp'] = info.object.channel.freq_lp
+        processing['freq_hp'] = info.object.channel.freq_hp
+        processing['filter_order'] = info.object.channel.filter_order
+        processing['bad_channels'] = info.object.channel.bad_channels
+        processing['diff_mode'] = info.object.channel.diff_mode
 
         # Set up the variables here.  We can eventually separate this out into a
         # stand-alone script or module that can be reused by non-GUI programs.
@@ -394,9 +456,17 @@ class PhysiologyReviewController(Controller):
 
         extract_spikes(progress_callback=callback, **kwargs)
 
-    def add_to_batchfile(self, info):
+    def create_lfp(self, info):
+        channel = info.object.channel
+        differential = channel.diff_matrix
+        q = np.floor(channel.fs/600.0)
+        decimate_waveform(info.object.data_node._v_file.filename,
+                          info.object.data_node._v_file.rootUEP,
+                          q, differential, 4)
+
+    def append_batchfile(self, info):
         kwargs = self._prepare_extract_settings(info)
-        with open('batch_file.dat', 'ab') as fh:
+        with open(info.object.batchfile, 'ab') as fh:
             # Pickle is a framed protocol (i.e. we can dump multiple objects to
             # the same file and Pickle will insert a separator in between each
             # object).  This is a Python binary protocol and is not
@@ -406,8 +476,10 @@ class PhysiologyReviewController(Controller):
 
 class PhysiologyReview(HasTraits):
 
+    # File to save batch jobs to for later processing
+    batchfile           = File
     data_node           = Any(transient=True)
-    physiology_data     = Instance('cns.channel.ProcessedMultiChannel', (),
+    channel             = Instance('cns.channel.ProcessedMultiChannel', (),
                                    transient=True)
 
     plot                = Instance(Component, transient=True)
@@ -456,7 +528,7 @@ class PhysiologyReview(HasTraits):
         raw = node.physiology.raw
         channel = ProcessedFileMultiChannel.from_node(raw,
                                                       filter_mode='lfilter')
-        self.physiology_data = channel
+        self.channel = channel
         self.trial_data = node.trial_log.read()
         self._update_plot()
 
@@ -464,7 +536,7 @@ class PhysiologyReview(HasTraits):
         return ChannelDataRange(span=5, trig_delay=0)
 
     def _current_trial_changed(self, trial):
-        self.index_range.trig_delay = -trial['start']+1
+        self.index_range.trig_delay = -trial['start']
 
     def _get_visible_channels(self):
         channels = self.channel_settings
@@ -531,7 +603,7 @@ class PhysiologyReview(HasTraits):
         # Add the multichannel neurophysiology to the container.  This is done
         # last so it appears on *top* of the TTL plots.
         value_mapper = LinearMapper(range=DataRange1D())
-        plot = ExtremesMultiChannelPlot(source=self.physiology_data,
+        plot = ExtremesMultiChannelPlot(source=self.channel,
                                         index_mapper=index_mapper,
                                         value_mapper=value_mapper)
         
@@ -540,7 +612,7 @@ class PhysiologyReview(HasTraits):
         plot.tools.append(tool)
         self.sync_trait('visible_channels', plot, 'channel_visible',
                         mutual=False)
-        self.sync_trait('bad_channels', self.physiology_data, mutual=False)
+        self.sync_trait('bad_channels', self.channel, mutual=False)
 
         # Show what channels are displayed
         overlay = ChannelNumberOverlay(plot=plot)
@@ -569,7 +641,6 @@ class PhysiologyReview(HasTraits):
         self.sync_trait('extract_channels', overlay, 'sort_channels',
                         mutual=False)
         plot.overlays.append(overlay)
-        #plot.overlays.append(LineSegmentTool(plot))
 
         self.plot = container
 
@@ -578,23 +649,33 @@ class PhysiologyReview(HasTraits):
             Tabbed(
                 VGroup(
                     VGroup(
-                        Item('object.physiology_data.freq_hp', 
+                        Item('object.channel.process_order', 
+                             label='Processing order'),
+                        Item('object.channel.diff_mode', 
+                             label='Differential mode'),
+                        Item('object.channel.freq_hp', 
                              label='Highpass cutoff (Hz)'),
-                        Item('object.physiology_data.freq_lp', 
+                        Item('object.channel.freq_lp', 
                              label='Lowpass cutoff (Hz)'),
-                        Item('object.physiology_data.filter_order', 
+                        Item('object.channel.filter_order', 
                              label='Filter order'),
+                        Item('object.channel.filter_mode', 
+                             label='Filter mode'),
+                        Item('object.channel.filter_pass', 
+                             label='Filter pass mode'),
+                        Item('object.channel.filter_type', 
+                             label='Filter type'),
                         label='Filter settings',
                     ),
-                    Item('channel_settings', editor=channel_editor, width=150),
-                    #Item('plot_settings', editor=plot_editor, width=150),
+                    Item('channel_settings', editor=channel_editor, width=350),
                     show_labels=False,
                     label='Channels',
                 ),
-                Item('trial_data', editor=trial_log_editor, show_label=False),
+                Item('trial_data', editor=trial_log_editor, show_label=False,
+                     width=350),
             ),
             Item('plot', 
-                editor=ComponentEditor(width=500, height=800), 
+                editor=ComponentEditor(width=1000, height=800), 
                 resizable=True),
             show_labels=False,
             ),
@@ -602,21 +683,72 @@ class PhysiologyReview(HasTraits):
         height=0.9, 
         width=0.9,
         handler=PhysiologyReviewController(),
+
+        # For all the ImageResource icons, the icons should be located under
+        # <folder where this file is>/images/.  As for the enabled_when, these
+        # are Python expresssions that are evaluated anytime something changes
+        # in the program.  "object" is a reference to the PhysiologyReview
+        # instance and I *think* that "handler" would be a reference to the
+        # PhysiologyReviewController instance.  If you want to pick out some
+        # icons, look under the cns/widgets/oxygen directory.  These are all
+        # open-source icons designed by the Oxygen project.
         menubar = MenuBar(
             Menu(
                 ActionGroup(
-                    Action(name='Open file',
+                    Action(name='&Open file',
+                           accelerator='Ctrl+O',
+                           image=ImageResource('open.png'),
                            action='open_file'),
-                    Action(name='Save settings',
-                           action='save_settings'),
-                    Action(name='Extract spikes',
-                           action='extract_spikes'),
-                    Action(name='Add to batchfile',
-                           action='add_to_batchfile'),
-                    Action(name='Compute noise floor', 
-                           action='compute_std'),
+                    Action(name='&Create &batchfile',
+                           action='create_batchfile'),
+                    Action(name='Open &batchfile',
+                           action='open_batchfile'),
                 ),
                 name='&File',
+            ),
+            Menu(
+                ActionGroup(
+                    Action(name='Save settings', 
+                           action='save_settings',
+                           tooltip='Save channel and filter settings',
+                           accelerator='Ctrl+S',
+                           image=ImageResource('save_settings.png'),
+                           enabled_when='object.data_node is not None'
+                          ),
+                    Action(name='Revert to default settings', 
+                           action='revert_settings',
+                           accelerator='Ctrl+R',
+                           image=ImageResource('revert_settings.png'),
+                           enabled_when='object.data_node is not None',
+                          ),
+                ),
+                name='&Settings',
+            ),
+            Menu(
+                ActionGroup(
+                    Action(name='Compute noise floor', 
+                           action='compute_std',
+                           tooltip='Compute RMS noise floor',
+                           accelerator='Ctrl+C',
+                           image=ImageResource('compute.png'),
+                           enabled_when='object.data_node is not None'
+                          ),
+                    Action(name='Extract spikes',
+                           action='extract_spikes',
+                           accelerator='Ctrl+E',
+                           image=ImageResource('extract.png'),
+                           enabled_when='object.data_node is not None ' + \
+                                        'and len(object.extract_channels)',
+                          ),
+                    Action(name='Add to batchfile',
+                           action='add_batch',
+                           accelerator='Ctrl+E',
+                           image=ImageResource('extract.png'),
+                           enabled_when='object.data_node is not None ' + \
+                                        'and len(object.extract_channels)',
+                          ),
+                ),
+                name='&Actions',
             ),
         ),
         title='Physiology Review',

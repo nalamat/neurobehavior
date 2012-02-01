@@ -13,11 +13,13 @@ class TemporalIntegrationControllerMixin(HasTraits):
     output_secondary = Instance(Sink)
     
     def _output_primary_default(self):
-        return Sink(token=self.envelope.waveform, fs=self.iface_behavior.fs,
+        return Sink(token=self.envelope.waveform, 
+                    fs=self.iface_behavior.fs,
                     calibration=self.cal_primary)
     
     def _output_secondary_default(self):
-        return Sink(token=self.envelope.waveform, fs=self.iface_behavior.fs,
+        return Sink(token=self.envelope.waveform, 
+                    fs=self.iface_behavior.fs,
                     calibration=self.cal_secondary)
     
     def _tone_carrier_default(self):
