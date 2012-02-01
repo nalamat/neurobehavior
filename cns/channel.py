@@ -233,8 +233,6 @@ class Timeseries(HasTraits):
         self.updated = np.array(timestamps)/self.fs
 
     def get_range(self, lb, ub):
-        print self._buffer
-        print self._buffer.shape
         timestamps = self._buffer.read()
         ilb = int(lb*self.fs)
         iub = int(ub*self.fs)
@@ -653,24 +651,31 @@ class MultiChannel(Channel):
         self.write(data)
 
 class ProcessedMultiChannel(MultiChannel):
+    '''
+    References and filters the data when requested
+    '''
+    process_order       = Enum('reference first', 'filter first')
 
     # Channels in the list should use zero-based indexing (e.g. the first
     # channel is 0).
     bad_channels        = List(Int)
-    freq_lp             = Float(6e3)
-    freq_hp             = Float(600)
-    filter_order        = Float(8.0)
-    filter_instable     = Property(depends_on='filter_order, freq_+')
+    diff_mode           = Enum('all_good', None)
+    diff_matrix         = Property(depends_on='bad_channels, diff_mode')
 
+    freq_lp             = Float(6e3, filter=True)
+    freq_hp             = Float(600, filter=True)
+    filter_pass         = Enum('bandpass', 'lowpass', 'highpass', filter=True)
+    filter_order        = Float(8.0, filter=True)
+    filter_type         = Enum('butter', 'ellip', 'cheby1', 'cheby2', 'bessel',
+                               None, filter=True)
     # We would want to change filter mode to lfilter for plotting since it's
     # significantly faster, but for data analysis we would use filtfilt.
-    filter_mode         = Enum('filtfilt', 'lfilter')
+    filter_mode         = Enum('filtfilt', 'lfilter', filter=True)
     _filter             = Property(depends_on='filter_mode')
 
-    diff_mode           = Enum('all_good')
-    diff_matrix         = Property(depends_on='bad_channels')
-    filter_coefficients = Property(depends_on='filter_order, freq_+')
-    filter_zpk          = Property(depends_on='filter_order, freq_+')
+    filter_instable     = Property(depends_on='+filter')
+    filter_coefficients = Property(depends_on='+filter')
+    #filter_zpk          = Property(depends_on='+filter')
 
     ntaps               = Property(depends_on='filter_order')
     filter_window       = Property(depends_on='ntaps')      
@@ -684,40 +689,53 @@ class ProcessedMultiChannel(MultiChannel):
         b, a = self.filter_coefficients
         return not np.all(np.abs(np.roots(a)) < 1)
 
-    @on_trait_change('filter_coefficients, diff_matrix')
-    def _fire_update(self):
-        # Objects listening for the updated event expect a tuple indicating the
-        # affected range.  Since changes to the filter coefficients or the
-        # differential matrix affect the entire dataset, we report that the
-        # entire dataset has changed.  Sometimes listeners do not need to
-        # respond to an updated event if they are not interested in that
-        # particular time-range.
+    @on_trait_change('filter_coefficients, diff_matrix, filter_mode, process_order')
+    def _fire_change(self):
+        # Objects that use this channel as a datasource need to know when the
+        # data changes.  Since changes to the filter coefficients, differential
+        # matrix or filter function affect the entire dataset, we fire the
+        # changed event.  This will tell, for example, the
+        # ExtremesMultiChannelPlot to clear it's cache and redraw the entire
+        # waveform.
         self.changed = True
 
     @cached_property
     def _get_diff_matrix(self):
-        matrix = np.identity(self.channels)
-        weight = 1.0/(self.channels-1-len(self.bad_channels))
-        for r in range(self.channels):
-            if r in self.bad_channels:
-                matrix[r, r] = 0
-            else:
-                for i in range(self.channels):
-                    if (not i in self.bad_channels) and (i != r):
-                        matrix[r, i] = -weight
-        return matrix
+        if self.diff_mode is None:
+            return np.identity(self.channels)
+        else:
+            matrix = np.identity(self.channels)
+            weight = 1.0/(self.channels-1-len(self.bad_channels))
+            for r in range(self.channels):
+                if r in self.bad_channels:
+                    matrix[r, r] = 0
+                else:
+                    for i in range(self.channels):
+                        if (not i in self.bad_channels) and (i != r):
+                            matrix[r, i] = -weight
+            return matrix
 
     @cached_property
     def _get_filter_coefficients(self):
-        Wp = np.array([self.freq_hp, self.freq_lp])/(0.5*self.fs)
-        return signal.iirfilter(self.filter_order, Wp, 60, 2, ftype='butter',
-                                btype='band', output='ba')
+        if self.filter_type is None:
+            return [], []
+        if self.filter_pass == 'bandpass':
+            Wp = np.array([self.freq_hp, self.freq_lp])
+        elif self.filter_pass == 'highpass':
+            Wp = self.freq_hp
+        else:
+            Wp = self.freq_lp
+        Wp = Wp/(0.5*self.fs)
+        return signal.iirfilter(self.filter_order, Wp, 60, 2,
+                                ftype=self.filter_type,
+                                btype=self.filter_pass, 
+                                output='ba')
 
-    @cached_property
-    def _get_filter_zpk(self):
-        Wp = np.array([self.freq_hp, self.freq_lp])/(0.5*self.fs)
-        return signal.iirfilter(self.filter_order, Wp, 60, 2, ftype='butter',
-                                btype='band', output='zpk')
+    #@cached_property
+    #def _get_filter_zpk(self):
+    #    Wp = np.array([self.freq_hp, self.freq_lp])/(0.5*self.fs)
+    #    return signal.iirfilter(self.filter_order, Wp, 60, 2, ftype='butter',
+    #                            btype='band', output='zpk')
 
     @cached_property
     def _get_ntaps(self):
@@ -738,14 +756,24 @@ class ProcessedMultiChannel(MultiChannel):
         # Because we need the full waveform for referencing, we load the entire
         # array from disk.
         data = self._buffer[:, time_slice]
-        data = self.diff_matrix.dot(data)
 
-        # For the filtering, we do not need all the channels, so we can throw
-        # out the extra channels by slicing along the second axis
-        data = data[ch_slice]
-        b, a = self.filter_coefficients
-        filtered = self._filter(b, a, data)
-        return filtered[..., start_edge:end_edge]
+        if self.process_order == 'reference first':
+            data = self.diff_matrix.dot(data)
+            # For the filtering, we do not need all the channels, so we can throw
+            # out the extra channels by slicing along the second axis
+            data = data[ch_slice]
+            if self.filter_type is not None:
+                b, a = self.filter_coefficients
+                data = self._filter(b, a, data)
+        else:
+            if self.filter_type is not None:
+                b, a = self.filter_coefficients
+                data = self._filter(b, a, data)
+            data = self.diff_matrix.dot(data)
+            data = data[ch_slice]
+            # For the filtering, we do not need all the channels, so we can throw
+            # out the extra channels by slicing along the second axis
+        return data[..., start_edge:end_edge]
 
 def expand_slice(s, samples, overlap):
     '''

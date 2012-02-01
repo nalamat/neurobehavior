@@ -19,12 +19,209 @@ def compute_noise_std(input_file, experiment_path, lb, ub):
     for std, setting in zip(stdevs, self.model.channel_settings):
         setting.std = std
 
+def decimate_waveform(input_file, experiment_path, q, differential=None, N=4):
+    '''
+    Decimates the waveform data to a lower sampling frequency using a lowpass
+    filter cutoff.  Resulting decimation is saved under the physiology node as
+    "raw_decimated_N" where N is the decimation factor.  If the data already
+    exists from a prior run it will be overwritten.
+
+    A 4th order lowpass butterworth filter is used in conjunction with filtfilt
+    to apply a zero phase-delay to the waveform.
+
+    Parameters
+    ----------
+    input_file : str
+        File containing the experiment data
+    experiment_path : str
+        Path to location of experiment node in the HDF5 tree.  A HDF5 node can
+        contain multiple experiments, so it's important to specify which
+        experiment is being processed.
+    q : int
+        The downsampling (i.e. decimation) factor
+    differential : 2D array
+        The differential matrix containing the referencing configuration.  If
+        None, the identity matrix will be used.
+    N : int
+        The filter order to use
+
+    This code is carefully designed to handle boundary issues when processing
+    large datasets in chunks (e.g. stabilizing the edges of each chunk when
+    filtering and extracting the correct samples from each chunk).
+    '''
+    # Load information about the data we are processing and compute the sampling
+    # frequency for the decimated dataset
+    fh_in = tables.openFile(input_file, 'a', rootUEP=experiment_path)
+    physiology = fh_in.root.data.physiology
+    raw = physiology.raw
+    source_fs = raw._v_attrs['fs']
+    target_fs = source_fs/q
+
+    n_channels, n_samples = raw.shape
+    n_dec_samples = np.floor(n_samples/q)
+
+    filters = tables.Filters(complevel=1, complib='blosc', fletcher32=True)
+    shape = (n_channels, n_dec_samples)
+    lfp = fh_in.createCArray(physiology, 'lfp_{}'.format(q), raw.atom, shape,
+                             "Lowpass filtered signal for LFP analysis",
+                             filters=filters)
+
+    # Critical frequency of the lowpass filter (ensure that the filter cutoff is
+    # twice the target sampling frequency to avoid aliasing).
+    Wn = target_fs*2/source_fs
+    b, a = signal.iirdesign(N, Wn, btype='lowpass') # Defaults to butter
+    
+    # The number of samples in each chunk *must* be a multiple of the decimation
+    # factor so that we can extract the *correct* samples from each chunk.
+    samples = chunk_samples(raw, 10e6, q)
+    dec_samples = samples/q
+    overlap = 2*len(b)
+    iterable = chunk_iter(raw, samples, loverlap=overlap, roverlap=overlap,
+                          pad_value=0)
+    for i, chunk in enumerate(iterable):
+        # Technically the documentation says the identity matrix will be used,
+        # but we might as well skip that step (and the computational power)
+        # because the result will be the same.
+        if differential is not None:
+            chunk = differential.dot(chunk)
+        chunk = signal.filtfilt(chunk, b, a)
+
+        # Now that we've filtered our chunk, we can discard the overlapping data
+        # that was provided to help stabilize the edges of the filter while
+        # decimating the remaining array.
+        lb = i*dec_samples
+        lfp[lb:lb+dec_samples] = chunk[overlap:-overlap:q]
+
+    # Save some data about how the lfp data was generated
+    lfp._v_attrs['q'] = q
+    lfp._v_attrs['fs'] = target_fs
+    lfp._v_attrs['b'] = b
+    lfp._v_attrs['a'] = a
+    lfp._v_attrs['differential'] = differential
+    lfp._v_attrs['chunk_overlap'] = overlap
+    lfp._v_attrs['ftype'] = 'butter'
+    lfp._v_attrs['btype'] = 'lowpass'
+    lfp._v_attrs['order'] = N
+    lfp._v_attrs['freq_lowpass'] = target_fs*2
+
+    fh_in.close()
+
+def chunk_samples(x, max_bytes=10e6, block_size=None, axis=-1):
+    '''
+    Compute number of samples per channel to load based on the preferred memory
+    size of the chunk (as indicated by max_bytes) and the underlying datatype.
+
+    Parameters
+    ----------
+    x : ndarray
+        The array that will be chunked
+    max_bytes : int
+        Maximum chunk size in number of bytes.  A good default is 10 MB (i.e.
+        10e6 bytes).  The actual chunk size may be smaller than requested.
+    axis : int
+        Axis over which the data is chunked.
+    block_size : None
+        Ensure that the number of samples is a multiple of block_size. 
+
+    Examples
+    --------
+    >>> x = np.arange(10e3, dtype=np.float64)   # 8 bytes per sample
+    >>> chunk_samples(x, 800)
+    100
+    >>> chunk_samples(x, 10e3)                  # 10 kilobyte chunks
+    1250
+    >>> chunk_samples(x, 10e3, block_size=500)
+    1000
+    >>> chunk_samples(x, 10e3, block_size=300)
+    1200
+    >>> x.shape = 5, 2e3
+    >>> chunk_samples(x, 800)
+    20
+    >>> chunk_samples(x, 10e3)
+    250
+
+    If the array cannot be broken up into chunks that are no greater than the
+    maximum number of bytes specified, an error is raised:
+
+    >>> x = np.ones((10e3, 100), dtype=np.float64)
+    >>> chunk_samples(x, 1600)
+    Traceback (most recent call last):
+        ...
+    ValueError: cannot achieve requested chunk size
+
+    This is OK, however, because we are chunking along the first axis:
+
+    >>> chunk_samples(x, 1600, axis=0)
+    2
+    '''
+    bytes = np.nbytes[x.dtype]
+
+    # Compute the number of elements in the remaining dimensions.  E.g. if we
+    # have a 3D array of shape (2, 16, 1000) and wish to chunk along the last
+    # axis, then the number of elements in the remaining dimensions is 2x16).
+    shape = list(x.shape)
+    shape.pop(axis)
+    elements = np.prod(shape)
+    samples = np.floor(max_bytes/elements/bytes)
+    if block_size is not None:
+        samples = np.floor(samples/block_size)*block_size
+    if not samples:
+        raise ValueError, "cannot achieve requested chunk size"
+    return int(samples)
+    
+def chunk_iter_2D(x, chunk_samples, loverlap=0, roverlap=0, pad_value=np.nan):
+    '''
+    Return an iterable that yields the data in chunks.  Only supports chunking
+    along the last axis at the moment.
+
+    x : ndarray
+        The array that will be chunked
+    chunk_samples : int
+        Number of samples per chunk along the specified axis
+    loverlap : int
+        Number of samples on the left to overlap with prior chunk (used to
+        handle extraction of features that cross chunk boundaries)
+    roverlap : int
+        Number of samples on the right to overlap with the next chunk (used
+        to handle extraction of features that cross chunk boundaries)
+    pad_value : numeric
+        Value to pad first chunk with if loverlap is > 0 and last chunk if
+        roverlap is > 0
+    '''
+    channels, samples = x.shape
+
+    i = 0
+    while i < samples:
+        lb = i-loverlap
+        ub = i+n_samples+roverlap
+
+        # If we are on the first chunk or last chunk, we have some special-case
+        # handling to take care of.
+        lpadding, rpadding = 0, 0
+        if lb < 0:
+            lpadding = np.abs(lb)
+            lb = 0
+        if ub > self.n_samples:
+            rpadding = ub-self.n_samples
+            ub = self.n_samples
+
+        # Pull out the chunk and pad if needed
+        chunk = self[..., lb:ub]
+        if lpadding or rpadding:
+            lchunk = np.ones((channels, lpadding))
+            rchunk = np.ones((channels, rpadding))
+            chunk = np.c_[lchunk, chunk, rchunk]
+
+        yield chunk
+
 def extract_spikes(input_file, experiment_path, channels, noise_std,
                    threshold_stds, rej_threshold_stds, processing,
                    output_file=None, output_path='/', window_size=2.1,
                    cross_time=0.5, cov_samples=10000, progress_callback=None,
                    chunk_size=5e7):
     '''
+    Extracts spikes
+
     Parameters
     ----------
     input_file : str
@@ -376,5 +573,7 @@ def process_batchfile(batchfile):
         pickle.dump(failed_jobs, fh)
 
 if __name__ == '__main__':
-    import sys
-    process_batchfile(sys.argv[1])
+    import doctest
+    doctest.testmod()
+    #import sys
+    #process_batchfile(sys.argv[1])
