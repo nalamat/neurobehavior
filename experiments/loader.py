@@ -7,6 +7,7 @@ import tables
 import imp
 import os
 from os.path import join, dirname, basename, exists
+from importlib import import_module
 
 from enthought.traits.api import Any, Trait, TraitError, Bool, Str
 from enthought.traits.ui.api import View, Item, VGroup, HGroup, Spring
@@ -148,27 +149,45 @@ class ExperimentLauncher(CohortViewHandler):
             self.launch_experiment(info, info.object.selected)
 
 def prepare_experiment(args, store_node):
+    '''
+    Given the arguments passed in via the command-line, configure the
+    Experiment, Controller, Data and Paradigm class accordingly and return an
+    instance of the model and controller class.
+    '''
+    # If the user did not specify a list of parameters that the data should be
+    # grouped into before analysis (i.e. for computing the hit and false alarm
+    # fractions), then use the parameters specified via rove as the analysis
+    # parameters.
     if len(args.analyze) == 0:
         args.analyze = args.rove[:]
+
+    # Load the experiment from the launchers folder.  args.type should be the
+    # name of the corresponding file in the launchers folder (without the .py
+    # extension)
     module = get_experiment(args.type)
     
-    # Find the classes
+    # Pull out the classes
     paradigm_class = module.Paradigm
     experiment_class = module.Experiment
     controller_class = module.Controller
     data_class = module.Data
     node_name = module.node_name
 
+    # Create the experiment and data nodes. Hint!  This is where you would
+    # change the default pathname for the experiment if you wished.
     exp_node = append_date_node(store_node, node_name + '_')
+
+    # Where the data is stored
     data_node = append_node(exp_node, 'data')
 
     # Configure the TrialSetting/trial_setting_editor objects to contain the
     # parameters we wish to control in the experiment
     trial_setting.add_parameters(args.rove, paradigm_class, args.repeats)
 
-    # The user wants to specify values in terms of dB attenuation rather than a
-    # calibrated dB SPL standard.  Prepare the calibration accordingly.
     if args.att:
+        # The user wants to specify values in terms of dB attenuation rather
+        # than a calibrated dB SPL standard.  Prepare the calibration
+        # accordingly.
         cal1 = calibration.Attenuation()
         cal2 = calibration.Attenuation()
     else:
@@ -206,13 +225,9 @@ def prepare_experiment(args, store_node):
             data=data,
             paradigm=paradigm,
             spool_physiology=args.physiology,
+            plot_index=args.analyze[0],
+            plot_group=args.analyze[1:],
             )
-    if len(args.analyze) > 0:
-        model.plot_index = args.analyze[0]
-        model.plot_group=args.analyze[1:]
-    elif len(args.rove) > 0:
-        model.plot_index = args.rove[0]
-        model.plot_group=args.rove[1:]
 
     controller = controller_class(**controller_args)
     return model, controller
@@ -264,7 +279,6 @@ def inspect_experiment(args):
     '''
     Print out parameters available for requested paradigm
     '''
-    
     # Get a list of the parameters available in the paradigm
     p = get_experiment(args.type).Paradigm
     parameters = sorted(list(p.get_parameter_info().items()))
@@ -289,11 +303,14 @@ def inspect_experiment(args):
             print ''
 
 def get_invalid_parameters(args):
+    '''
+    Check the list of parameters provided by the user and return the invalid
+    parameters
+    '''
     parameters = set(args.rove)
     parameters.update(args.analyze)
     paradigm = get_experiment(args.type).Paradigm
     return [p for p in parameters if p not in paradigm.get_parameters()]
 
 def get_experiment(etype):
-    from importlib import import_module
     return import_module('launchers.{}'.format(etype))
