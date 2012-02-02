@@ -47,3 +47,31 @@ def generate_envelope(n, ramp_n):
         raise ValueError, mesg
     ramp = cos2ramp(ramp_n)
     return np.r_[ramp, np.ones(n-2*ramp_n), ramp[::-1]]
+
+def am_eq_power(depth):
+    '''
+    Given the modulation depth for a token, return the scaling factor to
+    multiply the waveform by so that the power in the modulated token is equal
+    to the power in the unmodulated token.
+    '''
+    return (3.0/8.0*depth**2-depth+1)**0.5
+
+def am_eq_phase(depth, direction='positive'):
+    '''
+    Given the modulation depth, return the starting phase of the modulation that
+    ensures a smooth transition from an unmodulated token to the modulated
+    token.
+
+    depth : [0, 1]
+        Modulation depth as a fraction
+    direction : {'positive', 'negative'}
+        Direction you would like the modulation to move in (i.e. downwards or
+        upwards).
+    '''
+    if depth == 0:
+        # This is the easy case
+        return 0
+    eq_power = am_eq_power(depth)
+    z = 2.0/depth*eq_power-2.0/depth+1
+    phi = np.arccos(z)
+    return 2*pi-phi if direction == 'positive' else phi

@@ -175,4 +175,4 @@ class Experiment(AbstractAversiveExperiment, ConstantLimitsExperimentMixin):
     data = Instance(Data, (), store='child')
     paradigm = Instance(Paradigm, (), store='child')
 
-node_name = 'AversiveFMCLExperiment'
+node_name = 'AversiveAMNoiseExperiment'

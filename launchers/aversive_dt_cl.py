@@ -35,7 +35,18 @@ class Controller(
     def initial_setting(self):
         return self.nogo_setting()
 
+    def set_fc(self, value):
+        # Ensure that the requested carrier frequency falls on a calibrated
+        # frequency so that we can ensure the calibration/output is accurate
+        # even if the frequency falls within or near a notch.
+        coerced_value = self.cal_primary.get_nearest_frequency(value)
+        self.iface_behavior.set_tag('fc', coerced_value)
+        mesg = 'Coercing {} Hz to nearest calibrated frequency of {} Hz'
+        self.notify(mesg.format(value, coerced_value))
+        self.set_current_value('fc', coerced_value)
+
     def _compute_waveform(self, calibration):
+        # Gather the variables we need
         fs = self.buffer_trial.fs
         fc = self.get_current_value('frequency')
         ramp_duration = self.get_current_value('ramp_duration')
@@ -63,7 +74,6 @@ class Controller(
             att1 = 120.0
         else:
             raise ValueError, 'Unsupported speaker mode %r' % speaker
-
         self.iface_behavior.set_tag('att1', att1)
         self.iface_behavior.set_tag('att2', att2)
         self.buffer_trial.set(waveform)

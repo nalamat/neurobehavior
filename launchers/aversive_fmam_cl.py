@@ -4,6 +4,7 @@ from enthought.enable.api import Component, ComponentEditor
 from experiments.evaluate import Expression
 from os.path import join
 from cns import get_config
+from cns.signal import am_eq_power, am_eq_phase
 
 from experiments import (
         # Controller and mixins
@@ -87,8 +88,8 @@ class Controller(
 
         am_amplitude = am_depth/2.0
         am_shift = 1-am_amplitude
-        am_phase = SAM.eq_phase(am_depth, am_direction)
-        am_sf = 1.0/SAM.eq_power(am_depth)
+        am_phase = am_eq_phase(am_depth, am_direction)
+        am_sf = 1.0/am_eq_power(am_depth)
 
         self.iface_behavior.set_tag('am_amplitude', am_amplitude)
         self.iface_behavior.set_tag('am_shift', am_shift)
@@ -119,9 +120,7 @@ class Controller(
 
     def set_speaker_equalize(self, value):
         if value:
-            firdata = self.cal_primary.fir_coefficients
-            self.iface_behavior.set_coefficients('fir1', firdata)
-        # Need to unset somehow?
+            raise NotImplementedError, "Equalization not implemented"
 
 class Paradigm(
         AbstractAversiveParadigm, 
@@ -184,12 +183,5 @@ class Experiment(AbstractAversiveExperiment, ConstantLimitsExperimentMixin):
 
     data = Instance(Data, (), store='child')
     paradigm = Instance(Paradigm, (), store='child')
-
-    traits_view = View(
-            Include('traits_group'),
-            resizable=True,
-            height=0.9,
-            width=0.9,
-            handler=Controller)
 
 node_name = 'AversiveFMCLExperiment'

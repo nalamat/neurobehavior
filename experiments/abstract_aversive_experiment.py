@@ -30,7 +30,6 @@ class TrialLogAdapter(TabularAdapter):
     
     # List of tuples (column_name, field )
     columns = [ ('P',       'parameter'),
-                #('S',       'speaker'),
                 ('Time',    'time'),
                 ('Score',   'contact_score'),
                 ]
