@@ -7,8 +7,31 @@ import re
 from os import path
 
 from cns.channel import ProcessedFileMultiChannel
+from cns.arraytools import chunk_samples, chunk_iter
 
 noise_std = lambda x: np.median(np.abs(x)/0.6745, axis=1)
+
+def histogram_bins(bin_width, fs, lb, ub):
+    '''
+    Compute the bins by hand.  Numpy, Scipy and Matplotlib (Pylab) all come with
+    histogram functions, but the autogeneration of the bins rarely are what we
+    want them to be.  Good for quick analysis, but we need tighter control over
+    where the bin edges fall.
+    '''
+    bins =  n.arange(lb, ub, int(bin_width*fs))/fs
+    bins -= bins[np.argmin(np.abs(bins))]
+    return bins
+
+def import_spikes(filename, channel):
+    with tables.openFile(filename, 'r') as fh:
+        mask = fh.root.channels[:] == channel
+        return fh.root.timestamps[mask]
+
+def reference(event_times, reference_times):
+    '''
+    Compute the event times relative to the reference times
+    '''
+    return event_times-reference_times[np.newaxis].T
 
 def compute_noise_std(input_file, experiment_path, lb, ub):
     node = self.model.physiology_data
@@ -75,9 +98,10 @@ def decimate_waveform(x, fs, q, differential=None, N=4):
     # factor so that we can extract the *correct* samples from each chunk.
     samples = chunk_samples(raw, 10e6, q)
     dec_samples = samples/q
-    overlap = 2*len(b)
+    overlap = 3*len(b)
     iterable = chunk_iter(raw, samples, loverlap=overlap, roverlap=overlap,
                           pad_value=0)
+
     for i, chunk in enumerate(iterable):
         # Technically the documentation says the identity matrix will be used,
         # but we might as well skip that step (and the computational power)
@@ -106,124 +130,12 @@ def decimate_waveform(x, fs, q, differential=None, N=4):
 
     fh_in.close()
 
-def chunk_samples(x, max_bytes=10e6, block_size=None, axis=-1):
-    '''
-    Compute number of samples per channel to load based on the preferred memory
-    size of the chunk (as indicated by max_bytes) and the underlying datatype.
-
-    This code is carefully designed to handle boundary issues when processing
-    large datasets in chunks (e.g. stabilizing the edges of each chunk when
-    filtering and extracting the correct samples from each chunk).
-
-    Parameters
-    ----------
-    x : ndarray
-        The array that will be chunked
-    max_bytes : int
-        Maximum chunk size in number of bytes.  A good default is 10 MB (i.e.
-        10e6 bytes).  The actual chunk size may be smaller than requested.
-    axis : int
-        Axis over which the data is chunked.
-    block_size : None
-        Ensure that the number of samples is a multiple of block_size. 
-
-    Examples
-    --------
-    >>> x = np.arange(10e3, dtype=np.float64)   # 8 bytes per sample
-    >>> chunk_samples(x, 800)
-    100
-    >>> chunk_samples(x, 10e3)                  # 10 kilobyte chunks
-    1250
-    >>> chunk_samples(x, 10e3, block_size=500)
-    1000
-    >>> chunk_samples(x, 10e3, block_size=300)
-    1200
-    >>> x.shape = 5, 2e3
-    >>> chunk_samples(x, 800)
-    20
-    >>> chunk_samples(x, 10e3)
-    250
-
-    If the array cannot be broken up into chunks that are no greater than the
-    maximum number of bytes specified, an error is raised:
-
-    >>> x = np.ones((10e3, 100), dtype=np.float64)
-    >>> chunk_samples(x, 1600)
-    Traceback (most recent call last):
-        ...
-    ValueError: cannot achieve requested chunk size
-
-    This is OK, however, because we are chunking along the first axis:
-
-    >>> chunk_samples(x, 1600, axis=0)
-    2
-    '''
-    bytes = np.nbytes[x.dtype]
-
-    # Compute the number of elements in the remaining dimensions.  E.g. if we
-    # have a 3D array of shape (2, 16, 1000) and wish to chunk along the last
-    # axis, then the number of elements in the remaining dimensions is 2x16).
-    shape = list(x.shape)
-    shape.pop(axis)
-    elements = np.prod(shape)
-    samples = np.floor(max_bytes/elements/bytes)
-    if block_size is not None:
-        samples = np.floor(samples/block_size)*block_size
-    if not samples:
-        raise ValueError, "cannot achieve requested chunk size"
-    return int(samples)
-    
-def chunk_iter_2D(x, chunk_samples, loverlap=0, roverlap=0, pad_value=np.nan):
-    '''
-    Return an iterable that yields the data in chunks.  Only supports chunking
-    along the last axis at the moment.
-
-    x : ndarray
-        The array that will be chunked
-    chunk_samples : int
-        Number of samples per chunk along the specified axis
-    loverlap : int
-        Number of samples on the left to overlap with prior chunk (used to
-        handle extraction of features that cross chunk boundaries)
-    roverlap : int
-        Number of samples on the right to overlap with the next chunk (used
-        to handle extraction of features that cross chunk boundaries)
-    pad_value : numeric
-        Value to pad first chunk with if loverlap is > 0 and last chunk if
-        roverlap is > 0
-    '''
-    channels, samples = x.shape
-
-    i = 0
-    while i < samples:
-        lb = i-loverlap
-        ub = i+n_samples+roverlap
-
-        # If we are on the first chunk or last chunk, we have some special-case
-        # handling to take care of.
-        lpadding, rpadding = 0, 0
-        if lb < 0:
-            lpadding = np.abs(lb)
-            lb = 0
-        if ub > self.n_samples:
-            rpadding = ub-self.n_samples
-            ub = self.n_samples
-
-        # Pull out the chunk and pad if needed
-        chunk = self[..., lb:ub]
-        if lpadding or rpadding:
-            lchunk = np.ones((channels, lpadding))
-            rchunk = np.ones((channels, rpadding))
-            chunk = np.c_[lchunk, chunk, rchunk]
-
-        yield chunk
-
 def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
                    rej_threshold_stds, processing, window_size=2.1,
                    cross_time=0.5, cov_samples=10000, progress_callback=None,
-                   chunk_size=5e6):
+                   chunk_size=10e7):
     '''
-    Extracts spikes
+    Extracts spikes.  Lots of options.
 
     Parameters
     ----------
@@ -293,7 +205,6 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
     # it.  This wrapper will handle all the pertinent issues of referencing and
     # filtering (as well as chunking the data).
     node = ProcessedFileMultiChannel.from_node(input_node.physiology.raw,
-                                               filter_mode='filtfilt',
                                                **processing)
     fs = node.fs
 
@@ -301,12 +212,16 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
     ts_end   = input_node.trial_log[-1]['ts_end']
 
     n_channels = len(channels)
-    chunk_samples = node.chunk_samples(chunk_size)
 
     # Convert msec to number of samples
     window_samples = int(np.ceil(window_size*fs*1e-3))
     samples_before = int(np.ceil(cross_time*fs*1e-3))
     samples_after = window_samples-samples_before
+
+    # Compute chunk settings
+    loverlap = samples_before
+    roverlap = samples_after
+    c_samples = chunk_samples(node, chunk_size)
 
     # Now, create the nodes in the HDF5 file to store the data we extract.
     fh_out = output_node._v_file
@@ -390,10 +305,17 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
     fh_out.setNodeAttr(output_node, 'fc_lowpass', node.freq_lp)
     fh_out.setNodeAttr(output_node, 'fc_highpass', node.freq_hp)
     fh_out.setNodeAttr(output_node, 'filter_order', node.filter_order)
+    fh_out.setNodeAttr(output_node, 'filter_btype', node.filter_pass)
+    fh_out.setNodeAttr(output_node, 'filter_padding', node._padding)
 
     b, a = node.filter_coefficients
     fh_out.createArray(output_node, 'filter_b', b)
     fh_out.createArray(output_node, 'filter_a', a)
+
+    # Chunk settings
+    fh_out.setNodeAttr(output_node, 'chunk_samples', c_samples)
+    fh_out.setNodeAttr(output_node, 'chunk_loverlap', loverlap)
+    fh_out.setNodeAttr(output_node, 'chunk_roverlap', roverlap)
 
     # Feature extraction settings
     fh_out.setNodeAttr(output_node, 'window_size', window_size)
@@ -438,39 +360,23 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
 
     rej_thresholds = rej_thresholds[np.newaxis, :, np.newaxis]
 
-    # Keep the user updated as to how many candidate spikes they're
-    # getting
+    # Keep the user updated as to how many candidate spikes they're getting
     tot_features = 0
 
-    # Now, loop through the data in chunks, identifying the spikes in each chunk
-    # and loading them into the event times file.  The current chunk number is
-    # tracked as i_chunk
-    n_chunks = node.n_chunks(chunk_size)
-    iterable = node.chunk_iter(chunk_size, channels, samples_before,
-                               samples_after)
+    iterable = chunk_iter(node, c_samples, loverlap, roverlap,
+                          ndslice=np.s_[channels, :])
 
     for i_chunk, chunk in enumerate(iterable):
-
-        print 'processing', i_chunk, n_chunks
-
-        # Update the progress callback each time we finish processing a chunk.
-        # If the progress callback returns True, end the processing immediately.
-
-        mesg = 'Found {} features'.format(tot_features)
-        if progress_callback(i_chunk/n_chunks, mesg):
-            break
-
         # Truncate the chunk so we don't look for threshold crossings in the
         # portion of the chunk that overlaps with the following chunk.  This
-        # prevents us from attempting to extract partials spikes.  Finally, flip
+        # prevents us from attempting to extract partial spikes.  Finally, flip
         # the waveforms on the pertinent channels (where we had a negative
         # threshold requested) so that we can perform the thresholding on all
         # channels at the same time using broadcasting.
         c = chunk[..., samples_before:-samples_after] * signs
         crossings = (c[..., :-1] <= thresholds) & (c[..., 1:] > thresholds)
 
-        # Get the channel number and index for each crossing.  Be sure to let
-        # the user know what's going on.
+        # Get the channel number and index for each crossing.
         channel_index, sample_index = np.where(crossings) 
 
         # Waveforms is likely to be reasonably large array, so preallocate for
@@ -485,10 +391,10 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
             w[:] = chunk[..., s:s+window_samples]
         fh_waveforms.append(waveforms)
 
-        # Find all the artifacts and discard them.  First, check the entire
-        # waveform array to see if the signal exceeds the artifact threshold
-        # defined on any given sample.  Note that the specified reject threshold
-        # for each channel will be honored via broadcasting of the array.
+        # Find all the artifacts.  First, check the entire waveform array to see
+        # if the signal exceeds the artifact threshold defined on any given
+        # sample.  Note that the specified reject threshold for each channel
+        # will be honored via broadcasting of the array.
         artifacts = (waveforms >= rej_thresholds) | \
                     (waveforms < -rej_thresholds)
 
@@ -504,7 +410,7 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
         # processing in chunks and the indices are referenced to the start of
         # the chunk, not the start of the experiment, we need to correct for
         # this.  The number of chunks processed is stored in i_chunk.
-        fh_indices.append(sample_index+i_chunk*chunk_samples)
+        fh_indices.append(sample_index+i_chunk*c_samples)
 
         # Channel on which the event was detected
         fh_channels.append(channels[channel_index]+1)
@@ -512,8 +418,8 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
 
         # Check to see if any of the samples requested for the covariance matrix
         # lie in this chunk.  If so, pull them out.
-        chunk_lb = i_chunk*chunk_samples
-        chunk_ub = chunk_lb+chunk_samples
+        chunk_lb = i_chunk*c_samples
+        chunk_ub = chunk_lb+c_samples
         while True:
             if cov_i == cov_samples:
                 break
@@ -523,6 +429,12 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
             index = index-chunk_lb
             cov_waves[cov_i] = chunk[..., index:index+window_samples]
             cov_i += 1
+
+        # Update the progress callback each time we finish processing a chunk.
+        # If the progress callback returns True, end the processing immediately.
+        mesg = 'Found {} features'.format(tot_features)
+        if progress_callback(i_chunk*c_samples, mesg):
+            break
 
     # If the user explicitly requested a cancel, compute the covariance
     # matrix only on the samples we were able to draw from the data.
@@ -541,11 +453,12 @@ def update_progress(progress, mesg):
     Command-line progress bar.  Progress must be a fraction.
     '''
     import sys
-    # The \r tells it to return to the beginning of the line rather than
-    # starting a new line.
     max_chars = 60
     num_chars = int(progress*max_chars)
     num_left = max_chars-num_chars
+    # The \r tells the cursor to return to the beginning of the line rather than
+    # starting a new line.  This allows us to have a progressbar-style display
+    # in the console window.
     sys.stdout.write('\r[{}{}] {:.2f}%'.format('#'*num_chars, 
                                                ' '*num_left,
                                                progress))

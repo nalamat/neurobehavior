@@ -45,11 +45,9 @@ function [spikes] = import_spikes(filename, varargin)
 %       end timestamp of the last trial).
 %   max_features : integer (default inf)
 %       Maximum number of features to return (useful for debugging since
-%       the clustering algorithsm can often be slow when working with a
-%       large number of features).  If you are debugging, 10,000 features
-%       is a good value. Note that artifact rejection is done after the
-%       features are extracted, so you may end up with fewer than the
-%       requested number of features if exclude_artifacts is true.
+%       the clustering algorithms can often be slow when working with a
+%       large number of features).  Note that the entire dataset is loaded
+%       into memory before truncating it.
 %
 %   Returns struct containing spike waveform data (waveforms, indices and
 %   event times) that just needs a tiny bit of tweaking before it is 100%

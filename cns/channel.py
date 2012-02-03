@@ -14,6 +14,7 @@ from enthought.traits.api import HasTraits, Property, Array, Int, Event, \
 import numpy as np
 import tables
 from scipy import signal
+from .arraytools import slice_overlap
 
 import logging
 log = logging.getLogger(__name__)
@@ -152,85 +153,80 @@ class FileMixin(HasTraits):
     def __repr__(self):
         return '<HDF5Store {}>'.format(self.name)
 
-    def chunk_samples(self, chunk_bytes):
-        '''
-        Compute number of samples per channel to load based on the preferred
-        memory size of the chunk (as indicated by chunk_bytes).  The data is
-        stored in 32-bit format, which translates to 4 bytes/sample.  Then,
-        coerce the number of samples in each chunk to a multiple of the
-        chunksize of the underlying data (it is much faster to load data in
-        multiples of the native chunksize from the disk rather than splitting
-        some reads across chunks ...
+    #def chunk_samples(self, chunk_bytes):
+    #    '''
+    #    Compute number of samples per channel to load based on the preferred
+    #    memory size of the chunk (as indicated by chunk_bytes).  
 
-        A good default is 10 MB (i.e. 10e3 bytes)
-        '''
-        file_chunksize = self._buffer.chunkshape[-1]
-        bytes = np.nbytes[self.dtype]
-        chunk_samples = chunk_bytes/self.channels/bytes
-        chunk_samples = int(chunk_samples/file_chunksize)*file_chunksize
-        return chunk_samples
+    #    See cns.arraytools.chunk_samples for additional documentation.
+    #    '''
+    #    file_chunksize = self._buffer.chunkshape[-1]
+    #    bytes = np.nbytes[self.dtype]
+    #    chunk_samples = chunk_bytes/self.channels/bytes
+    #    chunk_samples = int(chunk_samples/file_chunksize)*file_chunksize
+    #    return chunk_samples
 
-    def n_chunks(self, chunk_bytes):
-        chunk_samples = self.chunk_samples(chunk_bytes)
-        samples = self._buffer.shape[-1]
-        return int(np.ceil(samples/chunk_samples))
+    #def n_chunks(self, chunk_bytes):
+    #    chunk_samples = self.chunk_samples(chunk_bytes)
+    #    samples = self._buffer.shape[-1]
+    #    return int(np.ceil(samples/chunk_samples))
 
-    def chunk_iter(self, chunk_bytes, channels=None, loverlap=0, roverlap=0):
-        '''
-        Return an iterable that yields the data in segments based on the
-        requested memory size (in bytes) that each segment should be.  This will
-        be coerced to a multiple of the underlying chunkshape for efficiency
-        reasons.
+    #def chunk_iter(self, chunk_bytes, channels=None, loverlap=0, roverlap=0):
+    #    '''
+    #    Return an iterable that yields the data in segments based on the
+    #    requested memory size (in bytes) that each segment should be.  This will
+    #    be coerced to a multiple of the underlying chunkshape for efficiency
+    #    reasons.
 
-        chunk_bytes
-            Total size of chunk (in bytes).  The size of the underlying datatype
-            (e.g. 16-bit or 32-bit float) and total number of channels will be
-            factored in.  Important!  Even if you only request a subset of the
-            channels, this currently assumes that all channels are being loaded
-            into memory before discarding the ones that are not requested.
+    #    chunk_bytes
+    #        Total size of chunk (in bytes).  The size of the underlying datatype
+    #        (e.g. 16-bit or 32-bit float) and total number of channels will be
+    #        factored in.  Important!  Even if you only request a subset of the
+    #        channels, this currently assumes that all channels are being loaded
+    #        into memory before discarding the ones that are not requested.
 
-        channels
-            Channels to extract
+    #    channels
+    #        Channels to extract
 
-        loverlap
-            Number of samples on the left to overlap with prior chunk (used to
-            handle extraction of features that cross chunk boundaries)
-        roverlap
-            Number of samples on the right to overlap with the next chunk (used
-            to handle extraction of features that cross chunk boundaries)
+    #    loverlap
+    #        Number of samples on the left to overlap with prior chunk (used to
+    #        handle extraction of features that cross chunk boundaries)
+    #    roverlap
+    #        Number of samples on the right to overlap with the next chunk (used
+    #        to handle extraction of features that cross chunk boundaries)
 
-        TODO: Set this up for arbitrary dimensions
-        '''
-        n_samples = self.chunk_samples(chunk_bytes)
-        n_chunks = self.n_chunks(chunk_bytes)
+    #    TODO: Set this up for arbitrary dimensions
+    #    '''
+    #    n_samples = self.chunk_samples(chunk_bytes)
+    #    n_chunks = self.n_chunks(chunk_bytes)
 
-        # Create a special slice object that returns all channels
-        if channels is None:
-            channels = slice(None)
+    #    # Create a special slice object that returns all channels
+    #    if channels is None:
+    #        channels = slice(None)
 
-        for chunk in range(n_chunks):
-            i = chunk*n_samples
-            lb = i-loverlap
-            ub = i+n_samples+roverlap
+    #    for chunk in range(n_chunks):
+    #        i = chunk*n_samples
+    #        lb = i-loverlap
+    #        ub = i+n_samples+roverlap
 
-            # If we are on the first chunk or last chunk, we have some
-            # special-case handling to take care of.
-            lpadding, rpadding = 0, 0
-            if lb < 0:
-                lpadding = np.abs(lb)
-                lb = 0
-            if ub > self.n_samples:
-                rpadding = ub-self.n_samples
-                ub = self.n_samples
+    #        # If we are on the first chunk or last chunk, we have some
+    #        # special-case handling to take care of.
+    #        lpadding, rpadding = 0, 0
+    #        if lb < 0:
+    #            lpadding = np.abs(lb)
+    #            lb = 0
+    #        if ub > self.n_samples:
+    #            rpadding = ub-self.n_samples
+    #            ub = self.n_samples
 
-            chunk_samples = self[channels, lb:ub]
+    #        chunk_samples = self[channels, lb:ub]
 
-            n_channels = chunk_samples.shape[0]
-            if lpadding or rpadding:
-                yield np.c_[np.ones((n_channels, lpadding)) * np.nan,
-                            chunk_samples,
-                            np.ones((n_channels, rpadding)) * np.nan]
-            yield chunk_samples
+    #        n_channels = chunk_samples.shape[0]
+    #        if lpadding or rpadding:
+    #            yield np.c_[np.ones((n_channels, lpadding)) * np.nan,
+    #                        chunk_samples,
+    #                        np.ones((n_channels, rpadding)) * np.nan]
+    #        yield chunk_samples
 
 class Timeseries(HasTraits):
 
@@ -345,6 +341,11 @@ class Channel(HasTraits):
     added       = Event
     changed     = Event
 
+    shape       = Property
+
+    def _get_shape(self):
+        return self._buffer.shape
+
     def __getitem__(self, slice):
         '''
         Delegates to the __getitem__ method on the buffer
@@ -405,6 +406,20 @@ class Channel(HasTraits):
         index = max(0, index-t0_index+reference)
         return self[..., index]
 
+    def _to_bounds(self, start, end, reference=None):
+        if start > end:
+            raise ValueError("Start time must be < end time")
+
+        if reference is not None:
+            ref_idx = self.to_index(reference)
+        else:
+            ref_idx = 0
+
+        lb = max(0, self.to_index(start)+ref_idx)
+        ub = max(0, self.to_index(end)+ref_idx)
+
+        return lb, ub
+
     def get_range(self, start, end, reference=None):
         '''
         Returns a subset of the range.
@@ -418,59 +433,32 @@ class Channel(HasTraits):
         reference : float, optional
             Set to -1 to get the most recent range
         '''
-        # Return an empty array of the appropriate dimensionality (whether it's
-        # single or multichannel)
-        if start == end:
-            return self[..., 0:0]
-
-        # Otherwise, ensure that start time is greater than end 
-        if start > end:
-            raise ValueError("Start time must be < end time")
-
-        if reference is not None:
-            if reference == -1:
-                return self.get_recent_range(start, end)
-            else:
-                ref_idx = self.to_index(reference)
-        else:
-            ref_idx = 0
-
-        # Due to the two checks at the beginning of this function, we do not
-        # need to worry about start == inf and end == -inf
-        if start == -np.inf:
-            lb = self.t0
-        else:
-            lb = max(0, self.to_index(start)+ref_idx)
-        if end == np.inf:
-            ub = self.get_size()
-        else:
-            ub = max(0, self.to_index(end)+ref_idx)
-
+        lb, ub = self._to_bounds(start, end, reference)
         return self[..., lb:ub]
 
-    def get_recent_range(self, start, end=0):
-        '''
-        Returns a subset of the range, with start and end referenced to the most
-        recent sample.
+    #def get_recent_range(self, start, end=0):
+    #    '''
+    #    Returns a subset of the range, with start and end referenced to the most
+    #    recent sample.
 
-        Parameters
-        ==========
-        start
-            Start time
-        end
-            End time
-        '''
-        lb = min(-1, int(start*self.fs))
-        ub = min(-1, int(end*self.fs))
-        # This check is necessary to avoid raising an error in the HDF5
-        # (PyTables?) library if it attempts to slice an empty array.
-        if len(self._buffer) == 0:
-            signal = np.array([])
-        else:
-            signal = self._buffer[..., lb:ub]
-        ub_time = ub/self.fs
-        lb_time = ub_time-signal.shape[-1]/self.fs
-        return signal, lb_time, ub_time
+    #    Parameters
+    #    ==========
+    #    start
+    #        Start time
+    #    end
+    #        End time
+    #    '''
+    #    lb = min(-1, int(start*self.fs))
+    #    ub = min(-1, int(end*self.fs))
+    #    # This check is necessary to avoid raising an error in the HDF5
+    #    # (PyTables?) library if it attempts to slice an empty array.
+    #    if len(self._buffer) == 0:
+    #        signal = np.array([])
+    #    else:
+    #        signal = self._buffer[..., lb:ub]
+    #    ub_time = ub/self.fs
+    #    lb_time = ub_time-signal.shape[-1]/self.fs
+    #    return signal, lb_time, ub_time
 
     def get_size(self):
         return self._buffer.shape[-1]
@@ -660,6 +648,10 @@ class MultiChannel(Channel):
     def send(self, data):
         self.write(data)
 
+    def get_range(self, start, end, reference=None, channels=None):
+        lb, ub = self._to_bounds(start, end, reference)
+        return self[channels, lb:ub]
+
 class ProcessedMultiChannel(MultiChannel):
     '''
     References and filters the data when requested
@@ -667,9 +659,9 @@ class ProcessedMultiChannel(MultiChannel):
 
     # Channels in the list should use zero-based indexing (e.g. the first
     # channel is 0).
-    bad_channels        = List(Int)
+    bad_channels        = Array(dtype='int')
     diff_mode           = Enum('all good', None)
-    diff_matrix         = Property(depends_on='bad_channels, diff_mode')
+    diff_matrix         = Property(depends_on='bad_channels, diff_mode, channels')
 
     freq_lp             = Float(6e3, filter=True)
     freq_hp             = Float(600, filter=True)
@@ -679,12 +671,10 @@ class ProcessedMultiChannel(MultiChannel):
     filter_type         = Enum('butter', 'ellip', 'cheby1', 'cheby2', 'bessel',
                                filter=True)
 
-    filter_instable     = Property(depends_on='+filter')
-    filter_coefficients = Property(depends_on='+filter')
-    #filter_zpk          = Property(depends_on='+filter')
+    filter_instable     = Property(depends_on='filter_coefficients')
+    filter_coefficients = Property(depends_on='+filter, fs')
 
-    ntaps               = Property(depends_on='filter_order')
-    filter_window       = Property(depends_on='ntaps')      
+    _padding            = Property(depends_on='filter_order')
 
     @cached_property
     def _get_filter_instable(self):
@@ -721,7 +711,6 @@ class ProcessedMultiChannel(MultiChannel):
     def _get_filter_coefficients(self):
         if self.filter_pass is None:
             return [], []
-
         if self.filter_pass == 'bandpass':
             Wp = np.array([self.freq_hp, self.freq_lp])
         elif self.filter_pass == 'highpass':
@@ -729,127 +718,38 @@ class ProcessedMultiChannel(MultiChannel):
         else:
             Wp = self.freq_lp
         Wp = Wp/(0.5*self.fs)
+
         return signal.iirfilter(self.filter_order, Wp, 60, 2,
                                 ftype=self.filter_type,
                                 btype=self.filter_pass, 
                                 output='ba')
 
-    #@cached_property
-    #def _get_filter_zpk(self):
-    #    Wp = np.array([self.freq_hp, self.freq_lp])/(0.5*self.fs)
-    #    return signal.iirfilter(self.filter_order, Wp, 60, 2, ftype='butter',
-    #                            btype='band', output='zpk')
-
     @cached_property
-    def _get_ntaps(self):
-        return 2*self.filter_order+1
+    def _get__padding(self):
+        return 3*self.filter_order
 
-    @cached_property
-    def _get_filter_window(self):
-        return signal.hamming(self.ntaps)
-
-    def __getitem__(self, data_slice):
+    def __getitem__(self, slice):
         # We need to stabilize the edges of the chunk with extra data from
         # adjacent chunks.  Expand the time slice to obtain this extra data.
-        ch_slice, time_slice = data_slice
-        time_slice, start_edge, end_edge = expand_slice(time_slice,
-                                                        self.n_samples,
-                                                        self.ntaps)
+        padding = self._padding
+        data = slice_overlap(self._buffer, slice[-1], padding, padding)
 
-        # Because we need the full waveform for referencing, we load the entire
-        # array from disk.
-        data = self._buffer[:, time_slice]
-
-        # It does not matter whether you compute the differential first or apply
+        # It does not matter whether we compute the differential first or apply
         # the filter.  Since the differential requires data from all channels
         # while filtering does not, we compute the differential first then throw
         # away the channels we do not need.
-
         data = self.diff_matrix.dot(data)
+
         # For the filtering, we do not need all the channels, so we can throw
         # out the extra channels by slicing along the second axis
-        data = data[ch_slice]
+        data = data[slice[:-1]]
         if self.filter_pass is not None:
             b, a = self.filter_coefficients
             # Since we have already padded the data at both ends padlen can be
             # set to 0.  The "unstable" edges of the filtered waveform will be
             # chopped off before returning the result.
-            data = signal.lfilter(b, a, data)
-        return data[..., start_edge:end_edge]
-
-def expand_slice(s, samples, overlap):
-    '''
-    Expand the requested slice to include extra data.  Handles boundary
-    conditions.
-
-    s
-        Slice to expand
-    samples
-        Total number of elements in the array
-    overlap
-        Number of elements to expand slice by
-
-    The expanded slice will have overlap appended to both ends.  If the overlap
-    extends beyond the boundaries of the array to be sliced, the overlap will be
-    truncated.
-
-    >>> x = np.arange(100)
-    >>> s1 = np.s_[10:50]
-    >>> s2, lb, ub = expand_slice(s1, len(x), 10)
-    >>> len(x[s1])
-    40
-    >>> len(x[s2])
-    60
-    >>> len(x[s2][lb:ub])
-    40
-    >>> np.all(x[s2][lb:ub]==x[s1])
-    True
-
-    >>> s1 = np.s_[5:45]
-    >>> s2, lb, ub = expand_slice(s1, len(x), 10)
-    >>> lb
-    5
-    >>> ub
-    -10
-    >>> len(x[s1])
-    40
-    >>> len(x[s2])
-    55
-    >>> np.all(x[s2][lb:ub]==x[s1])
-    True
-
-    >>> s1 = np.s_[57:97]
-    >>> s2, lb, ub = expand_slice(s1, len(x), 10)
-    >>> lb
-    10
-    >>> ub
-    -3
-    >>> len(x[s1])
-    40
-    >>> len(x[s2])
-    53
-    >>> np.all(x[s2][lb:ub]==x[s1])
-    True
-    '''
-    start, stop, step = s.indices(samples)
-    start = start-overlap*step
-    stop = stop+overlap*step
-
-    # Make sure we're havent adjusted the slice beyond the bounds of the
-    # data array.  The *_edge variables indicate how much data we need to
-    # truncate from the final array before returning it.
-    if start < 0:
-        start_edge = overlap+start 
-        start = 0
-    else:
-        start_edge = overlap
-    if stop > samples:
-        stop_edge = stop-samples-overlap
-        stop = samples
-    else:
-        stop_edge = -overlap
-
-    return slice(start, stop, step), start_edge, stop_edge
+            data = signal.filtfilt(b, a, data, padlen=0)
+        return data[..., padding:-padding]
 
 class ProcessedFileMultiChannel(FileMixin, ProcessedMultiChannel):
     pass
