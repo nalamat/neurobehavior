@@ -47,8 +47,6 @@ class CohortViewHandler(FileHandler):
     path = File
     wildcard = Str
     modified_trait = '_modified'
-import logging
-log = logging.getLogger(__name__)
 
 class AnimalColumn(ObjectColumn):
 

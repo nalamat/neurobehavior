@@ -97,12 +97,21 @@ class FileMixin(HasTraits):
         '''
         Create an instance of the class from an existing node
         '''
-
         # If the attribute (e.g. fs or t0) are not provided, load the value of
         # the attribute from the node attributes
         for name in cls.class_trait_names(attr=True):
             if name not in kwargs:
-                kwargs[name] = node._v_attrs[name]
+                try:
+                    kwargs[name] = node._v_attrs[name]
+                except KeyError:
+                    # This checks for an older verison of the physiology channel
+                    # data format that did not save t0 as an attribute to the
+                    # node.
+                    if name == 't0':
+                        kwargs['t0'] = 0
+                    else:
+                        raise
+
         kwargs['node'] = node._v_parent
         kwargs['name'] = node._v_name
         kwargs['_buffer'] = node
@@ -215,6 +224,7 @@ class FileMixin(HasTraits):
                 ub = self.n_samples
 
             chunk_samples = self[channels, lb:ub]
+
             n_channels = chunk_samples.shape[0]
             if lpadding or rpadding:
                 yield np.c_[np.ones((n_channels, lpadding)) * np.nan,
@@ -654,24 +664,20 @@ class ProcessedMultiChannel(MultiChannel):
     '''
     References and filters the data when requested
     '''
-    process_order       = Enum('reference first', 'filter first')
 
     # Channels in the list should use zero-based indexing (e.g. the first
     # channel is 0).
     bad_channels        = List(Int)
-    diff_mode           = Enum('all_good', None)
+    diff_mode           = Enum('all good', None)
     diff_matrix         = Property(depends_on='bad_channels, diff_mode')
 
     freq_lp             = Float(6e3, filter=True)
     freq_hp             = Float(600, filter=True)
-    filter_pass         = Enum('bandpass', 'lowpass', 'highpass', filter=True)
+    filter_pass         = Enum('bandpass', 'lowpass', 'highpass', None,
+                               filter=True)
     filter_order        = Float(8.0, filter=True)
     filter_type         = Enum('butter', 'ellip', 'cheby1', 'cheby2', 'bessel',
-                               None, filter=True)
-    # We would want to change filter mode to lfilter for plotting since it's
-    # significantly faster, but for data analysis we would use filtfilt.
-    filter_mode         = Enum('filtfilt', 'lfilter', filter=True)
-    _filter             = Property(depends_on='filter_mode')
+                               filter=True)
 
     filter_instable     = Property(depends_on='+filter')
     filter_coefficients = Property(depends_on='+filter')
@@ -681,15 +687,11 @@ class ProcessedMultiChannel(MultiChannel):
     filter_window       = Property(depends_on='ntaps')      
 
     @cached_property
-    def _get__filter(self):
-        return getattr(signal, self.filter_mode)
-
-    @cached_property
     def _get_filter_instable(self):
         b, a = self.filter_coefficients
         return not np.all(np.abs(np.roots(a)) < 1)
 
-    @on_trait_change('filter_coefficients, diff_matrix, filter_mode, process_order')
+    @on_trait_change('filter_coefficients, diff_matrix')
     def _fire_change(self):
         # Objects that use this channel as a datasource need to know when the
         # data changes.  Since changes to the filter coefficients, differential
@@ -717,8 +719,9 @@ class ProcessedMultiChannel(MultiChannel):
 
     @cached_property
     def _get_filter_coefficients(self):
-        if self.filter_type is None:
+        if self.filter_pass is None:
             return [], []
+
         if self.filter_pass == 'bandpass':
             Wp = np.array([self.freq_hp, self.freq_lp])
         elif self.filter_pass == 'highpass':
@@ -757,22 +760,21 @@ class ProcessedMultiChannel(MultiChannel):
         # array from disk.
         data = self._buffer[:, time_slice]
 
-        if self.process_order == 'reference first':
-            data = self.diff_matrix.dot(data)
-            # For the filtering, we do not need all the channels, so we can throw
-            # out the extra channels by slicing along the second axis
-            data = data[ch_slice]
-            if self.filter_type is not None:
-                b, a = self.filter_coefficients
-                data = self._filter(b, a, data)
-        else:
-            if self.filter_type is not None:
-                b, a = self.filter_coefficients
-                data = self._filter(b, a, data)
-            data = self.diff_matrix.dot(data)
-            data = data[ch_slice]
-            # For the filtering, we do not need all the channels, so we can throw
-            # out the extra channels by slicing along the second axis
+        # It does not matter whether you compute the differential first or apply
+        # the filter.  Since the differential requires data from all channels
+        # while filtering does not, we compute the differential first then throw
+        # away the channels we do not need.
+
+        data = self.diff_matrix.dot(data)
+        # For the filtering, we do not need all the channels, so we can throw
+        # out the extra channels by slicing along the second axis
+        data = data[ch_slice]
+        if self.filter_pass is not None:
+            b, a = self.filter_coefficients
+            # Since we have already padded the data at both ends padlen can be
+            # set to 0.  The "unstable" edges of the filtered waveform will be
+            # chopped off before returning the result.
+            data = signal.lfilter(b, a, data)
         return data[..., start_edge:end_edge]
 
 def expand_slice(s, samples, overlap):
