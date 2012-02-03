@@ -7,19 +7,20 @@ import numpy as np
 from os import path
 import re
 
-from pyface.api import FileDialog, OK, error, ProgressDialog, ImageResource
+from pyface.api import FileDialog, OK, error, ProgressDialog, ImageResource, \
+        information
 from enable.api import Component, ComponentEditor
 from chaco.api import LinearMapper, DataRange1D, OverlayPlotContainer
 from chaco.tools.api import LineSegmentTool
 from traitsui.api import VGroup, HGroup, Item, Include, View, \
-        InstanceEditor, RangeEditor, HSplit, Tabbed, Controller, ShellEditor, \
+        InstanceEditor, RangeEditor, HSplit, Tabbed, Controller, \
         ToolBar
 from traits.api import Instance, HasTraits, Float, DelegatesTo, \
      Bool, on_trait_change, Int, on_trait_change, Any, Range, Event, Property,\
      Tuple, List, cached_property, Str, Dict, Enum, Button, File
 
 # Used for displaying the checkboxes for channel/plot visibility config
-from traitsui.api import TableEditor, ObjectColumn
+from traitsui.api import TableEditor, ObjectColumn, EnumEditor
 from traitsui.extras.checkbox_column import CheckboxColumn
 from traitsui.menu import MenuBar, Menu, ActionGroup, Action
 
@@ -259,11 +260,12 @@ class PhysiologyReviewController(Controller):
             return
         if info.object.data_node and info.object.data_node._v_file.isopen:
             info.object.data_node._v_file.close()
-        filename = path.join(dialog.directory, dialog.filename)
-        filename, nodepath = get_experiment_node(filename)
-        fh = tables.openFile(filename, 'a', rootUEP=nodepath)
+        nodepath = get_experiment_node_dialog(dialog.path)
+        fh = tables.openFile(dialog.path, 'a', rootUEP=nodepath)
         info.object.data_node = fh.root.data
+        info.object.datafile = dialog.path
         self.load_settings(info)
+        info.ui.title = '{} - Physiology Review'.format(dialog.filename)
 
     def open_batchfile(self, info):
         dialog = FileDialog(action="open", 
@@ -288,7 +290,6 @@ class PhysiologyReviewController(Controller):
         info.object.batchfile = dialog.path
 
     def save_settings(self, info):
-        print 'SAVING SETTINGS'
         settings = info.object.channel_settings
         node = info.object.data_node.physiology
         channel = info.object.channel
@@ -315,8 +316,8 @@ class PhysiologyReviewController(Controller):
         table._v_attrs['filter_order'] = channel.filter_order
         table._v_attrs['filter_type'] = channel.filter_type
         table._v_attrs['filter_pass'] = channel.filter_pass
-        table._v_attrs['filter_mode'] = channel.filter_mode
         table._v_attrs['diff_mode'] = channel.diff_mode
+        information(info.ui.control, "Saved settings to file")
 
     def load_settings(self, info):
         try:
@@ -349,15 +350,16 @@ class PhysiologyReviewController(Controller):
             channel.freq_lp = table._v_attrs['freq_lp']
             channel.freq_hp = table._v_attrs['freq_hp']
             channel.filter_order = table._v_attrs['filter_order']
-            channel.filter_mode = table._v_attrs['filter_mode']
             channel.filter_type = table._v_attrs['filter_type']
             channel.filter_pass = table._v_attrs['filter_pass']
             channel.diff_mode = table._v_attrs['diff_mode'] 
-        except tables.NoSuchNodeError:
-            # Means that we don't have any saved setting data for this file
-            pass
 
-    def revert_settings(self, info):
+        except (AttributeError, KeyError):
+            # The errors mean that we haven't saved settings information to this
+            # node yet.  Revert all settings back to default.
+            self.revert_settings(info)
+
+    def default_settings(self, info):
         reset = ['freq_lp', 'freq_hp', 'filter_order', 'diff_mode']
         info.object.channel.reset_traits(reset)
         settings = info.object._channel_settings_default()
@@ -372,6 +374,7 @@ class PhysiologyReviewController(Controller):
         stdevs = np.median(np.abs(chunk)/0.6745, axis=1)
         for std, setting in zip(stdevs, info.object.channel_settings):
             setting.std = std
+        information(info.ui.control, "Computed noise floor")
 
     def _prepare_extract_settings(self, info):
         settings = [s for s in info.object.channel_settings if s.extract]
@@ -401,8 +404,8 @@ class PhysiologyReviewController(Controller):
 
         # Set up the variables here.  We can eventually separate this out into a
         # stand-alone script or module that can be reused by non-GUI programs.
-        kwargs['input_file'] = info.object.data_node._v_file.filename
-        kwargs['experiment_path'] = info.object.data_node._v_file.rootUEP
+        #kwargs['input_file'] = info.object.data_node._v_file.filename
+        #kwargs['experiment_path'] = info.object.data_node._v_file.rootUEP
         kwargs['processing'] = processing
         kwargs['noise_std'] = [s.std for s in settings]
         kwargs['channels'] = [s.index for s in settings]
@@ -436,25 +439,29 @@ class PhysiologyReviewController(Controller):
         dialog.open()
         if dialog.return_code != OK:
             return
-        kwargs['output_file'] = path.join(dialog.directory, dialog.filename) 
-        kwargs['output_path'] = '/'
 
-        # Create a progress dialog that keeps the user up-to-date on what's going on
-        # since this is a fairly lengthy process.
-        dialog = ProgressDialog(title='Exporting data', 
-                                min=1,
-                                max=100,
-                                can_cancel=True,
-                                message='Initializing ...')
+        with tables.openFile(dialog.path, 'w') as fh_out:
+            kwargs['input_node'] = info.object.data_node
+            kwargs['output_node'] = fh_out.root
 
-        # Define a function that, when called, updates the dialog ... 
-        dialog.open()
-        def callback(pct, mesg):
-            dialog.change_message(mesg)
-            cont, skip = dialog.update(pct*100)
-            return not cont
+            # Create a progress dialog that keeps the user up-to-date on what's
+            # going on since this is a fairly lengthy process.
+            dialog = ProgressDialog(title='Exporting data', 
+                                    min=1,
+                                    max=100,
+                                    can_cancel=True,
+                                    message='Initializing ...')
 
-        extract_spikes(progress_callback=callback, **kwargs)
+            # Define a function that, when called, updates the dialog ... 
+            dialog.open()
+            def callback(pct, mesg):
+                print 'callback', mesg, pct
+                dialog.change_message(mesg)
+                cont, skip = dialog.update(pct*100)
+                return not cont
+            
+            # Run the extraction script
+            extract_spikes(progress_callback=callback, **kwargs)
 
     def create_lfp(self, info):
         channel = info.object.channel
@@ -473,10 +480,40 @@ class PhysiologyReviewController(Controller):
             # human-readable (nor human-editable).  This file is purely meant
             # for one-time use.
             pickle.dump(kwargs, fh)
+        information(info.ui.control, "Appended job to batchfile")
+
+    def set_lfp_filter_defaults(self, info):
+        defaults = {
+            'diff_mode':        None,
+            'filter_pass':      'lowpass',
+            'filter_order':     4,
+            'freq_lp':          300,
+            'filter_type':      'butter',
+        }
+        info.object.channel.trait_set(**defaults)
+
+    def set_su_filter_defaults(self, info):
+        defaults = {
+            'diff_mode':        None,
+            'filter_pass':      'highpass',
+            'filter_order':     8,
+            'freq_hp':          300,
+            'freq_lp':          6000,
+            'filter_type':      'butter',
+        }
+        info.object.channel.trait_set(**defaults)
+
+    def set_raw_defaults(self, info):
+        defaults = {
+            'diff_mode':        None,
+            'filter_pass':      None,
+        }
+        info.object.channel.trait_set(**defaults)
 
 class PhysiologyReview(HasTraits):
 
     # File to save batch jobs to for later processing
+    datafile            = File
     batchfile           = File
     data_node           = Any(transient=True)
     channel             = Instance('cns.channel.ProcessedMultiChannel', (),
@@ -504,6 +541,7 @@ class PhysiologyReview(HasTraits):
 
     def _channel_dclicked_fired(self, event):
         setting, column = event
+        print setting, column
         if self.channel_dclick_toggle:
             # We are currently in dclick "mask" mode where the user is viewing
             # only a single channel that they dclicked.
@@ -526,8 +564,7 @@ class PhysiologyReview(HasTraits):
 
     def _data_node_changed(self, node):
         raw = node.physiology.raw
-        channel = ProcessedFileMultiChannel.from_node(raw,
-                                                      filter_mode='lfilter')
+        channel = ProcessedFileMultiChannel.from_node(raw)
         self.channel = channel
         self.trial_data = node.trial_log.read()
         self._update_plot()
@@ -634,7 +671,7 @@ class PhysiologyReview(HasTraits):
                         mutual=False)
         plot.overlays.append(overlay)
 
-        overlay = ThresholdOverlay(plot=plot, sort_signs=[True]*16,
+        overlay = ThresholdOverlay(plot=plot, sort_signs=[False]*16,
                                    line_color='red')
         self.sync_trait('artifact_thresholds', overlay, 'sort_thresholds',
                         mutual=False)
@@ -649,8 +686,6 @@ class PhysiologyReview(HasTraits):
             Tabbed(
                 VGroup(
                     VGroup(
-                        Item('object.channel.process_order', 
-                             label='Processing order'),
                         Item('object.channel.diff_mode', 
                              label='Differential mode'),
                         Item('object.channel.freq_hp', 
@@ -659,8 +694,6 @@ class PhysiologyReview(HasTraits):
                              label='Lowpass cutoff (Hz)'),
                         Item('object.channel.filter_order', 
                              label='Filter order'),
-                        Item('object.channel.filter_mode', 
-                             label='Filter mode'),
                         Item('object.channel.filter_pass', 
                              label='Filter pass mode'),
                         Item('object.channel.filter_type', 
@@ -715,10 +748,29 @@ class PhysiologyReview(HasTraits):
                            image=ImageResource('save_settings.png'),
                            enabled_when='object.data_node is not None'
                           ),
-                    Action(name='Revert to default settings', 
-                           action='revert_settings',
+                    Action(name='Revert settings', 
+                           action='load_settings',
                            accelerator='Ctrl+R',
                            image=ImageResource('revert_settings.png'),
+                           enabled_when='object.data_node is not None',
+                          ),
+                    Action(name='Default settings', 
+                           action='default_settings',
+                           accelerator='Ctrl+R',
+                           enabled_when='object.data_node is not None',
+                          ),
+                ),
+                ActionGroup(
+                    Action(name='LFP filter defaults',
+                           action='set_lfp_filter_defaults',
+                           enabled_when='object.data_node is not None',
+                          ),
+                    Action(name='Single unit filter defaults',
+                           action='set_su_filter_defaults',
+                           enabled_when='object.data_node is not None',
+                          ),
+                    Action(name='No filtering',
+                           action='set_raw_defaults',
                            enabled_when='object.data_node is not None',
                           ),
                 ),
@@ -747,12 +799,63 @@ class PhysiologyReview(HasTraits):
                            enabled_when='object.data_node is not None ' + \
                                         'and len(object.extract_channels)',
                           ),
+                    Action(name='Downsample waveform',
+                           action='downsample_waveform',
+                           accelerator='Ctrl+D',
+                           image=ImageResource('extract.png'),
+                           enabled_when='object.data_node is not None ' + \
+                                        'and len(object.extract_channels)',
+                          ),
                 ),
                 name='&Actions',
             ),
         ),
         title='Physiology Review',
     )
+
+def get_experiment_node_dialog(filename):
+    '''
+    Given a physiology experiment file with multiple experiments, prompt the
+    user for the experiment they'd like to analyze.  If only one experiment is
+    present, no prompt will be generated.
+
+    filename : str or None
+        File to obtain experiment from.  If None, extract the argument from
+        sys.argv[1]
+
+    returns : (filename, node path)
+    '''
+    class Dialog(HasTraits):
+        experiment = Str
+        options = List
+        view = View(
+            Item('experiment', 
+                 style='custom',
+                 editor=EnumEditor(name='options'),
+                ),
+            kind='modal',
+            buttons=['OK', 'Cancel'],
+        )
+
+    with tables.openFile(filename, 'r') as fh:
+        nodes = fh.root._f_listNodes()
+        if len(nodes) == 1:
+            return nodes[0]._v_pathname
+        elif len(nodes) == 0:
+            return ''
+
+        options = []
+        for node in nodes:
+            try:
+                trials = len(node.data.trial_log)
+            except:
+                trials = 0
+            option = '{} trials: {}'.format(trials, node._v_name)
+            options.append(option)
+        dialog = Dialog(options=options)
+        dialog.configure_traits()
+        i = options.index(dialog.experiment)
+        return nodes[i]._v_pathname
 
 def get_experiment_node(filename=None):
     '''

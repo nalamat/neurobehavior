@@ -19,7 +19,7 @@ def compute_noise_std(input_file, experiment_path, lb, ub):
     for std, setting in zip(stdevs, self.model.channel_settings):
         setting.std = std
 
-def decimate_waveform(input_file, experiment_path, q, differential=None, N=4):
+def decimate_waveform(x, fs, q, differential=None, N=4):
     '''
     Decimates the waveform data to a lower sampling frequency using a lowpass
     filter cutoff.  Resulting decimation is saved under the physiology node as
@@ -28,6 +28,10 @@ def decimate_waveform(input_file, experiment_path, q, differential=None, N=4):
 
     A 4th order lowpass butterworth filter is used in conjunction with filtfilt
     to apply a zero phase-delay to the waveform.
+
+    This code is carefully designed to handle boundary issues when processing
+    large datasets in chunks (e.g. stabilizing the edges of each chunk when
+    filtering and extracting the correct samples from each chunk).
 
     Parameters
     ----------
@@ -44,10 +48,6 @@ def decimate_waveform(input_file, experiment_path, q, differential=None, N=4):
         None, the identity matrix will be used.
     N : int
         The filter order to use
-
-    This code is carefully designed to handle boundary issues when processing
-    large datasets in chunks (e.g. stabilizing the edges of each chunk when
-    filtering and extracting the correct samples from each chunk).
     '''
     # Load information about the data we are processing and compute the sampling
     # frequency for the decimated dataset
@@ -110,6 +110,10 @@ def chunk_samples(x, max_bytes=10e6, block_size=None, axis=-1):
     '''
     Compute number of samples per channel to load based on the preferred memory
     size of the chunk (as indicated by max_bytes) and the underlying datatype.
+
+    This code is carefully designed to handle boundary issues when processing
+    large datasets in chunks (e.g. stabilizing the edges of each chunk when
+    filtering and extracting the correct samples from each chunk).
 
     Parameters
     ----------
@@ -214,30 +218,22 @@ def chunk_iter_2D(x, chunk_samples, loverlap=0, roverlap=0, pad_value=np.nan):
 
         yield chunk
 
-def extract_spikes(input_file, experiment_path, channels, noise_std,
-                   threshold_stds, rej_threshold_stds, processing,
-                   output_file=None, output_path='/', window_size=2.1,
+def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
+                   rej_threshold_stds, processing, window_size=2.1,
                    cross_time=0.5, cov_samples=10000, progress_callback=None,
-                   chunk_size=5e7):
+                   chunk_size=5e6):
     '''
     Extracts spikes
 
     Parameters
     ----------
-    input_file : str
-        File containing the experiment data
-    experiment_path : str
-        Path to location of experiment node in the HDF5 tree.  A HDF5 node can
-        contain multiple experiments, so it's important to specify which
-        experiment is being processed.
-    output_file : str or None
-        File to save the output to.  Note that if the file exists, an error will
-        be raised.  Data will not be overwritten by default.  You must
-        explicitly delete the existing file first!  If None, will default to
-        input_file_extracted.hd5 (typical for batch operations).
-    output_path : str
-        Base path for the data to be saved to in the HDF5 tree (use '/' for the
-        root node).
+    input_node : instance of tables.Array
+        The PyTables Array containing the data to be processed (i.e. the "raw"
+        array)
+    output_node : instance of tables.Group
+        The target node to save the data to.  Note that this must be an instance
+        of tables.Group since several arrays will be saved under the target
+        node.
     processing : dict
         Dictionary containing settings that will be passed along to
         ProcessedMultiChannel.  These serve as instructions for referencing and
@@ -272,7 +268,8 @@ def extract_spikes(input_file, experiment_path, channels, noise_std,
     cross_time : float (msec)
         Alignment point for peak of waveform
     cov_samples : int
-        Number of samples to collect for estimating the covariance matrix
+        Number of samples to collect for estimating the covariance matrix (used
+        by UMS2000)
     progress_callback : callable
         Function to be notified each time a chunk is processed.  The function
         must take three arguments, (chunk number, total chunks, message).  As
@@ -292,23 +289,16 @@ def extract_spikes(input_file, experiment_path, channels, noise_std,
     if progress_callback is None:
         progress_callback = lambda x, y, z: False
 
-    # If output_file is not specified, automatically generate it from the
-    # input_file name.
-    if output_file is None:
-        output_file = re.sub(r'(.*)\.([h5|hd5|hdf5])', r'\1_extracted.\2',
-                             input_file)
-
     # Load the physiology data and put a ProcessedMultiChannel wrapper around
     # it.  This wrapper will handle all the pertinent issues of referencing and
     # filtering (as well as chunking the data).
-    fh_in = tables.openFile(input_file, 'r', rootUEP=experiment_path)
-    node = ProcessedFileMultiChannel.from_node(fh_in.root.data.physiology.raw,
+    node = ProcessedFileMultiChannel.from_node(input_node.physiology.raw,
                                                filter_mode='filtfilt',
                                                **processing)
     fs = node.fs
 
-    ts_start = fh_in.root.data.trial_log[0]['ts_start']
-    ts_end   = fh_in.root.data.trial_log[-1]['ts_end']
+    ts_start = input_node.trial_log[0]['ts_start']
+    ts_end   = input_node.trial_log[-1]['ts_end']
 
     n_channels = len(channels)
     chunk_samples = node.chunk_samples(chunk_size)
@@ -319,7 +309,7 @@ def extract_spikes(input_file, experiment_path, channels, noise_std,
     samples_after = window_samples-samples_before
 
     # Now, create the nodes in the HDF5 file to store the data we extract.
-    fh_out = tables.openFile(output_file, 'w')
+    fh_out = output_node._v_file
 
     # Ensure that underlying datatype of HDF5 array containing waveforms is
     # identical to the datatype of the source waveform (e.g. 32-bit float).
@@ -327,19 +317,20 @@ def extract_spikes(input_file, experiment_path, channels, noise_std,
     # along a single dimension.
     size = (0, n_channels, window_samples)
     atom = tables.Atom.from_dtype(node.dtype)
-    fh_waveforms = fh_out.createEArray('/', 'waveforms', atom, size)
+    fh_waveforms = fh_out.createEArray(output_node, 'waveforms', atom, size)
 
     # If we have a sampling rate of 12.5 kHz, storing indices as a 32-bit
     # integer allows us to locate samples in a continuous waveform of up to 49.7
     # hours in duration.  This is more than sufficient for our purpose (we will
     # likely run into file size issues well before this point anyway).
-    fh_indices = fh_out.createEArray('/', 'timestamps', tables.Int32Atom(), (0,))
+    fh_indices = fh_out.createEArray(output_node, 'timestamps',
+                                     tables.Int32Atom(), (0,))
     
     # The actual channel the event was detected on.  We can represent up
     # to 32,767 channels with a 16 bit integer.  This should be
     # sufficient for at least the next year.
-    fh_channels = fh_out.createEArray('/', 'channels', tables.Int16Atom(),
-                                  (0,))
+    fh_channels = fh_out.createEArray(output_node, 'channels',
+                                      tables.Int16Atom(), (0,))
 
     # This is another way of determining which channel the event was detected
     # on.  Specifically, if we are saving waveforms from channels 4, 5, 9, and
@@ -355,8 +346,8 @@ def extract_spikes(input_file, experiment_path, channels, noise_std,
     # waveforms and assumes they are numbered consecutively starting at 1.  By
     # adding 1 to the values stored in this array, this can be used for the
     # event_channel data provided to UMS2000.
-    fh_channel_indices = fh_out.createEArray('/', 'channel_indices',
-                                         tables.Int16Atom(), (0,))
+    fh_channel_indices = fh_out.createEArray(output_node, 'channel_indices',
+                                             tables.Int16Atom(), (0,))
 
     # We can represent up to 256 values with an 8 bit integer.  That's overkill
     # for a boolean datatype; however Matlab doesn't support pure boolean
@@ -364,58 +355,60 @@ def extract_spikes(input_file, experiment_path, channels, noise_std,
     # channel] indicating, for each event, which channels exceeded the artifact
     # reject threshold.
     size = (0, n_channels)
-    fh_artifacts = fh_out.createEArray('/', 'artifacts', tables.Int8Atom(), size)
+    fh_artifacts = fh_out.createEArray(output_node, 'artifacts',
+                                       tables.Int8Atom(), size)
 
     # Save some metadata regarding the preprocessing of the data (e.g.
     # referencing and filtering) and feature extraction parameters.
-    fh_out.setNodeAttr('/', 'fs', node.fs)
+    fh_out.setNodeAttr(output_node, 'fs', node.fs)
 
     # This needs to be an EArray rather than an attribute or typical Array
     # because setNodeAttr() and createArray complain if you attempt to pass an
     # empty array to it (I think this is actually an implementation issue with
     # the underlying HDF5 library).  By doing this workaround, we can ensure
     # that empty arrays (i.e. no bad channels) can also be saved.
-    fh_bad_channels = fh_out.createEArray('/', 'bad_channels',
+    fh_bad_channels = fh_out.createEArray(output_node, 'bad_channels',
                                           tables.Int8Atom(), (0,))
     fh_bad_channels.append(np.array(node.bad_channels)+1)
 
     # Currently we only support one referencing mode (i.e. reference against the
     # average of the good channels) so I've hardcoded this attribute for now.
-    fh_out.setNodeAttr('/', 'diff_mode', node.diff_mode)
-    fh_out.createArray('/', 'differential', node.diff_matrix)
+    fh_out.setNodeAttr(output_node, 'diff_mode', node.diff_mode)
+    fh_out.createArray(output_node, 'differential', node.diff_matrix)
 
     # Since we conventionally count channels from 1, convert our 0-based index
     # to a 1-based index.  It's OK to set these as node attributes becasue they
     # will never be empty arrays.  However, let's keep consistency and make
     # everything that's an array an array.
-    fh_out.createArray('/', 'extracted_channels', channels+1)
-    fh_out.createArray('/', 'noise_std', noise_std)
+    fh_out.createArray(output_node, 'extracted_channels', channels+1)
+    fh_out.createArray(output_node, 'noise_std', noise_std)
 
     # Be sure to save the filter coefficients used (not sure if this is
     # meaningful).  The ZPK may be more useful in general.  Unfortunately, HDF5
     # does not natively support complex numbers and I'm not inclined to deal
     # with the issue at present.
-    fh_out.setNodeAttr('/', 'fc_lowpass', node.freq_lp)
-    fh_out.setNodeAttr('/', 'fc_highpass', node.freq_hp)
-    fh_out.setNodeAttr('/', 'filter_order', node.filter_order)
+    fh_out.setNodeAttr(output_node, 'fc_lowpass', node.freq_lp)
+    fh_out.setNodeAttr(output_node, 'fc_highpass', node.freq_hp)
+    fh_out.setNodeAttr(output_node, 'filter_order', node.filter_order)
 
     b, a = node.filter_coefficients
-    fh_out.createArray('/', 'filter_b', b)
-    fh_out.createArray('/', 'filter_a', a)
+    fh_out.createArray(output_node, 'filter_b', b)
+    fh_out.createArray(output_node, 'filter_a', a)
 
     # Feature extraction settings
-    fh_out.setNodeAttr('/', 'window_size', window_size)
-    fh_out.setNodeAttr('/', 'cross_time', cross_time)
-    fh_out.setNodeAttr('/', 'samples_before', samples_before)
-    fh_out.setNodeAttr('/', 'samples_after', samples_after)
-    fh_out.setNodeAttr('/', 'window_samples', window_samples)
-    fh_out.createArray('/', 'threshold', thresholds)
-    fh_out.createArray('/', 'reject_threshold', rej_thresholds)
-    fh_out.createArray('/', 'threshold_std', threshold_stds)
-    fh_out.createArray('/', 'reject_threshold_std', rej_threshold_stds)
+    fh_out.setNodeAttr(output_node, 'window_size', window_size)
+    fh_out.setNodeAttr(output_node, 'cross_time', cross_time)
+    fh_out.setNodeAttr(output_node, 'samples_before', samples_before)
+    fh_out.setNodeAttr(output_node, 'samples_after', samples_after)
+    fh_out.setNodeAttr(output_node, 'window_samples', window_samples)
+    fh_out.createArray(output_node, 'threshold', thresholds)
+    fh_out.createArray(output_node, 'reject_threshold', rej_thresholds)
+    fh_out.createArray(output_node, 'threshold_std', threshold_stds)
+    fh_out.createArray(output_node, 'reject_threshold_std', rej_threshold_stds)
 
     # This is bullshit.  We need to do better.
-    fh_out.createArray('/', 'experiment_range_ts', np.array([ts_start, ts_end]))
+    fh_out.createArray(output_node, 'experiment_range_ts', 
+                       np.array([ts_start, ts_end]))
 
     # Allocate a temporary array, cov_waves, for storing the data used for
     # computing the covariance matrix required by UltraMegaSort2000.  Ensure
@@ -457,6 +450,8 @@ def extract_spikes(input_file, experiment_path, channels, noise_std,
                                samples_after)
 
     for i_chunk, chunk in enumerate(iterable):
+
+        print 'processing', i_chunk, n_chunks
 
         # Update the progress callback each time we finish processing a chunk.
         # If the progress callback returns True, end the processing immediately.
@@ -515,6 +510,8 @@ def extract_spikes(input_file, experiment_path, channels, noise_std,
         fh_channels.append(channels[channel_index]+1)
         fh_channel_indices.append(channel_index)
 
+        # Check to see if any of the samples requested for the covariance matrix
+        # lie in this chunk.  If so, pull them out.
         chunk_lb = i_chunk*chunk_samples
         chunk_ub = chunk_lb+chunk_samples
         while True:
@@ -536,10 +533,8 @@ def extract_spikes(input_file, experiment_path, channels, noise_std,
     # intuition here, but this should be the correct format required).
     cov_waves.shape = cov_i, -1
     cov_matrix = np.cov(cov_waves.T)
-    fh_out.createArray('/', 'covariance_matrix', cov_matrix)
-
-    fh_in.close()
-    fh_out.close()
+    fh_out.createArray(output_node, 'covariance_matrix', cov_matrix)
+    fh_out.createArray(output_node, 'covariance_data', cov_waves)
 
 def update_progress(progress, mesg):
     '''
