@@ -22,11 +22,6 @@ from cns.widgets.toolbar import ToolBar
 from enthought.savage.traits.ui.svg_button import SVGButton
 from cns.widgets.icons import icons
 
-# Enthought supports both the PySide and Qt4 backend.  PySide is essentially a
-# rewrite of PyQt4.  These backends are not compatible with each other, so we
-# need to be sure to import the backend that Enthought has decided to use.
-from enthought.qt import QtGui
-
 from enthought.traits.api import HasTraits, Dict, on_trait_change, Property, \
         cached_property
 
@@ -263,6 +258,15 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
             # not seem to work very well.  Either the popups are modal (in which
             # case they block the program from continuing to run) or they
             # dissappear below the main window.
+
+            # HACK ALERT! This is a buried import to ensure that I can still run
+            # my analysis code.
+            # Enthought supports both the PySide and Qt4 backend.  PySide is
+            # essentially a rewrite of PyQt4.  These backends are not compatible
+            # with each other, so we need to be sure to import the backend that
+            # Enthought has decided to use.
+            from enthought.qt import QtGui
+
             #self.system_tray = QtGui.QSystemTrayIcon(icon, info.ui.control)
             icon_path = path.join(path.dirname(__file__), 'psi_uppercase.svg')
             icon = QtGui.QIcon(icon_path)

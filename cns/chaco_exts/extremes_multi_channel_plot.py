@@ -20,6 +20,15 @@ class ExtremesMultiChannelPlot(ExtremesChannelPlot):
     offsets = Property(depends_on='channel_+, value_mapper.updated')
     screen_offsets = Property(depends_on='offsets')
 
+    def _gather_points(self):
+        if not self._data_cache_valid:
+            range = self.index_mapper.range
+            data = self.source.get_range(range.low, range.high,
+                                         channels=self.channel_visible)
+            self._cached_data = self._preprocess_data(data)
+            self._data_cache_valid = True
+            self._screen_cache_valid = False
+
     def _channel_offset_changed(self):
         self._invalidate_screen()
 
@@ -40,8 +49,8 @@ class ExtremesMultiChannelPlot(ExtremesChannelPlot):
         return self.value_mapper.map_screen(self.offsets)
 
     def _map_screen(self, data):
-        spaced_data = data[self.channel_visible] + self.offsets
-        return self.value_mapper.map_screen(spaced_data)
+        #spaced_data = data[self.channel_visible] + self.offsets
+        return self.value_mapper.map_screen(data + self.offsets)
 
     def _render(self, gc, points):
         if len(points[0]) == 0:
