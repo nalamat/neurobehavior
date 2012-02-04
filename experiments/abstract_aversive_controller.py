@@ -1,4 +1,4 @@
-from enthought.traits.api import Property, Int
+from enthought.traits.api import Property, Int, Any
 from cns.pipeline import deinterleave_bits
 from abstract_experiment_controller import AbstractExperimentController
 from cns import get_config
@@ -14,6 +14,7 @@ class AbstractAversiveController(AbstractExperimentController):
     # sampling frequency of the DSP) to the TTL and contact sampling frequency
     # (critcal for computing lick_offset, etc).
     fs_conversion = Int
+    pipeline_TTL = Any
 
     def _setup_shock(self):
         # First, we need to load the circuit we need to control the shocker.
@@ -188,8 +189,9 @@ class AbstractAversiveController(AbstractExperimentController):
 
     ############################################################################
     # Code to apply parameter changes.  This is backend-specific.  If you want
-    # to implement a new backend, you would subclass this and override the
-    # appropriate set_* and get_* methods.
+    # to implement a new backend (e.g. use National Instruments instead of TDT),
+    # you would subclass this and override the appropriate set_* and get_*
+    # methods.
     ############################################################################
 
     def get_reaction_ts(self):

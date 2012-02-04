@@ -1,4 +1,4 @@
-from enthought.traits.api import Str, Property, Instance, Int, Float
+from enthought.traits.api import Str, Property, Instance, Int, Float, Any
 from enthought.traits.ui.api import View, Item, HGroup, spring
 from abstract_experiment_controller import AbstractExperimentController
 from abstract_experiment_controller import ExperimentToolBar
@@ -44,6 +44,9 @@ class AbstractPositiveController(AbstractExperimentController):
     current_hw_att1 = Float(120)
     current_hw_att2 = Float(120)
 
+    pipeline_TTL1   = Any
+    pipeline_TTL2   = Any
+
     def set_attenuations(self, att1, att2, check=True):
         # TDT's built-in attenuators for the RZ6 function in 20 dB steps, so we
         # need to determine the next greater step size for the attenuator.  The
@@ -69,6 +72,9 @@ class AbstractPositiveController(AbstractExperimentController):
             self.current_hw_att2 = hw2
             self.output_secondary.hw_attenuation = hw2
             log.debug('Updated secondary attenuation to %.2f', hw2)
+
+        # For efficiency reasons, we prefer to do most of the computation for
+        # the RZ6 attenuator values in software rather than hardware.
         att_bits = RZ6.atten_to_bits(att1, att2)
         self.iface_behavior.set_tag('att_bits', att_bits)
 
@@ -176,9 +182,6 @@ class AbstractPositiveController(AbstractExperimentController):
             poke = self.iface_behavior.get_tag('resp_poke?')
             spout = self.iface_behavior.get_tag('resp_spout?')
             to = self.iface_behavior.get_tag('fa?')
-            print 'POKE', poke
-            print 'SPOUT', spout
-            print 'TO', to
             if to:
                 response = 'spout'
             elif poke and not spout:

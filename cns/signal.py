@@ -75,3 +75,9 @@ def am_eq_phase(depth, direction='positive'):
     z = 2.0/depth*eq_power-2.0/depth+1
     phi = np.arccos(z)
     return 2*pi-phi if direction == 'positive' else phi
+
+def rms(waveform):
+    '''
+    Compute root-mean-square power of waveform
+    '''
+    return np.mean(waveform**2)**0.5
