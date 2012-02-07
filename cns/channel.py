@@ -718,7 +718,7 @@ class ProcessedMultiChannel(MultiChannel):
         elif self.filter_btype == 'highpass':
             Wp = self.filter_freq_hp
         else:
-            Wp = self.filter_freq_lpiirdesign
+            Wp = self.filter_freq_lp
         Wp = Wp/(0.5*self.fs)
 
         return signal.iirfilter(self.filter_order, Wp, 60, 2,
