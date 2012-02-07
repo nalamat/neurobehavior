@@ -56,6 +56,7 @@ function [spikes] = import_spikes(filename, varargin)
     % Let the inputParser handle massaging the input into the format we need and
     % setting default values as required.  This is a lot of work that Python
     % handles under the hood by default.
+
     p = inputParser();
     p.addRequired('filename', @ischar);
     p.addParamValue('waveform_channels', [], @isvector);
@@ -168,13 +169,9 @@ function [spikes] = import_spikes(filename, varargin)
 
     % Now, trim the result down if requested
     if omit_prepost, 
-        % HACK ALERT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!11
-        % Multiply by 10 because the timestamps were saved at 10% of the
-        % physiology clock speed.  Need to automate this computation in the
-        % future.
-        valid_range = double(h5read(filename, '/experiment_range_ts')) .* 10;
-        start = find(timestamps >= valid_range(1), 1, 'first');
-        stop = find(timestamps < valid_range(2), 1, 'last');
+        epochs = double(h5read(filename, '/physiology_epoch'));
+        start = find(timestamps >= epochs(1, 1), 1, 'first');
+        stop = find(timestamps < epochs(end, end), 1, 'last');
     else
         start = 1;
         stop = length(timestamps);

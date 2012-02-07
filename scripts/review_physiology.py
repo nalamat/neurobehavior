@@ -3,20 +3,17 @@
 import tables
 import cPickle as pickle
 import numpy as np
-from os import path
 import re
 
 from pyface.api import FileDialog, OK, error, ProgressDialog, ImageResource, \
         information
 from enable.api import Component, ComponentEditor
 from chaco.api import LinearMapper, DataRange1D, OverlayPlotContainer
-from chaco.tools.api import LineSegmentTool
-from traitsui.api import VGroup, HGroup, Item, Include, View, \
-        InstanceEditor, RangeEditor, HSplit, Tabbed, Controller, \
-        ToolBar
+from traitsui.api import VGroup, Item, View, \
+        HSplit, Tabbed, Controller
 from traits.api import Instance, HasTraits, Float, DelegatesTo, \
-     Bool, on_trait_change, Int, on_trait_change, Any, Range, Event, Property,\
-     Tuple, List, cached_property, Str, Dict, Enum, Button, File
+     Bool, Int, Any, Event, Property,\
+     List, cached_property, Str, Enum, File
 
 # Used for displaying the checkboxes for channel/plot visibility config
 from traitsui.api import TableEditor, ObjectColumn, EnumEditor
@@ -27,29 +24,24 @@ from traitsui.menu import MenuBar, Menu, ActionGroup, Action
 from traitsui.api import TabularEditor
 from traitsui.tabular_adapter import TabularAdapter
 
-from cns.channel import ProcessedFileMultiChannel, FileChannel, FileTimeseries
+from cns import get_config
+from cns.channel import ProcessedFileMultiChannel, FileChannel
 from cns.chaco_exts.helpers import add_default_grids, add_time_axis
 from cns.chaco_exts.channel_data_range import ChannelDataRange
 from cns.chaco_exts.extremes_multi_channel_plot import ExtremesMultiChannelPlot
 from cns.chaco_exts.ttl_plot import TTLPlot
-from cns.chaco_exts.epoch_plot import EpochPlot
 from cns.chaco_exts.channel_range_tool import MultiChannelRangeTool
 from cns.chaco_exts.channel_number_overlay import ChannelNumberOverlay
 from cns.chaco_exts.threshold_overlay import ThresholdOverlay
-from cns.chaco_exts.timeseries_plot import TimeseriesPlot
 
 from experiments.colors import color_names
-from extract_spikes import extract_spikes, decimate_waveform
-
-from cns.arraytools import chunk_samples
+from extract_spikes import extract_spikes, median_std, decimate_waveform
 
 is_none = lambda x: x is None
 
 fill_alpha = 0.25
 line_alpha = 0.55
 line_width = 0.5
-
-CHUNK_SIZE = 1e7
 
 CHANNEL_FORMAT = {
     'spout_TTL':    {
@@ -177,8 +169,7 @@ trial_log_editor = TabularEditor(editable=False,
                                  adapter=TrialLogAdapter(),
                                  selected='current_trial')
 
-class ChannelSetting(HasTraits):
-
+class ChannelSetting(HasTraits): 
     # Channel number (used for indexing purposes so this should be zero-based)
     index           = Int
     # Channel number (used for GUI purposes so this should be one-based)
@@ -205,6 +196,10 @@ class ChannelSetting(HasTraits):
     # Channel type
     classification = Enum('None', 'single-unit', 'multi-unit', 'artifact',
                           'hash', 'gross discharge')
+    # Does the channel have an auditory response?
+    auditory_response = Bool(False)
+    # Does the channel have a behavior response?
+    behavior_response = Bool(False)
 
     @cached_property
     def _get_gui_index(self):
@@ -233,6 +228,8 @@ channel_editor = TableEditor(
         ObjectColumn(name='std_mv', width=25, label=u'\u03C3 (mV)',
                      format='%.3f', editable=False),
         ObjectColumn(name='classification', width=50, label='Classification'),
+        CheckboxColumn(name='auditory_response', width=5, label='AR'),
+        CheckboxColumn(name='behavior_response', width=5, label='BR'),
         ],
     dclick='channel_dclicked',
     )
@@ -252,6 +249,24 @@ plot_editor = TableEditor(
 
 class PhysiologyReviewController(Controller):
 
+    def _do_zoom(self, level, info):
+        info.object.index_range.span = level
+
+    def set_zoom_1(self, info):
+        self._do_zoom(1, info)
+
+    def set_zoom_2(self, info):
+        self._do_zoom(2, info)
+
+    def set_zoom_4(self, info):
+        self._do_zoom(4, info)
+
+    def set_zoom_8(self, info):
+        self._do_zoom(8, info)
+
+    def set_zoom_16(self, info):
+        self._do_zoom(16, info)
+
     def open_file(self, info):
         # Get the output filename from the user
         dialog = FileDialog(action="open", 
@@ -263,11 +278,23 @@ class PhysiologyReviewController(Controller):
             info.object.data_node._v_file.close()
         nodepath = get_experiment_node_dialog(dialog.path)
         fh = tables.openFile(dialog.path, 'a', rootUEP=nodepath)
-        info.object.data_node = fh.root.data
-        info.object.datafile = dialog.path
-        self.load_settings(info)
-        info.ui.title = '{} - Physiology Review'.format(dialog.filename)
 
+        # Save the information back to the object
+        info.object.data_node = fh.root
+        info.object.datafile = dialog.path
+        info.object.datapath = nodepath
+        self._update_title(info)
+        self.load_settings(info)
+
+    def _update_title(self, info):
+        if info.object.batchfile:
+            template = '{} >> {} - Physiology Review'
+            info.ui.title = template.format(info.object.datafile,
+                                            info.object.batchfile)
+        else:
+            template = '{} - Physiology Review'
+            info.ui.title = template.format(info.object.datafile)
+    
     def open_batchfile(self, info):
         dialog = FileDialog(action="open", 
                             wildcard='Batch file (*.bat)|*.bat|')
@@ -277,6 +304,7 @@ class PhysiologyReviewController(Controller):
         # Save the full path to the batchfile.  Don't open it (we'll open it
         # each time we need to add to it).
         info.object.batchfile = dialog.path
+        self._update_title(info)
 
     def create_batchfile(self, info):
         dialog = FileDialog(action="save as", 
@@ -289,10 +317,11 @@ class PhysiologyReviewController(Controller):
         # Save the full path to the batchfile.  Don't open it (we'll open it
         # each time we need to add to it).
         info.object.batchfile = dialog.path
+        self._update_title(info)
 
     def save_settings(self, info):
         settings = info.object.channel_settings
-        node = info.object.data_node.physiology
+        node = info.object.data_node.data.physiology
         channel = info.object.channel
 
         # If the channel_metadata table already exists, remove it.
@@ -311,19 +340,18 @@ class PhysiologyReviewController(Controller):
         table = node._v_file.createTable(node, 'channel_metadata', records)
 
         # Save the filtering/referencing settings as attributes in the table
-        # node
-        table._v_attrs['freq_lp'] = channel.freq_lp
-        table._v_attrs['freq_hp'] = channel.freq_hp
-        table._v_attrs['filter_order'] = channel.filter_order
-        table._v_attrs['filter_type'] = channel.filter_type
-        table._v_attrs['filter_pass'] = channel.filter_pass
-        table._v_attrs['diff_mode'] = channel.diff_mode
+        # node.  This code basically pulls out all of the traits on the
+        # PhysiologyReview that do not have the transient metadata set to True.
+        # Note that some Traits (e.g. Property, Event, etc.) already have
+        # transient set to True, so I do not define them here.
+        for k, v in info.object.trait_get(setting=True).items():
+            table._v_attrs[k] = v
         information(info.ui.control, "Saved settings to file")
 
     def load_settings(self, info):
         try:
             channel = info.object.channel
-            table = info.object.data_node.physiology.channel_metadata
+            table = info.object.data_node.data.physiology.channel_metadata
 
             # This returns a Numpy record array
             records = table.read()
@@ -333,8 +361,13 @@ class PhysiologyReviewController(Controller):
             # the "Property" traits such as artifact_threshold are dynamically
             # computed since they are derived from other traits in the class),
             # so we need to ensure we only pull out the "editable" traits from
-            # the channel_metadata table.
+            # the channel_metadata table.  Furthermore, I may have added new
+            # columns in future revisions of the program that are not present in
+            # the saved channel_metadat atable.  To ensure
+            # backward-compatibility, we only load the columns that are present
+            # in table.cols.
             traits = ChannelSetting.class_trait_names(transient=is_none)
+            traits = list(np.intersect1d(traits, table.colnames))
 
             # Pull out the columns from the record array 
             records = records[traits]
@@ -347,18 +380,16 @@ class PhysiologyReviewController(Controller):
                 settings.append(setting)
             info.object.channel_settings = settings
 
-            # Load the filtering/referencing data
-            channel.freq_lp = table._v_attrs['freq_lp']
-            channel.freq_hp = table._v_attrs['freq_hp']
-            channel.filter_order = table._v_attrs['filter_order']
-            channel.filter_type = table._v_attrs['filter_type']
-            channel.filter_pass = table._v_attrs['filter_pass']
-            channel.diff_mode = table._v_attrs['diff_mode'] 
+            # Now, load!
+            info.object.trait_set(table._v_attrs)
 
-        except (AttributeError, KeyError), e:
+        except (AttributeError):
             # The errors mean that we haven't saved settings information to this
             # node yet.  Revert all settings back to default.
             self.default_settings(info)
+        except (KeyError):
+            # Some additional metadata may be missing
+            pass
 
     def default_settings(self, info):
         reset = ['freq_lp', 'freq_hp', 'filter_order', 'diff_mode']
@@ -367,16 +398,16 @@ class PhysiologyReviewController(Controller):
         info.object.channel_settings = settings
 
     def compute_std(self, info):
-        lb = int(info.object.trial_data[0]['ts_start'])
-        node = info.object.channel
-        channels = info.object.extract_channels
-        s = chunk_samples(node, CHUNK_SIZE)
-        #chunk_samples = int(node.chunk_samples(CHUNK_SIZE))
-        chunk = node[:,lb:lb+s]
-        stdevs = np.median(np.abs(chunk)/0.6745, axis=1)
+        duration = get_config('NOISE_DURATION')
+        lb = info.object.index_range.low
+        ub = lb + duration
+        lb, ub = info.object.channel.to_samples((lb, ub))
+        stdevs = median_std(info.object.channel[:,lb:ub])
         for std, setting in zip(stdevs, info.object.channel_settings):
             setting.std = std
-        information(info.ui.control, "Computed noise floor")
+        information(info.ui.control, "Computed standard deviation of signal")
+        info.object.std_lb = lb
+        info.object.std_ub = ub
 
     def _prepare_extract_settings(self, info):
         settings = [s for s in info.object.channel_settings if s.extract]
@@ -391,24 +422,18 @@ class PhysiologyReviewController(Controller):
                   title='No channels selected')
             return
 
-        # Ensure that the noise floor computation is up-to-date
-        self.compute_std(info)
-
         kwargs = {}
 
         # Compile our referencing and filtering instructions
         processing = {}
-        processing['freq_lp'] = info.object.channel.freq_lp
-        processing['freq_hp'] = info.object.channel.freq_hp
-        processing['filter_order'] = info.object.channel.filter_order
-        processing['filter_pass'] = info.object.channel.filter_pass
-        processing['bad_channels'] = info.object.channel.bad_channels
-        processing['diff_mode'] = info.object.channel.diff_mode
+        processing['filter_freq_lp'] = info.object.filter_freq_lp
+        processing['filter_freq_hp'] = info.object.filter_freq_hp
+        processing['filter_order'] = info.object.filter_order
+        processing['filter_btype'] = info.object.filter_btype
+        processing['bad_channels'] = info.object.bad_channels
+        processing['diff_mode'] = info.object.diff_mode
 
-        # Set up the variables here.  We can eventually separate this out into a
-        # stand-alone script or module that can be reused by non-GUI programs.
-        #kwargs['input_file'] = info.object.data_node._v_file.filename
-        #kwargs['experiment_path'] = info.object.data_node._v_file.rootUEP
+        # Gather the arguments required by the spike extraction routine
         kwargs['processing'] = processing
         kwargs['noise_std'] = [s.std for s in settings]
         kwargs['channels'] = [s.index for s in settings]
@@ -432,7 +457,7 @@ class PhysiologyReviewController(Controller):
         # Suggest a filename based on the filename of the original file (to make
         # it easier for the user to just click "OK").
         filename = info.object.data_node._v_file.filename
-        filename = re.sub(r'(.*)\.([h5|hd5|hdf5])', r'\1_extracted.\2',
+        filename = re.sub(r'(.*)\.(h5|hd5|hdf5)', r'\1_extracted.\2',
                           filename)
 
         # Get the output filename from the user
@@ -457,7 +482,7 @@ class PhysiologyReviewController(Controller):
 
             # Define a function that, when called, updates the dialog ... 
             dialog.open()
-            def callback(samples, mesg):
+            def callback(samples, max_samples, mesg):
                 dialog.change_message(mesg)
                 cont, skip = dialog.update(samples)
                 return not cont
@@ -465,58 +490,116 @@ class PhysiologyReviewController(Controller):
             # Run the extraction script
             extract_spikes(progress_callback=callback, **kwargs)
 
-    def create_lfp(self, info):
-        channel = info.object.channel
-        differential = channel.diff_matrix
-        q = np.floor(channel.fs/600.0)
-        decimate_waveform(info.object.data_node._v_file.filename,
-                          info.object.data_node._v_file.rootUEP,
-                          q, differential, 4)
+    def _prepare_decimation_settings(self, info):
+        kwargs = {}
+        kwargs['q'] = np.floor(info.object.channel.fs/600.0)
+        kwargs['N'] = 4
+        return kwargs
 
-    def append_batchfile(self, info):
+    def decimate_waveform(self, info):
+        outputfile = self._get_filename('decimated', info)
+        if outputfile is None:
+            return
+        kwargs = self._prepare_decimation_settings(info)
+        with tables.openFile(outputfile, 'w') as fh:
+            kwargs['input_node'] = info.object.data_node
+            kwargs['output_node'] = fh.root
+            decimate_waveform(**kwargs)
+
+    def queue_extraction(self, info):
         kwargs = self._prepare_extract_settings(info)
+        if kwargs is None:
+            return
+        outputfile = self._get_filename('extracted', info)
+        if outputfile is None:
+            return
+        file_info = {
+            'input_file':   info.object.datafile,
+            'input_path':   info.object.datapath,
+            'output_file':  outputfile,
+            'output_path':  '/',
+            }
+        self._append_batchfile('extract_spikes', file_info, kwargs, info)
+
+    def queue_decimation(self, info):
+        outputfile = self._get_filename('decimated', info)
+        if outputfile is None:
+            return
+        file_info = {
+            'input_file':   info.object.datafile,
+            'input_path':   info.object.datapath,
+            'output_file':  outputfile,
+            'output_path':  '/',
+            }
+        kwargs = self._prepare_decimation_settings(info)
+        self._append_batchfile('decimate_waveform', file_info, kwargs, info)
+
+    def _get_filename(self, extension, info):
+        # Suggest a filename based on the filename of the original file (to make
+        # it easier for the user to just click "OK").
+        filename = info.object.data_node._v_file.filename
+        filename = re.sub(r'(.*)\.(h5|hd5|hdf5)',
+                          r'\1_{}.\2'.format(extension),
+                          filename)
+        # Get the output filename from the user
+        dialog = FileDialog(action="save as", 
+                            wildcard='HDF5 file (*.hd5)|*.hd5|',
+                            default_path=filename)
+        dialog.open()
+        if dialog.return_code != OK:
+            return
+        else:
+            return dialog.path
+
+    def _append_batchfile(self, fn, file_info, kwargs, info):
         with open(info.object.batchfile, 'ab') as fh:
             # Pickle is a framed protocol (i.e. we can dump multiple objects to
             # the same file and Pickle will insert a separator in between each
             # object).  This is a Python binary protocol and is not
             # human-readable (nor human-editable).  This file is purely meant
             # for one-time use.
-            pickle.dump(kwargs, fh)
+            pickle.dump((fn, file_info, kwargs), fh)
         information(info.ui.control, "Appended job to batchfile")
 
     def set_lfp_filter_defaults(self, info):
+        # Set the freq_hp as well in case the user selects bandpass after
+        # selecting this action.
         defaults = {
             'diff_mode':        None,
-            'filter_pass':      'lowpass',
+            'filter_btype':    'lowpass',
             'filter_order':     4,
-            'freq_lp':          300,
+            'filter_freq_lp':   300,
+            'filter_freq_hp':   30,
             'filter_type':      'butter',
         }
-        info.object.channel.trait_set(**defaults)
+        info.object.trait_set(**defaults)
 
     def set_su_filter_defaults(self, info):
+        # Set the freq_lp as well in case the user selects bandpass after
+        # selecting this action.
         defaults = {
-            'diff_mode':        None,
-            'filter_pass':      'highpass',
+            'diff_mode':        'all_good',
+            'filter_btype':     'highpass',
             'filter_order':     8,
-            'freq_hp':          300,
-            'freq_lp':          6000,
+            'filter_freq_hp':   300,
+            'filter_freq_lp':   6000,
             'filter_type':      'butter',
         }
-        info.object.channel.trait_set(**defaults)
+        info.object.trait_set(**defaults)
 
     def set_raw_defaults(self, info):
         defaults = {
             'diff_mode':        None,
             'filter_pass':      None,
         }
-        info.object.channel.trait_set(**defaults)
+        info.object.trait_set(**defaults)
 
 class PhysiologyReview(HasTraits):
 
     # File to save batch jobs to for later processing
-    datafile            = File
-    batchfile           = File
+    datafile            = File(transient=True)
+    datapath            = Str(transient=True)
+    batchfile           = File(transient=True)
     data_node           = Any(transient=True)
     channel             = Instance('cns.channel.ProcessedMultiChannel', (),
                                    transient=True)
@@ -538,12 +621,25 @@ class PhysiologyReview(HasTraits):
     channel_dclick_toggle   = Bool(False, transient=True)
     channel_dclick_cache    = Any
 
+    # Settings.  Be sure to include setting=True to indicate the value should be
+    # saved and loaded as needed.
+    filter_order        = DelegatesTo('channel', setting=True)
+    filter_btype        = DelegatesTo('channel', setting=True)
+    filter_freq_hp      = DelegatesTo('channel', setting=True)
+    filter_freq_lp      = DelegatesTo('channel', setting=True)
+    filter_type         = DelegatesTo('channel', setting=True)
+
+    diff_mode           = DelegatesTo('channel', setting=True)
+
+    # Region used to compute the noise floor 
+    std_lb              = Int(-1, setting=True) # lower bound (in samples)
+    std_ub              = Int(-1, setting=True) # upper bound (in samples)
+
     def _trial_data_default(self):
         return []
 
     def _channel_dclicked_fired(self, event):
         setting, column = event
-        print setting, column
         if self.channel_dclick_toggle:
             # We are currently in dclick "mask" mode where the user is viewing
             # only a single channel that they dclicked.
@@ -565,14 +661,14 @@ class PhysiologyReview(HasTraits):
             self.channel_dclick_toggle = True
 
     def _data_node_changed(self, node):
-        raw = node.physiology.raw
+        raw = node.data.physiology.raw
         channel = ProcessedFileMultiChannel.from_node(raw)
         self.channel = channel
-        self.trial_data = node.trial_log.read()
+        self.trial_data = node.data.trial_log.read()
         self._update_plot()
 
     def _index_range_default(self):
-        return ChannelDataRange(span=5, trig_delay=0)
+        return ChannelDataRange(span=6, trig_delay=0)
 
     def _current_trial_changed(self, trial):
         self.index_range.trig_delay = -trial['start']
@@ -629,7 +725,7 @@ class PhysiologyReview(HasTraits):
         self.plot_settings = []
         for name, format in CHANNEL_FORMAT.items():
             try:
-                node = self.data_node.contact._f_getChild(name)
+                node = self.data_node.data.contact._f_getChild(name)
                 channel = FileChannel.from_node(node)
                 plot = TTLPlot(source=channel, index_mapper=index_mapper,
                                value_mapper=value_mapper, **format)
@@ -688,19 +784,13 @@ class PhysiologyReview(HasTraits):
             Tabbed(
                 VGroup(
                     VGroup(
-                        Item('object.channel.diff_mode', 
-                             label='Differential mode'),
-                        Item('object.channel.freq_hp', 
-                             label='Highpass cutoff (Hz)'),
-                        Item('object.channel.freq_lp', 
-                             label='Lowpass cutoff (Hz)'),
-                        Item('object.channel.filter_order', 
-                             label='Filter order'),
-                        Item('object.channel.filter_pass', 
-                             label='Filter pass mode'),
-                        Item('object.channel.filter_type', 
-                             label='Filter type'),
-                        label='Filter settings',
+                        Item('diff_mode', label='Differential mode'),
+                        Item('filter_freq_hp', label='Highpass cutoff (Hz)'),
+                        Item('filter_freq_lp', label='Lowpass cutoff (Hz)'),
+                        Item('filter_order', label='Filter order'),
+                        Item('filter_btype', label='Filter band type'),
+                        Item('filter_type', label='Filter type'),
+                        label='Preprocessing',
                     ),
                     Item('channel_settings', editor=channel_editor, width=350),
                     show_labels=False,
@@ -776,17 +866,32 @@ class PhysiologyReview(HasTraits):
                            enabled_when='object.data_node is not None',
                           ),
                 ),
+                ActionGroup(
+                    Action(name='Zoom to 1 second',
+                           action='set_zoom_1'),
+                    Action(name='Zoom to 2 seconds',
+                           action='set_zoom_2'),
+                    Action(name='Zoom to 4 seconds',
+                           action='set_zoom_4'),
+                    Action(name='Zoom to 8 seconds',
+                           action='set_zoom_8'),
+                    Action(name='Zoom to 16 seconds',
+                           action='set_zoom_16'),
+
+                ),
                 name='&Settings',
             ),
             Menu(
                 ActionGroup(
-                    Action(name='Compute noise floor', 
+                    Action(name=u'Compute signal std. dev.', 
                            action='compute_std',
-                           tooltip='Compute RMS noise floor',
+                           #tooltip=u'Compute signal \u03C3',
                            accelerator='Ctrl+C',
                            image=ImageResource('compute.png'),
                            enabled_when='object.data_node is not None'
                           ),
+                ),
+                ActionGroup(
                     Action(name='Extract spikes',
                            action='extract_spikes',
                            accelerator='Ctrl+E',
@@ -794,20 +899,23 @@ class PhysiologyReview(HasTraits):
                            enabled_when='object.data_node is not None ' + \
                                         'and len(object.extract_channels)',
                           ),
-                    Action(name='Add to batchfile',
-                           action='add_batch',
-                           accelerator='Ctrl+E',
+                    Action(name='Queue spike extraction',
+                           action='queue_extraction',
                            image=ImageResource('extract.png'),
                            enabled_when='object.data_node is not None ' + \
+                                        'and object.batchfile ' + \
                                         'and len(object.extract_channels)',
                           ),
-                    Action(name='Downsample waveform',
-                           action='downsample_waveform',
+                ),
+                ActionGroup(
+                    Action(name='Decimate waveform',
+                           action='decimate_waveform',
                            accelerator='Ctrl+D',
                            image=ImageResource('extract.png'),
-                           enabled_when='object.data_node is not None ' + \
-                                        'and len(object.extract_channels)',
-                          ),
+                           enabled_when='object.data_node is not None'),
+                    Action(name='Queue decimation',
+                           action='queue_decimation',
+                           enabled_when='object.data_node and object.batchfile'),
                 ),
                 name='&Actions',
             ),

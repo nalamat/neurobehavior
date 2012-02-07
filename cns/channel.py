@@ -367,7 +367,9 @@ class Channel(HasTraits):
         '''
         Convert time to number of samples.
         '''
-        return int(time*self.fs)
+        time = np.asanyarray(time)
+        samples = time*self.fs
+        return samples.astype('i')
 
     def get_range_index(self, start, end, reference=0, check_bounds=False):
         '''
@@ -663,9 +665,9 @@ class ProcessedMultiChannel(MultiChannel):
     diff_mode           = Enum('all good', None)
     diff_matrix         = Property(depends_on='bad_channels, diff_mode, channels')
 
-    freq_lp             = Float(6e3, filter=True)
-    freq_hp             = Float(600, filter=True)
-    filter_pass         = Enum('bandpass', 'lowpass', 'highpass', None,
+    filter_freq_lp      = Float(6e3, filter=True)
+    filter_freq_hp      = Float(600, filter=True)
+    filter_btype        = Enum('highpass', 'bandpass', 'lowpass', None,
                                filter=True)
     filter_order        = Float(8.0, filter=True)
     filter_type         = Enum('butter', 'ellip', 'cheby1', 'cheby2', 'bessel',
@@ -709,19 +711,19 @@ class ProcessedMultiChannel(MultiChannel):
 
     @cached_property
     def _get_filter_coefficients(self):
-        if self.filter_pass is None:
+        if self.filter_btype is None:
             return [], []
-        if self.filter_pass == 'bandpass':
-            Wp = np.array([self.freq_hp, self.freq_lp])
-        elif self.filter_pass == 'highpass':
-            Wp = self.freq_hp
+        if self.filter_btype == 'bandpass':
+            Wp = np.array([self.filter_freq_hp, self.filter_freq_lp])
+        elif self.filter_btype == 'highpass':
+            Wp = self.filter_freq_hp
         else:
-            Wp = self.freq_lp
+            Wp = self.filter_freq_lpiirdesign
         Wp = Wp/(0.5*self.fs)
 
         return signal.iirfilter(self.filter_order, Wp, 60, 2,
                                 ftype=self.filter_type,
-                                btype=self.filter_pass, 
+                                btype=self.filter_btype, 
                                 output='ba')
 
     @cached_property
@@ -743,7 +745,7 @@ class ProcessedMultiChannel(MultiChannel):
         # For the filtering, we do not need all the channels, so we can throw
         # out the extra channels by slicing along the second axis
         data = data[slice[:-1]]
-        if self.filter_pass is not None:
+        if self.filter_btype is not None:
             b, a = self.filter_coefficients
             # Since we have already padded the data at both ends padlen can be
             # set to 0.  The "unstable" edges of the filtered waveform will be

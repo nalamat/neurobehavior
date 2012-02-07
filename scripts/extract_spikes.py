@@ -3,46 +3,27 @@ from __future__ import division
 import cPickle as pickle
 import tables
 import numpy as np 
-import re
-from os import path
+from scipy import signal
 
 from cns.channel import ProcessedFileMultiChannel
 from cns.arraytools import chunk_samples, chunk_iter
 
-noise_std = lambda x: np.median(np.abs(x)/0.6745, axis=1)
+from cns import get_config
+default_chunk_size = get_config('CHUNK_SIZE')
 
-def histogram_bins(bin_width, fs, lb, ub):
+def median_std(x):
     '''
-    Compute the bins by hand.  Numpy, Scipy and Matplotlib (Pylab) all come with
-    histogram functions, but the autogeneration of the bins rarely are what we
-    want them to be.  Good for quick analysis, but we need tighter control over
-    where the bin edges fall.
+    Given a multichannel array, compute the standard deviation of the signal
+    using the median algorithm described in Quiroga et al. (2004) and online
+    (http://www.scholarpedia.org/article/Spike_sorting).
+
+    # TODO: format this for latex
+    \sigma_n = median {|x|/0.6745}
     '''
-    bins =  n.arange(lb, ub, int(bin_width*fs))/fs
-    bins -= bins[np.argmin(np.abs(bins))]
-    return bins
+    return np.median(np.abs(x)/0.6745, axis=1)
 
-def import_spikes(filename, channel):
-    with tables.openFile(filename, 'r') as fh:
-        mask = fh.root.channels[:] == channel
-        return fh.root.timestamps[mask]
-
-def reference(event_times, reference_times):
-    '''
-    Compute the event times relative to the reference times
-    '''
-    return event_times-reference_times[np.newaxis].T
-
-def compute_noise_std(input_file, experiment_path, lb, ub):
-    node = self.model.physiology_data
-    channels = self.model.extract_channels
-    chunk_samples = int(node.chunk_samples(CHUNK_SIZE)*0.1)
-    chunk = node[:,chunk_samples:2*chunk_samples]
-    stdevs = np.median(np.abs(chunk)/0.6745, axis=1)
-    for std, setting in zip(stdevs, self.model.channel_settings):
-        setting.std = std
-
-def decimate_waveform(x, fs, q, differential=None, N=4):
+def decimate_waveform(input_node, output_node, q, N=4, progress_callback=None,
+                      chunk_size=default_chunk_size, include_ts_data=True):
     '''
     Decimates the waveform data to a lower sampling frequency using a lowpass
     filter cutoff.  Resulting decimation is saved under the physiology node as
@@ -58,57 +39,66 @@ def decimate_waveform(x, fs, q, differential=None, N=4):
 
     Parameters
     ----------
-    input_file : str
-        File containing the experiment data
-    experiment_path : str
-        Path to location of experiment node in the HDF5 tree.  A HDF5 node can
-        contain multiple experiments, so it's important to specify which
-        experiment is being processed.
+    input_node : instance of tables.Group
+        The PyTables group pointing to the root of the experiment node.  The
+        physiology data will be found under input_node/physiology/raw.
+    output_node : instance of tables.Group
+        The target node to save the data to.  Note that this must be an instance
+        of tables.Group since several arrays will be saved under the target
+        node.
+    output_node : instance of tables.Group
     q : int
         The downsampling (i.e. decimation) factor
-    differential : 2D array
-        The differential matrix containing the referencing configuration.  If
-        None, the identity matrix will be used.
     N : int
         The filter order to use
+    progress_callback : callable
+        Function to be notified each time a chunk is processed.  The function
+        must take three arguments, (chunk number, total chunks, message).  As
+        each chunk is processed, the function will be called with updates to the
+        progress.  If the function returns a nonzero (True) value, the
+        processing will terminate.
+    chunk_size : float
+        Maximum memory size (in bytes) each chunk should occupy
+    include_ts_data : boolean
+        Copy the trial log, timestamp and epoch data to the extracted times file
+        as well.  This is useful for creating a smaller, more compact datafile
+        that you can carry around with you rather than the raw multi-gigabyte
+        physiology data.
     '''
+    # Make a dummy progress callback if none is requested
+    if progress_callback is None:
+        progress_callback = lambda x, y, z: False
+
     # Load information about the data we are processing and compute the sampling
     # frequency for the decimated dataset
-    fh_in = tables.openFile(input_file, 'a', rootUEP=experiment_path)
-    physiology = fh_in.root.data.physiology
-    raw = physiology.raw
+    raw = input_node.data.physiology.raw
     source_fs = raw._v_attrs['fs']
     target_fs = source_fs/q
 
     n_channels, n_samples = raw.shape
     n_dec_samples = np.floor(n_samples/q)
 
+    fh_out = output_node._v_file
     filters = tables.Filters(complevel=1, complib='blosc', fletcher32=True)
     shape = (n_channels, n_dec_samples)
-    lfp = fh_in.createCArray(physiology, 'lfp_{}'.format(q), raw.atom, shape,
-                             "Lowpass filtered signal for LFP analysis",
-                             filters=filters)
+    lfp = fh_out.createCArray(output_node, 'lfp', raw.atom,
+                              shape, "Lowpass filtered signal for LFP analysis",
+                              filters=filters)
 
     # Critical frequency of the lowpass filter (ensure that the filter cutoff is
     # twice the target sampling frequency to avoid aliasing).
     Wn = target_fs*2/source_fs
-    b, a = signal.iirdesign(N, Wn, btype='lowpass') # Defaults to butter
+    b, a = signal.iirfilter(N, Wn, btype='lowpass') # Defaults to butter
     
     # The number of samples in each chunk *must* be a multiple of the decimation
     # factor so that we can extract the *correct* samples from each chunk.
-    samples = chunk_samples(raw, 10e6, q)
-    dec_samples = samples/q
+    c_samples = chunk_samples(raw, 10e6, q)
+    dec_samples = int(c_samples/q)
     overlap = 3*len(b)
-    iterable = chunk_iter(raw, samples, loverlap=overlap, roverlap=overlap,
-                          pad_value=0)
+    iterable = chunk_iter(raw, c_samples, loverlap=overlap, roverlap=overlap)
 
     for i, chunk in enumerate(iterable):
-        # Technically the documentation says the identity matrix will be used,
-        # but we might as well skip that step (and the computational power)
-        # because the result will be the same.
-        if differential is not None:
-            chunk = differential.dot(chunk)
-        chunk = signal.filtfilt(chunk, b, a)
+        chunk = signal.filtfilt(b, a, chunk, padlen=0)
 
         # Now that we've filtered our chunk, we can discard the overlapping data
         # that was provided to help stabilize the edges of the filter while
@@ -116,32 +106,52 @@ def decimate_waveform(x, fs, q, differential=None, N=4):
         lb = i*dec_samples
         lfp[lb:lb+dec_samples] = chunk[overlap:-overlap:q]
 
+        if progress_callback(i*c_samples, n_samples, ''):
+            break
+
     # Save some data about how the lfp data was generated
     lfp._v_attrs['q'] = q
     lfp._v_attrs['fs'] = target_fs
     lfp._v_attrs['b'] = b
     lfp._v_attrs['a'] = a
-    lfp._v_attrs['differential'] = differential
     lfp._v_attrs['chunk_overlap'] = overlap
     lfp._v_attrs['ftype'] = 'butter'
     lfp._v_attrs['btype'] = 'lowpass'
     lfp._v_attrs['order'] = N
     lfp._v_attrs['freq_lowpass'] = target_fs*2
 
-    fh_in.close()
+    if include_ts_data:
+        copy_ts_data(input_node, output_node)
+
+def copy_ts_data(input_node, output_node):
+    '''
+    Copy the behavior data (e.g. trial log, timestamps and epochs) over to the
+    new node.
+    '''
+    to_copy = [('data/trial_log', 'trial_log'),
+               ('data/physiology/epoch', 'physiology_epoch'),
+               ('data/contact/trial_epoch', 'trial_epoch'),
+               ('data/contact/poke_epoch', 'poke_epoch'),
+               ('data/contact/signal_epoch', 'signal_epoch'),
+               ('data/contact/all_poke_epoch', 'all_poke_epoch'),
+               ('data/contact/response_ts', 'response_ts'),
+              ]
+    for (node_path, node_title) in to_copy:
+        node = input_node._f_getChild(node_path)
+        node._f_copy(output_node, newname=node_title)
 
 def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
                    rej_threshold_stds, processing, window_size=2.1,
                    cross_time=0.5, cov_samples=10000, progress_callback=None,
-                   chunk_size=10e7):
+                   chunk_size=default_chunk_size, include_ts_data=True):
     '''
     Extracts spikes.  Lots of options.
 
     Parameters
     ----------
-    input_node : instance of tables.Array
-        The PyTables Array containing the data to be processed (i.e. the "raw"
-        array)
+    input_node : instance of tables.Group
+        The PyTables group pointing to the root of the experiment node.  The
+        physiology data will be found under input_node/data/physiology/raw.
     output_node : instance of tables.Group
         The target node to save the data to.  Note that this must be an instance
         of tables.Group since several arrays will be saved under the target
@@ -188,6 +198,13 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
         each chunk is processed, the function will be called with updates to the
         progress.  If the function returns a nonzero (True) value, the
         processing will terminate.
+    chunk_size : float
+        Maximum memory size (in bytes) each chunk should occupy
+    include_ts_data : boolean
+        Copy the trial log, timestamp and epoch data to the extracted times file
+        as well.  This is useful for creating a smaller, more compact datafile
+        that you can carry around with you rather than the raw multi-gigabyte
+        physiology data.
     '''
     # Make sure data is in the format we want
     channels = np.asarray(channels)
@@ -204,14 +221,12 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
     # Load the physiology data and put a ProcessedMultiChannel wrapper around
     # it.  This wrapper will handle all the pertinent issues of referencing and
     # filtering (as well as chunking the data).
-    node = ProcessedFileMultiChannel.from_node(input_node.physiology.raw,
+    node = ProcessedFileMultiChannel.from_node(input_node.data.physiology.raw,
                                                **processing)
     fs = node.fs
 
-    ts_start = input_node.trial_log[0]['ts_start']
-    ts_end   = input_node.trial_log[-1]['ts_end']
-
     n_channels = len(channels)
+    total_samples = node.shape[-1]
 
     # Convert msec to number of samples
     window_samples = int(np.ceil(window_size*fs*1e-3))
@@ -286,10 +301,12 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
                                           tables.Int8Atom(), (0,))
     fh_bad_channels.append(np.array(node.bad_channels)+1)
 
+    filter_node = fh_out.createGroup(output_node, 'filter')
+
     # Currently we only support one referencing mode (i.e. reference against the
     # average of the good channels) so I've hardcoded this attribute for now.
-    fh_out.setNodeAttr(output_node, 'diff_mode', node.diff_mode)
-    fh_out.createArray(output_node, 'differential', node.diff_matrix)
+    fh_out.setNodeAttr(filter_node, 'diff_mode', node.diff_mode)
+    fh_out.createArray(filter_node, 'differential', node.diff_matrix)
 
     # Since we conventionally count channels from 1, convert our 0-based index
     # to a 1-based index.  It's OK to set these as node attributes becasue they
@@ -302,10 +319,10 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
     # meaningful).  The ZPK may be more useful in general.  Unfortunately, HDF5
     # does not natively support complex numbers and I'm not inclined to deal
     # with the issue at present.
-    fh_out.setNodeAttr(output_node, 'fc_lowpass', node.freq_lp)
-    fh_out.setNodeAttr(output_node, 'fc_highpass', node.freq_hp)
+    fh_out.setNodeAttr(output_node, 'fc_lowpass', node.filter_freq_lp)
+    fh_out.setNodeAttr(output_node, 'fc_highpass', node.filter_freq_hp)
     fh_out.setNodeAttr(output_node, 'filter_order', node.filter_order)
-    fh_out.setNodeAttr(output_node, 'filter_btype', node.filter_pass)
+    fh_out.setNodeAttr(output_node, 'filter_btype', node.filter_btype)
     fh_out.setNodeAttr(output_node, 'filter_padding', node._padding)
 
     b, a = node.filter_coefficients
@@ -327,10 +344,6 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
     fh_out.createArray(output_node, 'reject_threshold', rej_thresholds)
     fh_out.createArray(output_node, 'threshold_std', threshold_stds)
     fh_out.createArray(output_node, 'reject_threshold_std', rej_threshold_stds)
-
-    # This is bullshit.  We need to do better.
-    fh_out.createArray(output_node, 'experiment_range_ts', 
-                       np.array([ts_start, ts_end]))
 
     # Allocate a temporary array, cov_waves, for storing the data used for
     # computing the covariance matrix required by UltraMegaSort2000.  Ensure
@@ -433,7 +446,7 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
         # Update the progress callback each time we finish processing a chunk.
         # If the progress callback returns True, end the processing immediately.
         mesg = 'Found {} features'.format(tot_features)
-        if progress_callback(i_chunk*c_samples, mesg):
+        if progress_callback(i_chunk*c_samples, total_samples, mesg):
             break
 
     # If the user explicitly requested a cancel, compute the covariance
@@ -448,12 +461,16 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
     fh_out.createArray(output_node, 'covariance_matrix', cov_matrix)
     fh_out.createArray(output_node, 'covariance_data', cov_waves)
 
-def update_progress(progress, mesg):
+    if include_ts_data:
+        copy_ts_data(input_node, output_node)
+
+def update_progress(i, n, mesg):
     '''
-    Command-line progress bar.  Progress must be a fraction.
+    Command-line progress bar.  Progress must be a fraction in the range [0, 1].
     '''
     import sys
     max_chars = 60
+    progress = i/n
     num_chars = int(progress*max_chars)
     num_left = max_chars-num_chars
     # The \r tells the cursor to return to the beginning of the line rather than
@@ -461,27 +478,50 @@ def update_progress(progress, mesg):
     # in the console window.
     sys.stdout.write('\r[{}{}] {:.2f}%'.format('#'*num_chars, 
                                                ' '*num_left,
-                                               progress))
+                                               progress*100))
 
 def process_batchfile(batchfile):
+    '''
+    Run jobs queued in a batchfile created by the physiology review program
+    '''
     fh = open(batchfile, 'r')
     failed_jobs = []
     print 'Processing jobs in', batchfile
     with open(batchfile, 'rb') as fh:
         while True:
             try:
-                job = pickle.load(fh)
-                job['progress_callback'] = update_progress
-                print 'Processing', job['input_file']
-                #extract_spikes(**job)
-            except EOFError:
-                break
+                fn, file_info, kwargs = pickle.load(fh)
 
-    with open('failed_jobs.dat', 'wb') as fh:
-        pickle.dump(failed_jobs, fh)
+                # Open the source/destination for reading/writing as appropriate
+                fh_in = tables.openFile(file_info['input_file'], 'r',
+                                        rootUEP=file_info['input_path'])
+                fh_out = tables.openFile(file_info['output_file'], 'a',
+                                         rootUEP=file_info['output_path'])
+
+                # Update the list of keyword arguments to inclue the additional
+                # arguments required
+                kwargs['progress_callback'] = update_progress
+                kwargs['input_node'] = fh_in.root
+                kwargs['output_node'] = fh_out.root
+
+                print 'Running {} on {}'.format(fn, file_info['input_file'])
+                globals()[fn](**kwargs)
+            except EOFError:
+                # This error is raised when pickle reaches the end of the file
+                # and no more jobs are available
+                break
+            except:
+                # Catch all other errors and queue failed jobs so we can look at
+                # them later.  We want to continue processing the rest of the
+                # jobs.
+                failed_jobs.append((fn, file_info, kwargs))
+
+    # Save failed jobs to file
+    if failed_jobs:
+        print "There were failed jobs.  Please see the failed_jobs.dat file."
+        with open('failed_jobs.dat', 'wb') as fh:
+            pickle.dump(failed_jobs, fh)
 
 if __name__ == '__main__':
-    import doctest
-    doctest.testmod()
-    #import sys
-    #process_batchfile(sys.argv[1])
+    import sys
+    process_batchfile(sys.argv[1])
