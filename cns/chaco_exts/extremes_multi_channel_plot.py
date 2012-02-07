@@ -1,6 +1,6 @@
 from __future__ import division
 
-from enthought.traits.api import Instance
+from enthought.traits.api import Instance, on_trait_change
 
 import numpy as np
 from extremes_channel_plot import ExtremesChannelPlot
@@ -33,7 +33,7 @@ class ExtremesMultiChannelPlot(ExtremesChannelPlot):
         self._invalidate_screen()
 
     def _channel_visible_changed(self):
-        self._invalidate_screen()
+        self._invalidate_data()
 
     def _channel_spacing_changed(self):
         self._invalidate_screen()
@@ -49,7 +49,6 @@ class ExtremesMultiChannelPlot(ExtremesChannelPlot):
         return self.value_mapper.map_screen(self.offsets)
 
     def _map_screen(self, data):
-        #spaced_data = data[self.channel_visible] + self.offsets
         return self.value_mapper.map_screen(data + self.offsets)
 
     def _render(self, gc, points):

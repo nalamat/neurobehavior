@@ -1,9 +1,22 @@
 Spike extraction
 ----------------
 
-Events are identified based on a simple threshold crossing.  This threshold can be configured on a per-channel basis as can the artifact reject threshold.  Thresholds are defined as the number of standard deviations above or below the noise floor.  Noise floor is computed using a median algorithm.  
+Events (i.e. candidate spikes) are identified based on a voltage threshold
+crossing which is specified on a per-channel basis.  To determine the threshold,
+the standard deviation of the signal is computed using the algorithm defined in
+Quiroga et al. 2004.  
 
-Whenever an event is detected (via a threshold crossing) on any of the channels selected for extraction, the waveform from each selected channel is pulled out (not just the one the event was detected on).  This results in a 2D array for each event, [channel, sample].  If you are extracting a window of 30 samples from four channels, the size will be [4, 30].  
+.. math::
+
+    \sigma_n = median(|x|/0.6745)
+
+Both the candidate threshold and artifact reject threshold are specified as a
+multiple of :math:`\sigma_n`.  Whenever an event is detected (via a threshold
+crossing) on any of the channels selected for extraction, the waveform from each
+selected channel is pulled out (not just the one the event was detected on).
+This results in a 2D array for each event, [channel, sample].  If you are
+extracting a window of 30 samples from four channels, the resulting array will
+be [4, 30].  
 
 ..note:: 
     The spike sorting program, UMS2000, sorts the data based on events.  This
@@ -12,7 +25,14 @@ Whenever an event is detected (via a threshold crossing) on any of the channels 
     only a subset of the extracted channels or even a single channel you may do
     so when you load the data for processing by UMS2000.
 
-This program can handle several use-cases
+Some Matlab functions are provided under the matlab folder for use with Matlab.
+Be sure to add this folder to your Matlab path.  A function, import_ums2000, is
+provided to facilitate importing the data from the extracted file into a format
+that is compatible with UltraMegaSort2000, a Matlab program for clustering.  See
+the documentation in the import_ums2000.m and import_spikes.m file for more
+detail.
+
+This program can handle several use-cases::
 
     1.  A single neuron is detected by more than one channel (i.e. you can see
         the waveform on both channels).  You can choose to extract both

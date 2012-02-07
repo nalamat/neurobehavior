@@ -2,8 +2,7 @@ from __future__ import division
 
 from base_channel_plot import BaseChannelPlot
 import numpy as np
-from enthought.traits.api import (Float, Bool, Enum, on_trait_change, Property,
-        cached_property, Int)
+from enthought.traits.api import Bool, Property, cached_property, Int
 
 class ChannelPlot(BaseChannelPlot):
     '''

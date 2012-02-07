@@ -107,5 +107,5 @@ function [spikes] = import_ums2000(filename, sort, varargin)
     % said text processing was one of Matlab's "hidden strengths".  Is that a
     % euphemisim for "bolted-on, poorly-implemented functionality"?  Personal
     % opinion aside, this appears to inherit from the Perl-style syntax.
-    spikes.base_filename = regexprep(filename, '(.*)\.([h5|hd5|hdf5])', '$1');
+    spikes.base_filename = regexprep(filename, '(.*)\.(h5|hd5|hdf5)', '$1');
 end
