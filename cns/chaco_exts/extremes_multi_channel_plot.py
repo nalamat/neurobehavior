@@ -1,10 +1,14 @@
 from __future__ import division
 
+from enthought.traits.api import Instance, on_trait_change
+
 import numpy as np
 from extremes_channel_plot import ExtremesChannelPlot
 from enthought.traits.api import List, Float, Property, cached_property
 
 class ExtremesMultiChannelPlot(ExtremesChannelPlot):
+
+    source = Instance('cns.channel.MultiChannel')
     
     # Offset of all channels along the value axis
     channel_offset  = Float(0.25e-3)
@@ -16,13 +20,22 @@ class ExtremesMultiChannelPlot(ExtremesChannelPlot):
     offsets = Property(depends_on='channel_+, value_mapper.updated')
     screen_offsets = Property(depends_on='offsets')
 
-    def _offset_changed(self):
+    def _gather_points(self):
+        if not self._data_cache_valid:
+            range = self.index_mapper.range
+            data = self.source.get_range(range.low, range.high,
+                                         channels=self.channel_visible)
+            self._cached_data = self._preprocess_data(data)
+            self._data_cache_valid = True
+            self._screen_cache_valid = False
+
+    def _channel_offset_changed(self):
         self._invalidate_screen()
 
-    def _visible_changed(self):
-        self._invalidate_screen()
+    def _channel_visible_changed(self):
+        self._invalidate_data()
 
-    def _spacing_changed(self):
+    def _channel_spacing_changed(self):
         self._invalidate_screen()
 
     @cached_property
@@ -36,8 +49,7 @@ class ExtremesMultiChannelPlot(ExtremesChannelPlot):
         return self.value_mapper.map_screen(self.offsets)
 
     def _map_screen(self, data):
-        spaced_data = data[self.channel_visible] + self.offsets
-        return self.value_mapper.map_screen(spaced_data)
+        return self.value_mapper.map_screen(data + self.offsets)
 
     def _render(self, gc, points):
         if len(points[0]) == 0:

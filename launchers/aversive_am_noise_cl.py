@@ -29,6 +29,9 @@ from experiments import (
         )
 
 class Controller(
+	# Order of these classes are important for determining the method
+	# resolution order (i.e. the order in which each of the class
+	# definitions is checked for the method being requested).
         ConstantLimitsControllerMixin,
         PumpControllerMixin,
         AbstractAversiveController):

@@ -6,15 +6,15 @@ from base_channel_plot import BaseChannelPlot
 
 class SnippetChannelPlot(BaseChannelPlot):
 
-    last_reset = Int(0)
+    last_reset  = Int(0)
     history = Int(20)
     classifier = Int(0)
 
-    index_data = Property(depends_on='channel.fs, channel.snippet_size')
+    index_data = Property(depends_on='source.fs, source.snippet_size')
     index_screen = Property(depends_on='index_data')
-    value_data = Property(depends_on='channel.updated, last_reset, history')
+    value_data = Property(depends_on='source.updated, last_reset, history')
     value_screen = Property(depends_on='value_data')
-    classifier_masks = Property(depends_on='channel.updated')
+    classifier_masks = Property(depends_on='source.updated')
 
     colors = List(ColorTrait, ['red', 'green', 'blue', 'orange', 'black'])
 
@@ -23,7 +23,7 @@ class SnippetChannelPlot(BaseChannelPlot):
 
     @cached_property
     def _get_index_data(self):
-        return np.arange(self.channel.snippet_size)/self.channel.fs
+        return np.arange(self.source.snippet_size)/self.source.fs
 
     @cached_property
     def _get_index_screen(self):
@@ -31,7 +31,7 @@ class SnippetChannelPlot(BaseChannelPlot):
 
     @cached_property
     def _get_value_data(self):
-        return self.channel[self.last_reset:][-self.history:]
+        return self.source[self.last_reset:][-self.history:]
 
     @cached_property
     def _get_value_screen(self):
@@ -39,7 +39,7 @@ class SnippetChannelPlot(BaseChannelPlot):
 
     @cached_property
     def _get_classifier_masks(self):
-        classifiers = self.channel.classifiers[self.last_reset:][-self.history:]
+        classifiers = self.source.classifiers[self.last_reset:][-self.history:]
         return [c==classifiers for c in np.unique(classifiers)]
 
     def _configure_gc(self, gc):
@@ -70,6 +70,6 @@ class SnippetChannelPlot(BaseChannelPlot):
         self._draw_default_axes(gc)
         gc.restore_state()
 
-    @on_trait_change('channel.updated')
+    @on_trait_change('source.updated')
     def _data_changed(self):
         self.invalidate_and_redraw()

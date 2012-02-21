@@ -12,6 +12,7 @@ from abstract_experiment import AbstractExperiment
 from enthought.chaco.api import DataRange1D, LinearMapper, \
         OverlayPlotContainer, LogMapper
 
+from cns.chaco_exts.channel_range_tool import ChannelRangeTool
 from cns.chaco_exts.channel_data_range import ChannelDataRange
 from cns.chaco_exts.ttl_plot import TTLPlot
 from cns.chaco_exts.timeseries_plot import TimeseriesPlot
@@ -127,71 +128,75 @@ class AbstractPositiveExperiment(AbstractExperiment):
     def _add_experiment_plots(self, index_mapper, container, alpha=0.25):
         value_range = DataRange1D(low_setting=-0, high_setting=1)
         value_mapper = LinearMapper(range=value_range)
-        plot = TTLPlot(channel=self.data.spout_TTL, reference=0,
+        plot = TTLPlot(source=self.data.spout_TTL, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(0.25, 0.41, 0.88, alpha), line_width=1,
                 rect_center=0.25, rect_height=0.2)
         container.add(plot)
-        plot = TTLPlot(channel=self.data.signal_TTL, reference=0,
+        plot = TTLPlot(source=self.data.signal_TTL, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(0, 0, 0, alpha), line_color=(0, 0, 0, 0.75),
                 line_width=1, rect_height=0.3, rect_center=0.5)
         container.add(plot)
-        plot = TTLPlot(channel=self.data.poke_TTL, reference=0,
+        plot = TTLPlot(source=self.data.poke_TTL, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(.17, .54, .34, alpha), rect_center=0.75,
                 line_width=1, rect_height=0.2)
         container.add(plot)
-        plot = TTLPlot(channel=self.data.reaction_TTL, reference=0,
+        plot = TTLPlot(source=self.data.reaction_TTL, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(1, 0, 0, alpha), line_color=(1, 0, 0, 1),
                 line_width=1, rect_height=0.1, rect_center=0.6)
         container.add(plot)
-        plot = TTLPlot(channel=self.data.response_TTL, reference=0,
+        plot = TTLPlot(source=self.data.response_TTL, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(0, 1, 0, alpha), line_color=(0, 1, 0, 1),
                 line_width=1, rect_height=0.1, rect_center=0.5)
         container.add(plot)
-        plot = TTLPlot(channel=self.data.reward_TTL, reference=0,
+        plot = TTLPlot(source=self.data.reward_TTL, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(0, 0, 1, alpha), line_color=(0, 0, 1, 1),
                 line_width=1, rect_height=0.1, rect_center=0.4)
         container.add(plot)
-        plot = TTLPlot(channel=self.data.comm_inhibit_TTL, reference=0,
+        plot = TTLPlot(source=self.data.comm_inhibit_TTL, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(0, 1, 1, alpha), line_color=(0, 1, 1, 1),
                 line_width=1, rect_height=0.1, rect_center=0.2)
         container.add(plot) 
-        plot = TTLPlot(channel=self.data.TO_TTL, reference=0,
+        plot = TTLPlot(source=self.data.TO_TTL, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(1, 0, 0, alpha), line_color=(1, 0, 0, 1),
                 line_width=1, rect_height=0.1, rect_center=0.1)
         container.add(plot)
-        plot = TimeseriesPlot(series=self.data.response_ts, marker='diamond',
+        plot = TimeseriesPlot(source=self.data.response_ts, marker='diamond',
                 marker_color=(0, 1, 0, 1.0), marker_height=0.45,
                 index_mapper=index_mapper, value_mapper=value_mapper)
         container.add(plot)
-        plot = EpochPlot(series=self.data.all_poke_epoch, marker='diamond',
+        plot = EpochPlot(source=self.data.all_poke_epoch, marker='diamond',
                 marker_color=(.34, .54, .34, 1.0), marker_height=0.8,
                 index_mapper=index_mapper, value_mapper=value_mapper)
         container.add(plot)
-        plot = EpochPlot(series=self.data.poke_epoch, marker='diamond',
+        plot = EpochPlot(source=self.data.poke_epoch, marker='diamond',
                 marker_color=(.17, .54, .34, 1.0), marker_height=0.7,
                 index_mapper=index_mapper, value_mapper=value_mapper)
         container.add(plot)
-        plot = EpochPlot(series=self.data.signal_epoch, marker='diamond',
+        plot = EpochPlot(source=self.data.signal_epoch, marker='diamond',
                 marker_color=(0.5, 0.5, 0.5, 1.0), marker_height=0.6, 
                 index_mapper=index_mapper, value_mapper=value_mapper)
         container.add(plot)
-        plot = EpochPlot(series=self.data.trial_epoch, marker='diamond',
+        plot = EpochPlot(source=self.data.trial_epoch, marker='diamond',
                 marker_color=(0.75, 0.25, 0.75, 1.0), marker_height=0.5, 
                 index_mapper=index_mapper, value_mapper=value_mapper)
         container.add(plot)
 
+        tool = ChannelRangeTool(component=plot, allow_drag=False,
+                value_factor=1)
+        plot.tools.append(tool)
+
         # set up microphone plot
         value_range = DataRange1D(low_setting=0, high_setting=80)
         value_mapper = LinearMapper(range=value_range)
-        plot = RMSChannelPlot(channel=self.data.microphone,
+        plot = RMSChannelPlot(source=self.data.microphone,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 line_color=(0, 0, 0, 0.25))
         self.microphone_plot = plot
@@ -214,7 +219,6 @@ class AbstractPositiveExperiment(AbstractExperiment):
     status_group = VGroup(
             Item('animal'),
             Item('handler.status'),
-            #Item('handler.current_setting'),
             label='Experiment',
             show_border=True,
             style='readonly'

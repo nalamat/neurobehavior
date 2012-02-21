@@ -25,7 +25,19 @@ def load_settings():
 _settings = load_settings()
 
 def set_config(setting, value):
+    '''
+    Set value of setting
+    '''
     setattr(_settings, setting, value)
     
 def get_config(setting):
+    '''
+    Get value of setting
+    '''
     return getattr(_settings, setting) 
+
+def get_settings():
+    '''
+    Get all settings
+    '''
+    return _settings.copy()

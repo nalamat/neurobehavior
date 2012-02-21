@@ -1,11 +1,21 @@
-from enthought.traits.api import Float, Instance, on_trait_change
+from enthought.traits.api import Float, Instance, on_trait_change, Bool
 from enthought.enable.api import BaseTool, KeySpec
 #from enthought.chaco.tools.tool_history_mixin import ToolHistoryMixin
 
 class ChannelRangeTool(BaseTool):
 
+    # Can the user adjust the trigger delay by dragging with the left mouse
+    # button?  This is not always desirable, so we allow disabling of the drag
+    # feature.
+    allow_drag  = Bool(True)
+
+    # To disable zooming along one of the axes, set the corresponding factor to
+    # 1.0.
     index_factor = Float(1.5)
     value_factor = Float(1.5)
+
+    # I've been having trouble getting this to work
+
     #reset_trig_delay_key = Instance(KeySpec, args=("0",))
 
     #def normal_key_pressed(self, event):
@@ -25,12 +35,13 @@ class ChannelRangeTool(BaseTool):
             event.handled = True
 
     def normal_left_down(self, event):
-        self._start_data_x = event.x
-        self._start_delay = self.component.index_mapper.range.trig_delay
-        self.event_state = "panning"
-        event.window.set_pointer("hand")
-        event.window.set_mouse_owner(self, event.net_transform())
-        event.handled = True
+        if self.allow_drag:
+            self._start_data_x = event.x
+            self._start_delay = self.component.index_mapper.range.trig_delay
+            self.event_state = "panning"
+            event.window.set_pointer("hand")
+            event.window.set_mouse_owner(self, event.net_transform())
+            event.handled = True
 
     def panning_mouse_move(self, event):
         delta_screen = event.x-self._start_data_x

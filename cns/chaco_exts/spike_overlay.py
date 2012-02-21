@@ -16,14 +16,6 @@ class SpikeOverlay(AbstractOverlay):
     fill_color = ColorTrait('red')
     line_color = ColorTrait('white')
 
-    #spike_screen_offsets = Property(depends_on='plot.offsets')
-    #spike_screen_offsets = DelegatesTo('plot', 'screen_offsets')
-
-    @cached_property
-    def _get_spike_screen_offsets(self):
-        spike_offsets = self.plot.offsets
-        return self.plot.value_mapper.map_screen(spike_offsets)
-
     def overlay(self, component, gc, view_bounds=None, mode="normal"):
         plot = self.plot
         if len(plot.channel_visible) != 0:

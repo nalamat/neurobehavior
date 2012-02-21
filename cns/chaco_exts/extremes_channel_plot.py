@@ -75,6 +75,14 @@ class ExtremesChannelPlot(ChannelPlot):
     dec_threshold = Int(6)
     draw_mode = Property(depends_on='dec_threshold, dec_factor')
 
+    def _invalidate_data(self):
+        self._cached_min = None
+        self._cached_max = None
+        super(ExtremesChannelPlot, self)._invalidate_data()
+
+    def _data_changed(self):
+        self._invalidate_data()
+
     def _dec_points_changed(self):
         # Flush the downsampled cache since it is no longer valid
         self._cached_min = None

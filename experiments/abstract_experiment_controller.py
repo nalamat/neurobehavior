@@ -3,11 +3,12 @@ from datetime import datetime, timedelta
 from cns.data.persistence import add_or_update_object_node
 from cns.data.h5_utils import get_or_append_node
 
-from .evaluate import evaluate_expressions, evaluate_value
+import subprocess
+from os import path
 
 from tdt import DSPProject
 from tdt.device import RZ6
-from cns import get_config
+from cns import get_config, get_settings
 
 from enthought.pyface.api import error, confirm, YES, ConfirmationDialog
 from enthought.pyface.timer.api import Timer
@@ -20,10 +21,7 @@ from enthought.traits.ui.api import Controller, View, HGroup, Item, spring
 
 from cns.widgets.toolbar import ToolBar
 from enthought.savage.traits.ui.svg_button import SVGButton
-from cns.widgets import icons
-
-from PyQt4 import QtGui
-from PyQt4.QtGui import QApplication
+from cns.widgets.icons import icons
 
 from .apply_revert_controller_mixin import ApplyRevertControllerMixin
 
@@ -32,7 +30,6 @@ log = logging.getLogger(__name__)
 
 from cns import get_config
 from .utils import get_save_file, load_instance, dump_instance
-
 
 from physiology_experiment import PhysiologyExperiment
 from physiology_paradigm import PhysiologyParadigm
@@ -43,19 +40,19 @@ class ExperimentToolBar(ToolBar):
 
     size    = 24, 24
     kw      = dict(height=size[0], width=size[1], action=True)
-    apply   = SVGButton('Apply', filename=icons.apply,
+    apply   = SVGButton('Apply', filename=icons['apply'],
                         tooltip='Apply settings', **kw)
-    revert  = SVGButton('Revert', filename=icons.undo,
+    revert  = SVGButton('Revert', filename=icons['undo'],
                         tooltip='Revert settings', **kw)
-    start   = SVGButton('Run', filename=icons.start,
+    start   = SVGButton('Run', filename=icons['start'],
                         tooltip='Begin experiment', **kw)
-    pause   = SVGButton('Pause', filename=icons.pause,
+    pause   = SVGButton('Pause', filename=icons['pause'],
                         tooltip='Pause', **kw)
-    resume  = SVGButton('Resume', filename=icons.resume,
+    resume  = SVGButton('Resume', filename=icons['resume'],
                         tooltip='Resume', **kw)
-    stop    = SVGButton('Stop', filename=icons.stop,
+    stop    = SVGButton('Stop', filename=icons['stop'],
                         tooltip='stop', **kw)
-    remind  = SVGButton('Remind', filename=icons.warn,
+    remind  = SVGButton('Remind', filename=icons['warn'],
                         tooltip='Remind', **kw)
     item_kw = dict(show_label=False)
 
@@ -259,9 +256,17 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
             # not seem to work very well.  Either the popups are modal (in which
             # case they block the program from continuing to run) or they
             # dissappear below the main window.
+
+            # HACK ALERT! This is a buried import to ensure that I can still run
+            # my analysis code.
+            # Enthought supports both the PySide and Qt4 backend.  PySide is
+            # essentially a rewrite of PyQt4.  These backends are not compatible
+            # with each other, so we need to be sure to import the backend that
+            # Enthought has decided to use.
+            from enthought.qt import QtGui
+
             #self.system_tray = QtGui.QSystemTrayIcon(icon, info.ui.control)
-            from os.path import dirname, join
-            icon_path = join(dirname(__file__), 'psi_uppercase.svg')
+            icon_path = path.join(path.dirname(__file__), 'psi_uppercase.svg')
             icon = QtGui.QIcon(icon_path)
             self.system_tray = QtGui.QSystemTrayIcon()
             self.system_tray.setIcon(icon)
@@ -310,15 +315,32 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
         Subclasses must implement `start_experiment`
         '''
         try:
-            # setup_experiment should load the necessary circuits and
-            # initialize the buffers. This data is required before the
-            # hardware process is launched since the shared memory, locks and
-            # pipelines must be created.
+            node = info.object.data_node
+
+            # Get the current revision of the program code so that we can
+            # properly determine the version used to run the code.  I'm not sure
+            # what happens if Hg is not installed on the computer.  However, we
+            # currently don't have to deal with that use-case.
+            dir = path.abspath(path.dirname(__file__))
+            rev_id = subprocess.check_output('hg id --cwd {}'.format(dir))
+            node._v_attrs['neurobehavior_revision'] = rev_id
+
+            # This will actually store a pickled copy of the calibration data
+            # that can *only* be recovered with Python (and a copy of the
+            # Neurobehavior module)
+            node._v_attrs['cal_1'] = self.cal_primary
+            node._v_attrs['cal_2'] = self.cal_secondary
+
+            # setup_experiment should load the necessary circuits and initialize
+            # the buffers. This data is required before the hardware process is
+            # launched since the shared memory, locks and pipelines must be
+            # created.
             self.setup_experiment(info)
 
             # Start the harware process
             self.process.start()
 
+            # Sorta a hack
             if self.model.spool_physiology:
                 self.physiology_handler.start()
 
@@ -461,9 +483,11 @@ class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
             PARADIGM_ROOT = get_config('PARADIGM_ROOT')
             PARADIGM_WILDCARD = get_config('PARADIGM_WILDCARD')
             instance = load_instance(PARADIGM_ROOT, PARADIGM_WILDCARD)
+            print instance
             if instance is not None:
                 self.model.paradigm.copy_traits(instance)
-        except AttributeError:
+        except AttributeError, e:
+            log.exception(e)
             mesg = '''
             Unable to load paradigm.  This can be due to 1) the
             paradigm saved in the file being incompatible with the version

@@ -13,14 +13,25 @@ from enthought.traits.api import HasTraits, Property, Array, Int, Event, \
     DelegatesTo, Enum, Dict, Set
 import numpy as np
 import tables
+from scipy import signal
+from .arraytools import slice_overlap
 
 import logging
 log = logging.getLogger(__name__)
 
 class FileMixin(HasTraits):
     '''
-    Mixin class that streams acquired data to a HDF5_ EArray.  Note that if no
-    buffer is availale, then one will be created automatically.
+    Mixin class that uses a HDF5_ EArray as the backend for the buffer.  If the
+    array does not exist, it will be created automatically.  Note that this does
+    have some performance implications since data may have to be transferred
+    between the hard disk and RAM.
+
+    By default, this will create the node.  If the node already exists, use the
+    `from_node` classmethod to return an instance of the class.
+
+    IMPORTANT! When using this mixin with most subclasses of Channel, the
+    FileMixin typically must appear first in the list otherwise you may have
+    some MRO issues.
 
     .. _HDF5: http://www.hdfgroup.org/HDF5/
 
@@ -28,9 +39,10 @@ class FileMixin(HasTraits):
     ==========
     dtype
         Default is float64.  It is a good idea to set dtype appropriately for
-        the waveform (e.g. use bool for TTL data) to minimize file size.  Note
-        that Matlab does not currently support the HDF5 BITFIELD (e.g. boolean)
-        type and will be unable to read waveforms stored in this format.
+        the waveform (e.g. use a boolean dtype for TTL data) to minimize file
+        size.  Note that Matlab does not currently support the HDF5 BITFIELD
+        (e.g. boolean) type and will be unable to read waveforms stored in this
+        format.
     node
         A HDF5 node that will host the array
     name
@@ -59,37 +71,58 @@ class FileMixin(HasTraits):
     # According to http://www.pytables.org/docs/manual-1.4/ch05.html the best
     # compression method is LZO with a compression level of 1 and shuffling, but
     # it really depends on the type of data we are collecting.
-    compression_level   = Int(0)
-    compression_type    = Enum(None, 'lzo', 'zlib', 'bzip', 'blosc')
-    use_checksum        = Bool(False)
-    use_shuffle         = Bool(False)
+    compression_level   = Int(0, transient=True)
+    compression_type    = Enum(None, 'lzo', 'zlib', 'bzip', 'blosc',
+                               transient=True)
+    use_checksum        = Bool(False, transient=True)
+    use_shuffle         = Bool(False, transient=True)
     
     # It is important to implement dtype appropriately, otherwise it defaults to
     # float64 (double-precision float).
-    dtype               = Any
-
-    node                = Instance(tables.group.Group)
-    name                = String('FileChannel')
+    dtype               = Any(transient=True)
 
     # Duration is in seconds.  The default corresponds to a 30 minute
     # experiment, which we seem to have settled on as the "standard" for running
     # appetitive experiments.
-    expected_duration   = Float(1800) 
-    _buffer             = Instance(tables.array.Array)
+    expected_duration   = Float(1800, transient=True) 
     signal              = Property
     
-    def __init__(self, **traits):
-        HasTraits.__init__(self, **traits)
-        # Create the buffer once all traits are initialized
-        if self.name in self.node._v_children:
-            self._buffer = self._load_buffer()
-        else:
-            self._buffer = self._create_buffer()
+    # The actual source where the data is stored.  Node is the HDF5 Group that
+    # the EArray is stored under while name is the name of the EArray.
+    node                = Instance(tables.group.Group, transient=True)
+    name                = String('FileChannel', transient=True)
+    _buffer             = Instance(tables.array.Array, transient=True)
+
+    @classmethod
+    def from_node(cls, node, **kwargs):
+        '''
+        Create an instance of the class from an existing node
+        '''
+        # If the attribute (e.g. fs or t0) are not provided, load the value of
+        # the attribute from the node attributes
+        for name in cls.class_trait_names(attr=True):
+            if name not in kwargs:
+                try:
+                    kwargs[name] = node._v_attrs[name]
+                except KeyError:
+                    # This checks for an older verison of the physiology channel
+                    # data format that did not save t0 as an attribute to the
+                    # node.
+                    if name == 't0':
+                        kwargs['t0'] = 0
+                    else:
+                        raise
+
+        kwargs['node'] = node._v_parent
+        kwargs['name'] = node._v_name
+        kwargs['_buffer'] = node
+        kwargs['dtype'] = node.dtype
+        return cls(**kwargs)
 
     def _get_shape(self):
         return (0,)
 
-    def _create_buffer(self):
+    def __buffer_default(self):
         shape = self._get_shape()
         log.debug('%s: creating buffer with shape %r', self, self._get_shape())
         atom = tables.Atom.from_dtype(np.dtype(self.dtype))
@@ -104,15 +137,6 @@ class FileMixin(HasTraits):
             earray._v_attrs[k] = v
         return earray
 
-    #def _load_buffer(self):
-    #    buffer = self.node._v_children[self.name] 
-    #    traits = {}
-    #    for t in self.trait_names(attr=True):
-    #        if t in buffer._v_attrs:
-    #            traits[t] = buffer._v_attrs[t]
-    #    self.set(False, **traits)
-    #    return buffer
-
     # Ensure that all 'Traits' are synced with the file so we have that
     # information stored away.
     @on_trait_change('+attr', post_init=True)
@@ -123,11 +147,86 @@ class FileMixin(HasTraits):
     def _write(self, data):
         self._buffer.append(data)
 
+    def append(self, data):
+        self._buffer.append(data)
+
     def __repr__(self):
         return '<HDF5Store {}>'.format(self.name)
 
-    def append(self, data):
-        self._buffer.append(data)
+    #def chunk_samples(self, chunk_bytes):
+    #    '''
+    #    Compute number of samples per channel to load based on the preferred
+    #    memory size of the chunk (as indicated by chunk_bytes).  
+
+    #    See cns.arraytools.chunk_samples for additional documentation.
+    #    '''
+    #    file_chunksize = self._buffer.chunkshape[-1]
+    #    bytes = np.nbytes[self.dtype]
+    #    chunk_samples = chunk_bytes/self.channels/bytes
+    #    chunk_samples = int(chunk_samples/file_chunksize)*file_chunksize
+    #    return chunk_samples
+
+    #def n_chunks(self, chunk_bytes):
+    #    chunk_samples = self.chunk_samples(chunk_bytes)
+    #    samples = self._buffer.shape[-1]
+    #    return int(np.ceil(samples/chunk_samples))
+
+    #def chunk_iter(self, chunk_bytes, channels=None, loverlap=0, roverlap=0):
+    #    '''
+    #    Return an iterable that yields the data in segments based on the
+    #    requested memory size (in bytes) that each segment should be.  This will
+    #    be coerced to a multiple of the underlying chunkshape for efficiency
+    #    reasons.
+
+    #    chunk_bytes
+    #        Total size of chunk (in bytes).  The size of the underlying datatype
+    #        (e.g. 16-bit or 32-bit float) and total number of channels will be
+    #        factored in.  Important!  Even if you only request a subset of the
+    #        channels, this currently assumes that all channels are being loaded
+    #        into memory before discarding the ones that are not requested.
+
+    #    channels
+    #        Channels to extract
+
+    #    loverlap
+    #        Number of samples on the left to overlap with prior chunk (used to
+    #        handle extraction of features that cross chunk boundaries)
+    #    roverlap
+    #        Number of samples on the right to overlap with the next chunk (used
+    #        to handle extraction of features that cross chunk boundaries)
+
+    #    TODO: Set this up for arbitrary dimensions
+    #    '''
+    #    n_samples = self.chunk_samples(chunk_bytes)
+    #    n_chunks = self.n_chunks(chunk_bytes)
+
+    #    # Create a special slice object that returns all channels
+    #    if channels is None:
+    #        channels = slice(None)
+
+    #    for chunk in range(n_chunks):
+    #        i = chunk*n_samples
+    #        lb = i-loverlap
+    #        ub = i+n_samples+roverlap
+
+    #        # If we are on the first chunk or last chunk, we have some
+    #        # special-case handling to take care of.
+    #        lpadding, rpadding = 0, 0
+    #        if lb < 0:
+    #            lpadding = np.abs(lb)
+    #            lb = 0
+    #        if ub > self.n_samples:
+    #            rpadding = ub-self.n_samples
+    #            ub = self.n_samples
+
+    #        chunk_samples = self[channels, lb:ub]
+
+    #        n_channels = chunk_samples.shape[0]
+    #        if lpadding or rpadding:
+    #            yield np.c_[np.ones((n_channels, lpadding)) * np.nan,
+    #                        chunk_samples,
+    #                        np.ones((n_channels, rpadding)) * np.nan]
+    #        yield chunk_samples
 
 class Timeseries(HasTraits):
 
@@ -140,7 +239,7 @@ class Timeseries(HasTraits):
         self.updated = np.array(timestamps)/self.fs
 
     def get_range(self, lb, ub):
-        timestamps = self._buffer[:]
+        timestamps = self._buffer.read()
         ilb = int(lb*self.fs)
         iub = int(ub*self.fs)
         mask = (timestamps>=ilb) & (timestamps<iub)
@@ -166,7 +265,7 @@ class FileTimeseries(FileMixin, Timeseries):
 
 class Epoch(HasTraits):
 
-    updated = Event
+    added = Event
     fs = Float(attr=True)
     t0 = Float(0, attr=True)
 
@@ -187,7 +286,7 @@ class Epoch(HasTraits):
     def send(self, timestamps):
         if len(timestamps):
             self.append(timestamps)
-            self.updated = np.array(timestamps)/self.fs
+            self.added = np.array(timestamps)/self.fs
 
     def __getitem__(self, key):
         return self._buffer[key]/self.fs
@@ -202,43 +301,59 @@ class FileEpoch(FileMixin, Epoch):
 
 class Channel(HasTraits):
     '''
-    Base class for dealing with a continuous stream of data.  Subclasses are
-    responsible for implementing the data buffer (e.g. either a file-based or
-    memory-based buffer).
+    Base class for dealing with a continuous stream of data sampled at a fixed
+    rate, fs (cycles per time unit), starting at time t0 (time unit).  This
+    class is not meant to be used directly since it does not implement a backend
+    for storing the data.  Subclasses are responsible for implementing the data
+    buffer (e.g. either a file-based or memory-based buffer).
 
     fs
-        Sampling frequency (number of samples per second)
+        Sampling frequency
     t0
         Time offset (i.e. time of first sample) relative to the start of
         acquisition.  This typically defaults to zero; however, some subclasses
         may discard old data (e.g.  :class:`RAMChannel`), so we need to factor
         in the time offset when attempting to extract a given segment of the
         waveform for analysis.  
-    signal
-        The sample sequence
+
+    Two events are supported.
+
+    added
+        New data has been added. If listeners have been caching the results of
+        prior computations, they can assume that older data in the cache is
+        valid. 
+    changed
+        The underlying dataset has changed, but the time-range has not.
+
+    In general, the changed event roughly corresponds to changes in the Y-axis
+    (i.e. the signal) while added roughly corresponds to changes in the X-axis
+    (i.e.  addition of additional samples).
     '''
 
     # Sampling frequency of the data stored in the buffer
-    fs = Float(attr=True)
+    fs = Float(attr=True, transient=True)
 
     # Time of first sample in the buffer.  Typically this is 0, but if we delay
     # acquisition or discard "old" data (e.g. via a RAMBuffer), then we need to
     # update t0.
-    t0 = Float(0, attr=True)
+    t0 = Float(0, attr=True, transient=True)
 
-    # Fired when new data is added
-    updated = Event
-   
-    signal = Property
+    added       = Event
+    changed     = Event
 
-    def __getitem__(self, key):
+    shape       = Property
+
+    def _get_shape(self):
+        return self._buffer.shape
+
+    def __getitem__(self, slice):
         '''
         Delegates to the __getitem__ method on the buffer
-        '''
-        return self._buffer[key]
 
-    def get_data(self):
-        return self.signal
+        Subclasses can add additional data preprocessing by overriding this
+        method.  See `ProcessedFileMultiChannel` for an example.
+        '''
+        return self._buffer[slice]
 
     def to_index(self, time):
         '''
@@ -252,7 +367,9 @@ class Channel(HasTraits):
         '''
         Convert time to number of samples.
         '''
-        return int(time*self.fs)
+        time = np.asanyarray(time)
+        samples = time*self.fs
+        return samples.astype('i')
 
     def get_range_index(self, start, end, reference=0, check_bounds=False):
         '''
@@ -282,14 +399,28 @@ class Channel(HasTraits):
                 raise ValueError, "end must be <= signal length"
 
         if np.iterable(lb):
-            return [self._buffer[lb:ub] for lb, ub in zip(lb, ub)]
+            return [self[lb:ub] for lb, ub in zip(lb, ub)]
         else:
-            return self._buffer[..., lb:ub]
+            return self[..., lb:ub]
 
     def get_index(self, index, reference=0):
         t0_index = int(self.t0*self.fs)
         index = max(0, index-t0_index+reference)
-        return self._buffer[..., index]
+        return self[..., index]
+
+    def _to_bounds(self, start, end, reference=None):
+        if start > end:
+            raise ValueError("Start time must be < end time")
+
+        if reference is not None:
+            ref_idx = self.to_index(reference)
+        else:
+            ref_idx = 0
+
+        lb = max(0, self.to_index(start)+ref_idx)
+        ub = max(0, self.to_index(end)+ref_idx)
+
+        return lb, ub
 
     def get_range(self, start, end, reference=None):
         '''
@@ -304,59 +435,32 @@ class Channel(HasTraits):
         reference : float, optional
             Set to -1 to get the most recent range
         '''
-        # Return an empty array of the appropriate dimensionality (whether it's
-        # single or multichannel)
-        if start == end:
-            return self._buffer[..., 0:0]
+        lb, ub = self._to_bounds(start, end, reference)
+        return self[..., lb:ub]
 
-        # Otherwise, ensure that start time is greater than end 
-        if start > end:
-            raise ValueError("Start time must be < end time")
+    #def get_recent_range(self, start, end=0):
+    #    '''
+    #    Returns a subset of the range, with start and end referenced to the most
+    #    recent sample.
 
-        if reference is not None:
-            if reference == -1:
-                return self.get_recent_range(start, end)
-            else:
-                ref_idx = self.to_index(reference)
-        else:
-            ref_idx = 0
-
-        # Due to the two checks at the beginning of this function, we do not
-        # need to worry about start == inf and end == -inf
-        if start == -np.inf:
-            lb = self.t0
-        else:
-            lb = max(0, self.to_index(start)+ref_idx)
-        if end == np.inf:
-            ub = self.get_size()
-        else:
-            ub = max(0, self.to_index(end)+ref_idx)
-
-        return self._buffer[..., lb:ub]
-
-    def get_recent_range(self, start, end=0):
-        '''
-        Returns a subset of the range, with start and end referenced to the most
-        recent sample.
-
-        Parameters
-        ==========
-        start
-            Start time
-        end
-            End time
-        '''
-        lb = min(-1, int(start*self.fs))
-        ub = min(-1, int(end*self.fs))
-        # This check is necessary to avoid raising an error in the HDF5
-        # (PyTables?) library if it attempts to slice an empty array.
-        if len(self._buffer) == 0:
-            signal = np.array([])
-        else:
-            signal = self._buffer[..., lb:ub]
-        ub_time = ub/self.fs
-        lb_time = ub_time-signal.shape[-1]/self.fs
-        return signal, lb_time, ub_time
+    #    Parameters
+    #    ==========
+    #    start
+    #        Start time
+    #    end
+    #        End time
+    #    '''
+    #    lb = min(-1, int(start*self.fs))
+    #    ub = min(-1, int(end*self.fs))
+    #    # This check is necessary to avoid raising an error in the HDF5
+    #    # (PyTables?) library if it attempts to slice an empty array.
+    #    if len(self._buffer) == 0:
+    #        signal = np.array([])
+    #    else:
+    #        signal = self._buffer[..., lb:ub]
+    #    ub_time = ub/self.fs
+    #    lb_time = ub_time-signal.shape[-1]/self.fs
+    #    return signal, lb_time, ub_time
 
     def get_size(self):
         return self._buffer.shape[-1]
@@ -391,7 +495,7 @@ class Channel(HasTraits):
         # Updated has the upper and lower bound of the data that was added.
         # Some plots will use this to determine whether the updated region of
         # the data is within the visible region.  If not, no update is made.
-        self.updated = lb/self.fs, ub/self.fs
+        self.added = lb/self.fs, ub/self.fs
 
     def summarize(self, timestamps, offset, duration, fun):
         if len(timestamps) == 0:
@@ -422,6 +526,10 @@ class Channel(HasTraits):
             range = self.get_range_index(lb_index, ub_index, timestamps)
             return fun(range)
 
+    @property
+    def n_samples(self):
+        return self._buffer.shape[-1]
+
 class FileChannel(FileMixin, Channel):
     '''
     Use a HDF5 datastore for saving the channel
@@ -431,7 +539,8 @@ class FileChannel(FileMixin, Channel):
     dtype = Any(np.float32)
 
 class RAMChannel(Channel):
-    '''Buffers data in memory without saving it to disk.
+    '''
+    Buffers data in memory without saving it to disk.
 
     Uses a ringbuffer algorithm designed for efficient reads (writes are not as
     efficient, but should still be fairly quick).  The assumption is that this
@@ -472,9 +581,6 @@ class RAMChannel(Channel):
         self.dropped = 0
         self.partial_idx = 0
         self._write = self._partial_write
-
-    #def _get_signal(self):
-    #    return self.buffer
 
     def _partial_write(self, data):
         size = data.shape[-1]
@@ -538,8 +644,117 @@ class MultiChannel(Channel):
 
     channels = Int(8, attr=True)
 
+    def get_channel_range(self, channel, lb, ub):
+        return self.get_range(lb, ub)[channel]
+
     def send(self, data):
         self.write(data)
+
+    def get_range(self, start, end, reference=None, channels=None):
+        lb, ub = self._to_bounds(start, end, reference)
+        return self[channels, lb:ub]
+
+class ProcessedMultiChannel(MultiChannel):
+    '''
+    References and filters the data when requested
+    '''
+
+    # Channels in the list should use zero-based indexing (e.g. the first
+    # channel is 0).
+    bad_channels        = Array(dtype='int')
+    diff_mode           = Enum('all good', None)
+    diff_matrix         = Property(depends_on='bad_channels, diff_mode, channels')
+
+    filter_freq_lp      = Float(6e3, filter=True)
+    filter_freq_hp      = Float(600, filter=True)
+    filter_btype        = Enum('highpass', 'bandpass', 'lowpass', None,
+                               filter=True)
+    filter_order        = Float(8.0, filter=True)
+    filter_type         = Enum('butter', 'ellip', 'cheby1', 'cheby2', 'bessel',
+                               filter=True)
+
+    filter_instable     = Property(depends_on='filter_coefficients')
+    filter_coefficients = Property(depends_on='+filter, fs')
+
+    _padding            = Property(depends_on='filter_order')
+
+    @cached_property
+    def _get_filter_instable(self):
+        b, a = self.filter_coefficients
+        return not np.all(np.abs(np.roots(a)) < 1)
+
+    @on_trait_change('filter_coefficients, diff_matrix')
+    def _fire_change(self):
+        # Objects that use this channel as a datasource need to know when the
+        # data changes.  Since changes to the filter coefficients, differential
+        # matrix or filter function affect the entire dataset, we fire the
+        # changed event.  This will tell, for example, the
+        # ExtremesMultiChannelPlot to clear it's cache and redraw the entire
+        # waveform.
+        self.changed = True
+
+    @cached_property
+    def _get_diff_matrix(self):
+        if self.diff_mode is None:
+            return np.identity(self.channels)
+        else:
+            matrix = np.identity(self.channels)
+            weight = 1.0/(self.channels-1-len(self.bad_channels))
+            for r in range(self.channels):
+                if r in self.bad_channels:
+                    matrix[r, r] = 0
+                else:
+                    for i in range(self.channels):
+                        if (not i in self.bad_channels) and (i != r):
+                            matrix[r, i] = -weight
+            return matrix
+
+    @cached_property
+    def _get_filter_coefficients(self):
+        if self.filter_btype is None:
+            return [], []
+        if self.filter_btype == 'bandpass':
+            Wp = np.array([self.filter_freq_hp, self.filter_freq_lp])
+        elif self.filter_btype == 'highpass':
+            Wp = self.filter_freq_hp
+        else:
+            Wp = self.filter_freq_lp
+        Wp = Wp/(0.5*self.fs)
+
+        return signal.iirfilter(self.filter_order, Wp, 60, 2,
+                                ftype=self.filter_type,
+                                btype=self.filter_btype, 
+                                output='ba')
+
+    @cached_property
+    def _get__padding(self):
+        return 3*self.filter_order
+
+    def __getitem__(self, slice):
+        # We need to stabilize the edges of the chunk with extra data from
+        # adjacent chunks.  Expand the time slice to obtain this extra data.
+        padding = self._padding
+        data = slice_overlap(self._buffer, slice[-1], padding, padding)
+
+        # It does not matter whether we compute the differential first or apply
+        # the filter.  Since the differential requires data from all channels
+        # while filtering does not, we compute the differential first then throw
+        # away the channels we do not need.
+        data = self.diff_matrix.dot(data)
+
+        # For the filtering, we do not need all the channels, so we can throw
+        # out the extra channels by slicing along the second axis
+        data = data[slice[:-1]]
+        if self.filter_btype is not None:
+            b, a = self.filter_coefficients
+            # Since we have already padded the data at both ends padlen can be
+            # set to 0.  The "unstable" edges of the filtered waveform will be
+            # chopped off before returning the result.
+            data = signal.filtfilt(b, a, data, padlen=0)
+        return data[..., padding:-padding]
+
+class ProcessedFileMultiChannel(FileMixin, ProcessedMultiChannel):
+    pass
 
 class RAMMultiChannel(RAMChannel, MultiChannel):
 
@@ -562,10 +777,10 @@ class FileMultiChannel(FileMixin, MultiChannel):
 
 class FileSnippetChannel(FileChannel):
 
-    snippet_size = Int
-    classifiers = Any
-    timestamps = Any
-    unique_classifiers = Set
+    snippet_size        = Int
+    classifiers         = Any
+    timestamps          = Any
+    unique_classifiers  = Set
 
     def __getitem__(self, key):
         return self._buffer[key]
@@ -607,3 +822,45 @@ class FileSnippetChannel(FileChannel):
 
     def get_recent_average(self, count=1, classifier=None):
         return self.get_recent(count, classifier).mean(0)
+
+class SnippetChannel(Channel):
+
+    snippet_size        = Int
+    timestamps          = Array(dtype='int32')
+    classifiers         = Array(dtype='int32')
+    unique_classifiers  = Property(Set, depends_on='classifiers')
+
+    @cached_property
+    def _get_unique_classifiers(self):
+        return np.unique(self.classifiers)
+
+    def __getitem__(self, key):
+        return self._buffer[key]
+
+    def send(self, data, timestamps, classifiers):
+        data.shape = (-1, self.snippet_size)
+        self._buffer.append(data)
+        self.classifiers.append(classifiers)
+        self.timestamps.append(timestamps)
+        self.unique_classifiers.update(set(classifiers))
+        self.updated = True
+
+    def get_recent(self, history=1, classifier=None):
+        if len(self._buffer) == 0:
+            return np.array([]).reshape((-1, self.snippet_size))
+        spikes = self._buffer[-history:]
+        if classifier is not None:
+            classifiers = self.classifiers[-history:]
+            mask = classifiers[:] == classifier
+            return spikes[mask]
+        return spikes
+
+    def get_recent_average(self, count=1, classifier=None):
+        return self.get_recent(count, classifier).mean(0)
+
+    def __len__(self):
+        return len(self._buffer)
+
+if __name__ == '__main__':
+    import doctest
+    doctest.testmod()

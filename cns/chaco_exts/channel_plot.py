@@ -2,8 +2,7 @@ from __future__ import division
 
 from base_channel_plot import BaseChannelPlot
 import numpy as np
-from enthought.traits.api import (Float, Bool, Enum, on_trait_change, Property,
-        cached_property, Int)
+from enthought.traits.api import Bool, Property, cached_property, Int
 
 class ChannelPlot(BaseChannelPlot):
     '''
@@ -11,13 +10,16 @@ class ChannelPlot(BaseChannelPlot):
     Each time a Channel.updated event is fired, the new data is obtained and
     plotted.
     '''
-
-    _data_cache_valid = Bool(False)
-    _screen_cache_valid = Bool(False)
+    _data_cache_valid       = Bool(False)
+    _screen_cache_valid     = Bool(False)
 
     # When decimating, how many samples should be extracted per pixel?
     dec_points = Int(2)
-    dec_factor = Property(depends_on='index_mapper.updated, dec_points, channel.fs')
+    dec_factor = Property(depends_on='index_mapper.updated, dec_points, source.fs')
+
+    def _invalidate_data(self):
+        self._data_cache_valid = False
+        self.invalidate_and_redraw()
 
     def _invalidate_screen(self):
         self._screen_cache_valid = False
@@ -32,14 +34,14 @@ class ChannelPlot(BaseChannelPlot):
         Compute array of index values (i.e. the time of each sample that could
         be displayed in the visible range)
         '''
-        if self.channel is not None:
-            fs = self.channel.fs
+        if self.source is not None:
+            fs = self.source.fs
             # Channels contain continuous data starting at t0.  We do not want
             # to compute time values less than t0.
-            if self.index_range.low > self.channel.t0:
+            if self.index_range.low > self.source.t0:
                 low = int(self.index_range.low*fs)
             else:
-                low = int(self.channel.t0*fs)
+                low = int(self.source.t0*fs)
             high = int(self.index_range.high*fs)
             self.index_values = np.arange(low, high)/fs
             self._data_cache_valid = False
@@ -61,13 +63,17 @@ class ChannelPlot(BaseChannelPlot):
         screen_min, screen_max = self.index_mapper.screen_bounds
         screen_width = screen_max-screen_min # in pixels
         range = self.index_range
-        data_width = (range.high-range.low)*self.channel.fs
+        data_width = (range.high-range.low)*self.source.fs
         return np.floor((data_width/screen_width)/self.dec_points)
+
+    def _preprocess_data(self, data):
+        return data
 
     def _gather_points(self):
         if not self._data_cache_valid:
             range = self.index_mapper.range
-            self._cached_data = self.channel.get_range(range.low, range.high)
+            data = self.source.get_range(range.low, range.high)
+            self._cached_data = self._preprocess_data(data)
             self._data_cache_valid = True
             self._screen_cache_valid = False
 
@@ -108,12 +114,3 @@ class ChannelPlot(BaseChannelPlot):
         self._draw_default_axes(gc)
         gc.restore_state()
 
-    def _data_changed(self, bounds):
-        # We need to be smart about the "data changed" event.  If we're not
-        # tracking the index range, then the data that has changed *may* be
-        # off-screen.  In which case, we're doing a *lot* of work to redraw the
-        # exact same picture.
-        if self.index_range.mask_data(np.array(bounds)).any():
-            self._new_bounds_cache = bounds
-            self._data_cache_valid = False
-            self.invalidate_and_redraw()
