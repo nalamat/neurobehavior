@@ -2,9 +2,6 @@ import logging
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
-from .basic_characterization_controller import BasicCharacterizationController
-from .basic_characterization_paradigm import BasicCharacterizationParadigm
-
 # Base paradigm classes
 from .abstract_positive_paradigm import AbstractPositiveParadigm
 from .abstract_aversive_paradigm import AbstractAversiveParadigm

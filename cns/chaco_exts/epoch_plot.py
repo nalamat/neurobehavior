@@ -13,7 +13,7 @@ class EpochPlot(ChannelPlot):
     plotted.
     '''
 
-    series              = Instance('cns.channel.Epoch')
+    source              = Instance('cns.channel.Epoch')
     marker              = MarkerTrait
     marker_size         = Float(4.0)
     marker_color        = black_color_trait
@@ -23,12 +23,12 @@ class EpochPlot(ChannelPlot):
     line_color          = black_color_trait
     line_style          = LineStyle
 
-    def _gather_points(self):
-        if not self._data_cache_valid:
-            range = self.index_mapper.range
-            self._cached_data = self.series.get_range(range.low, range.high)
-            self._data_cache_valid = True
-            self._screen_cache_valid = False
+    #def _gather_points(self):
+    #    if not self._data_cache_valid:
+    #        range = self.index_mapper.range
+    #        self._cached_data = self.series.get_range(range.low, range.high)
+    #        self._data_cache_valid = True
+    #        self._screen_cache_valid = False
 
     def _get_screen_points(self):
         if not self._screen_cache_valid:
@@ -65,15 +65,15 @@ class EpochPlot(ChannelPlot):
         self._draw_default_axes(gc)
         gc.restore_state()
 
-    def _data_changed(self, timestamps):
+    def _data_added(self, timestamps):
         # Only fire an update if the changed data is within bounds
         if self.index_range.mask_data(np.array(timestamps)).any():
             self.invalidate_draw()
             self._data_cache_valid = False
             self.request_redraw()
 
-    def _series_changed(self, old, new):
-        if old is not None:
-            old.on_trait_change(self._data_changed, "updated", remove=True)
-        if new is not None:
-            new.on_trait_change(self._data_changed, "updated", dispatch="new")
+    #def _series_changed(self, old, new):
+    #    if old is not None:
+    #        old.on_trait_change(self._data_changed, "updated", remove=True)
+    #    if new is not None:
+    #        new.on_trait_change(self._data_changed, "updated", dispatch="new")

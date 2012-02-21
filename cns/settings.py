@@ -6,8 +6,15 @@ overridden in a custom settings.py file that NEUROBEHAVIOR_SETTINGS environment
 variable points to.
 '''
 
-import os, re, sys, logging
+import os, re, logging
 from os.path import dirname, join, abspath, getmtime
+
+# Recommended size (in bytes) to segment the raw physiology data into for
+# loading into memory.
+CHUNK_SIZE      = 10e7
+
+# Size of sample (in seconds) to use for computing the noise floor
+NOISE_DURATION  = 16 
 
 BASE_DIRECTORY  = os.environ['NEUROBEHAVIOR_BASE']
 LOG_ROOT        = join(BASE_DIRECTORY, 'logs')        # log files
@@ -19,6 +26,7 @@ SETTINGS_ROOT   = join(BASE_DIRECTORY, 'settings')
 PARADIGM_ROOT   = join(SETTINGS_ROOT, 'paradigm')
 PHYSIOLOGY_ROOT = join(SETTINGS_ROOT, 'physiology')
 
+# Default filename extensions used by the FileBrowser dialog to open/save files.
 COHORT_WILDCARD     = 'Cohort files (*.cohort.hd5)|*.cohort.hd5|'
 PARADIGM_WILDCARD   = 'Paradigm settings (*.par)|*.par|'
 PHYSIOLOGY_WILDCARD = 'Physiology settings (*.phy)|*.phy|'
@@ -35,7 +43,7 @@ def get_recent_cal(pattern):
         files.sort()
         files = [f[1] for f in files]
         return files[-1]
-    except Exception, e:
+    except Exception:
         return None
 
 # We prefer that the calibration file name be in the format
