@@ -225,9 +225,11 @@ def prepare_experiment(args, store_node):
             data=data,
             paradigm=paradigm,
             spool_physiology=args.physiology,
-            plot_index=args.analyze[0],
-            plot_group=args.analyze[1:],
             )
+    
+    if args.analyze:
+        model.plot_index = args.analyze[0]
+        model.plot_group = args.analyze[1:]
 
     controller = controller_class(**controller_args)
     return model, controller

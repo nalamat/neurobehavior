@@ -163,9 +163,6 @@ class AbstractExperimentController(Controller):
     iface_      = Any(iface=True)
     buffer_     = Any(buffer=True)
 
-    #data_       = Any(data=True)
-    #pipeline_   = Any(pipeline=True)
-
     # List of tasks to be run during experiment.  Each entry is a tuple
     # (callable, frequency) where frequency is how often the task should be run.
     # Tasks that are slow (e.g. communciating with the pump) should not be run
@@ -310,7 +307,7 @@ class AbstractExperimentController(Controller):
 
     def start(self, info=None):
         '''
-        Handles starting an experiment
+        Handles starting an experiment (called when the start button is pressed)
 
         Subclasses must implement `start_experiment`
         '''
@@ -573,7 +570,6 @@ class AbstractExperimentController(Controller):
         log.debug('Detected change to %s', name)
         trait = instance.trait(name)
         if trait.immediate:
-            print instance, name, old, new
             self.set_current_value(name, new)
         else:
             self.pending_changes = True
@@ -645,6 +641,9 @@ class AbstractExperimentController(Controller):
         pending_expressions stack.  Additional context variables may be
         evaluated as needed.
         '''
+        print self.current_context
+        print self.pending_expressions
+        
         try:
             return self.current_context[name]
         except:
@@ -716,6 +715,7 @@ class AbstractExperimentController(Controller):
     def initialize_context(self):
         for instance in (self.model.data, self.model.paradigm):
             for name, trait in instance.traits(context=True).items():
+                log.debug('Found context variable {}'.format(name))
                 self.context_labels[name] = trait.label
                 self.context_log[name] = trait.log
         # TODO: this is sort of a "hack" to ensure that the appropriate data for
