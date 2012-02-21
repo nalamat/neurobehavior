@@ -9,6 +9,9 @@ variable points to.
 import os, re, logging
 from os.path import dirname, join, abspath, getmtime
 
+# Maximum (safe) output voltage for DACs to speaker
+MAX_SPEAKER_DAC_VOLTAGE = 7
+
 # Recommended size (in bytes) to segment the raw physiology data into for
 # loading into memory.
 CHUNK_SIZE      = 10e7

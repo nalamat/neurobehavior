@@ -333,7 +333,7 @@ class Calibration(object):
 
         return a
 
-    def get_max_spl(self, frequencies, voltage=1, gain=0):
+    def get_spl(self, frequencies, voltage=1, gain=0):
         '''
         Computes expected speaker output (in dB SPL) for tones at the specified
         frequencies assuming 0 dB attenuation
@@ -343,7 +343,7 @@ class Calibration(object):
         frequencies : array-like (Hz)
             The frequencies to compute
         voltage : float (V)
-            The peak to peak amplitude of the tone
+            The target amplitude of the tone.  Note that whether it's peak to peak or RMS depends on how the calibration data was generated.  I believe FIRCal uses RMS (either case it's "only" 3 dB difference.
         gain : float (dB power)
             The output gain of the system
             
@@ -356,6 +356,14 @@ class Calibration(object):
         log.debug('%s: max output for %r is %r with gain %f and voltage %f',
                 self, frequencies, max_spl, gain, voltage)
         return max_spl
+    
+    def get_max_spl(self, frequencies, voltage=1, gain=0):
+        '''
+        This is a DEPRECATED method to support code that just calls get_max_spl
+        
+        This is not an accurately-named method and is misleading (blame EPL).
+        '''
+        return self.get_spl(frequencies, voltage, gain)
 
     def get_mean_spl(self, flow, fhigh, voltage=1, gain=0, mode='spectrum',
             endpoint=False):
@@ -450,11 +458,11 @@ class Calibration(object):
         '''
         Return scaling factor required to achieve required attenuation
         '''
-        max_spl = self.get_max_spl(frequency)
-        discrepancy = max_spl-level-attenuation
+        spl = self.get_spl(frequency)
+        discrepancy = spl-level-attenuation
         sf = 1.0/(10**(discrepancy/20.0))
-        log.debug('%s: max output is %f dB SPL, hw atten is %f dB',
-                  self, max_spl, attenuation), 
+        log.debug('%s: output is %f dB SPL, hw atten is %f dB',
+                  self, spl, attenuation), 
         log.debug('%s: must scale by %f to achieve remaining %f dB', self, sf,
                   discrepancy)
         return sf
