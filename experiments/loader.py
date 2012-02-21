@@ -13,7 +13,7 @@ from enthought.traits.api import Any, Trait, TraitError, Bool, Str
 from enthought.traits.ui.api import View, Item, VGroup, HGroup, Spring
 from experiments import trial_setting
 from enthought.traits.api import Float
-from neurogen import calibration
+from cns import calibration
 
 import logging
 log = logging.getLogger(__name__)
