@@ -6,6 +6,8 @@ from cns.data.h5_utils import get_or_append_node
 import subprocess
 from os import path
 
+from .evaluate import evaluate_value, evaluate_expressions
+
 from tdt import DSPProject
 from tdt.device import RZ6
 from cns import get_config, get_settings
@@ -22,8 +24,6 @@ from enthought.traits.ui.api import Controller, View, HGroup, Item, spring
 from cns.widgets.toolbar import ToolBar
 from enthought.savage.traits.ui.svg_button import SVGButton
 from cns.widgets.icons import icons
-
-from .apply_revert_controller_mixin import ApplyRevertControllerMixin
 
 import logging
 log = logging.getLogger(__name__)
@@ -86,7 +86,7 @@ class ExperimentToolBar(ToolBar):
             kind='subpanel',
             )
 
-class AbstractExperimentController(ApplyRevertControllerMixin, Controller):
+class AbstractExperimentController(Controller):
     """Primary controller for TDT System 3 hardware.  This class must be
     configured with a model that contains the appropriate parameters (e.g.
     Paradigm) and a view to show these parameters.
