@@ -1,4 +1,4 @@
-from enthought.traits.api import Str, Property, Instance, Int, Float, Any, Bool
+from enthought.traits.api import Instance, Int, Float, Any, Bool
 from enthought.traits.ui.api import View, Item, HGroup, spring
 from abstract_experiment_controller import AbstractExperimentController
 from abstract_experiment_controller import ExperimentToolBar
@@ -47,7 +47,10 @@ class AbstractPositiveController(AbstractExperimentController):
     pipeline_TTL1   = Any
     pipeline_TTL2   = Any
     
-    # All experiment controller subclasses are responsible for checking the value of this attribute when making a decision about what the next trial should be.  If True, this means that the user has clicked the "remind" button.
+    # All experiment controller subclasses are responsible for checking the
+    # value of this attribute when making a decision about what the next trial
+    # should be.  If True, this means that the user has clicked the "remind"
+    # button.
     remind_requested = Bool(False)
 
     def set_attenuations(self, att1, att2, check=True):
@@ -163,7 +166,17 @@ class AbstractPositiveController(AbstractExperimentController):
     # Master controller
     ############################################################################
     def monitor_behavior(self):
-        # This function gets called every ~100 msec (this time interval is not guaranteed).  Essentially this is a loop that queries the RPvds circuit, downloads all new data (and saves it to the PositiveData object which is a proxy for the HDF5 file -- the PositiveData object is required as a proxy rather than dumping the data directly to the HDF5 file because the PositiveData object also updates the GUI plots as well).  This function is also responsible for determining when a trial is over (when the value of trial_end_ts in the RPvds circuit changes this indicates that a trial is over).  When a trial is over, monitor_behavior calls the trigger_next() method to setup the next trial.
+        # This function gets called every ~100 msec (this time interval is not
+        # guaranteed).  Essentially this is a loop that queries the RPvds
+        # circuit, downloads all new data (and saves it to the PositiveData
+        # object which is a proxy for the HDF5 file -- the PositiveData object
+        # is required as a proxy rather than dumping the data directly to the
+        # HDF5 file because the PositiveData object also updates the GUI plots
+        # as well).  This function is also responsible for determining when a
+        # trial is over (when the value of trial_end_ts in the RPvds circuit
+        # changes this indicates that a trial is over).  When a trial is over,
+        # monitor_behavior calls the trigger_next() method to setup the next
+        # trial.
         self.model.data.microphone.send(self.buffer_mic.read())
         self.pipeline_TTL1.send(self.buffer_TTL1.read())
         self.pipeline_TTL2.send(self.buffer_TTL2.read())
@@ -239,11 +252,6 @@ class AbstractPositiveController(AbstractExperimentController):
     # appropriate set_* methods.
     ############################################################################
     
-    def set_poke_duration(self, value):
-        # Save requested value for parameter as an attribute because we need
-        # this value so we can randomly select a number between the lb and ub
-        self.current_poke_duration = value
-
     def set_intertrial_duration(self, value):
         self.iface_behavior.cset_tag('int_dur_n', value, 's', 'n')
 
@@ -258,7 +266,6 @@ class AbstractPositiveController(AbstractExperimentController):
 
         # We need to be sure to update the duration as well if we adjust this
         # value
-        duration = self.get_current_value('reaction_window_duration')
         self.set_reaction_window_duration(value)
 
     def set_response_window_duration(self, value):

@@ -5,7 +5,7 @@ import numpy as np
 Generators and Coroutines
 -------------------------
 The code below uses generators and coroutines, which are considered an advanced
-feature of Python.  While I have made effort to avoid using more arcane featurs
+feature of Python.  While I have made effort to avoid using more arcane features
 of Python, coroutines are extremely useful in the context of real-time data
 processing and visualization.  Coroutines can be thought of as "pipelines"
 (hence the name of the module) that continuously recieve data.  Once enough data

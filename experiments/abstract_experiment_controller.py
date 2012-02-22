@@ -1,5 +1,4 @@
-from copy import deepcopy, copy
-from datetime import datetime, timedelta
+from datetime import datetime
 from cns.data.persistence import add_or_update_object_node
 from cns.data.h5_utils import get_or_append_node
 
@@ -9,16 +8,13 @@ from os import path
 from .evaluate import evaluate_value, evaluate_expressions
 
 from tdt import DSPProject
-from tdt.device import RZ6
-from cns import get_config, get_settings
+from cns import get_config
 
-from enthought.pyface.api import error, confirm, YES, ConfirmationDialog
+from enthought.pyface.api import error, confirm, YES
 from enthought.pyface.timer.api import Timer
-from enthought.etsconfig.api import ETSConfig
-from enthought.traits.api import (Any, Instance, Enum, Dict, on_trait_change, 
-        HasTraits, List, Button, Bool, Tuple, Callable, Int, Property,
-        cached_property, Undefined, Event, TraitError, Str, Float, Trait,
-        on_trait_change, Property)
+from enthought.traits.api import (Any, Instance, Enum, Dict, List, Bool, Tuple,
+                                  Callable, Int, Property, Event, Str, Float,
+                                  Trait, on_trait_change)
 from enthought.traits.ui.api import Controller, View, HGroup, Item, spring
 
 from cns.widgets.toolbar import ToolBar
@@ -28,11 +24,9 @@ from cns.widgets.icons import icons
 import logging
 log = logging.getLogger(__name__)
 
-from cns import get_config
-from .utils import get_save_file, load_instance, dump_instance
+from .utils import load_instance, dump_instance
 
 from physiology_experiment import PhysiologyExperiment
-from physiology_paradigm import PhysiologyParadigm
 from physiology_data import PhysiologyData
 from physiology_controller import PhysiologyController
 
@@ -458,6 +452,8 @@ class AbstractExperimentController(Controller):
             self.output_secondary.fixed_attenuation = False
 
     def log_trial(self, **kwargs):
+        # In addition to the data provided in kwargs, include the current value
+        # of all parameters for that trial before saving it to the file.
         for key, value in self.context_log.items():
             if value:
                 kwargs[key] = self.current_context[key]
@@ -499,12 +495,6 @@ class AbstractExperimentController(Controller):
         PARADIGM_WILDCARD = get_config('PARADIGM_WILDCARD')
         dump_instance(self.model.paradigm, PARADIGM_ROOT, PARADIGM_WILDCARD)
 
-    def load_calibration(self, info):
-        directory = get_config('CAL_ROOT')
-        fd = FileDialog(action='open', default_directory=directory)
-        if fd.open() == OK and fd.path <> '':
-            print fd.path
-
     calibration_window = Any
 
     def show_calibration(self, info):
@@ -515,9 +505,6 @@ class AbstractExperimentController(Controller):
             calibrations = [self.cal_primary, self.cal_secondary]
             self.calibration_window = CalibrationPlot(calibrations=calibrations)
         self.calibration_window.edit_traits()
-
-    def show_signal(self, info):
-        pass
 
     '''
     APPLY/REVERT ATTRIBUTES AND LOGIC
@@ -544,7 +531,8 @@ class AbstractExperimentController(Controller):
     defined. If not, the controller checks to see if it has the method defined
     on itself.
     
-    The function must have the following signature set_parameter_name(self, value)
+    The function must have the following signature set_parameter_name(self,
+    value)
     '''
     trigger_requested = Bool(True)
 
@@ -718,6 +706,7 @@ class AbstractExperimentController(Controller):
                 log.debug('Found context variable {}'.format(name))
                 self.context_labels[name] = trait.label
                 self.context_log[name] = trait.log
+
         # TODO: this is sort of a "hack" to ensure that the appropriate data for
         # the trial type is included
         self.context_labels['ttype'] = 'Trial type'

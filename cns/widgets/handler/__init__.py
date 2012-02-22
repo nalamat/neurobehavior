@@ -1,10 +1,9 @@
 from enthought.traits.ui.menu import MenuBar, Menu, ActionGroup, Action
-from enthought.traits.api import Str, File, Trait, Any
+from enthought.traits.api import Str, File, Trait
 from enthought.traits.ui.api import Controller
-from enthought.pyface.api import FileDialog, confirm, NO, error, OK, YES
+from enthought.pyface.api import FileDialog, confirm, NO, error, OK
 import logging
 import os
-import sys
 log = logging.getLogger(__name__)
 
 def filehandler_menu():

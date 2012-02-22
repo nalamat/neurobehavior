@@ -22,26 +22,4 @@ icons = {'start':        'actions/1rightarrow.svgz',
 
 # Update the icon list with the full path to the resource
 for k, v in icons.items():
-	icons[k] = path.join(RESOURCE_PATH, v)
-                
-def button_test():
-    from enthought.traits.api import HasTraits
-    from enthought.traits.ui.api import View, Item
-    from enthought.savage.traits.ui.svg_button import SVGButton
-    
-    class TestButtons(HasTraits):    
-        pass
-    
-    test_buttons = TestButtons()    
-    items = []
-    for button in oxygen_icons:
-        filename = globals()[button]        
-        trait = SVGButton(button, filename=filename)
-        print button, filename
-        test_buttons.add_class_trait(button, trait)
-        items.append(Item(button))
-        
-    test_buttons.configure_traits(view=View(*items))
-    
-if __name__ == '__main__':
-    button_test()
+    icons[k] = path.join(RESOURCE_PATH, v)

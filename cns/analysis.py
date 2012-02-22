@@ -10,6 +10,73 @@ from .arraytools import chunk_samples, chunk_iter
 from . import get_config
 default_chunk_size = get_config('CHUNK_SIZE')
 
+def load_event_times(filename):
+    with tables.openFile(filename) as fh:
+        unsorted_et = fh.root.timestamps / fh.root._v_attrs['fs']
+        channels = fh.root.channels
+        et = []
+        for channel in fh.root.extracted_channels:
+            mask = [channels == channel]
+            et.append((channel, unsorted_et[mask]))
+        return et
+
+def load_trial_log(filename):
+    epochs = (
+        'trial_epoch',
+        'physiology_epoch',
+        'poke_epoch',
+        'signal_epoch',
+        )
+    with tables.openFile(filename) as fh:
+        tl = DataFrame(fh.root.trial_log[:])
+        for epoch in epochs:
+            basename = epoch.split('_')[0]
+            node = fh.root._f_getChild(epoch)
+            data = node[:]
+            # Save as a timestamp (i.e. the raw integer value)
+            tl[basename + '_ts/']  = data[:,0]
+            tl[basename + '_ts\\']  = data[:,1]
+            # Save as seconds
+            data = data.astype('f')/node._v_attrs['fs']
+            tl[basename + '/']  = data[:,0]
+            tl[basename + '\\']  = data[:,1]
+        # Pull in response timestamps as well
+        node = fh.root._f_getChild('response_ts')
+        tl['response_ts|'] = node[:]
+        tl['response|'] =  node[:]/node._v_attrs['fs']
+        return tl
+
+def histogram(et, tt, width, lb, ub):
+    '''
+    Generate a histogram.  Units of each parameter can be in seconds, cycles,
+    milliseconds, etc; however, they must be identical.
+
+    Parameters
+    ----------
+    et : array-like
+        Event times (i.e. spike times)
+    tt : array-like
+        Trigger times to reference event times to
+    lb : float
+        Lower bound of the bin range
+    ub : float
+        Upper bound of the bin range
+    width : float
+        Bin width
+
+    Returns
+    -------
+    bins : array
+        Lower edge of histogram bins
+    rate : array of dtype float
+        Spike rate in each bin
+    '''
+    bins = histogram_bins(width, lb, ub)
+    pst = et-tt[np.newaxis].T
+    n = np.histogram(pst, bins=bins)[0].astype('f')
+    n = n/width/len(tt)
+    return bins, n
+
 def histogram_bins(bin_width, lb, ub):
     '''
     Compute the bins.  
