@@ -1,25 +1,22 @@
 from enthought.pyface.api import error, information
-from cns.data.ui.cohort import CohortView, CohortViewHandler
+from cns.data.ui.cohort import CohortView, CohortViewHandler, CohortEditor
 from cns.data import persistence
 from cns.data.h5_utils import get_or_append_node
 import sys
 import tables
-import imp
 import os
-from os.path import join, dirname, basename, exists
+from os.path import join
 from importlib import import_module
 
-from enthought.traits.api import Any, Trait, TraitError, Bool, Str
-from enthought.traits.ui.api import View, Item, VGroup, HGroup, Spring
+from enthought.traits.api import Any, Trait, TraitError
+from enthought.traits.ui.api import View, Item, VGroup, HGroup
 from experiments import trial_setting
-from enthought.traits.api import Float
 from cns import calibration
 
 import logging
 log = logging.getLogger(__name__)
 
 # Import the experiments
-from cns.data.ui.cohort import CohortEditor, CohortView, CohortViewHandler
 from cns.data.h5_utils import append_node, append_date_node
 from cns import get_config
 
@@ -315,4 +312,4 @@ def get_invalid_parameters(args):
     return [p for p in parameters if p not in paradigm.get_parameters()]
 
 def get_experiment(etype):
-    return import_module('launchers.{}'.format(etype))
+    return import_module('paradigms.{}'.format(etype))
