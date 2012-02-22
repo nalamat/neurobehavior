@@ -1,6 +1,5 @@
-from cns.data.trait_types import CTuple, CDate
-from enthought.traits.api import HasTraits, Date, Enum, Instance, CList, \
-    Property, Int, Str, List, Any, Bool
+from enthought.traits.api import HasTraits, Date, Enum, Instance, \
+    Property, Int, Str, List, Bool
 import datetime
 
 class Animal(HasTraits):
@@ -20,8 +19,6 @@ class Animal(HasTraits):
     # update nyu_id effectively makes animal_id an alias for nyu_id
     def _get_animal_id(self):
         return self.nyu_id
-    def _get_animal_id(self):
-        return self.nyu_id
 
     def _set_animal_id(self, value):
         self.nyu_id = value
@@ -30,23 +27,6 @@ class Animal(HasTraits):
 
     #experiments = Property(List)
     name        = Property(Str)
-
-    #def _get_experiments(self):
-    #    try:
-    #        return self._experiments
-    #    except:
-    #        try:
-    #            from cns.data.persistence import get_objects
-    #            filter = {'_v_name': 'aversive_date*' }
-    #            exps = get_objects(self.store_node_source,
-    #                               self.store_node_path+'/experiments',
-    #                               filter=filter,
-    #                               child='Data',
-    #                               type=Experiment)
-    #            self._experiments = exps
-    #            return self._experiments
-    #        except AttributeError:
-    #            return []
     
     def _get_age(self):
         if self.birth is None:

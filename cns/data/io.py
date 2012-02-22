@@ -1,5 +1,4 @@
 import tables
-from cns.data.type import Animal, Cohort
 from cns.data import persistence
 
 import logging
@@ -22,7 +21,7 @@ def load_cohort(id, filename):
         obj = persistence.load_object(getattr(fh.root, 'Cohort_' + str(id)))
         fh.close()
         return obj
-    except persistence.PersistenceReadError, e:
+    except persistence.PersistenceReadError:
         raise BadCohortFile(filename)
 
 def save_cohort(cohort, filename):
@@ -30,20 +29,3 @@ def save_cohort(cohort, filename):
     node = persistence.add_or_update_object(cohort, fh.root)
     fh.close()
     return node
-
-if __name__ == '__main__':
-    import datetime
-    file = tables.openFile('test.h5', 'a')
-    try:
-        a = Animal(parents='HH', birth=datetime.date(2009, 11, 30),
-                   identifier='tail')
-        a.weight_log.append((datetime.date.today(), 32.0))
-        a.weight_log.append((datetime.date.today(), 34.0))
-        a.weight_log.append((datetime.date.today(), 65.0))
-        a.status_log.append((datetime.date.today(), 'ON WATER'))
-        a.status_log.append((datetime.date.today(), 'OFF WATER'))
-        a.status_log.append((datetime.date.today(), 'OFF WATER'))
-        c = Cohort(animals=[a], description='Test Cohort')
-        add_or_update_object(c, file.root)
-    finally: file.close()
-    file = tables.openFile('test.h5', 'a')
