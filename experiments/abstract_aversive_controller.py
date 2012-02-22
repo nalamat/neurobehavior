@@ -14,6 +14,7 @@ class AbstractAversiveController(AbstractExperimentController):
     # sampling frequency of the DSP) to the TTL and contact sampling frequency
     # (critcal for computing lick_offset, etc).
     fs_conversion = Int
+    pipeline_TTL = Any
 
     def _setup_shock(self):
         # First, we need to load the circuit we need to control the shocker.
@@ -188,8 +189,9 @@ class AbstractAversiveController(AbstractExperimentController):
 
     ############################################################################
     # Code to apply parameter changes.  This is backend-specific.  If you want
-    # to implement a new backend, you would subclass this and override the
-    # appropriate set_* and get_* methods.
+    # to implement a new backend (e.g. use National Instruments instead of TDT),
+    # you would subclass this and override the appropriate set_* and get_*
+    # methods.
     ############################################################################
 
     def get_reaction_ts(self):
@@ -243,9 +245,27 @@ class AbstractAversiveController(AbstractExperimentController):
         self.iface_behavior.trigger(1)
 
     def set_shock_level(self, value):
-        # Programmable input ranges from 0 to 2.5 V corresponding to a 0 to 5 mA
-        # range.  Divide by 2.0 to convert mA to the corresponding shock level.
-        # When set to manual high, use the lower scale to read the meter.
+        '''
+         Programmable input ranges from 0 to 2.5 V corresponding to a 0 to 5 mA
+         range.  Divide by 2.0 to convert mA to the corresponding shock level.
+         When set to manual high, use the lower scale to read the meter.
+        
+         * iface_shock is a reference to the tdt.DSPCircuit that communicates
+         with the RZ5 (i.e. the shock-controller.rcx circuit when running
+         behavior only or the physiology.rcx circuit when running both phys and
+         behavior)
+         * iface_behavior is a reference to the tdt.DSPCircuit that
+         communicates with the RZ6 (i.e. the aversive-behavior.rcx or one of the
+         modified versions such as the aversive-behavior-fmam.rcx)
+         
+         We need to disable the shock trigger when shock_level is set to 0
+         because the shocker still generates a small current at this level.
+
+         iface is short for "interface"
+         '''
+        print value
+        self.iface_behavior.set_tag('do_shock', bool(value))
+        print self.iface_behavior.get_tag('do_shock')
         self.iface_shock.set_tag('shock_level', value/2.0)
 
     def cancel_trigger(self):
@@ -261,8 +281,6 @@ class AbstractAversiveController(AbstractExperimentController):
             if self.state == 'running':
                 self.trigger_next()
 
-    def set_trial_duration(self, value):
-        self.iface_behavior.cset_tag('trial_dur_n', value, 's', 'n')
 
     def update_intertrial(self):
 	'''
