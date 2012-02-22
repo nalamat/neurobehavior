@@ -2,6 +2,10 @@
 Getting Started
 ===============
 
+SETTINGS
+--------
+TODO: explain the settings (cns.settings vs local_settings) and how to use get_config
+
 Organization of the code
 ========================
 The code is structured into several folders:

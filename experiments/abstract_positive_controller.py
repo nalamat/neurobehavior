@@ -1,4 +1,4 @@
-from enthought.traits.api import Str, Property, Instance, Int, Float
+from enthought.traits.api import Str, Property, Instance, Int, Float, Any, Bool
 from enthought.traits.ui.api import View, Item, HGroup, spring
 from abstract_experiment_controller import AbstractExperimentController
 from abstract_experiment_controller import ExperimentToolBar
@@ -44,6 +44,12 @@ class AbstractPositiveController(AbstractExperimentController):
     current_hw_att1 = Float(120)
     current_hw_att2 = Float(120)
 
+    pipeline_TTL1   = Any
+    pipeline_TTL2   = Any
+    
+    # All experiment controller subclasses are responsible for checking the value of this attribute when making a decision about what the next trial should be.  If True, this means that the user has clicked the "remind" button.
+    remind_requested = Bool(False)
+
     def set_attenuations(self, att1, att2, check=True):
         # TDT's built-in attenuators for the RZ6 function in 20 dB steps, so we
         # need to determine the next greater step size for the attenuator.  The
@@ -69,8 +75,13 @@ class AbstractPositiveController(AbstractExperimentController):
             self.current_hw_att2 = hw2
             self.output_secondary.hw_attenuation = hw2
             log.debug('Updated secondary attenuation to %.2f', hw2)
+
+        # For efficiency reasons, we prefer to do most of the computation for
+        # the RZ6 attenuator values in software rather than hardware.
         att_bits = RZ6.atten_to_bits(att1, att2)
         self.iface_behavior.set_tag('att_bits', att_bits)
+        
+        return sw1, sw2
 
     def setup_experiment(self, info):
         circuit = join(get_config('RCX_ROOT'), 'positive-behavior-v3')
@@ -152,6 +163,7 @@ class AbstractPositiveController(AbstractExperimentController):
     # Master controller
     ############################################################################
     def monitor_behavior(self):
+        # This function gets called every ~100 msec (this time interval is not guaranteed).  Essentially this is a loop that queries the RPvds circuit, downloads all new data (and saves it to the PositiveData object which is a proxy for the HDF5 file -- the PositiveData object is required as a proxy rather than dumping the data directly to the HDF5 file because the PositiveData object also updates the GUI plots as well).  This function is also responsible for determining when a trial is over (when the value of trial_end_ts in the RPvds circuit changes this indicates that a trial is over).  When a trial is over, monitor_behavior calls the trigger_next() method to setup the next trial.
         self.model.data.microphone.send(self.buffer_mic.read())
         self.pipeline_TTL1.send(self.buffer_TTL1.read())
         self.pipeline_TTL2.send(self.buffer_TTL2.read())
@@ -176,9 +188,6 @@ class AbstractPositiveController(AbstractExperimentController):
             poke = self.iface_behavior.get_tag('resp_poke?')
             spout = self.iface_behavior.get_tag('resp_spout?')
             to = self.iface_behavior.get_tag('fa?')
-            print 'POKE', poke
-            print 'SPOUT', spout
-            print 'TO', to
             if to:
                 response = 'spout'
             elif poke and not spout:
@@ -189,7 +198,6 @@ class AbstractPositiveController(AbstractExperimentController):
                 response = 'no response'
             else:
                 raise ValueError, "Unknown response type!"
-            print "The response was", response
 
             while True:
                 try:

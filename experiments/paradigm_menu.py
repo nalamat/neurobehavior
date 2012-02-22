@@ -7,7 +7,8 @@ def create_menubar():
             #Action(name='Select parameters', action='select_parameters'),
             )
     calibration_actions = ActionGroup(
-            #Action(name='Load calibration', action='load_calibration'),
+            Action(name='Load primary calibration', action='load_calibration'),
+            Action(name='Load secondary calibration', action='load_calibration'),
             Action(name='Show calibration', action='show_calibration'),
             Action(name='Show signal', action='show_signal'),
             )
