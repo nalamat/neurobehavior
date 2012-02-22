@@ -38,11 +38,13 @@ function [spikes] = import_spikes(filename, varargin)
 %           do not reject any event
 %       Keep in mind that you have access to the waveforms so you can
 %       perform your own reject algorithm
-%   omit_prepost : boolean (default true)
-%       Needs a better name for the variable.  Indicates whether to omit
-%       features that occur before the start or after the end of the
-%       experiment (i.e. from the start timestamp of the first trial to the
-%       end timestamp of the last trial).
+%   % DEPRECATED
+%   %omit_prepost : boolean (default true)
+%   %    Needs a better name for the variable.  Indicates whether to omit
+%   %    features that occur before the start or after the end of the
+%   %    experiment (i.e. from the start timestamp of the first trial to the
+%   %    end timestamp of the last trial).
+%   trial_mask : Empty or length 2 ()
 %   max_features : integer (default inf)
 %       Maximum number of features to return (useful for debugging since
 %       the clustering algorithms can often be slow when working with a
@@ -67,6 +69,9 @@ function [spikes] = import_spikes(filename, varargin)
                          strcmpi(x, 'detect') || strcmpi(x, 'waveform') ...
                    );
     p.addParamValue('omit_prepost', true, @islogical);
+    p.addParamValue('trial_range', [], ...
+                    @(x) isvector(x) && (length(x) == 2 || isempty(x)) ...
+                   );
     p.parse(filename, varargin{:});
 
     % Now, let's copy the results to the local namespace and get on with
@@ -76,7 +81,7 @@ function [spikes] = import_spikes(filename, varargin)
     detect_channels = p.Results.detect_channels;
     max_features = p.Results.max_features;
     artifact_reject = p.Results.artifact_reject;
-    omit_prepost = p.Results.omit_prepost;
+    trial_range = p.Results.trial_range;
 
     % Finally, we get to work on loading our data.
     
@@ -142,12 +147,11 @@ function [spikes] = import_spikes(filename, varargin)
             artifact_reject = extracted_channels;
         end
         
-        % Artifacts are a 2D array [event, channel] indicating which
-        % channels exceeded the aritfact threshold for any given event.
-        % Note that the transpose operation is required because they are
-        % saved in C order in the HDF5 file.  Matlab views this as
-        % [channel, event] so we need to convert it to the appropriate
-        % [event, channel] format.
+        % Artifacts are a 2D array [event, channel] indicating which channels
+        % exceeded the aritfact threshold for any given event.  The transpose
+        % operation is required because they are saved in C order in the HDF5
+        % file.  Matlab views this as [channel, event] so we need to convert it
+        % to the appropriate [event, channel] format.
         artifacts = h5read(filename, '/artifacts')';
         
         % Now, pull out the values for the correct channels and see if any
@@ -160,31 +164,57 @@ function [spikes] = import_spikes(filename, varargin)
         artifact_mask = zeros(1, length(waveforms));
     end
     
-    % Now, cleanup our data according to the detect_mask and artifact_mask
-    mask = detect_mask & ~artifact_mask;
+    % Now, trim the result down if requested
+    %if omit_prepost, 
+    %    epochs = double(h5read(filename, '/physiology_epoch'));
+    %    start = find(timestamps >= epochs(1, 1), 1, 'first');
+    %    stop = find(timestamps < epochs(end, end), 1, 'last');
+    %else
+    %    start = 1;
+    %    stop = length(timestamps);
+    %end
+    %if (stop+start) > max_features,
+    %    % Ugly Matlab 1-based indexing issue
+    %    stop = max_features+start-1;
+    %end
+
+    if length(trial_range) == 2, 
+        lb = range(1);
+        ub = range(2);
+        epochs = double(h5read(filename, '/physiology_epoch'));
+        fs = h5readatt(filename, '/physiology_epoch', 'fs');
+        epochs(1,:) = epochs(1,:)-round(lb*fs);
+        epochs(2,:) = epochs(2,:)+round(ub*fs);
+
+        % Now, build a mask of all the event times that fall within the
+        % requested range
+        trial_mask = zeros(1, length(timestamps));
+        for i = 1:length(epochs),
+            submask = (timestamps >= epochs(1,i)) & (timestamps < epochs(2,i));
+            trial_mask = trial_mask | submask;
+        end
+    else
+        trial_mask = ones(1, length(timestamps));
+
+    end
+
+    % Now, cleanup our data according to the masks we have created
+    mask = detect_mask & ~artifact_mask & trial_mask;
     waveforms = waveforms(mask, :, :);
     timestamps = timestamps(mask);
     channels = channels(mask);
     channel_indices = channel_indices(mask);
 
-    % Now, trim the result down if requested
-    if omit_prepost, 
-        epochs = double(h5read(filename, '/physiology_epoch'));
-        start = find(timestamps >= epochs(1, 1), 1, 'first');
-        stop = find(timestamps < epochs(end, end), 1, 'last');
-    else
-        start = 1;
-        stop = length(timestamps);
-    end
-    if (stop+start) > max_features,
-        % Ugly Matlab 1-based indexing issue
-        stop = max_features+start-1;
-    end
-
     % More ugly Matlab 1-based indexing issues
-    spikes.info.detect.discarded_start = start-1;
-    spikes.info.detect.discarded_stop = length(timestamps)-stop-1;
+    %spikes.info.detect.discarded_start = start-1;
+    % Even more ugly Matlab 1-based indexing issues
+    %spikes.info.detect.discarded_stop = length(timestamps)-stop-1;
+    % Phew, no ugly Matlab 1-based indexing issue here
     spikes.info.detect.settings = p.Results;
+    spikes.info.detect.source_mask = mask;
+    spikes.info.detect.detect_mask = detect_mask;
+    spikes.info.trial.trial_mask = trial_mask;
+    spikes.info.artifact.artifact_mask = artifact_mask;
     
     % Information saved in spikes.info.detect.settings reflects the actual
     % arguments passed to the function, not the values that were actually
@@ -194,10 +224,13 @@ function [spikes] = import_spikes(filename, varargin)
     spikes.info.detect.window_samples = size(waveforms, 2);
     spikes.info.detect.source_file = filename;
     
-    spikes.waveforms = waveforms(start:stop, :, :);
-    spikes.timestamps = timestamps(start:stop);
-    spikes.channels = channels(start:stop);
-    spikes.channel_indices = channel_indices(start:stop);
+    if max_features > length(timestamps),
+        max_features = length(timestamps);
+    end
+    spikes.waveforms = waveforms(1:max_features, :, :);
+    spikes.timestamps = timestamps(1:max_features);
+    spikes.channels = channels(1:max_features);
+    spikes.channel_indices = channel_indices(1:max_features);
     
 end
 

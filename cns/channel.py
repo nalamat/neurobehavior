@@ -666,7 +666,7 @@ class ProcessedMultiChannel(MultiChannel):
     diff_matrix         = Property(depends_on='bad_channels, diff_mode, channels')
 
     filter_freq_lp      = Float(6e3, filter=True)
-    filter_freq_hp      = Float(600, filter=True)
+    filter_freq_hp      = Float(300, filter=True)
     filter_btype        = Enum('highpass', 'bandpass', 'lowpass', None,
                                filter=True)
     filter_order        = Float(8.0, filter=True)

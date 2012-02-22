@@ -1,34 +1,27 @@
 from __future__ import division
 
-import numpy as np
-from enthought.traits.api import HasTraits, Any, Instance, DelegatesTo, \
-        Int, Float, Property, on_trait_change, cached_property, List, Dict
-from enthought.traits.ui.api import View, Item, VGroup, HGroup, InstanceEditor,\
-    VSplit, HSplit, TabularEditor, Group, Include, Tabbed
+from enthought.traits.api import Any, Instance, \
+        Int, Float, Property, on_trait_change, cached_property
+from enthought.traits.ui.api import Item, VGroup, InstanceEditor,\
+    HSplit, TabularEditor, Include, Tabbed
 
 from enthought.enable.api import Component, ComponentEditor
 from abstract_experiment import AbstractExperiment
 
 from enthought.chaco.api import DataRange1D, LinearMapper, \
-        OverlayPlotContainer, LogMapper
+        OverlayPlotContainer
 
 from cns.chaco_exts.channel_range_tool import ChannelRangeTool
 from cns.chaco_exts.channel_data_range import ChannelDataRange
 from cns.chaco_exts.ttl_plot import TTLPlot
 from cns.chaco_exts.timeseries_plot import TimeseriesPlot
-from cns.chaco_exts.channel_plot import ChannelPlot
 from cns.chaco_exts.epoch_plot import EpochPlot
-from cns.chaco_exts.extremes_channel_plot import ExtremesChannelPlot
 from cns.chaco_exts.rms_channel_plot import RMSChannelPlot
-from cns.chaco_exts.timeseries_plot import TimeseriesPlot
 from cns.chaco_exts.helpers import add_default_grids, add_time_axis
-from cns.chaco_exts.channel_range_tool import ChannelRangeTool
 
-from enthought.traits.ui.api import VGroup, Item
+from cns import get_config
+COLORS = get_config('EXPERIMENT_COLORS')
 
-from colors import color_names
-
-from enthought.traits.ui.api import TabularEditor
 from enthought.traits.ui.tabular_adapter import TabularAdapter
 
 class TrialLogAdapter(TabularAdapter):
@@ -69,14 +62,7 @@ class TrialLogAdapter(TabularAdapter):
         return "{0}:{1:02}".format(*divmod(int(seconds), 60))
 
     def _get_bg_color(self):
-        if self.item['ttype'] == 'GO_REMIND':
-            return color_names['dark green']
-        elif self.item['ttype'] == 'GO':
-            return color_names['light green']
-        elif self.item['ttype'] == 'NOGO_REPEAT':
-            return color_names['dark red']
-        elif self.item['ttype'] == 'NOGO':
-            return color_names['light red']
+        return COLORS[self.item['ttype']]
 
     def _get_reaction_image(self):
         if self.item['reaction'] == 'early':

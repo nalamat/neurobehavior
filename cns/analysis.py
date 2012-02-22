@@ -1,15 +1,43 @@
 from __future__ import division
 
-import cPickle as pickle
 import tables
 import numpy as np 
 from scipy import signal
 
-from cns.channel import ProcessedFileMultiChannel
-from cns.arraytools import chunk_samples, chunk_iter
+from .channel import ProcessedFileMultiChannel
+from .arraytools import chunk_samples, chunk_iter
 
-from cns import get_config
+from . import get_config
 default_chunk_size = get_config('CHUNK_SIZE')
+
+def histogram_bins(bin_width, lb, ub):
+    '''
+    Compute the bins.  
+    
+    Numpy, Scipy and Matplotlib (Pylab) all come with histogram functions, but
+    the autogeneration of the bins rarely are what we want them to be.  This
+    makes sure that we get the bins we want.
+    '''
+    bins =  np.arange(lb, ub, bin_width)
+    bins -= bins[np.argmin(np.abs(bins))]
+    return bins
+
+def copy_ts_data(input_node, output_node):
+    '''
+    Copy the behavior data (e.g. trial log, timestamps and epochs) over to the
+    new node.
+    '''
+    to_copy = [('data/trial_log', 'trial_log'),
+               ('data/physiology/epoch', 'physiology_epoch'),
+               ('data/contact/trial_epoch', 'trial_epoch'),
+               ('data/contact/poke_epoch', 'poke_epoch'),
+               ('data/contact/signal_epoch', 'signal_epoch'),
+               ('data/contact/all_poke_epoch', 'all_poke_epoch'),
+               ('data/contact/response_ts', 'response_ts'),
+              ]
+    for (node_path, node_title) in to_copy:
+        node = input_node._f_getChild(node_path)
+        node._f_copy(output_node, newname=node_title)
 
 def median_std(x):
     '''
@@ -35,7 +63,8 @@ def decimate_waveform(input_node, output_node, q, N=4, progress_callback=None,
 
     This code is carefully designed to handle boundary issues when processing
     large datasets in chunks (e.g. stabilizing the edges of each chunk when
-    filtering and extracting the correct samples from each chunk).
+    filtering and extracting the correct samples from each chunk to ensure
+    uniform decimation spacing).
 
     Parameters
     ----------
@@ -122,23 +151,6 @@ def decimate_waveform(input_node, output_node, q, N=4, progress_callback=None,
 
     if include_ts_data:
         copy_ts_data(input_node, output_node)
-
-def copy_ts_data(input_node, output_node):
-    '''
-    Copy the behavior data (e.g. trial log, timestamps and epochs) over to the
-    new node.
-    '''
-    to_copy = [('data/trial_log', 'trial_log'),
-               ('data/physiology/epoch', 'physiology_epoch'),
-               ('data/contact/trial_epoch', 'trial_epoch'),
-               ('data/contact/poke_epoch', 'poke_epoch'),
-               ('data/contact/signal_epoch', 'signal_epoch'),
-               ('data/contact/all_poke_epoch', 'all_poke_epoch'),
-               ('data/contact/response_ts', 'response_ts'),
-              ]
-    for (node_path, node_title) in to_copy:
-        node = input_node._f_getChild(node_path)
-        node._f_copy(output_node, newname=node_title)
 
 def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
                    rej_threshold_stds, processing, window_size=2.1,
@@ -447,6 +459,7 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
         # If the progress callback returns True, end the processing immediately.
         mesg = 'Found {} features'.format(tot_features)
         if progress_callback(i_chunk*c_samples, total_samples, mesg):
+            print 'breaking'
             break
 
     # If the user explicitly requested a cancel, compute the covariance
@@ -463,23 +476,3 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
 
     if include_ts_data:
         copy_ts_data(input_node, output_node)
-
-def update_progress(i, n, mesg):
-    '''
-    Command-line progress bar.  Progress must be a fraction in the range [0, 1].
-    '''
-    import sys
-    max_chars = 60
-    progress = i/n
-    num_chars = int(progress*max_chars)
-    num_left = max_chars-num_chars
-    # The \r tells the cursor to return to the beginning of the line rather than
-    # starting a new line.  This allows us to have a progressbar-style display
-    # in the console window.
-    sys.stdout.write('\r[{}{}] {:.2f}%'.format('#'*num_chars, 
-                                               ' '*num_left,
-                                               progress*100))
-
-if __name__ == '__main__':
-    import sys
-    process_batchfile(sys.argv[1])

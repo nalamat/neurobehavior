@@ -34,8 +34,8 @@ from cns.chaco_exts.channel_range_tool import MultiChannelRangeTool
 from cns.chaco_exts.channel_number_overlay import ChannelNumberOverlay
 from cns.chaco_exts.threshold_overlay import ThresholdOverlay
 
-from experiments.colors import color_names
-from extract_spikes import extract_spikes, median_std, decimate_waveform
+from cns.analysis import extract_spikes, median_std, decimate_waveform
+COLORS = get_config('EXPERIMENT_COLORS')
 
 is_none = lambda x: x is None
 
@@ -133,14 +133,7 @@ class TrialLogAdapter(TabularAdapter):
         return "{0}:{1:02}".format(*divmod(int(seconds), 60))
 
     def _get_bg_color(self):
-        if self.item['ttype'] == 'GO_REMIND':
-            return color_names['dark green']
-        elif self.item['ttype'] == 'GO':
-            return color_names['light green']
-        elif self.item['ttype'] == 'NOGO_REPEAT':
-            return color_names['dark red']
-        elif self.item['ttype'] == 'NOGO':
-            return color_names['light red']
+        return COLORS[self.item['ttype']]
 
     def _get_reaction_image(self):
         if self.item['reaction'] == 'early':
@@ -274,10 +267,13 @@ class PhysiologyReviewController(Controller):
         dialog.open()
         if dialog.return_code != OK:
             return
+        nodepath = get_experiment_node_dialog(dialog.path)
+        if nodepath == '':
+            return
+
+        fh = tables.openFile(dialog.path, 'a', rootUEP=nodepath)
         if info.object.data_node and info.object.data_node._v_file.isopen:
             info.object.data_node._v_file.close()
-        nodepath = get_experiment_node_dialog(dialog.path)
-        fh = tables.openFile(dialog.path, 'a', rootUEP=nodepath)
 
         # Save the information back to the object
         info.object.data_node = fh.root
@@ -322,7 +318,6 @@ class PhysiologyReviewController(Controller):
     def save_settings(self, info):
         settings = info.object.channel_settings
         node = info.object.data_node.data.physiology
-        channel = info.object.channel
 
         # If the channel_metadata table already exists, remove it.
         try:
@@ -350,7 +345,6 @@ class PhysiologyReviewController(Controller):
 
     def load_settings(self, info):
         try:
-            channel = info.object.channel
             table = info.object.data_node.data.physiology.channel_metadata
 
             # This returns a Numpy record array

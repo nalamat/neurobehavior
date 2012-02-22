@@ -1,18 +1,14 @@
-from numpy import clip
-
 from enthought.traits.api import Instance, on_trait_change, Float, Property
-from enthought.traits.ui.api import (View, Item, VGroup, HGroup, HSplit, Tabbed,
-    Include)
+from enthought.traits.ui.api import (Item, VGroup, HSplit, Tabbed, Include)
 from enthought.enable.api import Component, ComponentEditor
-from enthought.chaco.api import DataRange1D, LinearMapper, PlotLabel, \
-        VPlotContainer, PlotAxis, OverlayPlotContainer, Legend, ToolTip
+from enthought.chaco.api import DataRange1D, LinearMapper, \
+        OverlayPlotContainer
 
 from cns.chaco_exts.channel_data_range import ChannelDataRange
 from cns.chaco_exts.channel_plot import ChannelPlot
 from cns.chaco_exts.ttl_plot import TTLPlot
 from cns.chaco_exts.timeseries_plot import TimeseriesPlot
 from cns.chaco_exts.epoch_plot import EpochPlot
-from cns.chaco_exts.dynamic_bar_plot import DynamicBarPlot, DynamicBarplotAxis
 from cns.chaco_exts.helpers import add_default_grids, add_time_axis
 
 from abstract_experiment import AbstractExperiment
@@ -24,7 +20,8 @@ from enthought.traits.ui.api import TabularEditor
 from enthought.traits.ui.tabular_adapter import TabularAdapter
 from enthought.traits.api import *
 
-from colors import color_names
+from cns import get_config
+COLORS = get_config('EXPERIMENT_COLORS')
 
 class TrialLogAdapter(TabularAdapter):
     
@@ -60,15 +57,7 @@ class TrialLogAdapter(TabularAdapter):
         return "{0}:{1:02}".format(*divmod(int(seconds), 60))
 
     def _get_bg_color(self):
-        ttype = self.item['ttype']
-        if ttype == 'NOGO':
-            return color_names['light red']
-        elif ttype == 'NOGO_REPEAT':
-            return color_names['dark red']
-        elif ttype == 'GO_REMIND':
-            return color_names['dark green']
-        elif ttype == 'GO':
-            return color_names['light green']
+        return COLORS[self.item['ttype']]
 
     def _get_contact_score_image(self):
         if self.object.on_spout_seq[-(self.row+1)]:

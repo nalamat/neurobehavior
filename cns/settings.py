@@ -97,3 +97,20 @@ log = logging.getLogger()
 for k, v in sorted(globals().items()):
     if k == k.upper():
         log.debug("CNS SETTING %s : %r", k, v)
+
+COLOR_NAMES = {
+    'light green': '#98FB98',
+    'dark green': '#2E8B57',
+    'light red': '#FFC8CB',
+    'dark red': '#FA8072',
+    'gray': '#D3D3D3',
+    'light blue': '#ADD8E6',
+    'white': '#FFFFFF',
+    }
+
+EXPERIMENT_COLORS  = {
+    'GO_REMIND': COLOR_NAMES['light green'],
+    'GO': COLOR_NAMES['dark green'],
+    'NOGO_REPEAT': COLOR_NAMES['dark red'],
+    'NOGO': COLOR_NAMES['light red'],
+    }

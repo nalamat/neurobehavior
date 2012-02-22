@@ -20,7 +20,7 @@ function [spikes] = import_ums2000(filename, sort, varargin)
 %   As a convenience feature, the filename of the source data (with the
 %   extension stripped) is provided as spikes.base_filename so you can quickly
 %   append your desired extension when saving the data.  It's probably good
-%   practice to keep naming consistent.
+%   practice to keep file naming consistent.
 
     % Load the spike waveform data
     spikes = import_spikes(filename, varargin{:});
@@ -54,7 +54,17 @@ function [spikes] = import_ums2000(filename, sort, varargin)
     window_samples = spikes.info.detect.window_samples;
     
     spikes.info.detect.stds = stds(extract_indices);
-    spikes.info.detect.thresh = thresh(extract_indices);
+    
+    % UMS2000 requires that the maximum amplitude of the spike be in the
+    % negative direction (for the alignment procedure).  If the spike was
+    % detected using a positive threhsold, then we need to flip around the
+    % waveform so that it is negative.
+    thresh = thresh(extract_indices);
+    spikes.info.detect.thresh = thresh;
+    
+    % Two negatives make a positive (i.e. if threhsold is negative, don't
+    % flip).
+    spikes.waveforms = spikes.waveforms .* (sign(thresh) .* -1);
     
     % We need to pull out only the covariance data we need.wave
     cov_samples = length(extract_indices) * window_samples;

@@ -35,12 +35,12 @@ def rcount(sequence):
     return i
 
 def dprime(n_nogo, n_go, n_fa, n_hit, clip=0.01):
-    '''Computes d' given number of safes, warns, false alarms and hits.
-    Primarily a utility function for scripting.
+    '''
+    Computes d' given number of safes, warns, false alarms and hits.
 
-    This implements the algorithm described in Macmillan & Creelman (2004,
-    p.21), particularly for edge cases where observed hits and/or misses are
-    zero. This assumes a go-nogo paradigm.
+    Primarily a utility function for scripting.  This implements the algorithm
+    described in Macmillan & Creelman (2004, p.21), particularly for edge cases
+    where observed hits and/or misses are zero. This assumes a go-nogo paradigm.
     
     Parameters
     ==========
