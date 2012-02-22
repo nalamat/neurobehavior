@@ -3,10 +3,9 @@ from cns.data import io
 from cns.widgets.handler import FileHandler, filehandler_menubar
 from enthought.pyface.api import YES, confirm
 from enthought.traits.api import HasTraits, Button, Instance, Event, \
-    on_trait_change, Property, File, Bool, Str, List
+    on_trait_change, File, Bool, Str
 from enthought.traits.ui.api import View, HGroup, Item, VGroup, spring, \
-    InstanceEditor, Group, TableEditor, ObjectColumn
-from enthought.traits.ui.tabular_adapter import TabularAdapter
+    Group, TableEditor, ObjectColumn
 
 from cns import get_config
 import logging
