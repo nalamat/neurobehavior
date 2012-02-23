@@ -34,31 +34,31 @@ class PositiveStage1Experiment(AbstractExperiment):
                 padding=50, spacing=50)
 
         # SIGNAL
-        plot = TTLPlot(channel=self.data.signal_TTL,
+        plot = TTLPlot(source=self.data.signal_TTL,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(0, 1, 0, 0.5), rect_height=0.2, rect_center=0.9)
         container.add(plot)
 
         # PUMP
-        plot = TTLPlot(channel=self.data.pump_TTL,
+        plot = TTLPlot(source=self.data.pump_TTL,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(0, 0, 1, 0.5), rect_height=0.2, rect_center=0.7)
         container.add(plot)
 
         # SPOUT
-        plot = TTLPlot(channel=self.data.spout_TTL, reference=0,
+        plot = TTLPlot(source=self.data.spout_TTL, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(1, 1, 1, 0.5), rect_height=0.2, rect_center=0.5)
         container.add(plot)
 
         # OVERRIDE
-        plot = TTLPlot(channel=self.data.override_TTL, reference=0,
+        plot = TTLPlot(source=self.data.override_TTL, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(1, 0, 0, 0.5), rect_height=0.2, rect_center=0.3)
         container.add(plot)
 
         # FREE RUN
-        plot = TTLPlot(channel=self.data.free_run_TTL, reference=0,
+        plot = TTLPlot(source=self.data.free_run_TTL, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(1, 0, 0, 0.5), rect_height=0.2, rect_center=0.1)
         container.add(plot)
@@ -79,7 +79,7 @@ class PositiveStage1Experiment(AbstractExperiment):
         # set up microphone plot
         value_range = DataRange1D(low_setting=0, high_setting=80)
         value_mapper = LinearMapper(range=value_range)
-        plot = RMSChannelPlot(channel=self.data.microphone,
+        plot = RMSChannelPlot(source=self.data.microphone,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 line_color=(0, 0, 0, 0.25))
         self.microphone_plot = plot
