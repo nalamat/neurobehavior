@@ -3,7 +3,7 @@ from __future__ import division
 from enthought.traits.api import Any, Instance, \
         Int, Float, Property, on_trait_change, cached_property
 from enthought.traits.ui.api import Item, VGroup, InstanceEditor,\
-    HSplit, TabularEditor, Include, Tabbed
+    HSplit, TabularEditor, Include, Tabbed, ShellEditor
 
 from enthought.enable.api import Component, ComponentEditor
 from abstract_experiment import AbstractExperiment
@@ -215,6 +215,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
                 width=1000, height=300),
             Include('analysis_plot_group'),
             show_labels=False,
+            label='Experiment overview',
             )
 
     traits_group = HSplit(
@@ -232,7 +233,15 @@ class AbstractPositiveExperiment(AbstractExperiment):
                     ),
                 show_labels=False,
             ),
-            Include('plots_group'),
+            Tabbed(
+                Include('plots_group'),
+                # Handler is a reference to the controller class.  In this case,
+                # the subclass AbstractPositiveController defined in the
+                # paradigm file.
+                Item('handler.shell_variables', editor=ShellEditor(),
+                     label='Python shell'),
+                show_labels=False,
+                ),
             VGroup(
                 VGroup(
                     Item('object.data.global_fa_frac', label='Mean FA (frac)'),

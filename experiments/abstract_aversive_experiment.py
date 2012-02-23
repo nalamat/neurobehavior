@@ -1,5 +1,6 @@
 from enthought.traits.api import Instance, on_trait_change, Float, Property
-from enthought.traits.ui.api import (Item, VGroup, HSplit, Tabbed, Include)
+from enthought.traits.ui.api import (Item, VGroup, HSplit, Tabbed, Include,
+        ShellEditor)
 from enthought.enable.api import Component, ComponentEditor
 from enthought.chaco.api import DataRange1D, LinearMapper, \
         OverlayPlotContainer
@@ -153,10 +154,16 @@ class AbstractAversiveExperiment(AbstractExperiment):
                     ),
                 show_labels=False,
                 ),
-            VGroup(
-                Item('experiment_plot', editor=ComponentEditor(),
-                    show_label=False, width=1000, height=150),
-                Include('analysis_plot_group'),
+            Tabbed(
+                VGroup(
+                    Item('experiment_plot', editor=ComponentEditor(),
+                        show_label=False, width=1000, height=150),
+                    Include('analysis_plot_group'),
+                    show_labels=False,
+                    label='Experiment overview'
+                    ),
+                Item('handler.shell_variables', editor=ShellEditor(), 
+                    label='Python shell'),
                 show_labels=False,
                 ),
             Tabbed(

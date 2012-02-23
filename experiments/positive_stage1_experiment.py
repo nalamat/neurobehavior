@@ -1,5 +1,6 @@
 from enthought.traits.api import Instance, Any, DelegatesTo
-from enthought.traits.ui.api import View, HGroup, HSplit, VGroup, Item
+from enthought.traits.ui.api import (View, HGroup, HSplit, VGroup, Item, Tabbed,
+        ShellEditor)
 
 from enthought.enable.api import Component, ComponentEditor
 from enthought.chaco.api import DataRange1D, LinearMapper, \
@@ -113,8 +114,13 @@ class PositiveStage1Experiment(AbstractExperiment):
                     Item('paradigm', style='custom'),
                     show_labels=False,
                     ),
-                Item('contact_plot', editor=ComponentEditor(),
-                    show_label=False, width=600, height=600),
+                Tabbed(
+                    Item('contact_plot', editor=ComponentEditor(),
+                        width=600, height=600, label='Experiment overview'),
+                    Item('handler.shell_variables', editor=ShellEditor(),
+                        label='Python shell'),
+                    show_labels=False,
+                    ),
                 ),
             resizable=True,
             close_result=False,

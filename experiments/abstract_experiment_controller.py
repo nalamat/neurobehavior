@@ -131,6 +131,11 @@ class AbstractExperimentController(Controller):
     variable from the paradigm.
     """
 
+    shell_variables = Dict
+
+    def _shell_variables_default(self):
+        return dict(controller=self)
+
     toolbar = Instance(ExperimentToolBar, (), toolbar=True)
     
     state = Enum('halted', 'paused', 'running', 'manual', 'disconnected',
