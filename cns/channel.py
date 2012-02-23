@@ -93,6 +93,9 @@ class FileMixin(HasTraits):
     name                = String('FileChannel', transient=True)
     _buffer             = Instance(tables.array.Array, transient=True)
 
+    def get_samples(self):
+        return self._buffer.shape[-1]
+
     @classmethod
     def from_node(cls, node, **kwargs):
         '''
@@ -652,7 +655,16 @@ class MultiChannel(Channel):
 
     def get_range(self, start, end, reference=None, channels=None):
         lb, ub = self._to_bounds(start, end, reference)
-        return self[channels, lb:ub]
+        samples = self.get_samples()
+        if ub > samples:
+            ub = samples
+        if lb == ub:
+            chunk = np.array([])
+            chunk.shape = self._get_shape()
+            chunk = chunk[channels]
+        else:
+            chunk = self[channels, lb:ub]
+        return chunk
 
 class ProcessedMultiChannel(MultiChannel):
     '''
