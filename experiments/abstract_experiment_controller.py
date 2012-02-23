@@ -476,7 +476,6 @@ class AbstractExperimentController(Controller):
             PARADIGM_ROOT = get_config('PARADIGM_ROOT')
             PARADIGM_WILDCARD = get_config('PARADIGM_WILDCARD')
             instance = load_instance(PARADIGM_ROOT, PARADIGM_WILDCARD)
-            print instance
             if instance is not None:
                 self.model.paradigm.copy_traits(instance)
         except AttributeError, e:
@@ -629,9 +628,6 @@ class AbstractExperimentController(Controller):
         pending_expressions stack.  Additional context variables may be
         evaluated as needed.
         '''
-        print self.current_context
-        print self.pending_expressions
-        
         try:
             return self.current_context[name]
         except:
