@@ -2,8 +2,11 @@ from os.path import join
 from cns import get_config
 from cns.pipeline import deinterleave_bits
 from abstract_experiment_controller import AbstractExperimentController
+from enthought.traits.api import Any
 
 class PositiveStage1Controller(AbstractExperimentController):
+
+    pipeline_TTL = Any
 
     def setup_experiment(self, info):
         circuit = join(get_config('RCX_ROOT'), 'positive-behavior-stage1')
