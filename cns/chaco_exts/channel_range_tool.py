@@ -1,6 +1,5 @@
-from enthought.traits.api import Float, Instance, on_trait_change, Bool
+from traits.api import Float, on_trait_change, Bool, Instance, Enum, DelegatesTo
 from enthought.enable.api import BaseTool, KeySpec
-#from enthought.chaco.tools.tool_history_mixin import ToolHistoryMixin
 
 class ChannelRangeTool(BaseTool):
 
@@ -14,13 +13,12 @@ class ChannelRangeTool(BaseTool):
     index_factor = Float(1.5)
     value_factor = Float(1.5)
 
-    # I've been having trouble getting this to work
+    reset_trig_delay_key = Instance(KeySpec, args=("0",))
+    drag_mode = Enum('trig_delay', 'trigger')
 
-    #reset_trig_delay_key = Instance(KeySpec, args=("0",))
-
-    #def normal_key_pressed(self, event):
-    #    if self.reset_trig_delay_key.match(event):
-    #        self.component.index_mapper.range.trig_delay = 0
+    def normal_key_pressed(self, event):
+        if self.reset_trig_delay_key.match(event):
+            self.component.index_mapper.range.trig_delay = 0
 
     def normal_mouse_enter(self, event):
         if self.component._window is not None:
@@ -36,8 +34,14 @@ class ChannelRangeTool(BaseTool):
 
     def normal_left_down(self, event):
         if self.allow_drag:
+            range = self.component.index_mapper.range
+            if event.control_down:
+                self.drag_mode = 'trig_delay'
+                self._start_delay = range.trig_delay
+            else:
+                self.drag_mode = 'trigger'
             self._start_data_x = event.x
-            self._start_delay = self.component.index_mapper.range.trig_delay
+            self._start_value = getattr(range, self.drag_mode)
             self.event_state = "panning"
             event.window.set_pointer("hand")
             event.window.set_mouse_owner(self, event.net_transform())
@@ -47,8 +51,13 @@ class ChannelRangeTool(BaseTool):
         delta_screen = event.x-self._start_data_x
         data_0 = self.component.index_mapper.map_data(0)
         data_d = self.component.index_mapper.map_data(delta_screen)
-        new_delay = self._start_delay+data_d-data_0
-        self.component.index_mapper.range.trig_delay = new_delay
+        delta_data = data_d-data_0
+
+        range = self.component.index_mapper.range
+        if self.drag_mode == 'trig_delay':
+            range.trig_delay = self._start_value+delta_data
+        else:
+            range.trigger = self._start_value-delta_data
 
     def zoom_index(self, event):
         if event.mouse_wheel < 0:
