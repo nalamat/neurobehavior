@@ -30,7 +30,7 @@ logging_config = {
             'console': {
                 'class': 'logging.StreamHandler',
                 'formatter': 'simple',
-                'level': 'CRITICAL',
+                'level': 'DEBUG',
                 },
             # This is what gets saved to the file
             'file': {

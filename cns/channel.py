@@ -9,8 +9,8 @@
 '''
 
 from enthought.traits.api import HasTraits, Property, Array, Int, Event, \
-    Instance, on_trait_change, Bool, Any, String, Float, cached_property, List, Str, \
-    DelegatesTo, Enum, Dict, Set
+    Instance, on_trait_change, Bool, Any, String, Float, cached_property, \
+    Enum, Set
 import numpy as np
 import tables
 from scipy import signal
@@ -92,9 +92,6 @@ class FileMixin(HasTraits):
     node                = Instance(tables.group.Group, transient=True)
     name                = String('FileChannel', transient=True)
     _buffer             = Instance(tables.array.Array, transient=True)
-
-    def get_samples(self):
-        return self._buffer.shape[-1]
 
     @classmethod
     def from_node(cls, node, **kwargs):
@@ -234,29 +231,28 @@ class FileMixin(HasTraits):
 class Timeseries(HasTraits):
 
     updated = Event
-    fs = Float(attr=True)
-    t0 = Float(0, attr=True)
+    fs      = Float(attr=True)
+    t0      = Float(0, attr=True)
 
     def send(self, timestamps):
         self.append(timestamps)
         self.updated = np.array(timestamps)/self.fs
 
     def get_range(self, lb, ub):
-        timestamps = self._buffer.read()
+        ts = self._buffer.read()
         ilb = int(lb*self.fs)
         iub = int(ub*self.fs)
-        mask = (timestamps>=ilb) & (timestamps<iub)
-        return timestamps[mask]/self.fs
+        mask = (ts>=ilb) & (ts<iub)
+        return ts[mask]/self.fs
 
     def latest(self):
         if len(self._buffer) > 0:
             return self._buffer[-1]/self.fs
         else:
-            # TODO: This should be np.nan
-            return self.t0
+            np.nan
 
-    def __getitem__(self, key):
-        return self._buffer[key]/self.fs
+    def __getitem__(self, slice):
+        return self._buffer[slice]/self.fs
 
     def __len__(self):
         return len(self._buffer)
@@ -328,9 +324,9 @@ class Channel(HasTraits):
     changed
         The underlying dataset has changed, but the time-range has not.
 
-    In general, the changed event roughly corresponds to changes in the Y-axis
-    (i.e. the signal) while added roughly corresponds to changes in the X-axis
-    (i.e.  addition of additional samples).
+    The changed event roughly corresponds to changes in the Y-axis (i.e. the
+    signal) while added roughly corresponds to changes in the X-axis (i.e.
+    addition of additional samples).
     '''
 
     # Sampling frequency of the data stored in the buffer
@@ -351,7 +347,7 @@ class Channel(HasTraits):
 
     def __getitem__(self, slice):
         '''
-        Delegates to the __getitem__ method on the buffer
+        Delegates to the __getitem__ method on the underlying buffer
 
         Subclasses can add additional data preprocessing by overriding this
         method.  See `ProcessedFileMultiChannel` for an example.
@@ -441,30 +437,6 @@ class Channel(HasTraits):
         lb, ub = self._to_bounds(start, end, reference)
         return self[..., lb:ub]
 
-    #def get_recent_range(self, start, end=0):
-    #    '''
-    #    Returns a subset of the range, with start and end referenced to the most
-    #    recent sample.
-
-    #    Parameters
-    #    ==========
-    #    start
-    #        Start time
-    #    end
-    #        End time
-    #    '''
-    #    lb = min(-1, int(start*self.fs))
-    #    ub = min(-1, int(end*self.fs))
-    #    # This check is necessary to avoid raising an error in the HDF5
-    #    # (PyTables?) library if it attempts to slice an empty array.
-    #    if len(self._buffer) == 0:
-    #        signal = np.array([])
-    #    else:
-    #        signal = self._buffer[..., lb:ub]
-    #    ub_time = ub/self.fs
-    #    lb_time = ub_time-signal.shape[-1]/self.fs
-    #    return signal, lb_time, ub_time
-
     def get_size(self):
         return self._buffer.shape[-1]
 
@@ -510,7 +482,6 @@ class Channel(HasTraits):
         # contact during the interval [n+lb_index, n+ub_index).
         lb_index = self.to_samples(offset)
         ub_index = self.to_samples(offset+duration)
-        result = []
 
         # Variable ts is the sample number at which the trial began and is a
         # multiple of the contact sampling frequency.
@@ -535,7 +506,7 @@ class Channel(HasTraits):
 
 class FileChannel(FileMixin, Channel):
     '''
-    Use a HDF5 datastore for saving the channel
+    Uses a HDF5 datastore for the buffer
     '''
 
     name  = 'FileChannel'
@@ -655,16 +626,7 @@ class MultiChannel(Channel):
 
     def get_range(self, start, end, reference=None, channels=None):
         lb, ub = self._to_bounds(start, end, reference)
-        samples = self.get_samples()
-        if ub > samples:
-            ub = samples
-        if lb == ub:
-            chunk = np.array([])
-            chunk.shape = self._get_shape()
-            chunk = chunk[channels]
-        else:
-            chunk = self[channels, lb:ub]
-        return chunk
+        return self[channels, lb:ub]
 
 class ProcessedMultiChannel(MultiChannel):
     '''
