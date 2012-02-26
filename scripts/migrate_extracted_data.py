@@ -1,4 +1,6 @@
+import argparse
 import tables
+from glob import glob
 
 blocks = (
     'physiology_epoch', 
@@ -65,9 +67,19 @@ def main(filename):
         
         try:
             fh.root.filter_a._f_move(filter_node, 'a_coefficients')
+        except AttributeError:
+            pass
+
+        try:
             fh.root.filter_b._f_move(filter_node, 'b_coefficients')
         except AttributeError:
             pass
+
+        try:
+            fh.root.differential._f_move(filter_node, 'differential')
+        except AttributeError:
+            pass
+
 
         for attr in filt_attrs:
             try:
@@ -132,6 +144,26 @@ def main(filename):
         except KeyError:
             pass
 
+        if 'timestamps_n' not in event_node:
+            node = event_node.timestamps
+            node._f_rename('timestamps_n')
+            ts = node[:] / node._v_attrs['fs']
+            fh.createArray(event_node, 'timestamps', ts)
+
 if __name__ == '__main__':
-    import sys
-    main(sys.argv[1])
+    class GlobPath(argparse.Action):
+
+        def __call__(self, parser, args, values, option_string=None):
+            filenames = []
+            for filename in values:
+                filenames.extend(glob(filename))
+            setattr(args, self.dest, filenames)
+
+    parser = argparse.ArgumentParser(description='Reformat extracted file')
+    parser.add_argument('files',  nargs='+', action=GlobPath, 
+                        help='Files to decimate')
+    args = parser.parse_args()
+
+    for filename in args.files:
+        main(filename)
+        print 'Processed {}'.format(filename)
