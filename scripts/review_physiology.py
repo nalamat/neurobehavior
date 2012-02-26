@@ -515,7 +515,7 @@ class PhysiologyReviewController(Controller):
 
         # Get the output filename from the user
         dialog = FileDialog(action="open", 
-                            wildcard='HDF5 file (*.hd5)|*.hd5|',
+                            wildcard='HDF5 file (*_extracted.hd5)|*_extracted.hd5|',
                             default_path=filename)
         dialog.open()
         if dialog.return_code != OK:
