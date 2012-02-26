@@ -1,5 +1,6 @@
 function [ spikes ] = import_chronux( filename )
-
+%   Neurobehavior by Buran BN and Sanes DH
+%   
 %   IMPORT_CHRONUX Load spike waveforms from HDF5 file into Matlab
 %
 %   filename : string

@@ -38,13 +38,8 @@ function [spikes] = import_spikes(filename, varargin)
 %           do not reject any event
 %       Keep in mind that you have access to the waveforms so you can
 %       perform your own reject algorithm
-%   % DEPRECATED
-%   %omit_prepost : boolean (default true)
-%   %    Needs a better name for the variable.  Indicates whether to omit
-%   %    features that occur before the start or after the end of the
-%   %    experiment (i.e. from the start timestamp of the first trial to the
-%   %    end timestamp of the last trial).
 %   trial_mask : Empty or length 2 ()
+%       TODO expound on this
 %   max_features : integer (default inf)
 %       Maximum number of features to return (useful for debugging since
 %       the clustering algorithms can often be slow when working with a
@@ -164,20 +159,6 @@ function [spikes] = import_spikes(filename, varargin)
         artifact_mask = zeros(1, length(waveforms));
     end
     
-    % Now, trim the result down if requested
-    %if omit_prepost, 
-    %    epochs = double(h5read(filename, '/physiology_epoch'));
-    %    start = find(timestamps >= epochs(1, 1), 1, 'first');
-    %    stop = find(timestamps < epochs(end, end), 1, 'last');
-    %else
-    %    start = 1;
-    %    stop = length(timestamps);
-    %end
-    %if (stop+start) > max_features,
-    %    % Ugly Matlab 1-based indexing issue
-    %    stop = max_features+start-1;
-    %end
-
     if length(trial_range) == 2, 
         lb = range(1);
         ub = range(2);
