@@ -1,6 +1,6 @@
 from __future__ import division
 
-from enthought.traits.api import Instance, on_trait_change
+from enthought.traits.api import Instance
 
 import numpy as np
 from extremes_channel_plot import ExtremesChannelPlot

@@ -1,18 +1,19 @@
 from __future__ import division
 
-import numpy as np
 from enthought.chaco.api import DataRange1D
-from enthought.traits.api import Float, List, Instance, Enum, Int
+from enthought.traits.api import Float, List, Instance, Enum
 
 class ChannelDataRange(DataRange1D):
 
     sources         = List(Instance('cns.channel.Channel'))
-    timeseries      = Instance('cns.channel.Timeseries')
     span            = Float(20)
     trig_delay      = Float(5)
-    update_mode     = Enum('auto', 'auto full', 'triggered', 'triggered full')
-    trigger         = Int(-1)
+    trigger         = Float(0)
+    update_mode     = Enum('auto', 'auto full', 'triggered')
     scroll_period   = Float(20)
+
+    def _trigger_changed(self):
+        self.refresh()
 
     def _span_changed(self):
         self.refresh()
@@ -40,37 +41,16 @@ class ChannelDataRange(DataRange1D):
             high_value = (spans+1)*span-self.trig_delay
             low_value = high_value-span
         elif self.update_mode == 'auto full':
-            # Don't update the bounds until we have a full span of data to display
+            # Don't update the bounds until we have a full span of data to
+            # display
             spans = self.get_max_time()//span
             high_value = spans*span-self.trig_delay
             low_value = high_value-span
         elif self.update_mode == 'triggered':
             # We want the lower bound of the range to be referenced to the
             # trigger itself.
-            #low_value = self.timeseries.latest()-self.trig_delay
-            try:
-                low_value = self.timeseries[self.trigger]-self.trig_delay
-            except:
-                low_value = -self.trig_delay
+            low_value = self.trigger-self.trig_delay
             high_value = low_value+span
-        elif self.update_mode == 'triggered full':
-            # We want the lower bound of the range to be referenced to the
-            # trigger, but we don't want it to update until we have collected
-            # enough data to display across the full span of the plot.
-            max_time = self.get_max_time()
-            index = -1
-            try:
-                # Keep searching through the timestamps until we find one that
-                # is within the range we want
-                while True:
-                    ts = self.timeseries[index]
-                    high_value = ts+span
-                    if high_value < self.get_max_time():
-                        break
-                    index -= 1
-            except IndexError:
-                high_value = self.timeseries.t0
-            low_value = high_value-span-self.trig_delay
 
         # Important!  Don't update the values unless they are different.
         # Needlessly updating these values results in excessive screen redraws,
@@ -97,7 +77,7 @@ class ChannelDataRange(DataRange1D):
 
     def _timeseries_changed(self, old, new):
         if old is not None:
-            old.on_trait_change(self.refresh, 'updated', remove=true)
+            old.on_trait_change(self.refresh, 'updated', remove=True)
         if new is not None:
             new.on_trait_change(self.refresh, 'updated')
         self.refresh()

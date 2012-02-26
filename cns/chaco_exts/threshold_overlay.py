@@ -1,9 +1,7 @@
-import numpy as np
-from enthought.enable.api import MarkerTrait, ColorTrait
+from enthought.enable.api import ColorTrait
 from enthought.chaco.api import AbstractOverlay
-from enthought.chaco.scatterplot import render_markers
 from enthought.traits.api import (Instance, Property, cached_property, Int,
-        Float, List, Bool, DelegatesTo, on_trait_change)
+        Float, List, Bool, on_trait_change)
 from enthought.traits.ui.api import View, VGroup, Item
 
 class ThresholdOverlay(AbstractOverlay):

@@ -4,10 +4,11 @@ from enthought.chaco.api import AbstractOverlay
 from enthought.traits.api import Instance, Any, Int
 from enthought.traits.ui.api import View, Item, VGroup
 
-class SpikeOverlay(AbstractOverlay):
+class ExtractedSpikeOverlay(AbstractOverlay):
 
     plot = Instance('enthought.enable.api.Component')
-    spikes = Any
+    timestamps = Any
+    channels = Any
 
     marker = MarkerTrait('inverted_triangle')
     marker_size = Int(5)
@@ -26,8 +27,7 @@ class SpikeOverlay(AbstractOverlay):
                 gc.set_stroke_color(self.line_color_)
 
                 for o, n in zip(plot.screen_offsets, plot.channel_visible):
-                    spikes = self.spikes[n]
-                    ts = spikes.timestamps[:]/spikes.fs
+                    ts = self.timestamps[self.channels == n]
                     ts_offset = np.ones(len(ts))*o
                     ts_screen = plot.index_mapper.map_screen(ts)
                     points = np.column_stack((ts_screen, ts_offset))
