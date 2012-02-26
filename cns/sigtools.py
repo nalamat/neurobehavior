@@ -197,21 +197,21 @@ def normalize_rms(waveform, out=None):
 
 def filter_response(b, a, fs, axes_magnitude=None, axes_phase=None):
     # We need to keep the import inside here because a lot of GUI applications
-    # based on PyQt may want to use Neurogen, and Matplotlib currently does nto
-    # play well with hese applications
-    from pylab import figure, show
+    # based on PyQt may want to use Neurogen, and Matplotlib currently does not
+    # play well with these applications
+    from pylab import figure
     w, h = signal.freqz(b, a)
     f = w*0.5*fs/np.pi
 
     if axes_magnitude is None and axes_phase is None:
         fig = figure()
         axes_magnitude = fig.add_subplot(211)
-        axis_phase = fig.add_subplot(212)
+        axes_phase = fig.add_subplot(212)
 
     if axes_magnitude is not None:
         axes_magnitude.semilogx(f, 20*np.log10(np.abs(h)))
     if axes_phase is not None:
-        s.semilogx(f, np.unwrap(np.angle(h)))
+        axes_phase.semilogx(f, np.unwrap(np.angle(h)))
 
 def rfft(signal, fs):
     N = len(signal)
@@ -226,7 +226,7 @@ def signal_spectrum(signal, fs, reference=1, axes_magnitude=None,
     # We need to keep the import inside here because a lot of GUI applications
     # based on PyQt may want to use Neurogen, and Matplotlib currently does nto
     # play well with hese applications
-    from pylab import gcf, show
+    from pylab import gcf
     freq, force, phase = rfft(signal, fs)
 
     if plot_kw is None:

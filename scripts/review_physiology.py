@@ -33,6 +33,7 @@ from cns.chaco_exts.ttl_plot import TTLPlot
 from cns.chaco_exts.channel_range_tool import MultiChannelRangeTool
 from cns.chaco_exts.channel_number_overlay import ChannelNumberOverlay
 from cns.chaco_exts.threshold_overlay import ThresholdOverlay
+from cns.chaco_exts.extracted_spike_overlay import ExtractedSpikeOverlay
 
 from cns.analysis import extract_spikes, median_std, decimate_waveform
 COLORS = get_config('EXPERIMENT_COLORS')
@@ -343,47 +344,65 @@ class PhysiologyReviewController(Controller):
             table._v_attrs[k] = v
         information(info.ui.control, "Saved settings to file")
 
+    def _load_settings(self, info, table_node):
+        # This returns a Numpy record array
+        records = table_node.read()
+
+        # First, get a list of the traits in the ChannelSetting object that
+        # we need to set.  Some of the traits cannot be set directly (e.g.
+        # the "Property" traits such as artifact_threshold are dynamically
+        # computed since they are derived from other traits in the class),
+        # so we need to ensure we only pull out the "editable" traits from
+        # the channel_metadata table.  Furthermore, I may have added new
+        # columns in future revisions of the program that are not present in
+        # the saved channel_metadat atable.  To ensure
+        # backward-compatibility, we only load the columns that are present
+        # in table.cols.
+        traits = ChannelSetting.class_trait_names(transient=is_none)
+        traits = list(np.intersect1d(traits, table_node.colnames))
+
+        # Pull out the columns from the record array 
+        records = records[traits]
+
+        # Now, create a list of channelsetting objects!
+        settings = []
+        for record in records:
+            kwargs = dict(zip(traits, record))
+            setting = ChannelSetting(**kwargs)
+            settings.append(setting)
+        info.object.channel_settings = settings
+
+        # Now, load!
+        info.object.trait_set(table_node._v_attrs)
+
     def load_settings(self, info):
         try:
             table = info.object.data_node.data.physiology.channel_metadata
-
-            # This returns a Numpy record array
-            records = table.read()
-
-            # First, get a list of the traits in the ChannelSetting object that
-            # we need to set.  Some of the traits cannot be set directly (e.g.
-            # the "Property" traits such as artifact_threshold are dynamically
-            # computed since they are derived from other traits in the class),
-            # so we need to ensure we only pull out the "editable" traits from
-            # the channel_metadata table.  Furthermore, I may have added new
-            # columns in future revisions of the program that are not present in
-            # the saved channel_metadat atable.  To ensure
-            # backward-compatibility, we only load the columns that are present
-            # in table.cols.
-            traits = ChannelSetting.class_trait_names(transient=is_none)
-            traits = list(np.intersect1d(traits, table.colnames))
-
-            # Pull out the columns from the record array 
-            records = records[traits]
-
-            # Now, create a list of channelsetting objects!
-            settings = []
-            for record in records:
-                kwargs = dict(zip(traits, record))
-                setting = ChannelSetting(**kwargs)
-                settings.append(setting)
-            info.object.channel_settings = settings
-
-            # Now, load!
-            info.object.trait_set(table._v_attrs)
-
+            self._load_settings(info, table)
         except (AttributeError):
             # The errors mean that we haven't saved settings information to this
-            # node yet.  Revert all settings back to default.
+            # node yet.  Revert all settings back to default (silently).
             self.default_settings(info)
         except (KeyError):
-            # Some additional metadata may be missing
-            pass
+            information("Unable to load saved settings")
+            self.default_settings(info)
+
+    def copy_settings(self, info):
+        dialog = FileDialog(action="open", 
+                            wildcard='HDF5 file (*.hd5)|*.hd5|')
+        dialog.open()
+        if dialog.return_code != OK:
+            return
+        nodepath = get_experiment_node_dialog(dialog.path)
+        if nodepath == '':
+            return
+
+        try:
+            fh = tables.openFile(dialog.path, 'r', rootUEP=nodepath)
+            table = fh.root.data.physiology.channel_metadata
+            self._load_settings(info, table)
+        except:
+            information("Unable to copy settings")
 
     def default_settings(self, info):
         reset = ['freq_lp', 'freq_hp', 'filter_order', 'diff_mode']
@@ -476,13 +495,39 @@ class PhysiologyReviewController(Controller):
 
             # Define a function that, when called, updates the dialog ... 
             dialog.open()
+
             def callback(samples, max_samples, mesg):
+                if samples == max_samples:
+                    dialog.close()
                 dialog.change_message(mesg)
                 cont, skip = dialog.update(samples)
                 return not cont
             
             # Run the extraction script
             extract_spikes(progress_callback=callback, **kwargs)
+
+    def overlay_extracted_spikes(self, info):
+        # Suggest a filename based on the filename of the original file (to make
+        # it easier for the user to just click "OK").
+        filename = info.object.data_node._v_file.filename
+        filename = re.sub(r'(.*)\.(h5|hd5|hdf5)', r'\1_extracted.\2',
+                          filename)
+
+        # Get the output filename from the user
+        dialog = FileDialog(action="open", 
+                            wildcard='HDF5 file (*.hd5)|*.hd5|',
+                            default_path=filename)
+        dialog.open()
+        if dialog.return_code != OK:
+            return
+
+        with tables.openFile(dialog.path, 'r') as fh:
+            timestamps = fh.root.event_data.timestamps[:]
+            channels = fh.root.event_data.channels[:]-1
+            overlay = ExtractedSpikeOverlay(timestamps=timestamps,
+                                            channels=channels,
+                                            plot=info.object.channel_plot)
+            info.object.channel_plot.overlays.append(overlay)
 
     def _prepare_decimation_settings(self, info):
         kwargs = {}
@@ -598,7 +643,8 @@ class PhysiologyReview(HasTraits):
     channel             = Instance('cns.channel.ProcessedMultiChannel', (),
                                    transient=True)
 
-    plot                = Instance(Component, transient=True)
+    plot_container      = Instance(Component, transient=True)
+    channel_plot        = Instance(Component, transient=True)
     channel_settings    = List(Instance(ChannelSetting))
     plot_settings       = List(Instance(PlotSetting), transient=True)
     trial_data          = Any(transient=True)
@@ -628,6 +674,10 @@ class PhysiologyReview(HasTraits):
     # Region used to compute the noise floor 
     std_lb              = Int(-1, setting=True) # lower bound (in samples)
     std_ub              = Int(-1, setting=True) # upper bound (in samples)
+
+    # What to show
+    artifact_overlay_visible = Bool(True)
+    threshold_overlay_visible = Bool(True)
 
     def _trial_data_default(self):
         return []
@@ -662,10 +712,10 @@ class PhysiologyReview(HasTraits):
         self._update_plot()
 
     def _index_range_default(self):
-        return ChannelDataRange(span=6, trig_delay=0)
+        return ChannelDataRange(span=6, update_mode='triggered')
 
     def _current_trial_changed(self, trial):
-        self.index_range.trig_delay = -trial['start']
+        self.index_range.trigger = trial['start']
 
     def _get_visible_channels(self):
         channels = self.channel_settings
@@ -726,7 +776,7 @@ class PhysiologyReview(HasTraits):
                 container.add(plot)
                 setting = PlotSetting(plot=plot, name=name)
                 self.plot_settings.append(setting)
-            except AttributeError, e:
+            except AttributeError:
                 print '{} does not exist'.format(name)
 
         # Add the multichannel neurophysiology to the container.  This is done
@@ -746,6 +796,7 @@ class PhysiologyReview(HasTraits):
         # Show what channels are displayed
         overlay = ChannelNumberOverlay(plot=plot)
         plot.overlays.append(overlay)
+        self.channel_plot = plot
 
         # Add the plot to the container (otherwise it won't be shown at all)
         container.add(plot)
@@ -761,6 +812,7 @@ class PhysiologyReview(HasTraits):
         self.sync_trait('thresholds', overlay, 'sort_thresholds', mutual=False)
         self.sync_trait('extract_channels', overlay, 'sort_channels',
                         mutual=False)
+        self.sync_trait('threshold_overlay_visible', overlay, 'visible')
         plot.overlays.append(overlay)
 
         overlay = ThresholdOverlay(plot=plot, sort_signs=[False]*16,
@@ -769,14 +821,22 @@ class PhysiologyReview(HasTraits):
                         mutual=False)
         self.sync_trait('extract_channels', overlay, 'sort_channels',
                         mutual=False)
+        self.sync_trait('artifact_overlay_visible', overlay, 'visible')
         plot.overlays.append(overlay)
 
-        self.plot = container
+        self.plot_container = container
 
     physiology_view = View(
         HSplit(
             Tabbed(
                 VGroup(
+                    VGroup(
+                        Item('artifact_overlay_visible', 
+                             label='Show artifact thresholds?'),
+                        Item('threshold_overlay_visible', 
+                             label='Show spike thresholds?'),
+                        label='View settings'
+                    ),
                     VGroup(
                         Item('diff_mode', label='Differential mode'),
                         Item('filter_freq_hp', label='Highpass cutoff (Hz)'),
@@ -793,7 +853,7 @@ class PhysiologyReview(HasTraits):
                 Item('trial_data', editor=trial_log_editor, show_label=False,
                      width=350),
             ),
-            Item('plot', 
+            Item('plot_container', 
                 editor=ComponentEditor(width=1000, height=800), 
                 resizable=True),
             show_labels=False,
@@ -842,7 +902,10 @@ class PhysiologyReview(HasTraits):
                           ),
                     Action(name='Default settings', 
                            action='default_settings',
-                           accelerator='Ctrl+R',
+                           enabled_when='object.data_node is not None',
+                          ),
+                    Action(name='Copy settings', 
+                           action='copy_settings',
                            enabled_when='object.data_node is not None',
                           ),
                 ),
@@ -873,13 +936,17 @@ class PhysiologyReview(HasTraits):
                            action='set_zoom_16'),
 
                 ),
+                ActionGroup(
+                    Action(name='Overlay extracted spikes',
+                           action='overlay_extracted_spikes',
+                           enabled_when='object.data_node is not None'),
+                ),
                 name='&Settings',
             ),
             Menu(
                 ActionGroup(
                     Action(name=u'Compute signal std. dev.', 
                            action='compute_std',
-                           #tooltip=u'Compute signal \u03C3',
                            accelerator='Ctrl+C',
                            image=ImageResource('compute.png'),
                            enabled_when='object.data_node is not None'
