@@ -19,6 +19,12 @@ Contents:
    positive_behavior.rst
    data_processing.rst
 
+Scripts
+=======
+
+If you run into memory errors when trying to decimate the waveform or extract
+spikes, change the CHUNK_SIZE setting to a smaller value.
+
 Indices and tables
 ==================
 
