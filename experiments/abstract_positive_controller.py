@@ -54,6 +54,16 @@ class AbstractPositiveController(AbstractExperimentController):
     remind_requested = Bool(False)
 
     def set_attenuations(self, att1, att2, check=True):
+        '''
+        Set attenuators for Out-1 and Out-2 on the RZ6
+
+        Note that this only sets the hardware attenuation in valid steps (e.g.
+        0, 20, 40 and 60 dB).  The remaining attenuation must be realized via
+        scaling of the waveform before it is uploaded to the signal buffer.
+        '''
+
+        # TODO: remove the logic for fixed attenuation from this code
+
         # TDT's built-in attenuators for the RZ6 function in 20 dB steps, so we
         # need to determine the next greater step size for the attenuator.  The
         # maximum hardware attenuation is 60 dB.
@@ -70,13 +80,11 @@ class AbstractPositiveController(AbstractExperimentController):
             if check and self.get_current_value('fixed_attenuation'):
                 raise ValueError, 'Cannot change primary attenuation'
             self.current_hw_att1 = hw1
-            self.output_primary.hw_attenuation = hw1
             log.debug('Updated primary attenuation to %.2f', hw1)
         if hw2 != self.current_hw_att2:
             if check and self.get_current_value('fixed_attenuation'):
                 raise ValueError, 'Cannot change secondary attenuation'
             self.current_hw_att2 = hw2
-            self.output_secondary.hw_attenuation = hw2
             log.debug('Updated secondary attenuation to %.2f', hw2)
 
         # For efficiency reasons, we prefer to do most of the computation for
@@ -87,6 +95,7 @@ class AbstractPositiveController(AbstractExperimentController):
         return sw1, sw2
 
     def setup_experiment(self, info):
+
         circuit = join(get_config('RCX_ROOT'), 'positive-behavior-v3')
         self.iface_behavior = self.process.load_circuit(circuit, 'RZ6')
 
@@ -344,6 +353,15 @@ class AbstractPositiveController(AbstractExperimentController):
         if self.cancel_trigger():
             self.trigger_next()
 
+    def compute_waveform(self, calibration):
+        '''
+        Must be implemented by the specific paradigms.
+
+        Should return the waveform (scaled as needed) and the relevant hardware
+        attenuation value.
+        '''
+        raise NotImplementedError
+
     def trigger_next(self):
         log.debug('Preparing next trial')
         self.invalidate_context()
@@ -353,36 +371,14 @@ class AbstractPositiveController(AbstractExperimentController):
         speaker = self.get_current_value('speaker')
         self.iface_behavior.set_tag('go?', self.is_go())
 
-        # The outputs will automatically handle scaling the waveform given
-        # the current hardware attenuation settings.
         if speaker == 'primary':
+            calibration = self.cal_primary
             self.iface_behavior.set_tag('speaker', 0)
-            att1, waveform, clip, floor = self.output_primary.realize()
-            att2 = None
         elif speaker == 'secondary':
+            calibration = self.cal_secondary
             self.iface_behavior.set_tag('speaker', 1)
-            att2, waveform, clip, floor = self.output_secondary.realize()
-            att1 = None
 
-        clip_mesg = 'The {} output exceeds the maximum limits of the system'
-        floor_mesg = 'The {} output is below the noise floor of the system'
-
-        message = ''
-        if clip:
-            message += clip_mesg.format(speaker)
-            mesg = '''
-            The current experiment settings will produce a distorted signal.
-            Please review your settings carefully and correct any discrepancies
-            you observe.
-            '''
-            import textwrap
-            mesg = textwrap.dedent(mesg).strip().replace('\n', ' ')
-            mesg = message + '\n\n' + mesg
-            self.handle_error(mesg)
-
-        # set_attenuations has a built-in safety check to ensure attenuation has
-        # not changed.  If it has, indeed, changed and fixed_attenuation is
-        # True, then an error will be raised.
-        self.set_attenuations(att1, att2)
+        waveform, attenuation = self.compute_waveform(calibration)
+        self.set_attenuation(self.speaker, attenuation)
         self.buffer_out.set(waveform)
         self.iface_behavior.trigger(1)

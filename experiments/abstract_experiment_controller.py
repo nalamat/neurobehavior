@@ -81,9 +81,10 @@ class ExperimentToolBar(ToolBar):
             )
 
 class AbstractExperimentController(Controller):
-    """Primary controller for TDT System 3 hardware.  This class must be
-    configured with a model that contains the appropriate parameters (e.g.
-    Paradigm) and a view to show these parameters.
+    """
+    Primary controller for TDT System 3 hardware.  This class must be configured
+    with a model that contains the appropriate parameters (e.g.  Paradigm) and a
+    view to show these parameters.
 
     As changes are applied to the view, the necessary changes to the hardware
     (e.g. RX6 tags and PA5 attenuation) will be made and the model will be
@@ -95,6 +96,7 @@ class AbstractExperimentController(Controller):
     https://svn.enthought.com/enthought/wiki/UnderstandingMVCAndTraitsUI
 
     The controller has one of several states:
+
     Halted
         The system is waiting for the user to configure parameters.  No data
         acquisition is in progress nor is a signal being played.  
@@ -110,25 +112,6 @@ class AbstractExperimentController(Controller):
         The experiment is done.
     Disconnected
         Could not connect to the equipment.
-
-    The controller listens for changes to paradigm parameters.  All requested
-    changes are intercepted and cached.  If a parameter is changed several times
-    (before applying or reverting), the cache is updated with the most recent
-    value.  To make a parameter configurable during an experiment it must have a
-    function handler named `_apply_<parameter name>` that takes the new value of
-    the parameter and performs the necessary logic to update the experiment
-    state.
-
-    If the change is not allowed, a warning will be raised (but the handler will
-    continue running).  If a parameter is not configurable, be sure to set the
-    view accordingly (e.g. hide or disable the field) so the user knows why the
-    change isn't getting applied.
-
-    Very important!  To ensure that your controller logic ties in cleanly with
-    the apply/revert mechanism, never read values directly from the paradigm
-    itself.  Always make a copy of the variable and store it elsewhere (e.g. in
-    the controller object) and create an apply handler to update the copy of the
-    variable from the paradigm.
     """
 
     shell_variables = Dict
@@ -432,33 +415,43 @@ class AbstractExperimentController(Controller):
         '''
         raise NotImplementedError
 
-    def set_expected_speaker_range(self, value):
-        self._update_attenuators()
-
-    def set_fixed_attenuation(self, value):
-        self._update_attenuators()
-
-    def set_speaker_equalize(self, value):
-        self.output_primary.equalize = value
-        self.output_secondary.equalize = value
-
-    def _update_attenuators(self):
-        if self.get_current_value('fixed_attenuation'):
-            ranges = self.get_current_value('expected_speaker_range')
-            ranges = [(s.frequency, s.max_level) for s in ranges]
-            att1 = self.cal_primary.get_best_attenuation(ranges)
-            att2 = self.cal_secondary.get_best_attenuation(ranges)
-            log.debug('Best attenuations are %.2f and %.2f', att1, att2)
-            self.set_attenuations(att1, att2, False)
-            self.output_primary.fixed_attenuation = True
-            self.output_secondary.fixed_attenuation = True
-        else:
-            self.output_primary.fixed_attenuation = False
-            self.output_secondary.fixed_attenuation = False
-
     def log_trial(self, **kwargs):
-        # In addition to the data provided in kwargs, include the current value
-        # of all parameters for that trial before saving it to the file.
+        '''
+        Add entry to trial log table
+
+        In addition to the data provided via kwargs, the current value of all
+        parameters for that given trial will be included.  The keys of the
+        kwargs dictionary will be used as the column names.
+
+        The first call to log_trial establishes the columns that will be present
+        on every call.  Subsequent calls to log_trial must use the exact same
+        set of keys (e.g. you cannot remove or add new parameters on each call).
+
+        This is a valid sequence of calls:
+
+            self.log_trial(hw_atten=120, noise_seed=4)
+            ...
+            self.log_trial(hw_atten=20, noise_seed=5)
+            ...
+            self.log_trial(hw_atten=30, noise_seed=6)
+            ...
+
+        This is an invalid sequence of calls:
+
+            self.log_trial(hw_atten=120, noise_seed=4)
+            ...
+
+            # Invalid because a keyword argument provided in the first call is
+            # missing
+            self.log_trial(noise_seed=5)
+            ...
+
+            # Invalid because a keyword argument not provided in the first call
+            # has been added
+            self.log_trial(hw_atten=30, noise_seed=6, noise_bandwidth=1000)
+            ...
+
+        '''
         for key, value in self.context_log.items():
             if value:
                 kwargs[key] = self.current_context[key]
