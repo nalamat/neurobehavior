@@ -1,5 +1,6 @@
 from __future__ import division
 
+import time
 import tables
 import numpy as np 
 from scipy import signal
@@ -11,6 +12,9 @@ from .arraytools import chunk_samples, chunk_iter
 
 from . import get_config
 default_chunk_size = get_config('CHUNK_SIZE')
+
+import logging
+log = logging.getLogger(__name__)
 
 def rates(et, tt, bins):
     n_tt = len(tt)
@@ -124,6 +128,95 @@ def copy_block_data(input_node, output_node):
         except AttributeError:
             print 'Unable to find {}'.format(node_path)
 
+def zero_waveform(input_node, duration):
+    '''
+    Given the experiment data, zeros out both the raw physiology and TTL
+    waveforms up to the specified duration.   Useful for eliminating transients
+    in the physiology signal that occur just before the animal enters the cage.
+
+    This is a destructive operation that manipulates the raw data and cannot be
+    undone.  Be sure to backup your data.
+
+    Parameters
+    ----------
+    input_node : instance of tables.Group
+        The PyTables group pointing to the root of the experiment node.  The
+        physiology data will be found under input_node/data/physiology/raw.
+    duration : float (sec)
+        Duration (in seconds) to zero out from the beginning of data
+        acquisition.
+
+    The value (in samples) that was zeroed out for each waveform will be stored
+    as an attribute in the node for each waveform.
+    '''
+
+    nodes = (('physiology', 'raw'),
+             ('contact', 'TO_TTL'),
+             ('contact', 'poke_TTL'),
+             ('contact', 'reaction_TTL'),
+             ('contact', 'response_TTL'),
+             ('contact', 'reward_TTL'),
+             ('contact', 'signal_TTL'),
+             ('contact', 'spout_TTL'),
+            )
+
+    for group_name, node_name in nodes:
+        group = input_node.data._f_getChild(group_name)
+        node = group._f_getChild(node_name)
+        node_fs = node._v_attrs['fs']
+        samples = int(duration*node_fs)
+
+        # Logically NaN would be a reasonable value to use, but this
+        # significantly slows down the online plotting of the data so let's just
+        # use 0.
+        node[..., :samples] = 0
+        node._v_attrs['zero:samples'] = samples
+
+def truncate_waveform(input_node, duration):
+    '''
+    Given the experiment data, truncates both the raw physiology and TTL
+    waveforms after the specified duration.  Useful for eliminating transients
+    in the physiology signal that occur when the headstage falls off or after
+    the animal is removed from the cage.
+
+    This is a destructive operation that manipulates the raw data and cannot be
+    undone.  Be sure to backup your data.
+
+    Parameters
+    ----------
+    input_node : instance of tables.Group
+        The PyTables group pointing to the root of the experiment node.  The
+        physiology data will be found under input_node/data/physiology/raw.
+    duration : float (sec)
+        Duration (in seconds) to zero out from the beginning of data
+        acquisition.
+
+    The value (in samples) that was zeroed out for each waveform will be stored
+    as an attribute in the node for each waveform.
+    '''
+    nodes = (('physiology', 'raw'),
+             ('contact', 'TO_TTL'),
+             ('contact', 'poke_TTL'),
+             ('contact', 'reaction_TTL'),
+             ('contact', 'response_TTL'),
+             ('contact', 'reward_TTL'),
+             ('contact', 'signal_TTL'),
+             ('contact', 'spout_TTL'),
+            )
+
+    for group_name, node_name in nodes:
+        group = input_node.data._f_getChild(group_name)
+        node = group._f_getChild(node_name)
+        node_fs = node._v_attrs['fs']
+        new_size = int(duration*node_fs)
+        old_size = len(node)
+        node.truncate(new_size)
+
+        # If this is the first time we've truncated the waveform, add a note to
+        # the node metadata so that we know we've manipulated it.
+        if 'truncate:original_size' not in node._v_attrs:
+            node._v_attrs['truncate:original_size'] = old_size
+
 def median_std(x):
     '''
     Given a multichannel array, compute the standard deviation of the signal
@@ -211,7 +304,7 @@ def decimate_waveform(input_node, output_node, q=None, N=4, progress_callback=No
     
     # The number of samples in each chunk *must* be a multiple of the decimation
     # factor so that we can extract the *correct* samples from each chunk.
-    c_samples = chunk_samples(raw, 10e6, q)
+    c_samples = chunk_samples(raw, chunk_size, q)
     overlap = 3*len(b)
     iterable = chunk_iter(raw, c_samples, loverlap=overlap, roverlap=overlap)
 
@@ -309,6 +402,7 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
         that you can carry around with you rather than the raw multi-gigabyte
         physiology data.
     '''
+
     # Make sure data is in the format we want
     channels = np.asarray(channels)
     noise_std = np.asarray(noise_std)
@@ -504,6 +598,10 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
     iterable = chunk_iter(node, c_samples, loverlap, roverlap,
                           ndslice=np.s_[channels, :])
 
+    aborted = False
+    samples_processed = 0
+
+    t_chunk_start = time.time()
     for i_chunk, chunk in enumerate(iterable):
         # Truncate the chunk so we don't look for threshold crossings in the
         # portion of the chunk that overlaps with the following chunk.  This
@@ -517,32 +615,12 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
         # Get the channel number and index for each crossing.
         channel_index, sample_index = np.where(crossings) 
 
-        # Waveforms is likely to be reasonably large array, so preallocate for
-        # speed.  It may actually be faster to just hand it directly to PyTables
-        # for saving to the HDF5 file since PyTables handles caching of writes.
         n_features = len(sample_index)
-        waveforms = np.empty((n_features, n_channels, window_samples),
-                             dtype=node.dtype)
+        tot_features += n_features
 
-        # Loop through sample_index and pull out each waveform set.
-        for w, s in zip(waveforms, sample_index):
-            w[:] = chunk[..., s:s+window_samples]
-        fh_waveforms.append(waveforms)
-
-        # Find all the artifacts.  First, check the entire waveform array to see
-        # if the signal exceeds the artifact threshold defined on any given
-        # sample.  Note that the specified reject threshold for each channel
-        # will be honored via broadcasting of the array.
-        artifacts = (waveforms >= rej_thresholds) | \
-                    (waveforms < -rej_thresholds)
-
-        # Now, reduce the array so that we end up with a 2d array [event,
-        # channel] indicating whether the waveform for any given event exceed
-        # the reject threshold specified for that channel.
-        artifacts = np.any(artifacts, axis=-1)
-        fh_artifacts.append(artifacts)
-
-        tot_features += len(waveforms)
+        # This may not be the most efficient approach, but it suffices.
+        for s in sample_index:
+            fh_waveforms.append(chunk[..., s:s+window_samples][np.newaxis])
 
         # The indices saved to the file must be referenced to t0.  Since we're
         # processing in chunks and the indices are referenced to the start of
@@ -568,14 +646,43 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
             cov_waves[cov_i] = chunk[..., index:index+window_samples]
             cov_i += 1
 
+        # Track the total number of samples processed.  For the first n-1
+        # blocks, this will be equivalent to i_chunk*c_samples.  However, the
+        # size of the last chunk will be variable since it's highly unlikely
+        # that the total number of samples will be an integer multiple of
+        # c_samples.
+        samples_processed += chunk.shape[-1]
+
         # Update the progress callback each time we finish processing a chunk.
         # If the progress callback returns True, end the processing immediately.
+        # Be sure to add a note to the output node indicating that acquisition
+        # was aborted.
         mesg = 'Found {} features'.format(tot_features)
         if progress_callback(i_chunk*c_samples, total_samples, mesg):
+            aborted = True
             break
 
-    # Notify the progress dialog that we're done
-    progress_callback(total_samples, total_samples, 'Complete')
+    # Save some informationa bout whet
+    output_node._v_attrs['aborted'] = aborted
+    output_node._v_attrs['last_processed_sample'] = samples_processed
+        
+    t_chunk_end = time.time()
+    t_chunk = t_chunk_end-t_chunk_start
+    log.debug('Extracting spikes took {} seconds'.format(t_chunk))
+
+    # Find all the artifacts.  First, check the entire waveform array to see if
+    # the signal exceeds the artifact threshold defined on any given sample.
+    # Note that the specified reject threshold for each channel will be honored
+    # via broadcasting of the array.  This uses tables.Expr to avoid creating
+    # large Numpy temporary arrays in memory (and should be much faster). 
+    exp = tables.Expr("(fh_waveforms >= rej_thresholds) |" 
+                      "(fh_waveforms < -rej_thresholds)")
+
+    # Now, evaluate and reduce the expression so that we end up with a 2d array
+    # [event, channel] indicating whether the waveform for any given event
+    # exceed the reject threshold specified for that channel.
+    artifacts = np.any(exp.eval(), axis=-1)
+    fh_artifacts.append(artifacts)
 
     # If the user explicitly requested a cancel, compute the covariance matrix
     # only on the samples we were able to draw from the data.
@@ -599,3 +706,6 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
     if include_block_data:
         block_node = output_node._v_file.createGroup(output_node, 'block_data')
         copy_block_data(input_node, block_node)
+
+    # Notify the progress dialog that we're done
+    progress_callback(total_samples, total_samples, 'Complete')

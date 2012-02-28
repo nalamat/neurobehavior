@@ -6,7 +6,7 @@ import numpy as np
 import re
 
 from pyface.api import FileDialog, OK, error, ProgressDialog, ImageResource, \
-        information
+        information, confirm, YES
 from enable.api import Component, ComponentEditor
 from chaco.api import LinearMapper, DataRange1D, OverlayPlotContainer
 from traitsui.api import VGroup, Item, View, \
@@ -35,7 +35,8 @@ from cns.chaco_exts.channel_number_overlay import ChannelNumberOverlay
 from cns.chaco_exts.threshold_overlay import ThresholdOverlay
 from cns.chaco_exts.extracted_spike_overlay import ExtractedSpikeOverlay
 
-from cns.analysis import extract_spikes, median_std, decimate_waveform
+from cns.analysis import (extract_spikes, median_std, decimate_waveform,
+    truncate_waveform, zero_waveform)
 COLORS = get_config('EXPERIMENT_COLORS')
 
 is_none = lambda x: x is None
@@ -422,6 +423,45 @@ class PhysiologyReviewController(Controller):
         info.object.std_lb = lb
         info.object.std_ub = ub
 
+    def truncate_waveform(self, info):
+        result = confirm(info.ui.control, "This action will permanently alter"
+                         "the data in the file and cannot be undone.  Are "
+                         "you sure you wish to continue?", 
+                         title="Truncate waveform")
+        if result != YES:
+            return
+
+        result = confirm(info.ui.control, "Are you really sure?",
+                         title="Truncate waveform")
+        if result != YES:
+            return
+
+        # Truncate the waveform
+        truncate_waveform(info.object.data_node, info.object.index_range.high)
+
+        information(info.ui.control, "Truncated waveform.  Be sure to run "
+                    "ptrepack or h5repack to regain the unused disk space.")
+
+    def zero_waveform(self, info):
+        result = confirm(info.ui.control, "This action will permanently alter"
+                         "the data in the file and cannot be undone.  Are "
+                         "you sure you wish to continue?", 
+                         title="Zero waveform")
+        if result != YES:
+            return
+
+        result = confirm(info.ui.control, "Are you really sure?", 
+                         title="Zero waveform")
+        if result != YES:
+            return
+
+        # Zero the waveform
+        zero_waveform(info.object.data_node, info.object.index_range.low)
+
+        information(info.ui.control, "Zeroed waveform.  Be sure to run "
+                    "ptrepack or h5repack to recompress the file.")
+
+
     def _prepare_extract_settings(self, info):
         settings = [s for s in info.object.channel_settings if s.extract]
         # The return statement forces an exit from this function, meaning
@@ -617,7 +657,7 @@ class PhysiologyReviewController(Controller):
         # Set the freq_lp as well in case the user selects bandpass after
         # selecting this action.
         defaults = {
-            'diff_mode':        'all_good',
+            'diff_mode':        'all good',
             'filter_btype':     'highpass',
             'filter_order':     8,
             'filter_freq_hp':   300,
@@ -632,6 +672,25 @@ class PhysiologyReviewController(Controller):
             'filter_pass':      None,
         }
         info.object.trait_set(**defaults)
+
+    def goto_time(self, info):
+        # Create a little prompt to allow the user to specify the time they
+        # want.
+        class TimeDialog(HasTraits):
+            minute = Int
+            second = Int
+        td = TimeDialog()
+
+        # Setting kind to 'livemodal' ensures that the next line of code is not
+        # reached until the user explicitly closes the dialog.
+        dlg = td.edit_traits(parent=info.ui.control, kind='livemodal')
+
+        # The HasTraits.edit_trait() method returns an instance of the GUI
+        # dialog.  The result attribute is True when the users selects "OK",
+        # False otherwise.
+        if dlg.result:
+            seconds = td.minute*60 + td.second
+            info.object.index_range.trigger = seconds
 
 class PhysiologyReview(HasTraits):
 
@@ -924,6 +983,10 @@ class PhysiologyReview(HasTraits):
                           ),
                 ),
                 ActionGroup(
+                    Action(name='Goto time',
+                           action='goto_time'),
+                ),
+                ActionGroup(
                     Action(name='Zoom to 1 second',
                            action='set_zoom_1'),
                     Action(name='Zoom to 2 seconds',
@@ -977,6 +1040,14 @@ class PhysiologyReview(HasTraits):
                     Action(name='Queue decimation',
                            action='queue_decimation',
                            enabled_when='object.data_node and object.batchfile'),
+                ),
+                ActionGroup(
+                    Action(name='Truncate waveform',
+                           action='truncate_waveform',
+                           enabled_when='object.data_node is not None'),
+                    Action(name='Zero waveform',
+                           action='zero_waveform',
+                           enabled_when='object.data_node is not None'),
                 ),
                 name='&Actions',
             ),

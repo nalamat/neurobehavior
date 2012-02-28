@@ -39,7 +39,7 @@ if __name__ == '__main__':
     parser.add_argument('files',  nargs='+', action=GlobPath, 
                         help='Files to decimate')
     parser.add_argument('--force-overwrite', action='store_true',
-                        help='Overwrite output file if it exists')
+                        help='Overwrite existing output files')
     args = parser.parse_args()
 
     for filename in args.files:

@@ -1,4 +1,4 @@
-from traits.api import Float, on_trait_change, Bool, Instance, Enum, DelegatesTo
+from traits.api import Float, on_trait_change, Bool, Instance, Enum
 from enthought.enable.api import BaseTool, KeySpec
 
 class ChannelRangeTool(BaseTool):
@@ -13,12 +13,32 @@ class ChannelRangeTool(BaseTool):
     index_factor = Float(1.5)
     value_factor = Float(1.5)
 
-    reset_trig_delay_key = Instance(KeySpec, args=("0",))
+    key_decr_by_span = Instance(KeySpec, args=("Left",))
+    key_incr_by_span = Instance(KeySpec, args=("Right",))
+    key_jump_to_start = Instance(KeySpec, args=("s",))
+    key_reset_trig_delay = Instance(KeySpec, args=("0",))
+
+    key_incr_zoom_value = Instance(KeySpec, args=("Up",))
+    key_decr_zoom_value = Instance(KeySpec, args=("Down",))
+
     drag_mode = Enum('trig_delay', 'trigger')
 
     def normal_key_pressed(self, event):
-        if self.reset_trig_delay_key.match(event):
-            self.component.index_mapper.range.trig_delay = 0
+        range = self.component.index_mapper.range
+        if self.key_reset_trig_delay.match(event):
+            range.trig_delay = 0
+        elif self.key_jump_to_start.match(event):
+            range.trigger = 0
+        elif self.key_incr_by_span.match(event):
+            span = range.span
+            range.trigger += span
+        elif self.key_decr_by_span.match(event):
+            span = range.span
+            range.trigger -= span
+        elif self.key_incr_zoom_value.match(event):
+            self.zoom_in_value(self.value_factor)
+        elif self.key_decr_zoom_value.match(event):
+            self.zoom_out_value(self.value_factor)
 
     def normal_mouse_enter(self, event):
         if self.component._window is not None:
@@ -72,18 +92,18 @@ class ChannelRangeTool(BaseTool):
         self.component.index_mapper.range.span *= factor
 
     def zoom_value(self, event):
-        if event.mouse_wheel < 0:
+        if event.mouse_wheel > 0:
             self.zoom_in_value(self.value_factor)
         else:
             self.zoom_out_value(self.value_factor)
 
     def zoom_out_value(self, factor):
-        self.component.value_mapper.range.low_setting /= factor
-        self.component.value_mapper.range.high_setting /= factor
-
-    def zoom_in_value(self, factor):
         self.component.value_mapper.range.low_setting *= factor
         self.component.value_mapper.range.high_setting *= factor
+
+    def zoom_in_value(self, factor):
+        self.component.value_mapper.range.low_setting /= factor
+        self.component.value_mapper.range.high_setting /= factor
 
     def panning_left_up(self, event):
         self._end_pan(event)
@@ -118,16 +138,16 @@ class MultiChannelRangeTool(ChannelRangeTool):
             else:
                 if event.mouse_wheel < 0:
                     factor = self.get_value_zoom_factor(event)
-                    self.zoom_in_value(factor)
+                    self.zoom_out_value(factor)
                 else:
                     factor = self.get_value_zoom_factor(event)
-                    self.zoom_out_value(factor)
+                    self.zoom_in_value(factor)
 
     def zoom_in_value(self, factor):
-        self.value_span *= factor
+        self.value_span /= factor
 
     def zoom_out_value(self, factor):
-        self.value_span /= factor
+        self.value_span *= factor
 
     @on_trait_change('value_span, component.channel_visible')
     def _update_span(self):

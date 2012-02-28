@@ -191,6 +191,7 @@ if __name__ == '__main__':
         from os import isatty
         import sys, traceback
         traceback.print_exc(file=sys.stdout)
+
         # Now, if we are running from a terminal, don't exit until the user hits
         # enter so they have time to read the error message.  Note that the
         # error message will be properly logged as well.
