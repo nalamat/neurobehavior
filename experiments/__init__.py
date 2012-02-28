@@ -36,11 +36,3 @@ from .maximum_likelihood_data_mixin import MaximumLikelihoodDataMixin
 # Mixin classes for controlling pump
 from .pump_controller_mixin import PumpControllerMixin
 from .pump_paradigm_mixin import PumpParadigmMixin
-
-# Signals
-from .temporal_integration_paradigm_mixin import TemporalIntegrationParadigmMixin
-from .temporal_integration_controller_mixin import TemporalIntegrationControllerMixin
-from .am_noise_paradigm_mixin import AMNoiseParadigmMixin
-from .positive_am_noise_controller_mixin import PositiveAMNoiseControllerMixin
-from .masking_paradigm_mixin import MaskingParadigmMixin
-from .aversive_masking_controller_mixin import AversiveMaskingControllerMixin

@@ -2,13 +2,11 @@ from __future__ import division
 from cns.channel import FileTimeseries, FileChannel, FileEpoch
 from abstract_experiment_data import AbstractExperimentData
 
-from enthought.traits.api import Instance, List, Int, Float, Any, \
-    Range, DelegatesTo, cached_property, on_trait_change, Array, Event, \
-    Property, Undefined, Str, Enum, Bool, DelegatesTo, HasTraits, Tuple
+from enthought.traits.api import (Instance, Int, Float, cached_property,
+                                  Property, Enum)
 
 import numpy as np
 from cns.data.h5_utils import get_or_append_node
-from scipy.stats import norm
 
 from aversive_analysis_mixin import AversiveAnalysisMixin
 

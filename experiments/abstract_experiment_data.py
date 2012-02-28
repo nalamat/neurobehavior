@@ -5,7 +5,7 @@ log = logging.getLogger(__name__)
 from pump_data_mixin import PumpDataMixin
 
 from enthought.traits.api import (List, Property, Tuple, cached_property, Any,
-        Array, Int, Event)
+                                  Int, Event)
 
 EVENT_DTYPE = [('timestamp', 'i'), ('name', 'S64'), ('value', 'S128'), ]
 

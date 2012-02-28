@@ -1,5 +1,5 @@
-from enthought.traits.api import HasTraits, Enum, Property, Bool, List, \
-     Float, Button, Instance, Tuple
+from enthought.traits.api import HasTraits, Bool, List, \
+     Float, Button, Instance
 from enthought.traits.ui.api import VGroup, Item, HGroup
 from .evaluate import Expression
 
@@ -45,14 +45,6 @@ speaker_range_editor = TabularEditor(
     )
 
 class AbstractExperimentParadigm(HasTraits):
-
-    def __load_paradigm_fired(self):
-        instance = load_instance(PARADIGM_ROOT, PARADIGM_WILDCARD)
-        if instance is not None:
-            self.copy_traits(instance)
-
-    def __save_paradigm_fired(self):
-        print dump_instance(self, PARADIGM_ROOT, PARADIGM_WILDCARD)
 
     speaker = Expression("random_speaker(0.5)", label='Output Speaker',
             store='attribute', context=True, log=True)
@@ -101,6 +93,38 @@ class AbstractExperimentParadigm(HasTraits):
     @classmethod
     def get_parameter_label(cls, parameter):
         return cls.get_parameter_info()[parameter]
+
+    @classmethod
+    def get_invalid_parameters(cls, parameters):
+        return [p for p in parameters if p not in cls.get_parameters()]
+
+    @classmethod
+    def pp_parameters(cls):
+        '''
+        Utility classmethod for pretty-printing the list of parameters to the
+        command line.
+        '''
+        par_info = cls.get_parameter_info()
+        parameters = sorted(list(par_info.items()))
+
+        # Add the column headings
+        parameters.insert(0, ('Variable Name', 'Label'))
+        parameters.insert(1, ('-------------', '-----'))
+
+        # Determine the padding we need for the columns
+        col_paddings = []
+        for i in range(len(parameters[0])):
+            sizes = [len(row[i]) if row[i] != None else 0 for row in parameters]
+            col_paddings.append(max(sizes))
+
+        # Pretty print the list
+        print '\n'
+        for i, row in enumerate(parameters):
+            print row[0].rjust(col_paddings[0]+2) + ' ',
+            if row[1] is not None:
+                print row[1].ljust(col_paddings[1]+2)
+            else:
+                print ''
 
     speaker_group = VGroup(
             'speaker',

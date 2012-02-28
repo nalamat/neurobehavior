@@ -1,5 +1,4 @@
 from enthought.pyface.api import FileDialog, OK
-#import cPickle as pickle
 import pickle
 
 def get_save_file(path, wildcard):

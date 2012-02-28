@@ -1,19 +1,19 @@
 from enthought.traits.api import Instance
-from enthought.traits.ui.api import View, Include, VSplit, VGroup, Item
-from enthought.enable.api import Component, ComponentEditor
+from enthought.traits.ui.api import View, Include, VGroup
+
+from ._positive_dt_controller_mixin import PositiveDTControllerMixin
+from ._positive_dt_paradigm_mixin import PositiveDTParadigmMixin
 
 from experiments import (
         # Controller and mixins
         AbstractPositiveController,
         ConstantLimitsControllerMixin, 
         PumpControllerMixin,
-        TemporalIntegrationControllerMixin,
 
         # Paradigm and mixins
         AbstractPositiveParadigm,
         ConstantLimitsParadigmMixin,
         PumpParadigmMixin,
-        TemporalIntegrationParadigmMixin,
 
         # The experiment
         AbstractPositiveExperiment,
@@ -28,14 +28,15 @@ class Controller(
         AbstractPositiveController, 
         ConstantLimitsControllerMixin,
         PumpControllerMixin,
-        TemporalIntegrationControllerMixin):
+        PositiveDTControllerMixin,
+        ):
     pass
 
 class Paradigm(
         AbstractPositiveParadigm, 
         PumpParadigmMixin,
         ConstantLimitsParadigmMixin,
-        TemporalIntegrationParadigmMixin,
+        PositiveDTParadigmMixin,
         ):
 
     traits_view = View(
@@ -47,7 +48,7 @@ class Paradigm(
                 ),
             VGroup(
                 Include('speaker_group'),
-                Include('temporal_integration_group'),
+                Include('dt_group'),
                 label='Sound',
                 ),
             )
