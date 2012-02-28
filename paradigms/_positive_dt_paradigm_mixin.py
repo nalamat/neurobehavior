@@ -1,8 +1,10 @@
-from traits.api import HasTraits
 from traitsui.api import VGroup
-from experiments.eval import Expression
 
-class PositiveDTParadigmMixin(HasTraits):
+from experiments.eval import Expression
+from experiments.fixed_attenuation_paradigm_mixin import \
+        FixedAttenuationParadigmMixin
+
+class PositiveDTParadigmMixin(FixedAttenuationParadigmMixin):
 
     kw = {'context': True, 'store': 'attribute', 'log': True}
 

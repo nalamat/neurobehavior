@@ -2,7 +2,29 @@ from traits.api import HasTraits, Any
 import numpy as np
 from cns import signal as wave
 
+import logging
+log = logging.getLogger(__name__)
+
 class PositiveDTControllerMixin(HasTraits):
+
+    #########################################################################
+    # Fixed attenuation logic
+    #########################################################################
+
+    def set_expected_speaker_range(self, value):
+        self._update_attenuators()
+
+    def set_fixed_attenuation(self, value):
+        self._update_attenuators()
+
+    def _update_attenuators(self):
+        if self.get_current_value('fixed_attenuation'):
+            ranges = self.get_current_value('expected_speaker_range')
+            ranges = [(s.frequency, s.max_level) for s in ranges]
+            att1 = self.cal_primary.get_best_attenuation(ranges)
+            att2 = self.cal_secondary.get_best_attenuation(ranges)
+            log.debug('Best attenuations are %.2f and %.2f', att1, att2)
+            self.set_attenuations(att1, att2, False)
 
     #########################################################################
     # Cached waveforms to speed up computation

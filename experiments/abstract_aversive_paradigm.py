@@ -1,9 +1,5 @@
-from enthought.traits.api import Trait, Instance, Range, Float, Property, \
-        Bool, List, Int, Str, Tuple, Button
-from enthought.traits.ui.api import VGroup, Item, HGroup, View, Include, \
-        Tabbed
-
-from cns import choice
+from enthought.traits.api import Bool
+from enthought.traits.ui.api import VGroup
 
 from abstract_experiment_paradigm import AbstractExperimentParadigm
 

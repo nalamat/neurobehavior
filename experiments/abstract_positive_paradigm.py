@@ -5,8 +5,11 @@ from .abstract_experiment_paradigm import AbstractExperimentParadigm
 from .evaluate import Expression
 
 class AbstractPositiveParadigm(AbstractExperimentParadigm):
+
     
     kw = {'context': True, 'store': 'attribute', 'log': True}
+
+    speaker = Expression("random_speaker(0.5)", label='Output Speaker', **kw)
 
     pump_rate = Expression(1.5, label='Pump rate (ml/min)', **kw)
     reward_volume = Expression(25, label='Reward volume (ul)', **kw)
