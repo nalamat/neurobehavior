@@ -13,8 +13,11 @@ from os.path import dirname, join, abspath, getmtime
 MAX_SPEAKER_DAC_VOLTAGE = 7
 
 # Recommended size (in bytes) to segment the raw physiology data into for
-# loading into memory.
-CHUNK_SIZE      = 10e7
+# loading into memory.  You can probably get away with bigger chunks for most of
+# the data files; however, if a large number of artifacts are present (e.g. from
+# the headstage falling off), these will trigger the event detection algorithm
+# and cause memory size to balloon.
+CHUNK_SIZE      = 50e6
 
 # Size of sample (in seconds) to use for computing the noise floor
 NOISE_DURATION  = 16 
@@ -33,6 +36,10 @@ PHYSIOLOGY_ROOT = join(SETTINGS_ROOT, 'physiology')
 COHORT_WILDCARD     = 'Cohort files (*.cohort.hd5)|*.cohort.hd5|'
 PARADIGM_WILDCARD   = 'Paradigm settings (*.par)|*.par|'
 PHYSIOLOGY_WILDCARD = 'Physiology settings (*.phy)|*.phy|'
+
+# Be sure to update the RPvds circuit, physiology.rcx, with the appropriate
+# snippet size for the SpikeSort component if this value is changed.
+PHYSIOLOGY_SPIKE_SNIPPET_SIZE = 20
 
 PROGRAM_BASE = abspath(join(dirname(__file__), '..'))
 EXPERIMENT_ROOT = join(PROGRAM_BASE, 'launchers')
@@ -101,6 +108,8 @@ for k, v in sorted(globals().items()):
     if k == k.upper():
         log.debug("CNS SETTING %s : %r", k, v)
 
+# Color settings for the experiments
+
 COLOR_NAMES = {
     'light green': '#98FB98',
     'dark green': '#2E8B57',
@@ -112,8 +121,23 @@ COLOR_NAMES = {
     }
 
 EXPERIMENT_COLORS  = {
-    'GO_REMIND': COLOR_NAMES['light green'],
-    'GO': COLOR_NAMES['dark green'],
+    'GO_REMIND': COLOR_NAMES['dark green'],
+    'GO': COLOR_NAMES['light green'],
     'NOGO_REPEAT': COLOR_NAMES['dark red'],
     'NOGO': COLOR_NAMES['light red'],
     }
+
+PAIRED_COLORS_RGB_NORM = [
+   (0.900, 0.100, 0.200),
+   (1.000, 0.600, 0.750),
+   (0.400, 0.300, 1.000),
+   (0.800, 0.750, 1.000),
+   (0.100, 0.700, 1.000),
+   (0.650, 0.930, 1.000),
+   (0.200, 1.000, 0.000),
+   (0.700, 1.000, 0.550),
+   (1.000, 1.000, 0.200),
+   (1.000, 1.000, 0.600),
+   (1.000, 0.500, 0.000),
+   (1.000, 0.750, 0.500),
+   ]

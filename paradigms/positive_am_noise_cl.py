@@ -1,19 +1,19 @@
 from enthought.traits.api import Instance
-from enthought.traits.ui.api import View, Include, VSplit, VGroup, Item
-from enthought.enable.api import Component, ComponentEditor
+from enthought.traits.ui.api import View, Include, VGroup
+
+from ._positive_am_noise_paradigm_mixin import PositiveAMNoiseParadigmMixin
+from ._positive_am_noise_controller_mixin import PositiveAMNoiseControllerMixin
 
 from experiments import (
         # Controller and mixins
         AbstractPositiveController,
         ConstantLimitsControllerMixin, 
         PumpControllerMixin,
-        PositiveAMNoiseControllerMixin,
 
         # Paradigm and mixins
         AbstractPositiveParadigm,
         ConstantLimitsParadigmMixin,
         PumpParadigmMixin,
-        AMNoiseParadigmMixin,
 
         # The experiment
         AbstractPositiveExperiment,
@@ -35,7 +35,7 @@ class Paradigm(
         AbstractPositiveParadigm, 
         PumpParadigmMixin,
         ConstantLimitsParadigmMixin,
-        AMNoiseParadigmMixin,
+        PositiveAMNoiseParadigmMixin,
         ):
 
     traits_view = View(

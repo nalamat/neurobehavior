@@ -165,6 +165,7 @@ class AbstractPositiveController(AbstractExperimentController):
     ############################################################################
     # Master controller
     ############################################################################
+
     def monitor_behavior(self):
         # This function gets called every ~100 msec (this time interval is not
         # guaranteed).  Essentially this is a loop that queries the RPvds

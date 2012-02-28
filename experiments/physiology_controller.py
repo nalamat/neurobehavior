@@ -1,9 +1,6 @@
-import numpy as np
-from enthought.traits.api import (HasTraits, Instance, Any, List,
-        on_trait_change, Undefined, Enum)
+from enthought.traits.api import (Instance, Any, List, on_trait_change, Enum)
 
 from enthought.traits.ui.api import Controller
-from enthought.pyface.api import error
 from enthought.pyface.timer.api import Timer
 
 from tdt import DSPProject
@@ -13,10 +10,10 @@ from cns.pipeline import deinterleave_bits
 
 CHANNELS = get_config('PHYSIOLOGY_CHANNELS')
 PHYSIOLOGY_WILDCARD = get_config('PHYSIOLOGY_WILDCARD')
-SPIKE_SNIPPET_SIZE = 20
+SPIKE_SNIPPET_SIZE = get_config('PHYSIOLOGY_SPIKE_SNIPPET_SIZE')
 PHYSIOLOGY_ROOT = get_config('PHYSIOLOGY_ROOT')
 
-from .utils import get_save_file, load_instance, dump_instance
+from .utils import load_instance, dump_instance
 
 class PhysiologyController(Controller):
 

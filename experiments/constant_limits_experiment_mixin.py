@@ -1,23 +1,22 @@
 import numpy as np
 from enthought.enable.api import Component, ComponentEditor
 from enthought.traits.api import Instance, Int, on_trait_change, \
-        Dict, HasTraits, Any, List, Str, Enum, Property, Tuple
-from enthought.traits.ui.api import View, Include, VSplit, HSplit, \
-        VGroup, Item, EnumEditor, SetEditor, HGroup
+        Dict, HasTraits, Any, List, Str, Enum, Property
+from enthought.traits.ui.api import VGroup, Item, EnumEditor, SetEditor, HGroup
 
 from cns.chaco_exts.helpers import add_default_grids
-from colors import paired_colors, paired_colors_255
 
-from enthought.chaco.api import Plot, DataRange1D, LinearMapper, \
-        PlotAxis, ArrayPlotData, Legend, LogMapper, ArrayDataSource, \
-        OverlayPlotContainer, LinePlot, ScatterPlot, BarPlot, \
-        VPlotContainer
+from enthought.chaco.api import DataRange1D, LinearMapper, \
+        PlotAxis, LogMapper, ArrayDataSource, \
+        OverlayPlotContainer, LinePlot, ScatterPlot
 
 from enthought.traits.ui.api import TabularEditor
 from enthought.traits.ui.tabular_adapter import TabularAdapter
 
 from cns import get_config
+
 CHACO_AXES_PADDING = get_config('CHACO_AXES_PADDING')
+PAIRED_COLORS_NORM = get_config('PAIRED_COLORS_RGB_NORM')
 
 class ParInfoAdapter(TabularAdapter):
 
@@ -176,8 +175,10 @@ class ConstantLimitsExperimentMixin(HasTraits):
                     plot_color = self.color_map[category_name]
                 else:
                     self.color_index += 1
-                    plot_color = paired_colors[-self.color_index]
-                    plot_color_255 = paired_colors_255[-self.color_index]
+                    plot_color = PAIRED_COLORS_NORM[-self.color_index]
+                    # For some reason the par_info_adapter color map requires
+                    # the color to be scaled to 255
+                    plot_color_255 = tuple(255.0*c for c in plot_color)
                     self.color_map[category_name] = plot_color
                     self.par_info_adapter.color_map[category_name] = plot_color_255
 

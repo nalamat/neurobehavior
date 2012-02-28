@@ -238,7 +238,6 @@ def test_experiment(args):
     # Create a temporary file to write the data to
     import tempfile
     tempname = 'neurobehavior_tmp.h5'
-    tempdir = tempfile.gettempdir()
     filename = os.path.join(tempfile.gettempdir(), tempname)
     log.debug("Creating temporary file %s for testing", filename)
     launch_experiment(args, filename, True)
@@ -279,27 +278,8 @@ def inspect_experiment(args):
     Print out parameters available for requested paradigm
     '''
     # Get a list of the parameters available in the paradigm
-    p = get_experiment(args.type).Paradigm
-    parameters = sorted(list(p.get_parameter_info().items()))
-
-    # Add the column headings
-    parameters.insert(0, ('Variable Name', 'Label'))
-    parameters.insert(1, ('-------------', '-----'))
-
-    # Determine the padding we need for the columns
-    col_paddings = []
-    for i in range(len(parameters[0])):
-        sizes = [len(row[i]) if row[i] != None else 0 for row in parameters]
-        col_paddings.append(max(sizes))
-
-    # Pretty print the list
-    print '\n'
-    for i, row in enumerate(parameters):
-        print row[0].rjust(col_paddings[0]+2) + ' ',
-        if row[1] is not None:
-            print row[1].ljust(col_paddings[1]+2)
-        else:
-            print ''
+    cls = get_experiment(args.type).Paradigm
+    cls.pp_parameters()
 
 def get_invalid_parameters(args):
     '''
@@ -308,8 +288,8 @@ def get_invalid_parameters(args):
     '''
     parameters = set(args.rove)
     parameters.update(args.analyze)
-    paradigm = get_experiment(args.type).Paradigm
-    return [p for p in parameters if p not in paradigm.get_parameters()]
+    cls = get_experiment(args.type).Paradigm
+    return cls.get_invalid_parameters(parameters)
 
 def get_experiment(etype):
     return import_module('paradigms.{}'.format(etype))

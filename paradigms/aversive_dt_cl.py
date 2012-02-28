@@ -1,11 +1,10 @@
 import numpy as np
 
 from enthought.traits.api import Instance
-from enthought.traits.ui.api import View, Include, VGroup, Item, Include
-from enthought.enable.api import Component, ComponentEditor
+from enthought.traits.ui.api import View, VGroup, Item, Include
 from experiments.evaluate import Expression
 
-from cns.signal import time, cos2ramp, generate_envelope
+from cns.signal import time, generate_envelope
 
 from experiments import (
         # Controller and mixins
