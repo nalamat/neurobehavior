@@ -1,10 +1,10 @@
-from enthought.traits.api import Instance, Any, DelegatesTo
-from enthought.traits.ui.api import (View, HGroup, HSplit, VGroup, Item, Tabbed,
-        ShellEditor)
+from enthought.traits.api import Instance, Any
+from enthought.traits.ui.api import (View, HSplit, VGroup, Item, Tabbed,
+                                     ShellEditor)
 
 from enthought.enable.api import Component, ComponentEditor
 from enthought.chaco.api import DataRange1D, LinearMapper, \
-        PlotAxis, PlotGrid, OverlayPlotContainer
+        PlotGrid, OverlayPlotContainer
 
 from cns.chaco_exts.channel_data_range import ChannelDataRange
 from cns.chaco_exts.ttl_plot import TTLPlot
@@ -84,7 +84,6 @@ class PositiveStage1Experiment(AbstractExperiment):
                 line_color=(0, 0, 0, 0.25))
         self.microphone_plot = plot
         container.add(plot)
-
 
         self.contact_plot = container
 

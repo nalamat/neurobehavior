@@ -1,7 +1,6 @@
 from cns.widgets.toolbar import ToolBar
-from enthought.etsconfig.api import ETSConfig
-from enthought.traits.ui.api import View, HGroup, Item, Controller, VGroup
-from enthought.traits.api import Instance, Bool, HasTraits, Button, Tuple, Float
+from enthought.traits.ui.api import View, HGroup, Item
+from enthought.traits.api import Instance, Bool, HasTraits, Tuple, Float
 from enthought.savage.traits.ui.svg_button import SVGButton
 from cns.widgets.icons import icons
 

@@ -1,20 +1,16 @@
 from datetime import datetime, timedelta
 
+from enthought.traits.ui.menu import MenuBar, Menu, ActionGroup, Action
 from enthought.traits.api import HasTraits, Any, Instance, Property, Bool
 from enthought.traits.ui.api import View, Include, VGroup, Item, Tabbed
 
 from abstract_experiment_data import AbstractExperimentData
 from abstract_experiment_paradigm import AbstractExperimentParadigm
 
-from enthought.traits.ui.key_bindings import KeyBinding, KeyBindings
-from experiments.paradigm_menu import create_menubar
-
-import logging
-log = logging.getLogger(__name__)
-
 from enthought.traits.ui.api import TabularEditor
 from enthought.traits.ui.tabular_adapter import TabularAdapter
-from colors import color_names
+from cns import get_config
+color_names = get_config('COLOR_NAMES')
 
 class ContextAdapter(TabularAdapter):
 
@@ -65,10 +61,6 @@ class AbstractExperiment(HasTraits):
         else:
             return self.stop_time-self.start_time
 
-    key_bindings = KeyBindings(
-        KeyBinding(binding1='Ctrl-r', method_name='start'),
-        )
-
     traits_group = VGroup(
             Item('handler.toolbar', style='custom'),
             Tabbed(
@@ -88,8 +80,24 @@ class AbstractExperiment(HasTraits):
 
     traits_view = View(
             Include('traits_group'), 
-            key_bindings=key_bindings,
             resizable=True, 
-            menubar=create_menubar(),
+            menubar=MenuBar(
+                Menu(
+                    ActionGroup(
+                        Action(name='Load paradigm', action='load_paradigm'),
+                        Action(name='Save paradigm as', action='saveas_paradigm'),
+                    ),
+                    name='&Paradigm'),
+                Menu(
+                    ActionGroup(
+                        Action(name='Load primary calibration',
+                               action='load_calibration'),
+                        Action(name='Load secondary calibration',
+                               action='load_calibration'),
+                        Action(name='Show calibration',
+                               action='show_calibration'),
+                        ),
+                    name='&Calibration'),
+            ),
             height=0.9, 
             width=0.9)

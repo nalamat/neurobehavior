@@ -15,6 +15,7 @@ class PositiveStage1Controller(AbstractExperimentController):
         self.buffer_TTL = self.iface_behavior.get_buffer('TTL', 'r',
                 block_size=24, src_type='int8', dest_type='int8')
         self.buffer_mic = self.iface_behavior.get_buffer('mic', 'r')
+
         self.model.data.spout_TTL.fs = self.buffer_TTL.fs
         self.model.data.override_TTL.fs = self.buffer_TTL.fs
         self.model.data.pump_TTL.fs = self.buffer_TTL.fs
@@ -55,12 +56,6 @@ class PositiveStage1Controller(AbstractExperimentController):
         self.pipeline_TTL.send(self.buffer_TTL.read())
         self.model.data.microphone.send(self.buffer_mic.read())
 
-    def update_signal(self):
-        att, waveform, clip, floor = self.output_primary.realize()
-        self.buffer_signal.set(waveform)
-        self.iface_behavior.set_tag('att_A', att)
-        self.iface_behavior.set_tag('att_B', 120)
-
     def get_ts(self):
         return self.iface_behavior.get_tag('ts')
 
@@ -75,4 +70,7 @@ class PositiveStage1Controller(AbstractExperimentController):
     def _context_updated_fired(self):
         self.invalidate_context()
         self.evaluate_pending_expressions()
-        self.update_signal()
+        waveform, attenuation = self.compute_waveform(self.cal_primary)
+        self.buffer_signal.set(waveform)
+        self.iface_behavior.set_tag('att_A', attenuation)
+        self.iface_behavior.set_tag('att_B', 120)

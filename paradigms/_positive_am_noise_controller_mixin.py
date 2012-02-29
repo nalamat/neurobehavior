@@ -138,7 +138,9 @@ class PositiveAMNoiseControllerMixin(HasTraits):
     def compute_waveform(self):
         level = self.get_current_value('level')
 
-        # TODO - compute attenuation and scaling factor here
+        # TODO - compute attenuation and scaling factor here.  Need to talk to
+        # GvT about what he has been using.
+
         #fc = self.get_current_value('fc')
         #calibration.get_sf(fc, level)
 

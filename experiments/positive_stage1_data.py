@@ -1,6 +1,5 @@
 from enthought.traits.api import Instance
 from cns.channel import FileChannel
-from cns.data.h5_utils import get_or_append_node
 import numpy as np
 
 from abstract_experiment_data import AbstractExperimentData

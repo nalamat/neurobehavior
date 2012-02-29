@@ -6,6 +6,7 @@ from enthought.traits.api import HasTraits, Float, Property, List, \
 class SDTDataMixin(HasTraits):
 
     # Clip FA/HIT rate if < clip or > 1-clip (prevents unusually high z-scores)
+
     clip            = Property(store='attribute')
 
     @cached_property
@@ -36,11 +37,6 @@ class SDTDataMixin(HasTraits):
     def _get_par_z_hit(self):
         par_hit_frac = clip(self.par_hit_frac, self.clip, 1-self.clip)
         return norm.ppf(par_hit_frac)
-
-    #@cached_property
-    #def _get_par_z_fa(self):
-    #    par_fa_frac = clip(self.par_fa_frac, self.clip, 1-self.clip)
-    #    return norm.ppf(par_fa_frac)
 
     @cached_property
     def _get_par_dprime(self):
