@@ -1,11 +1,10 @@
 from enthought.traits.api import HasTraits, Float, Enum, Property, cached_property
 from enthought.traits.ui.api import View, Item, VGroup, HGroup
-
 from cns import get_config
-
 from evaluate import Expression
 
 SYRINGE_DATA = get_config('SYRINGE_DATA')
+SYRINGE_DEFAULT = get_config('SYRINGE_DEFAULT')
 
 class PumpParadigmMixin(HasTraits):
     
@@ -13,10 +12,10 @@ class PumpParadigmMixin(HasTraits):
     
     pump_rate = Expression(0.5, label='Pump rate (ml/min)', **kw)
     pump_rate_delta = Float(0.025, label='Pump rate delta (ml)', **kw)
-    pump_syringe = Enum(get_config('SYRINGE_DEFAULT'),
-            sorted(SYRINGE_DATA.keys()), label='Syringe', ignore=True, **kw)
+    pump_syringe = Enum(SYRINGE_DEFAULT, sorted(SYRINGE_DATA.keys()),
+                        label='Syringe', ignore=True, **kw)
     pump_syringe_diameter = Property(label='Syringe diameter (mm)',
-            depends_on='pump_syringe', **kw)
+                                     depends_on='pump_syringe', **kw)
 
     @cached_property
     def _get_pump_syringe_diameter(self):
@@ -25,6 +24,7 @@ class PumpParadigmMixin(HasTraits):
     # Note that we have defined two views here, a simple view and a more
     # detailed view.  When including this mixin class, you can choose which view
     # is used.
+
     detailed_pump_group = VGroup(
             HGroup(
                 'pump_rate',
@@ -55,7 +55,3 @@ class PumpParadigmMixin(HasTraits):
 
     detailed_view = View(detailed_pump_group)
     simple_view = View(simple_pump_group)
-
-if __name__ == '__main__':
-    PumpSettingsMixin().configure_traits(view='simple_view')
-    PumpSettingsMixin().configure_traits(view='detailed_view')

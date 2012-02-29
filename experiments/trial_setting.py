@@ -1,6 +1,5 @@
-from enthought.traits.api import HasTraits, Enum, TraitError, Float, Int,\
-     List, Str, TraitError
-from enthought.traits.ui.api import TableEditor, View, VGroup
+from enthought.traits.api import HasTraits, Enum, TraitError, Float, Int
+from enthought.traits.ui.api import View, VGroup
 
 class TrialSetting(HasTraits):
     
@@ -14,7 +13,8 @@ class TrialSetting(HasTraits):
         kwargs['ttype'] = ttype
         super(TrialSetting, self).__init__(**kwargs)
         
-    # How should the object appear under various contexts (GUI, command line, etc)
+    # How should the object appear under various contexts (GUI, command line,
+    # etc)
 
     def traits_view(self):
         return View(VGroup(*self._parameters))
@@ -77,7 +77,8 @@ class TrialSetting(HasTraits):
 from enthought.traits.ui.api import TabularEditor
 from enthought.traits.ui.tabular_adapter import TabularAdapter
 
-from colors import color_names
+from cns import get_config
+color_names = get_config('COLOR_NAMES')
 
 class TrialSettingAdapter(TabularAdapter):
 

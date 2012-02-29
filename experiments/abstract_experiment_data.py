@@ -7,7 +7,6 @@ from pump_data_mixin import PumpDataMixin
 from enthought.traits.api import (List, Property, Tuple, cached_property, Any,
                                   Int, Event)
 
-EVENT_DTYPE = [('timestamp', 'i'), ('name', 'S64'), ('value', 'S128'), ]
 
 from cns.data.h5_utils import get_or_append_node
 from cns.channel import FileChannel
@@ -50,10 +49,21 @@ class AbstractExperimentData(PumpDataMixin):
     # re-analyze your data on the fly.
     parameters = List
 
-    event_log = List(store='table', dtype=EVENT_DTYPE)
+    event_log = Any
+
+    def _event_log_default(self):
+        file = self.store_node._v_file
+        description = np.dtype([('timestamp', 'i'), ('name', 'S64'), 
+                                ('value', 'S128'),])
+        node = file.createTable(self.store_node, 'event_log', description)
+        return node
 
     def log_event(self, timestamp, name, value):
-        self.event_log.append((timestamp, name, repr(value)))
+        # The append() method of a tables.Table class requires a list of rows
+        # (i.e. records) to append to the table.  Since we only append a single
+        # row at a time, we need to nest it as a list that contains a single
+        # record.
+        self.event_log.append([(timestamp, name, repr(value))])
 
     # Trial log structure
     _trial_log = List
