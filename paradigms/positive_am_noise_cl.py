@@ -4,29 +4,23 @@ from enthought.traits.ui.api import View, Include, VGroup
 from ._positive_am_noise_paradigm_mixin import PositiveAMNoiseParadigmMixin
 from ._positive_am_noise_controller_mixin import PositiveAMNoiseControllerMixin
 
-from experiments import (
-        # Controller and mixins
-        AbstractPositiveController,
-        ConstantLimitsControllerMixin, 
-        PumpControllerMixin,
+from experiments.abstract_positive_experiment import AbstractPositiveExperiment
+from experiments.abstract_positive_controller import AbstractPositiveController
+from experiments.abstract_positive_paradigm import AbstractPositiveParadigm
+from experiments.positive_data import PositiveData
 
-        # Paradigm and mixins
-        AbstractPositiveParadigm,
-        ConstantLimitsParadigmMixin,
-        PumpParadigmMixin,
+from experiments.cl_controller_mixin import CLControllerMixin
+from experiments.cl_paradigm_mixin import CLParadigmMixin
+from experiments.cl_experiment_mixin import CLExperimentMixin
+from experiments.positive_cl_data_mixin import PositiveCLDataMixin
 
-        # The experiment
-        AbstractPositiveExperiment,
-        ConstantLimitsExperimentMixin,
-
-        # Data
-        PositiveData,
-        PositiveConstantLimitsDataMixin
-        )
+from experiments.pump_controller_mixin import PumpControllerMixin
+from experiments.pump_paradigm_mixin import PumpParadigmMixin
+from experiments.pump_data_mixin import PumpDataMixin
 
 class Controller(
         AbstractPositiveController, 
-        ConstantLimitsControllerMixin,
+        CLControllerMixin,
         PumpControllerMixin,
         PositiveAMNoiseControllerMixin):
     pass
@@ -34,7 +28,7 @@ class Controller(
 class Paradigm(
         AbstractPositiveParadigm, 
         PumpParadigmMixin,
-        ConstantLimitsParadigmMixin,
+        CLParadigmMixin,
         PositiveAMNoiseParadigmMixin,
         ):
 
@@ -52,9 +46,13 @@ class Paradigm(
                 ),
             )
 
-class Data(PositiveData, PositiveConstantLimitsDataMixin): pass
+class Data(
+    PositiveData, 
+    PositiveCLDataMixin, 
+    PumpDataMixin): 
+        pass
 
-class Experiment(AbstractPositiveExperiment, ConstantLimitsExperimentMixin):
+class Experiment(AbstractPositiveExperiment, CLExperimentMixin):
 
     data = Instance(Data, (), store='child')
     paradigm = Instance(Paradigm, (), store='child')

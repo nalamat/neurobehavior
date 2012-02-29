@@ -1,38 +1,26 @@
 from enthought.traits.api import Instance
-from enthought.traits.ui.api import View, Include, VGroup, Item, Include
-from enthought.enable.api import Component, ComponentEditor
+from enthought.traits.ui.api import View, VGroup, Item, Include
 from experiments.evaluate import Expression
 
 import numpy as np
 from cns import signal
 
-from experiments import (
-        # Controller and mixins
-        AbstractAversiveController,
-        ConstantLimitsControllerMixin, 
-        PumpControllerMixin,
-        AversiveAMNoiseControllerMixin,
+from experiments.abstract_aversive_experiment import AbstractAversiveExperiment
+from experiments.abstract_aversive_controller import AbstractAversiveController
+from experiments.abstract_aversive_paradigm import AbstractAversiveParadigm
+from experiments.aversive_data import AversiveData
 
-        # Paradigm and mixins
-        AbstractAversiveParadigm,
-        ConstantLimitsParadigmMixin,
-        PumpParadigmMixin,
-        AMBBNParadigmMixin,
+from experiments.cl_controller_mixin import CLControllerMixin
+from experiments.cl_paradigm_mixin import CLParadigmMixin
+from experiments.cl_experiment_mixin import CLExperimentMixin
+from experiments.aversive_cl_data_mixin import AversiveCLDataMixin
 
-        # The experiment
-        AbstractAversiveExperiment,
-        ConstantLimitsExperimentMixin,
-
-        # Data
-        AversiveData,
-        AversiveConstantLimitsDataMixin
-        )
+from experiments.pump_controller_mixin import PumpControllerMixin
+from experiments.pump_paradigm_mixin import PumpParadigmMixin
+from experiments.pump_data_mixin import PumpDataMixin
 
 class Controller(
-	# Order of these classes are important for determining the method
-	# resolution order (i.e. the order in which each of the class
-	# definitions is checked for the method being requested).
-        ConstantLimitsControllerMixin,
+        CLControllerMixin,
         PumpControllerMixin,
         AbstractAversiveController):
 
@@ -56,8 +44,8 @@ class Controller(
         rms = signal.rms(waveform)
         waveform = amplitude/rms*samples
 
-        eq_phase = signals.am_eq_phase(depth, direction)
-        eq_power = signals.am_eq_power(depth)
+        eq_phase = signal.am_eq_phase(depth, direction)
+        eq_power = signal.am_eq_power(depth)
         envelope = depth/2.0 * np.cos(2*np.pi*fm+eq_phase) + 1 - depth/2.0
         envelope *= 1/eq_power
         return waveform*envelope
@@ -90,8 +78,7 @@ class Controller(
 class Paradigm(
         AbstractAversiveParadigm, 
         PumpParadigmMixin,
-        ConstantLimitsParadigmMixin,
-        AMBBNParadigmMixin,
+        CLParadigmMixin,
         ):
 
     # Override settings 
@@ -141,10 +128,10 @@ class Paradigm(
                 ),
             )
 
-class Data(AversiveData, AversiveConstantLimitsDataMixin):
+class Data(AversiveData, AversiveCLDataMixin, PumpDataMixin):
     pass
 
-class Experiment(AbstractAversiveExperiment, ConstantLimitsExperimentMixin):
+class Experiment(AbstractAversiveExperiment, CLExperimentMixin):
 
     data = Instance(Data, (), store='child')
     paradigm = Instance(Paradigm, (), store='child')

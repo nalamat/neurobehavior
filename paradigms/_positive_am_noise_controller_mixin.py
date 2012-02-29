@@ -17,15 +17,15 @@ class PositiveAMNoiseControllerMixin(HasTraits):
     _noise_token = Any
     _filtered_noise_token = Any
 
-    #########################################################################
+    ########################################################################
     # Trigger recomputation of cosine envelope when rise time changes
     ########################################################################
 
     def set_rise_fall_time(self, value):
         self._recompute_cos_envelope()
 
-    #########################################################################
-    # Trigger recomputation of SAM envelope when modulation changes
+    ########################################################################
+    # Recompute SAM envelope when modulation changes
     ########################################################################
 
     def set_fm(self, value):
@@ -40,16 +40,16 @@ class PositiveAMNoiseControllerMixin(HasTraits):
     def set_modulation_onset(self, value):
         self._recompute_sam_envelope()
 
-    #########################################################################
-    # Trigger recomputation of base noise token when seed changes
-    #########################################################################
+    ########################################################################
+    # Recompute base noise token when seed changes
+    ########################################################################
 
     def set_seed(self, value):
         self._noise_token()
 
-    #########################################################################
-    # Trigger recomputation of filter noise token when filter settings change
-    #########################################################################
+    ########################################################################
+    # Recompute filter noise token when filter settings change
+    ########################################################################
 
     def set_fc(self, value):
         self._recompute_filtered_noise_token()
@@ -66,9 +66,9 @@ class PositiveAMNoiseControllerMixin(HasTraits):
     def set_bandwidth(self, value):
         self._recompute_filtered_noise_token()
 
-    #########################################################################
+    ########################################################################
     # Methods for computing/caching waveform
-    #########################################################################
+    ########################################################################
 
     def _recompute_time(self):
         duration = self.get_current_value('duration')
