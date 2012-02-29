@@ -3,15 +3,11 @@ from __future__ import division
 from os import path
 
 from enthought.traits.api import Instance, File, List, Any, Int, Bool, Enum
-from enthought.traits.ui.api import View, Include, VSplit, VGroup, Item
-from enthought.enable.api import Component, ComponentEditor
+from enthought.traits.ui.api import View, Include, VGroup
 
 from experiments.evaluate import Expression
 
-from cns import get_config
-
 from time import time
-import csv
 
 # Contains some utility functions
 from tdt.device import RZ6
@@ -23,23 +19,17 @@ import numpy as np
 import logging
 log = logging.getLogger(__name__)
 
-from experiments import (
-        # Controller and mixins
-        AbstractPositiveController,
-        PumpControllerMixin,
+from experiments.abstract_positive_experiment import AbstractPositiveExperiment
+from experiments.abstract_positive_controller import AbstractPositiveController
+from experiments.abstract_positive_paradigm import AbstractPositiveParadigm
+from experiments.positive_data import PositiveData
 
-        # Paradigm and mixins
-        AbstractPositiveParadigm,
-        PumpParadigmMixin,
+from experiments.cl_experiment_mixin import CLExperimentMixin
+from experiments.positive_cl_data_mixin import PositiveCLDataMixin
 
-        # The experiment
-        AbstractPositiveExperiment,
-        ConstantLimitsExperimentMixin,
-
-        # Data
-        PositiveData,
-        PositiveConstantLimitsDataMixin
-        )
+from experiments.pump_controller_mixin import PumpControllerMixin
+from experiments.pump_paradigm_mixin import PumpParadigmMixin
+from experiments.pump_data_mixin import PumpDataMixin
 
 class Controller(
         AbstractPositiveController, 
@@ -307,12 +297,12 @@ class Paradigm(
                 ),
             )
 
-class Data(PositiveData, PositiveConstantLimitsDataMixin):
+class Data(PositiveData, PositiveCLDataMixin, PumpDataMixin):
     '''
     Container for the data
     '''
 
-class Experiment(AbstractPositiveExperiment, ConstantLimitsExperimentMixin):
+class Experiment(AbstractPositiveExperiment, CLExperimentMixin):
     '''
     Defines the GUI layout
     '''

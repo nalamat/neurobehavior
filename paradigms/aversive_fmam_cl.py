@@ -1,33 +1,27 @@
 from enthought.traits.api import Instance
-from enthought.traits.ui.api import View, Include, VSplit, VGroup, Item, Include
-from enthought.enable.api import Component, ComponentEditor
+from enthought.traits.ui.api import View, VGroup, Item, Include
 from experiments.evaluate import Expression
 from os.path import join
 from cns import get_config
 from cns.signal import am_eq_power, am_eq_phase
+import numpy as np
 
-from experiments import (
-        # Controller and mixins
-        AbstractAversiveController,
-        ConstantLimitsControllerMixin, 
-        PumpControllerMixin,
+from experiments.abstract_aversive_experiment import AbstractAversiveExperiment
+from experiments.abstract_aversive_controller import AbstractAversiveController
+from experiments.abstract_aversive_paradigm import AbstractAversiveParadigm
+from experiments.aversive_data import AversiveData
 
-        # Paradigm and mixins
-        AbstractAversiveParadigm,
-        ConstantLimitsParadigmMixin,
-        PumpParadigmMixin,
+from experiments.cl_controller_mixin import CLControllerMixin
+from experiments.cl_paradigm_mixin import CLParadigmMixin
+from experiments.cl_experiment_mixin import CLExperimentMixin
+from experiments.aversive_cl_data_mixin import AversiveCLDataMixin
 
-        # The experiment
-        AbstractAversiveExperiment,
-        ConstantLimitsExperimentMixin,
-
-        # Data
-        AversiveData,
-        AversiveConstantLimitsDataMixin
-        )
+from experiments.pump_controller_mixin import PumpControllerMixin
+from experiments.pump_paradigm_mixin import PumpParadigmMixin
+from experiments.pump_data_mixin import PumpDataMixin
 
 class Controller(
-        ConstantLimitsControllerMixin,
+        CLControllerMixin,
         PumpControllerMixin,
         AbstractAversiveController):
 
@@ -125,7 +119,7 @@ class Controller(
 class Paradigm(
         AbstractAversiveParadigm, 
         PumpParadigmMixin,
-        ConstantLimitsParadigmMixin,
+        CLParadigmMixin,
         ):
 
     editable_nogo = False
@@ -176,10 +170,10 @@ class Paradigm(
                 ),
             )
 
-class Data(AversiveData, AversiveConstantLimitsDataMixin):
+class Data(AversiveData, AversiveCLDataMixin, PumpDataMixin):
     pass
 
-class Experiment(AbstractAversiveExperiment, ConstantLimitsExperimentMixin):
+class Experiment(AbstractAversiveExperiment, CLExperimentMixin):
 
     data = Instance(Data, (), store='child')
     paradigm = Instance(Paradigm, (), store='child')

@@ -5,7 +5,7 @@ from scipy import stats
 from enthought.traits.api import (HasTraits, Property, cached_property,
         on_trait_change)
 
-class PositiveConstantLimitsDataMixin(HasTraits):
+class PositiveCLDataMixin(HasTraits):
 
     par_go_mask     = Property(depends_on='masked_trial_log, parameters')
 

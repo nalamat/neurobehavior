@@ -36,7 +36,7 @@ class ParInfoAdapter(TabularAdapter):
         except:
             return
 
-class ConstantLimitsExperimentMixin(HasTraits):
+class CLExperimentMixin(HasTraits):
 
     index_range         = Any
     par_info_adapter    = ParInfoAdapter()

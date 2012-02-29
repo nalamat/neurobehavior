@@ -1,7 +1,6 @@
 from enthought.traits.api import (HasTraits, Instance, Button, List, Trait,
         Bool, Property)
 from enthought.traits.ui.api import View, VGroup, HGroup, Item, Include
-from copy import copy
 
 from cns import choice
 
@@ -19,7 +18,7 @@ from .evaluate import Expression
 # allow the user to add another nogo/remind or remove the existing nogo/remind.
 # Likewise, I do not allow the user to remove the last GO from the list.
 
-class ConstantLimitsParadigmMixin(HasTraits):
+class CLParadigmMixin(HasTraits):
 
     editable_nogo = Bool(True)
 
@@ -35,10 +34,6 @@ class ConstantLimitsParadigmMixin(HasTraits):
 
     kw = { 'log': True, 'context': True, 'store': 'attribute' }
 
-    #remind_setting_order = Trait('shuffled set', choice.options, 
-    #        label='Remind setting order', **kw)
-    #nogo_setting_order = Trait('shuffled set', choice.options, 
-    #        label='Nogo setting order', **kw)
     go_setting_order = Trait('shuffled set', choice.options, 
             label='Go setting order', **kw)
     go_probability = Expression('0.5 if c_nogo < 5 else 1', 
@@ -85,7 +80,6 @@ class ConstantLimitsParadigmMixin(HasTraits):
         if not go_found:
             # The list is missing a go.  Let's add it.
             settings.append(TrialSetting('GO'))
-
 
     def _get_nogo_setting(self):
         ts = [t for t in self.trial_settings if t.ttype == 'NOGO']
@@ -149,8 +143,6 @@ class ConstantLimitsParadigmMixin(HasTraits):
         VGroup(
             Item('go_probability'),
             Item('go_setting_order'),
-            #Item('nogo_setting_order'),
-            #Item('remind_setting_order'),
             Item('repeat_fa')
             ),
         Include('cl_trial_setting_group'),
@@ -159,12 +151,3 @@ class ConstantLimitsParadigmMixin(HasTraits):
         )
     
     traits_view = View(constant_limits_paradigm_mixin_group)
-
-if __name__ == '__main__':
-    from trial_setting import add_parameters
-    add_parameters(['test1'], repeats=False)
-    par = ConstantLimitsParadigmMixin()
-    #par.trial_settings = [TrialSetting('GO'), TrialSetting('GO'),
-    #                      TrialSetting('NOGO'), TrialSetting('NOGO')]
-    par.trial_settings = []
-    par.configure_traits()

@@ -1,11 +1,8 @@
 import numpy as np
-from enthought.traits.api import HasTraits, on_trait_change, Bool
+from enthought.traits.api import HasTraits
 from cns import choice
-from copy import copy
 
-class ConstantLimitsControllerMixin(HasTraits):
-    
-    remind_requested = Bool(False)
+class CLControllerMixin(HasTraits):
 
     def _create_selector(self):
         # The selector is a generator function that yields values from a list

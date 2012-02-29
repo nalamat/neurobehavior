@@ -2,10 +2,8 @@ import numpy as np
 import logging
 log = logging.getLogger(__name__)
 
-from pump_data_mixin import PumpDataMixin
-
 from enthought.traits.api import (List, Property, Tuple, cached_property, Any,
-                                  Int, Event)
+                                  Int, Event, HasTraits)
 
 
 from cns.data.h5_utils import get_or_append_node
@@ -18,7 +16,7 @@ def string_array_equal(a, string):
     else:
         return np.array(a) == string
 
-class AbstractExperimentData(PumpDataMixin):
+class AbstractExperimentData(HasTraits):
 
     new_trial = Event
 

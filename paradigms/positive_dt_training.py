@@ -9,7 +9,9 @@ from experiments.abstract_experiment_paradigm import AbstractExperimentParadigm
 from ._positive_dt_controller_mixin import PositiveDTControllerMixin
 from ._positive_dt_paradigm_mixin import PositiveDTParadigmMixin
 
-from experiments import PumpControllerMixin, PumpParadigmMixin
+from experiments.pump_controller_mixin import PumpControllerMixin
+from experiments.pump_paradigm_mixin import PumpParadigmMixin
+from experiments.pump_data_mixin import PumpDataMixin
 
 class Controller(
         PositiveStage1Controller,
@@ -43,7 +45,7 @@ class Paradigm(
                 ),
             )
 
-class Data(PositiveStage1Data): pass
+class Data(PositiveStage1Data, PumpDataMixin): pass
 
 class Experiment(PositiveStage1Experiment):
 

@@ -3,7 +3,7 @@ from __future__ import division
 from enthought.traits.api import HasTraits, Property, cached_property
 import numpy as np
 
-class AversiveConstantLimitsDataMixin(HasTraits):
+class AversiveCLDataMixin(HasTraits):
 
     par_warn_count  = Property(depends_on='masked_trial_log, parameters',
                                cl_statistic=True,
