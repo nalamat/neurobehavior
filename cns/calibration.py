@@ -10,16 +10,6 @@ log = logging.getLogger(__name__)
 def db(target, reference=1):
     return 20*np.log10(target/reference)
 
-#def nearest(target, values):
-#    unique_values = np.unique(values)
-#    i = np.abs(values-target).argmin()
-#    return unique_values[i]
-#
-#def nearest_mask(target, values):
-#    value = nearest(target, values)
-#    mask = values == value
-#    return value, mask
-
 def weights(target, values, check_bounds=False):
     '''
     Given an array of monotonically increasing values and a target value, return
@@ -343,7 +333,9 @@ class Calibration(object):
         frequencies : array-like (Hz)
             The frequencies to compute
         voltage : float (V)
-            The target amplitude of the tone.  Note that whether it's peak to peak or RMS depends on how the calibration data was generated.  I believe FIRCal uses RMS (either case it's "only" 3 dB difference.
+            The target amplitude of the tone.  Note that whether it's peak to
+            peak or RMS depends on how the calibration data was generated.  I
+            believe FIRCal uses RMS (either case it's "only" 3 dB difference).
         gain : float (dB power)
             The output gain of the system
             
@@ -366,7 +358,7 @@ class Calibration(object):
         return self.get_spl(frequencies, voltage, gain)
 
     def get_mean_spl(self, flow, fhigh, voltage=1, gain=0, mode='spectrum',
-            endpoint=False):
+                     endpoint=False):
         '''
         Computes average speaker output (in dB SPL) across given frequency range
 

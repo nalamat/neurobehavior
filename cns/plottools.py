@@ -1,9 +1,24 @@
 '''
 Collection of utilities to aid in generating (beautiful) plots
 '''
+from __future__ import division
 
 import pylab
 import numpy as np
+
+def color_iterator(grouping, cmap='jet'):
+    '''
+    Given a Matplotlib colormap, iterate through the color range in equal-sized
+    increments.
+    '''
+    n = len(grouping)
+    if isinstance(cmap, basestring):
+        cmap = pylab.get_cmap(cmap)
+    for i, g in enumerate(grouping):
+        if n == 1:
+            yield cmap(1), g
+        else:
+            yield cmap(i/(n-1)), g
 
 def adjust_spines(ax, spines, position=5):
     for loc, spine in ax.spines.iteritems():

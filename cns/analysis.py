@@ -4,13 +4,13 @@ import time
 import tables
 import numpy as np 
 from scipy import signal
-from pandas import DataFrame
 from os import path
 
 from .channel import ProcessedFileMultiChannel
 from .arraytools import chunk_samples, chunk_iter
-
 from . import get_config
+from .io import copy_block_data
+
 default_chunk_size = get_config('CHUNK_SIZE')
 
 import logging
@@ -25,44 +25,6 @@ def rates(et, tt, bins):
         n_et = len(pst[m])
         rates.append(n_et/n_tt/(ub-lb))
     return np.array(rates)
-
-def load_event_times(filename, path='/'):
-    with tables.openFile(filename, rootUEP=path) as fh:
-        unsorted_et = fh.root.timestamps[:] / fh.root._v_attrs['fs']
-        channels = fh.root.channels[:]
-        et = []
-        for channel in fh.root.extracted_channels:
-            mask = [channels == channel]
-            et.append((channel, unsorted_et[mask]))
-        return et
-
-def load_trial_log(filename, path='/'):
-    epochs = (
-        'trial_epoch',
-        'physiology_epoch',
-        'poke_epoch',
-        'signal_epoch',
-        )
-    with tables.openFile(filename) as fh:
-        base_node = fh.getNode(path)
-        tl = DataFrame(base_node.trial_log[:])
-        for epoch in epochs:
-            basename = epoch.split('_')[0]
-            node = base_node._f_getChild(epoch)
-            data = node[:]
-            # Save as a timestamp (i.e. the raw integer value)
-            tl[basename + '_ts/']  = data[:,0]
-            tl[basename + '_ts\\']  = data[:,1]
-            # Save as seconds
-            data = data.astype('f')/node._v_attrs['fs']
-            tl[basename + '/']  = data[:,0]
-            tl[basename + '\\']  = data[:,1]
-
-        # Pull in response timestamps as well
-        node = base_node._f_getChild('response_ts')
-        tl['response_ts|'] = node[:]
-        tl['response|'] =  node[:]/node._v_attrs['fs']
-        return tl
 
 def histogram(et, tt, width, lb, ub):
     '''
@@ -106,27 +68,6 @@ def histogram_bins(bin_width, lb, ub):
     bins =  np.arange(lb, ub, bin_width)
     bins -= bins[np.argmin(np.abs(bins))]
     return bins
-
-def copy_block_data(input_node, output_node):
-    '''
-    Copy the behavior data (e.g. trial log, timestamps and epochs) over to the
-    new node.
-    '''
-    to_copy = [('data/trial_log', 'trial_log'),
-               ('data/physiology/epoch', 'physiology_epoch'),
-               ('data/physiology/ts', 'physiology_ts'),
-               ('data/contact/trial_epoch', 'trial_epoch'),
-               ('data/contact/poke_epoch', 'poke_epoch'),
-               ('data/contact/signal_epoch', 'signal_epoch'),
-               ('data/contact/all_poke_epoch', 'all_poke_epoch'),
-               ('data/contact/response_ts', 'response_ts'),
-              ]
-    for (node_path, node_title) in to_copy:
-        try:
-            node = input_node._f_getChild(node_path)
-            node._f_copy(output_node, newname=node_title)
-        except AttributeError:
-            print 'Unable to find {}'.format(node_path)
 
 def zero_waveform(input_node, duration):
     '''
@@ -590,8 +531,6 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
     signs[thresholds < 0] = -1
     thresholds *= signs
 
-    rej_thresholds = rej_thresholds[np.newaxis, :, np.newaxis]
-
     # Keep the user updated as to how many candidate spikes they're getting
     tot_features = 0
 
@@ -675,6 +614,7 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
     # Note that the specified reject threshold for each channel will be honored
     # via broadcasting of the array.  This uses tables.Expr to avoid creating
     # large Numpy temporary arrays in memory (and should be much faster). 
+    rej_thresholds = rej_thresholds[np.newaxis].T
     exp = tables.Expr("(fh_waveforms >= rej_thresholds) |" 
                       "(fh_waveforms < -rej_thresholds)")
 
