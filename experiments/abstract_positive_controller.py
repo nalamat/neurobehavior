@@ -3,7 +3,6 @@ from enthought.traits.ui.api import View, Item, HGroup, spring
 from abstract_experiment_controller import AbstractExperimentController
 from abstract_experiment_controller import ExperimentToolBar
 from cns.pipeline import deinterleave_bits
-from tdt.device import RZ6
 
 from cns import get_config
 from os.path import join
@@ -53,16 +52,20 @@ class AbstractPositiveController(AbstractExperimentController):
     # button.
     remind_requested = Bool(False)
 
-    def set_attenuations(self, att1, att2, check=True):
+    def set_attenuations(self, att1, att2):
         '''
         Set attenuators for Out-1 and Out-2 on the RZ6
 
         Note that this only sets the hardware attenuation in valid steps (e.g.
         0, 20, 40 and 60 dB).  The remaining attenuation must be realized via
         scaling of the waveform before it is uploaded to the signal buffer.
-        '''
 
-        # TODO: remove the logic for fixed attenuation from this code
+        Returns the remaining attenuation that needs to be achieved via scaling
+        the waveform.
+        '''
+        # Again, we hide the import so people can launch the GUI without being
+        # able to run the experiment.
+        from tdt.device import RZ6
 
         # TDT's built-in attenuators for the RZ6 function in 20 dB steps, so we
         # need to determine the next greater step size for the attenuator.  The
@@ -77,13 +80,9 @@ class AbstractPositiveController(AbstractExperimentController):
         hw2, sw2 = RZ6.split_attenuation(att2)
 
         if hw1 != self.current_hw_att1:
-            if check and self.get_current_value('fixed_attenuation'):
-                raise ValueError, 'Cannot change primary attenuation'
             self.current_hw_att1 = hw1
             log.debug('Updated primary attenuation to %.2f', hw1)
         if hw2 != self.current_hw_att2:
-            if check and self.get_current_value('fixed_attenuation'):
-                raise ValueError, 'Cannot change secondary attenuation'
             self.current_hw_att2 = hw2
             log.debug('Updated secondary attenuation to %.2f', hw2)
 

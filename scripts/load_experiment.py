@@ -11,13 +11,24 @@ simple_format = '%(name)s - %(levelname)s - %(message)s'
 
 # Set up the logging file.  If a path has been defined, save the file to that
 # path.  If not, save the logging data to a temporary file.
-try:
-    from cns import get_config
-    filename = path.join(get_config('LOG_ROOT'), strftime('%Y%m%d_%H%M.log'))
-except ImportError:
+from cns import get_config
+
+log_root = get_config('LOG_ROOT') 
+if path.exists(log_root):
+    filename = path.join(log_root, strftime('%Y%m%d_%H%M.log'))
+else:
     import tempfile
+    import warnings
+    import textwrap
     fh = tempfile.NamedTemporaryFile(delete=False)
     filename = fh.name
+    mesg = '''
+    The folder for storing log files, {}, does not exist.  the log file will be
+    saved to the temporary file {}.  In the future, please create the folder,
+    {}, or update your NEUROBEHAVIOR_SETTINGS and/or NEUROBEHAVIOR_BASE to point
+    to the appropriate log file directory.'''
+    mesg = mesg.format(log_root, filename, log_root)
+    warnings.warn(textwrap.dedent(mesg).replace('\n', ''))
 
 logging_config = {
         'version': 1,

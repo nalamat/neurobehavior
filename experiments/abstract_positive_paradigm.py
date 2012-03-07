@@ -5,7 +5,6 @@ from .abstract_experiment_paradigm import AbstractExperimentParadigm
 from .evaluate import Expression
 
 class AbstractPositiveParadigm(AbstractExperimentParadigm):
-
     
     kw = {'context': True, 'store': 'attribute', 'log': True}
 

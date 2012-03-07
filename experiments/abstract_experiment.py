@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from enthought.traits.ui.menu import MenuBar, Menu, ActionGroup, Action
+from enthought.traits.ui.menu import MenuBar, Menu, ActionGroup, Action, ToolBar
 from enthought.traits.api import HasTraits, Any, Instance, Property, Bool
 from enthought.traits.ui.api import View, Include, VGroup, Item, Tabbed
 
@@ -88,16 +88,6 @@ class AbstractExperiment(HasTraits):
                         Action(name='Save paradigm as', action='saveas_paradigm'),
                     ),
                     name='&Paradigm'),
-                Menu(
-                    ActionGroup(
-                        Action(name='Load primary calibration',
-                               action='load_calibration'),
-                        Action(name='Load secondary calibration',
-                               action='load_calibration'),
-                        Action(name='Show calibration',
-                               action='show_calibration'),
-                        ),
-                    name='&Calibration'),
             ),
             height=0.9, 
             width=0.9)

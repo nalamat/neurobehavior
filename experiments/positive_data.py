@@ -1,19 +1,13 @@
 from __future__ import division
 
-from scipy import stats
 from abstract_experiment_data import AbstractExperimentData
 from sdt_data_mixin import SDTDataMixin
-from enthought.traits.api import Instance, List, CFloat, Int, Float, Any, \
-    Range, DelegatesTo, cached_property, on_trait_change, Array, Event, \
-    Property, Undefined, Callable, Str, Enum, Bool, Int, Str, Tuple, CList
-from enthought.traits.ui.api import EnumEditor, VGroup, Item, View
-from datetime import datetime
+from enthought.traits.api import Instance, Int, Float, \
+    cached_property, Array, Property, Enum
 import numpy as np
 from cns.data.h5_utils import get_or_append_node
 
 from cns.channel import FileTimeseries, FileChannel, FileEpoch
-
-from enthought.traits.ui.api import CheckListEditor
 
 import logging
 log = logging.getLogger(__name__)
@@ -56,11 +50,16 @@ edge_falling = lambda TTL: np.r_[0, np.diff(TTL.astype('i'))] == -1
 # maximum resolution of the system (i.e. the sampling rate of the DSP).  Also,
 # all logged timestamps now reflect the *maximum* resolution of the system
 # rather than the sampling rate of the TTL.
+# V4.0 - 120306 - Removed comm_inhibit_TTL and TO_safe_TTL since these are no
+# longer needed/used.  Also removed the unused store='channel' and store_path
+# attributes from the FileChannel/FileMultiChannel Trait instance definitions
+# because these are no longer needed.
 
 class PositiveData(AbstractExperimentData, SDTDataMixin):
 
-    # VERSION is a reserved keyword in HDF5 files, so I avoid using it here.
-    OBJECT_VERSION = Float(3.0, store='attribute')
+    # VERSION is a reserved keyword in HDF5 files, so I use OBJECT_VERSION
+    # instead
+    OBJECT_VERSION = Float(4.0, store='attribute')
 
     mask_mode = Enum('none', 'include recent')
     mask_num = Int(25)
@@ -88,30 +87,17 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
     c_nogo_all = Int(0, context=True, label='Consecutive nogos')
     fa_rate = Float(0, context=True, label='Running FA rate (frac)')
 
-    poke_TTL = Instance(FileChannel, 
-            store='channel', store_path='contact/poke_TTL')
-    spout_TTL = Instance(FileChannel, 
-            store='channel', store_path='contact/spout_TTL')
-    trial_TTL = Instance(FileChannel, 
-            store='channel', store_path='contact/trial_TTL')
-    response_TTL = Instance(FileChannel, 
-            store='channel', store_path='contact/response_TTL')
-    pump_TTL = Instance(FileChannel,
-            store='channel', store_path='contact/pump_TTL')
-    signal_TTL = Instance(FileChannel,
-            store='channel', store_path='contact/signal_TTL')
-    reaction_TTL = Instance(FileChannel,
-            store='channel', store_path='contact/reaction_TTL')
-    reward_TTL = Instance(FileChannel,
-            store='channel', store_path='contact/reward_TTL')
-    TO_TTL = Instance(FileChannel,
-            store='channel', store_path='contact/TO_TTL')
-    TO_safe_TTL = Instance(FileChannel,
-            store='channel', store_path='contact/TO_safe_TTL')
-    comm_inhibit_TTL = Instance(FileChannel,
-            store='channel', store_path='contact/comm_inhibit_TTL')
+    poke_TTL        = Instance(FileChannel)
+    spout_TTL       = Instance(FileChannel)
+    trial_TTL       = Instance(FileChannel)
+    response_TTL    = Instance(FileChannel)
+    pump_TTL        = Instance(FileChannel)
+    signal_TTL      = Instance(FileChannel)
+    reaction_TTL    = Instance(FileChannel)
+    reward_TTL      = Instance(FileChannel)
+    TO_TTL          = Instance(FileChannel)
 
-    microphone = Instance(FileChannel, store='channel', store_path='microphone')
+    microphone      = Instance(FileChannel)
 
     trial_epoch     = Instance(FileEpoch)
     signal_epoch    = Instance(FileEpoch)
@@ -149,12 +135,6 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
 
     def _TO_TTL_default(self):
         return self._create_channel('TO_TTL', np.bool)
-
-    def _TO_safe_TTL_default(self):
-        return self._create_channel('TO_safe_TTL', np.bool)
-
-    def _comm_inhibit_TTL_default(self):
-        return self._create_channel('comm_inhibit_TTL', np.bool)
 
     def _trial_epoch_default(self):
         node = get_or_append_node(self.store_node, 'contact')
@@ -224,8 +204,6 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
         poke_data = self.poke_TTL.get_range_index(ts_start, ts_end+5,
                 check_bounds=True)
         spout_data = self.spout_TTL.get_range_index(ts_start, ts_end+5,
-                check_bounds=True)
-        response_data = self.response_TTL.get_range_index(ts_start, ts_end+5,
                 check_bounds=True)
 
         reaction = 'normal'

@@ -7,7 +7,6 @@ from os import path
 
 from .evaluate import evaluate_value, evaluate_expressions
 
-from tdt import DSPProject
 from cns import get_config
 
 from enthought.pyface.api import error, confirm, YES
@@ -161,7 +160,7 @@ class AbstractExperimentController(Controller):
     # with the DSPs.  All circuits must be loaded and buffers initialized before
     # the process is started (so the process can appropriately allocate the
     # required shared memory resources).
-    process         = Instance(DSPProject)
+    process         = Instance('tdt.DSPProject')
     system_tray     = Any
 
     # Calibration objects
@@ -182,7 +181,14 @@ class AbstractExperimentController(Controller):
     address = Trait(None, None, Tuple(Str, Int))
 
     def _process_default(self):
-        return DSPProject(address=self.address)
+        # Imports typically should be listed at the top of the module (outside
+        # any class definitions, methods or functions); however, I hde the
+        # import for tdt here so that people can launch the GUI on their home
+        # computers without having to install the tdt module.  Obviously the
+        # experiment code will fail to run if TDTPy has not been installed, but
+        # you should at least be able to get to a GUI.
+        import tdt
+        return tdt.DSPProject(address=self.address)
 
     def _get_status(self):
         if self.state == 'disconnected':
