@@ -1,4 +1,4 @@
-function [ lfp ] = stack_lfp( lfp, trial_mask, lb, ub )
+function [ lfp ] = nb_stack_lfp( lfp, trial_mask, lb, ub )
 %   Neurobehavior by Buran BN and Sanes DH
 %   
 %   TODO

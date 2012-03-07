@@ -1,8 +1,9 @@
-function [spikes] = slice_spikes(spikes, lb, ub)
+function [spikes] = nb_slice_spikes(spikes, lb, ub)
 %   Neurobehavior by Buran BN and Sanes DH
 %
-%   SLICE_SPIKES Return subset of spikes, handling the slicing of all pertinent
-%   arrays in the structure.  Covariance data remains unchanged, however.
+%   NB_SLICE_SPIKES Return subset of spikes, handling the slicing of all
+%   pertinent arrays in the structure.  Covariance data remains unchanged,
+%   however.
 
     spikes.waveforms = spikes.waveforms(lb:ub,:);
     spikes.timestamps = spikes.timestamps(lb:ub);
