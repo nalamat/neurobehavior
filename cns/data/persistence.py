@@ -1,9 +1,7 @@
-import functools
 import tables
 import re
 from numpy import dtype, array, bool_
 from enthought.traits.api import Array, List, Dict
-from cns.channel import FileChannel, FileMultiChannel
 import datetime
 
 import logging
@@ -308,13 +306,6 @@ def load_automatic(node, name, trait):
     path = trait.store_path if trait.store_path else name
     return node._f_getChild(path)
 
-def load_channel(node, name, trait):
-    try:
-        value = getattr(node, trait.store_path)
-    except (TypeError, AttributeError):
-        value = getattr(node, name)
-    return load_file_channel(value)
-
 def load_attribute(node, name, trait):
     value = node._f_getAttr(name)
     # TraitMap will raise an error here
@@ -462,8 +453,7 @@ def load_object(source, path=None, type=None):
         except AttributeError:
             raise PersistenceReadError(node._v_file.filename, node._v_pathname)
 
-    loaders = (('channel', load_channel),
-               ('automatic', load_automatic),
+    loaders = (('automatic', load_automatic),
                ('child', load_child),
                ('table', load_table),
                ('attribute', load_attribute),
@@ -484,21 +474,3 @@ def load_object(source, path=None, type=None):
 
     object = type(**kw)
     return append_metadata(object, node)
-
-def load_file_channel(node):
-    kw = {}
-    kw['fs'] = node._f_getAttr('fs')
-    kw['dtype'] = node.atom.dtype
-    kw['compression_level'] = node.filters.complevel
-    kw['compression_type'] = node.filters.complib
-    kw['use_checksum'] = node.filters.fletcher32
-    kw['node'] = node._g_getparent()
-    kw['buffer'] = node
-    kw['name'] = node.name
-    
-    if len(node.shape) == 2:
-        klass = FileMultiChannel
-        kw['channels'] = node.shape[1]
-    else:
-        klass = FileChannel
-    return klass(**kw)
