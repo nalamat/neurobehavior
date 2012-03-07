@@ -6,7 +6,7 @@ from glob import glob
 import argparse
 
 from cns.analysis import decimate_waveform
-from cns.iotools import update_progress
+from cns.io import update_progress
 
 class GlobPath(argparse.Action):
 
@@ -44,3 +44,4 @@ if __name__ == '__main__':
 
     for filename in args.files:
         main(filename, args.force_overwrite)
+

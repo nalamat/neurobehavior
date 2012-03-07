@@ -214,6 +214,9 @@ def filter_response(b, a, fs, axes_magnitude=None, axes_phase=None):
         axes_phase.semilogx(f, np.unwrap(np.angle(h)))
 
 def rfft(signal, fs):
+    '''
+    Compute the real spectrum of the signal
+    '''
     N = len(signal)
     freq = rfftfreq(N, 2.0/fs)
     component = np.fft.rfft(signal, N) / N

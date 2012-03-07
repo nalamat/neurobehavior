@@ -9,10 +9,12 @@ class BaseChannelPlot(BaseXYPlot):
     '''
 
     source                  = Instance('cns.channel.Channel')
+
     fill_color              = black_color_trait
     line_color              = black_color_trait
     line_width              = Float(1.0)
     line_style              = LineStyle
+
     data_changed            = Event
 
     def _source_changed(self, old, new):

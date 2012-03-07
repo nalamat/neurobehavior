@@ -7,7 +7,12 @@ variable points to.
 '''
 
 import os, re, logging
-from os.path import dirname, join, abspath, getmtime
+from os import path
+
+# Ensure that ETS toolkit will default to PyQt4 and use the PyQt (instead of
+# the less stable PySide backend) if we load it
+os.environ['ETS_TOOLKIT'] = 'qt4' 
+#os.environ['QT_API'] = 'pyqt'
 
 # Maximum (safe) output voltage for DACs to speaker
 MAX_SPEAKER_DAC_VOLTAGE = 7
@@ -22,15 +27,29 @@ CHUNK_SIZE      = 50e6
 # Size of sample (in seconds) to use for computing the noise floor
 NOISE_DURATION  = 16 
 
-BASE_DIRECTORY  = os.environ['NEUROBEHAVIOR_BASE']
-LOG_ROOT        = join(BASE_DIRECTORY, 'logs')        # log files
-TEMP_ROOT       = join(BASE_DIRECTORY, 'temp')        # temp files
-DATA_ROOT       = join(BASE_DIRECTORY, 'data')        # data files
-COHORT_ROOT     = DATA_ROOT                           # cohort files
-CAL_ROOT        = join(BASE_DIRECTORY, 'calibration') # calibration files
-SETTINGS_ROOT   = join(BASE_DIRECTORY, 'settings')
-PARADIGM_ROOT   = join(SETTINGS_ROOT, 'paradigm')
-PHYSIOLOGY_ROOT = join(SETTINGS_ROOT, 'physiology')
+try:
+    BASE_DIRECTORY  = os.environ['NEUROBEHAVIOR_BASE']
+except KeyError:
+    import warnings
+    import textwrap
+    # Default to the user's home directory and raise a warning.
+    BASE_DIRECTORY = path.expanduser('~')
+    mesg = '''No NEUROBEHAVIOR_BASE environment variable defined.  Defaulting to
+    the user's home directory, {}.  In the future, it is recommended that you
+    create a base directory where the paradigm settings, calibration data, log
+    files and data files can be stored.  Once this directory is created, create
+    the environment variable, NEUROBEHAVIOR_BASE with the path to the directory
+    as the value.'''
+    warnings.warn(textwrap.dedent(mesg.format(BASE_DIRECTORY)))
+
+LOG_ROOT        = path.join(BASE_DIRECTORY, 'logs')        # log files
+TEMP_ROOT       = path.join(BASE_DIRECTORY, 'temp')        # temp files
+DATA_ROOT       = path.join(BASE_DIRECTORY, 'data')        # data files
+COHORT_ROOT     = DATA_ROOT                                # cohort files
+CAL_ROOT        = path.join(BASE_DIRECTORY, 'calibration') # calibration files
+SETTINGS_ROOT   = path.join(BASE_DIRECTORY, 'settings')
+PARADIGM_ROOT   = path.join(SETTINGS_ROOT, 'paradigm')
+PHYSIOLOGY_ROOT = path.join(SETTINGS_ROOT, 'physiology')
 
 # Default filename extensions used by the FileBrowser dialog to open/save files.
 COHORT_WILDCARD     = 'Cohort files (*.cohort.hd5)|*.cohort.hd5|'
@@ -41,15 +60,27 @@ PHYSIOLOGY_WILDCARD = 'Physiology settings (*.phy)|*.phy|'
 # snippet size for the SpikeSort component if this value is changed.
 PHYSIOLOGY_SPIKE_SNIPPET_SIZE = 20
 
-PROGRAM_BASE = abspath(join(dirname(__file__), '..'))
-EXPERIMENT_ROOT = join(PROGRAM_BASE, 'launchers')
-EXPERIMENT_PATTERN = join(EXPERIMENT_ROOT, '*.py')
+# __file__ is a special variable that is available in all Python files (when
+# loaded by the Python interpreter) that contains the path of the current file
+# or script. We extract the directory portion of the path and use that to
+# determine where the RCX files are stored. We keep components in source code
+# control as well to ensure that changes to the RCX files track changes to the
+# software.
+NEUROBEHAVIOR_BASE = path.abspath(path.join(path.dirname(__file__), '..'))
+
+# Consider making these a list of lists.  That way we can specify a paradigms
+# search path (e.g. users can store their paradigms in different locations and
+# Neurobehavior will search for this).  This may be a bit dangerous as it
+# increases the complexity of the program structure with little gain for
+# end-users.
+PARADIGMS_ROOT = path.join(NEUROBEHAVIOR_BASE, 'paradigms')
+RCX_ROOT = path.join(NEUROBEHAVIOR_BASE, 'components')
 
 def get_recent_cal(pattern):
     try:
         files = os.listdir(CAL_ROOT)
-        files = [join(CAL_ROOT, f) for f in files if pattern.match(f)]
-        files = [(getmtime(f), f) for f in files]
+        files = [path.join(CAL_ROOT, f) for f in files if pattern.match(f)]
+        files = [(path.getmtime(f), f) for f in files]
         files.sort()
         files = [f[1] for f in files]
         return files[-1]
@@ -87,29 +118,15 @@ SYRINGE_DATA = {
         'B-D 10cc (glass)'      : 14.20,
         }
 
-# __file__ is a special variable that is available in all Python files (when
-# loaded by the Python interpreter) that contains the path of the current file
-# or script. We extract the directory portion of the path and use that to
-# determine where the RCX files are stored. We keep components in source code
-# control as well to ensure that changes to the RCX files track changes to the
-# software.
-RCX_ROOT = join(abspath(dirname(__file__)), '../components')
-
-# Ensure that ETS toolkit will default to PyQt4 and use the PyQt (instead of
-# the less stable PySide backend) if we load it
-os.environ['ETS_TOOLKIT'] = 'qt4' 
-os.environ['QT_API'] = 'pyqt'
 
 # By convention, settings are in all caps.  Print these to the log file to
 # facilitate debugging other users' programs.
-#log = logging.getLogger(__name__)
 log = logging.getLogger()
 for k, v in sorted(globals().items()):
     if k == k.upper():
         log.debug("CNS SETTING %s : %r", k, v)
 
 # Color settings for the experiments
-
 COLOR_NAMES = {
     'light green': '#98FB98',
     'dark green': '#2E8B57',
@@ -125,6 +142,12 @@ EXPERIMENT_COLORS  = {
     'GO': COLOR_NAMES['light green'],
     'NOGO_REPEAT': COLOR_NAMES['dark red'],
     'NOGO': COLOR_NAMES['light red'],
+
+    # In the first version of the appetitive trial log (and also possibly the
+    # aversive) the GO_REMIND ttype was logged as REMIND.  This is left in for
+    # backwards-compatibility when reviewing older experiments using the
+    # review_physiology.py application.
+    'REMIND': COLOR_NAMES['dark green'],
     }
 
 PAIRED_COLORS_RGB_NORM = [
@@ -141,3 +164,12 @@ PAIRED_COLORS_RGB_NORM = [
    (1.000, 0.500, 0.000),
    (1.000, 0.750, 0.500),
    ]
+
+# Format to use when generating time strings (see time.strptime for
+# documentation re the format specifiers to use below)
+TIME_FORMAT = '%Y_%m_%d_%H_%M_%S'
+
+# Wildcards to use when presenting a GUI prompt to open the relevant file
+PHYSIOLOGY_RAW_WILDCARD = 'Raw (*_raw.hd5)|*_raw.hd5|'
+PHYSIOLOGY_EXTRACTED_WILDCARD = 'Extracted (*_extracted*.hd5)|*_extracted*.hd5|'
+PHYSIOLOGY_SORTED_WILDCARD = 'Sorted (*_sorted*.hd5)|*_sorted*.hd5|'

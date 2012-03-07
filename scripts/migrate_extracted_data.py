@@ -1,6 +1,7 @@
 import argparse
 import tables
 from glob import glob
+import numpy as np
 
 blocks = (
     'physiology_epoch', 
@@ -149,6 +150,18 @@ def main(filename):
             node._f_rename('timestamps_n')
             ts = node[:] / node._v_attrs['fs']
             fh.createArray(event_node, 'timestamps', ts)
+
+        if len(event_node.artifacts) != len(event_node.waveforms):
+            rej_thresholds = event_node._v_attrs['reject_threshold']
+            rej_thresholds = np.abs(rej_thresholds)
+            rej_thresholds = rej_thresholds[np.newaxis].T
+            fh_waveforms = event_node.waveforms
+            exp = tables.Expr("(fh_waveforms >= rej_thresholds) |" 
+                              "(fh_waveforms < -rej_thresholds)")
+            artifacts = exp.eval()
+            artifacts = np.any(artifacts, axis=-1)
+            event_node.artifacts.truncate(0)
+            event_node.artifacts.append(artifacts)
 
 if __name__ == '__main__':
     class GlobPath(argparse.Action):
