@@ -4,16 +4,18 @@ import tables
 import cPickle as pickle
 import numpy as np
 import re
+from os import path
 
-from pyface.api import FileDialog, OK, error, ProgressDialog, ImageResource, \
+from pyface.api import FileDialog, OK, error, ProgressDialog, \
         information, confirm, YES
 from enable.api import Component, ComponentEditor
-from chaco.api import LinearMapper, DataRange1D, OverlayPlotContainer
+from chaco.api import (LinearMapper, DataRange1D, OverlayPlotContainer,
+                       LogMapper, ArrayDataSource, LinePlot)
 from traitsui.api import VGroup, Item, View, \
         HSplit, Tabbed, Controller
 from traits.api import Instance, HasTraits, Float, DelegatesTo, \
      Bool, Int, Any, Event, Property,\
-     List, cached_property, Str, Enum, File
+     List, cached_property, Str, Enum, File, Range
 
 # Used for displaying the checkboxes for channel/plot visibility config
 from traitsui.api import TableEditor, ObjectColumn, EnumEditor
@@ -34,10 +36,13 @@ from cns.chaco_exts.channel_range_tool import MultiChannelRangeTool
 from cns.chaco_exts.channel_number_overlay import ChannelNumberOverlay
 from cns.chaco_exts.threshold_overlay import ThresholdOverlay
 from cns.chaco_exts.extracted_spike_overlay import ExtractedSpikeOverlay
+from cns.sigtools import rfft
 
 from cns.analysis import (extract_spikes, median_std, decimate_waveform,
     truncate_waveform, zero_waveform)
+
 COLORS = get_config('EXPERIMENT_COLORS')
+RAW_WILDCARD = get_config('PHYSIOLOGY_RAW_WILDCARD')
 
 is_none = lambda x: x is None
 
@@ -180,8 +185,10 @@ class ChannelSetting(HasTraits):
     std             = Float(np.nan)
     # Standard deviations above the noise floor for candidate features
     th_std          = Float(-5.0)
-    # Standard deviations above the noise floor to reject candidate 
-    artifact_std    = Float(20.0)
+    # Standard deviations above the noise floor to reject candidate.  Since this
+    # is a +/- reject, we should just ensure that it can never be set to a
+    # negative value by using Range.
+    artifact_std    = Range(0.0, np.inf, 20.0)
     # Convert to mV for displaying on-screen
     std_mv          = Property(Float, depends_on='std')
     # Thresholds to use for spike extraction (can be NaN or Inf)
@@ -264,8 +271,7 @@ class PhysiologyReviewController(Controller):
 
     def open_file(self, info):
         # Get the output filename from the user
-        dialog = FileDialog(action="open", 
-                            wildcard='HDF5 file (*.hd5)|*.hd5|')
+        dialog = FileDialog(action="open", wildcard=RAW_WILDCARD)
         dialog.open()
         if dialog.return_code != OK:
             return
@@ -549,9 +555,8 @@ class PhysiologyReviewController(Controller):
     def overlay_extracted_spikes(self, info):
         # Suggest a filename based on the filename of the original file (to make
         # it easier for the user to just click "OK").
-        filename = info.object.data_node._v_file.filename
-        filename = re.sub(r'(.*)\.(h5|hd5|hdf5)', r'\1_extracted.\2',
-                          filename)
+        filename = re.sub(r'(.*?)(_raw)?\.(h5|hd5|hdf5)', r'\1_extracted.\3',
+                          info.object.data_node._v_file.filename)
 
         # Get the output filename from the user
         dialog = FileDialog(action="open", 
@@ -562,12 +567,54 @@ class PhysiologyReviewController(Controller):
             return
 
         with tables.openFile(dialog.path, 'r') as fh:
-            timestamps = fh.root.event_data.timestamps[:]
+            ts = fh.root.event_data.timestamps[:]
             channels = fh.root.event_data.channels[:]-1
-            overlay = ExtractedSpikeOverlay(timestamps=timestamps,
+            clusters = fh.root.event_data.assigns[:]
+            cluster_ids = fh.root.event_data._v_attrs['cluster_ids']
+            cluster_types = fh.root.event_data._v_attrs['cluster_labels']
+            overlay = ExtractedSpikeOverlay(timestamps=ts,
                                             channels=channels,
+                                            clusters=clusters,
+                                            cluster_ids=cluster_ids,
+                                            cluster_types=cluster_types,
                                             plot=info.object.channel_plot)
             info.object.channel_plot.overlays.append(overlay)
+            info.object.spike_overlays.append(overlay)
+
+    def overlay_sorted_spikes(self, info):
+        # Suggest a filename based on the filename of the original file (to make
+        # it easier for the user to just click "OK").
+        wildcard = re.sub(r'(.*?)(_raw)?\.(h5|hd5|hdf5)', r'\1_*_sorted.\3',
+                          path.basename(info.object.data_node._v_file.filename))
+        wildcard = 'HDF5 file (*_sorted.hd5)|{}|'.format(wildcard)
+        print wildcard
+        # Get the output filename from the user
+        dialog = FileDialog(action="open", wildcard=wildcard)
+        dialog.open()
+        if dialog.return_code != OK:
+            return
+
+        with tables.openFile(dialog.path, 'r') as fh:
+            ts = fh.root.unwrapped_times[:].ravel()
+            channels = fh.root.channels[:].ravel()-1
+            clusters = fh.root.assigns[:].ravel()
+            cluster_ids = fh.root.labels[0].ravel()
+            cluster_types = fh.root.labels[1].ravel()
+
+            overlay = ExtractedSpikeOverlay(timestamps=ts,
+                                            channels=channels,
+                                            clusters=clusters,
+                                            cluster_ids=cluster_ids,
+                                            cluster_types=cluster_types,
+                                            plot=info.object.channel_plot)
+
+            info.object.channel_plot.overlays.append(overlay)
+            info.object.spike_overlays.append(overlay)
+
+    def clear_spike_overlays(self, info):
+        while info.object.spike_overlays:
+            overlay = info.object.spike_overlays.pop()
+            info.object.channel_plot.overlays.remove(overlay)
 
     def _prepare_decimation_settings(self, info):
         kwargs = {}
@@ -616,10 +663,10 @@ class PhysiologyReviewController(Controller):
     def _get_filename(self, extension, info):
         # Suggest a filename based on the filename of the original file (to make
         # it easier for the user to just click "OK").
-        filename = info.object.data_node._v_file.filename
-        filename = re.sub(r'(.*)\.(h5|hd5|hdf5)',
-                          r'\1_{}.\2'.format(extension),
-                          filename)
+        filename = re.sub(r'(.*?)(_raw)?\.(h5|hd5|hdf5)',
+                          r'\1_{}.\3'.format(extension),
+                          info.object.data_node._v_file.filename)
+
         # Get the output filename from the user
         dialog = FileDialog(action="save as", 
                             wildcard='HDF5 file (*.hd5)|*.hd5|',
@@ -694,7 +741,9 @@ class PhysiologyReviewController(Controller):
 
 class PhysiologyReview(HasTraits):
 
-    # File to save batch jobs to for later processing
+    spike_overlays      = List(Instance('chaco.api.AbstractOverlay'),
+                               transient=True)
+
     datafile            = File(transient=True)
     datapath            = Str(transient=True)
     batchfile           = File(transient=True)
@@ -735,8 +784,8 @@ class PhysiologyReview(HasTraits):
     std_ub              = Int(-1, setting=True) # upper bound (in samples)
 
     # What to show
-    artifact_overlay_visible = Bool(True)
-    threshold_overlay_visible = Bool(True)
+    artifact_overlay_visible    = Bool(True)
+    threshold_overlay_visible   = Bool(True)
 
     def _trial_data_default(self):
         return []
@@ -922,20 +971,11 @@ class PhysiologyReview(HasTraits):
         width=0.9,
         handler=PhysiologyReviewController(),
 
-        # For all the ImageResource icons, the icons should be located under
-        # <folder where this file is>/images/.  As for the enabled_when, these
-        # are Python expresssions that are evaluated anytime something changes
-        # in the program.  "object" is a reference to the PhysiologyReview
-        # instance and I *think* that "handler" would be a reference to the
-        # PhysiologyReviewController instance.  If you want to pick out some
-        # icons, look under the cns/widgets/oxygen directory.  These are all
-        # open-source icons designed by the Oxygen project.
         menubar = MenuBar(
             Menu(
                 ActionGroup(
                     Action(name='&Open file',
                            accelerator='Ctrl+O',
-                           image=ImageResource('open.png'),
                            action='open_file'),
                     Action(name='&Create &batchfile',
                            action='create_batchfile'),
@@ -950,13 +990,11 @@ class PhysiologyReview(HasTraits):
                            action='save_settings',
                            tooltip='Save channel and filter settings',
                            accelerator='Ctrl+S',
-                           image=ImageResource('save_settings.png'),
                            enabled_when='object.data_node is not None'
                           ),
                     Action(name='Revert settings', 
                            action='load_settings',
                            accelerator='Ctrl+R',
-                           image=ImageResource('revert_settings.png'),
                            enabled_when='object.data_node is not None',
                           ),
                     Action(name='Default settings', 
@@ -1003,15 +1041,24 @@ class PhysiologyReview(HasTraits):
                     Action(name='Overlay extracted spikes',
                            action='overlay_extracted_spikes',
                            enabled_when='object.data_node is not None'),
+                    Action(name='Overlay sorted spikes',
+                           action='overlay_sorted_spikes',
+                           enabled_when='object.data_node is not None'),
+                    Action(name='Clear spike overlays',
+                           action='clear_spike_overlays',
+                           enabled_when='object.data_node is not None'),
                 ),
                 name='&Settings',
             ),
             Menu(
                 ActionGroup(
-                    Action(name=u'Compute signal std. dev.', 
+                    Action(name='Show spectrum',
+                           action='show_spectrum_plot'),
+                ),
+                ActionGroup(
+                    Action(name='Compute signal std. dev.', 
                            action='compute_std',
                            accelerator='Ctrl+C',
-                           image=ImageResource('compute.png'),
                            enabled_when='object.data_node is not None'
                           ),
                 ),
@@ -1019,13 +1066,11 @@ class PhysiologyReview(HasTraits):
                     Action(name='Extract spikes',
                            action='extract_spikes',
                            accelerator='Ctrl+E',
-                           image=ImageResource('extract.png'),
                            enabled_when='object.data_node is not None ' + \
                                         'and len(object.extract_channels)',
                           ),
                     Action(name='Queue spike extraction',
                            action='queue_extraction',
-                           image=ImageResource('extract.png'),
                            enabled_when='object.data_node is not None ' + \
                                         'and object.batchfile ' + \
                                         'and len(object.extract_channels)',
@@ -1035,7 +1080,6 @@ class PhysiologyReview(HasTraits):
                     Action(name='Decimate waveform',
                            action='decimate_waveform',
                            accelerator='Ctrl+D',
-                           image=ImageResource('extract.png'),
                            enabled_when='object.data_node is not None'),
                     Action(name='Queue decimation',
                            action='queue_decimation',
@@ -1098,49 +1142,6 @@ def get_experiment_node_dialog(filename):
         dialog.configure_traits()
         i = options.index(dialog.experiment)
         return nodes[i]._v_pathname
-
-def get_experiment_node(filename=None):
-    '''
-    Given a physiology experiment file with multiple experiments, prompt the
-    user for the experiment they'd like to analyze.  If only one experiment is
-    present, no prompt will be generated.
-
-    filename : str or None
-        File to obtain experiment from.  If None, extract the argument from
-        sys.argv[1]
-
-    returns : (filename, node path)
-    '''
-    if filename is None:
-        import sys
-        filename = sys.argv[1]
-
-    with tables.openFile(filename, 'r') as fh:
-        nodes = fh.root._f_listNodes()
-        if len(nodes) == 1:
-            return filename, nodes[0]._v_pathname
-        elif len(nodes) == 0:
-            return ''
-
-        while True:
-            print 'Available experiments to analyze'
-            for i, node in enumerate(nodes):
-                try:
-                    trials = len(node.data.trial_log)
-                except:
-                    trials = 0
-                print '{}. {} trials: {}'.format(i, trials, node._v_name)
-
-            ans = raw_input('Which experiment would you like to analyze? ')
-            try:
-                ans = int(ans)
-                if 0 <= ans < len(nodes):
-                    break
-                else:
-                    print 'Invalid option'
-            except ValueError:
-                print 'Please enter the number of the experiment'
-        return filename, nodes[ans]._v_pathname
 
 if __name__ == '__main__':
     import sys
