@@ -5,7 +5,6 @@ log = logging.getLogger(__name__)
 from enthought.traits.api import (List, Property, Tuple, cached_property, Any,
                                   Int, Event, HasTraits)
 
-
 from cns.data.h5_utils import get_or_append_node
 from cns.channel import FileChannel
 from cns.util.math import rcount
@@ -134,7 +133,8 @@ class AbstractExperimentData(HasTraits):
         elif names == self._trial_log_columns:
             self._trial_log.append(record)
         else:
-            log.debug("Expected the following columns %r", self._trial_log_columns)
+            log.debug("Expected the following columns %r",
+                      self._trial_log_columns)
             log.debug("Recieved the following columns %r", names)
             raise AttributeError, "Invalid log_trial attempt"
         self.new_trial = kwargs

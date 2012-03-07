@@ -16,9 +16,10 @@ from cns import calibration
 import logging
 log = logging.getLogger(__name__)
 
-# Import the experiments
-from cns.data.h5_utils import append_node, append_date_node
 from cns import get_config
+from datetime import datetime
+
+time_fmt = get_config('TIME_FORMAT')
 
 class ExperimentCohortView(CohortView):
 
@@ -151,6 +152,10 @@ def prepare_experiment(args, store_node):
     Experiment, Controller, Data and Paradigm class accordingly and return an
     instance of the model and controller class.
     '''
+
+    # The HDF5 file that is used for the data
+    store_file = store_node._v_file
+
     # If the user did not specify a list of parameters that the data should be
     # grouped into before analysis (i.e. for computing the hit and false alarm
     # fractions), then use the parameters specified via rove as the analysis
@@ -170,12 +175,13 @@ def prepare_experiment(args, store_node):
     data_class = module.Data
     node_name = module.node_name
 
-    # Create the experiment and data nodes. Hint!  This is where you would
+    # Create the experiment and data nodes. Hint! This is where you would
     # change the default pathname for the experiment if you wished.
-    exp_node = append_date_node(store_node, node_name + '_')
+    name = node_name + '_' + datetime.now().strftime(time_fmt)
+    exp_node = store_file.createGroup(store_node, name)
 
     # Where the data is stored
-    data_node = append_node(exp_node, 'data')
+    data_node = store_file.createGroup(exp_node, 'data')
 
     # Configure the TrialSetting/trial_setting_editor objects to contain the
     # parameters we wish to control in the experiment
@@ -196,7 +202,6 @@ def prepare_experiment(args, store_node):
 
         cal1 = calibration.load_mat_cal(cal1_filename, args.equalized)
         log.debug('Loaded calibration file %s for primary', cal1_filename)
-
         cal2 = calibration.load_mat_cal(cal2_filename, args.equalized)
         log.debug('Loaded calibration file %s for secondary', cal2_filename)
 

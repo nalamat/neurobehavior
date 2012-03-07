@@ -1,6 +1,6 @@
 from traitsui.api import VGroup
 
-from experiments.eval import Expression
+from experiments.evaluate import Expression
 from experiments.fixed_attenuation_paradigm_mixin import \
         FixedAttenuationParadigmMixin
 

@@ -4,8 +4,6 @@ from enthought.traits.api import Instance, Bool, HasTraits, Tuple, Float
 from enthought.savage.traits.ui.svg_button import SVGButton
 from cns.widgets.icons import icons
 
-from new_era import PumpInterface
-
 class PumpToolBar(ToolBar):
     '''
     Toolbar containing command buttons that allow us to control the pump via a
@@ -31,7 +29,7 @@ class PumpToolBar(ToolBar):
 class PumpControllerMixin(HasTraits):
 
     pump_toolbar        = Instance(PumpToolBar, (), toolbar=True)
-    iface_pump          = Instance(PumpInterface, ())
+    iface_pump          = Instance('new_era.PumpInterface', ())
     pump_toggle         = Bool(False)
     pump_trigger_cache  = Tuple
     pump_volume_cache   = Float

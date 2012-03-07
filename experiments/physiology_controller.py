@@ -3,7 +3,6 @@ from enthought.traits.api import (Instance, Any, List, on_trait_change, Enum)
 from enthought.traits.ui.api import Controller
 from enthought.pyface.timer.api import Timer
 
-from tdt import DSPProject
 from cns import get_config
 from os.path import join
 from cns.pipeline import deinterleave_bits
@@ -29,7 +28,7 @@ class PhysiologyController(Controller):
     physiology_ttl_pipeline = Any
     buffer_spikes           = List(Any)
     state                   = Enum('master', 'client')
-    process                 = Instance(DSPProject)
+    process                 = Instance('tdt.DSPProject')
     timer                   = Instance(Timer)
     parent                  = Any
 
@@ -147,20 +146,6 @@ class PhysiologyController(Controller):
             cl = data[:,-1].view('int32')
             self.model.data.spikes[i].send(snip, ts, cl)
 
-    #@on_trait_change('model:settings:spike_thresholds')
-    #def set_spike_thresholds(self, instance, name, old, new):
-    #    print instance, name, old, new
-    #    value = new
-    #    for ch, threshold in enumerate(value):
-    #        name = 'a_spike{}'.format(ch+1)
-    #        self.iface_physiology.set_tag(name, threshold)
-
-    #@on_trait_change('model:settings:channel_settings:spike_windows')
-    #def _update_windows(self, channel, name, old, new):
-    #    if name != 'model' and self.iface_physiology is not None:
-    #        tag_name = 'c_spike{}'.format(channel.number)
-    #        self.iface_physiology.set_sort_windows(tag_name, new)
-            
     @on_trait_change('model.settings.spike_signs')
     def set_spike_signs(self, value):
         for ch, sign in enumerate(value):
@@ -204,11 +189,6 @@ class PhysiologyController(Controller):
     @on_trait_change('model.settings.monitor_gain_3')
     def set_monitor_gain_3(self, value):
         self.iface_physiology.set_tag('ch3_out_sf', value*1e3)
-
-    #@on_trait_change('model.settings.mapped_channels')
-    #def set_mapped_channels(self, value):
-    #    #self.iface_physiology.set_coefficients('ch_map', value)
-    #    pass
 
     @on_trait_change('model.settings.diff_matrix')
     def set_diff_matrix(self, value):
