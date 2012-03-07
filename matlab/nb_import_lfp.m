@@ -1,8 +1,10 @@
-function [ lfp ] = import_lfp( filename, channel, segment, field, value )
+function [ lfp ] = nb_import_lfp( filename, channel, segment, field, value )
 %   Neurobehavior by Buran BN and Sanes DH
 %   
-%   IMPORT_LFP Load lfp data from HDF5 file into Matlab
+%   NB_IMPORT_LFP Load lfp data from HDF5 file into Matlab
 %
+%   Parameters
+%   ----------
 %   filename : string
 %       Name of file containing downsampled data.  This file will typically be
 %       generated via the review_physiology GUI or using the downsample.py

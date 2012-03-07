@@ -1,7 +1,7 @@
-function [spikes] = sort_spikes(spikes)
+function [spikes] = nb_sort_spikes(spikes)
 %   Neurobehavior by Buran BN and Sanes DH
 %
-%   SORT_SPIKES Run the spike sorting functions
+%   NB_SORT_SPIKES Run the spike sorting functions
 
     spikes = ss_align(spikes);
     spikes = ss_kmeans(spikes);

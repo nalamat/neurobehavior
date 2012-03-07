@@ -1,7 +1,7 @@
-function [spikes] = import_ums2000(filename, sort, varargin)
+function [spikes] = nb_import_ums2000(filename, sort, varargin)
 %   Neurobehavior by Buran BN and Sanes DH
 %
-%   IMPORT_UMS2000 Load spike waveforms from HDF5 file into Matlab
+%   NB_IMPORT_UMS2000 Load spike waveforms from HDF5 file into Matlab
 %
 %   required parameters
 %   -------------------
@@ -11,8 +11,12 @@ function [spikes] = import_ums2000(filename, sort, varargin)
 %   sort : boolean
 %       Run spike sorting algorithms before returning
 %
-%   Important!  See IMPORT_SPIKES for a list of the optional arguments that
-%   you can pass along.
+%   Important information
+%   ---------------------
+%   * See IMPORT_SPIKES for a list of the optional arguments that you can pass
+%     along.
+%   * You must use Brad's version of UMS2000 with this code (unless they agree
+%     to incorporate Brad's changes into the UMS2000 package).
 %
 %   Returns struct containing spike waveform data that can be used directly by
 %   UltraMegaSort2000.
@@ -23,17 +27,26 @@ function [spikes] = import_ums2000(filename, sort, varargin)
 %   practice to keep file naming consistent.
 
     % Load the spike waveform data
-    spikes = import_spikes(filename, varargin{:});
+    spikes = nb_import_spikes(filename, varargin{:});
     
-    fs = double(h5readatt(filename, '/', 'fs'));
-    window_size = double(h5readatt(filename, '/', 'window_size'));
-    cross_time = double(h5readatt(filename, '/', 'cross_time'));
+    fs = double(h5readatt(filename, '/event_data/waveforms', 'fs'));
+    window_size = double(h5readatt(filename, '/event_data', 'window_size'));
+    cross_time = double(h5readatt(filename, '/event_data', 'cross_time'));
     shadow = 0;
     
     params = ss_default_params(fs, 'window_size', window_size, ...
                                'cross_time', cross_time, ...
                                'shadow', shadow);
     spikes.params = params.params;
+
+    % This is a new feature added to UMS2000 by BNB that allows the user to
+    % provide an arbitrary number of fields (where each field's length is equal
+    % to the number of events being sorted).  This will allow us to carry along
+    % some important metadata about each event (e.g. the channel and how to find
+    % it in the original extracted file) that UMS2000 doesn't handle by default.
+    % For this, you *MUST* use Brad's version of UMS2000.
+    extra_fields = {'channels', 'source_indices', 'channel_indices'};
+    spikes.params.extra_fields = extra_fields;
     
     spikes.spiketimes = spikes.timestamps./spikes.params.Fs;
     spikes.unwrapped_times = spikes.spiketimes;
@@ -41,14 +54,13 @@ function [spikes] = import_ums2000(filename, sort, varargin)
 
     % Now, let's reformat some of the fields so the same data structure is
     % compatible with UltraMegaSort2000.  Note that we upcast a lot of the
-    % datatypes to double simply because Matlab does not seem to deal well with
-    % non-double datatypes.
-    align_sample = h5readatt(filename, '/', 'samples_before')+1.0;
+    % datatypes to double simply because Matlab (and some functions in UMS2000)
+    % do not seem to deal well with non-double datatypes.
+    align_sample = h5readatt(filename, '/event_data', 'samples_before')+1.0;
     spikes.info.detect.align_sample = double(align_sample);
-    spikes.info.detect.cov = double(h5read(filename, '/covariance_matrix'));
     spikes.info.detect.dur = [spikes.spiketimes(end)];
-    stds = double(h5read(filename, '/noise_std'));
-    thresh = double(h5read(filename, '/threshold'));
+    stds = double(h5readatt(filename, '/event_data', 'noise_std'));
+    thresh = double(h5readatt(filename, '/event_data', 'threshold'));
     
     extract_indices = spikes.info.detect.extract_indices;
     window_samples = spikes.info.detect.window_samples;
@@ -61,17 +73,18 @@ function [spikes] = import_ums2000(filename, sort, varargin)
     % waveform so that it is negative.
     thresh = thresh(extract_indices);
     spikes.info.detect.thresh = thresh;
-    
-    % Two negatives make a positive (i.e. if threhsold is negative, don't
-    % flip).
-    spikes.waveforms = spikes.waveforms .* (sign(thresh) .* -1);
+    for i=length(thresh),
+        if sign(thresh(i)) == 1,
+            spikes.waveforms(:,:,i) = spikes.waveforms(:,:,i) * -1;
+        end
+    end
     
     % We need to pull out only the covariance data we need.wave
     cov_samples = length(extract_indices) * window_samples;
     % Explicitly requesting a 2D array is better than the implicit creation
     % of one ...
     cov_extracted = zeros(cov_samples, cov_samples);
-    cov_full = double(h5read(filename, '/covariance_matrix'));
+    cov_full = double(h5read(filename, '/event_data/covariance_matrix'));
     
     % The code below is a beautiful example of why 0-based indexing is so
     % much better ... Anyway, we need to pull out the covariance data relating
@@ -95,14 +108,17 @@ function [spikes] = import_ums2000(filename, sort, varargin)
 
             xycov = cov_full(full_xlb:full_xub, full_ylb:full_yub);
             cov_extracted(e_xlb:e_xub, e_ylb:e_yub) = xycov;
+        end
     end
     spikes.info.detect.cov = cov_extracted;
     
-    % UMS2000 needs to know what channel the detection event occured on.
+    % If we pulled out waveforms from more than one channel, then UMS2000 needs
+    % to know what channel the detection event occured on so it can use that
+    % channel for aligning the waveform.
     event_channels = zeros(length(spikes.waveforms), 1);
-    detect_channels = spikes.info.detect.detect_channels;
-    for i = 1:length(detect_channels),
-        event_channels(spikes.channels==detect_channels(i)) = i;
+    waveform_channels = spikes.info.detect.waveform_channels;
+    for i = 1:length(waveform_channels),
+        event_channels(spikes.channels==waveform_channels(i)) = i;
     end
     spikes.info.detect.event_channel = event_channels;
     

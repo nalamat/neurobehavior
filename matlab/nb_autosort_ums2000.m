@@ -1,7 +1,7 @@
-function autosort_ums2000(filenames, varargin)
+function nb_autosort_ums2000(filenames, varargin)
 %   Neurobehavior by Buran BN and Sanes DH
 %
-%   AUTOSORT_UMS2000 Run UMS2000 on each channel in the datafile using the given
+%   NB_AUTOSORT_UMS2000 Run UMS2000 on each channel in the datafile using the given
 %   settings specified by varargin.  See IMPORT_UMS2000 and IMPORT_SPIKES for
 %   more detail on the arguments that can be passed to varargin.  This function
 %   uses 'detect_channels' and 'waveform_channels', so don't attempt to set
