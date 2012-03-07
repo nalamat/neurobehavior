@@ -106,17 +106,13 @@ def extract_date_from_string(string):
     time_string = time_pattern.search(string).group()
     return datetime.strptime(time_string, time_fmt)
 
-S_V_ATTR = '+'
-S_P_ATTR = '../'
-S_SEPARATOR = '/'
-
 def _parse_xattr(xattr):
-    xattr = xattr.replace(S_P_ATTR, '/_v_parent/') # replace ../ with _v_parent
-    xattr = xattr.replace(S_V_ATTR, '/_v_attrs/')  # replace + with _v_attrs
-    xattr = xattr.replace('//', '/')               # remove double slashes
-    xattr = xattr.replace(S_SEPARATOR, '.')        # convert to attribute access
+    xattr = xattr.replace('../', '/_v_parent/') # replace ../ with _v_parent
+    xattr = xattr.replace('+', '/_v_attrs/')    # replace + with _v_attrs
+    xattr = xattr.replace('//', '/')            # remove double slashes
+    xattr = xattr.replace('/', '.')             # convert to attribute access
     xattr = xattr.replace('<.', '<')
-    xattr = xattr.strip('.')                       # remove leading period
+    xattr = xattr.strip('.')                    # remove leading period
     return xattr
 
 def _getattr(obj, xattr):
@@ -235,7 +231,7 @@ def node_match(n, filter):
                 return False
     return True
 
-def walk_nodes(where, filter, classname=None):
+def walk_nodes(where, filter, classname=None, wildcards=None):
     '''
     Starting at the specifide node, `walk_nodes` visits each node in the
     hierarchy, returning a list of all nodes that match the filter criteria.
@@ -319,9 +315,71 @@ def walk_nodes(where, filter, classname=None):
         if node_match(node, filter):
             yield node
 
+LINK_CLASSES = tables.link.SoftLink, tables.link.ExternalLink
+
+def p_get_node(node, pattern, dereference=True):
+    '''
+    Load a single node based on a indeterminate path
+
+    Used to obtain a node when you know that there is one (and only one) node
+    that can be reached by the specified pattern.  The pattern may contain
+    wildcards to indicate that the name of the intermediate node is unknown.
+
+    If multiple nodes match the wildcard pattern, only the first one found will
+    be returned.
+
+    In this example, the file only containes a single physiology experiment.
+    However, the parent node is PositiveDTCL_2011_09_09_11_59_58.  You would not
+    know what the exact name of this node is without checking it first.
+
+    >>> fh = tables.openFile('110909_G1_tail_behavior_raw.hd5', 'r')
+    >>> trial_log = p_load_node(fh.root, '*/data/trial_log')
+    '''
+    return list(p_load_nodes(node, pattern, dereference))[0]
+
+def p_load_nodes(node, pattern, dereference=True):
+    '''
+    TODO (document)
+    '''
+    if type(pattern) != type([]):
+        pattern = pattern.split('/')
+
+    # Check to see if the node is a SoftLink or ExternalLink.  If so, get the
+    # actual node that the link points to by dereferencing (see the PyTables
+    # documentation for an explanation of this).
+    if dereference and isinstance(node, LINK_CLASSES):
+        node = node()
+
+    if len(pattern) == 0:
+        yield node
+    elif '*' == pattern[0]:
+        for n in node._f_iterNodes():
+            for n in p_load_nodes(n, pattern[1:]):
+                yield n
+    else:
+        n = node._f_getChild(pattern[0])
+        for n in p_load_nodes(n, pattern[1:]):
+            yield n
+
+def p_list_nodes(file_name, pattern, dereference=True):
+    '''
+    When you know the structure of your datafile (and it is well-formed), then
+    this function will be significantly faster than walk_nodes.
+
+    You must process each node as they are loaded.  Once the generator is
+    exhausted, the file will be closed and you will be unable to access the data
+    stored in the node.
+    '''
+    with tables.openFile(file_name, 'r') as fh:
+        pattern = pattern.split('/')
+        if pattern[0] != '':
+            raise ValueError, 'Pattern must begin with /'
+        for node in load_nodes(fh.root, pattern[1:]):
+            yield node
+
 @memory.cache(ignore=('file_name',))
 def _extract_data(file_name, filters, fields=None, summary=None,
-                  classname='Table', hash=''):
+                  classname='Table', hash='', mode='walk'):
     '''
     Not meant for direct use.  This is broken out of :func:`extract_data` so we
     can wrap the code in a caching decorator to speed up loading of data from
@@ -332,14 +390,19 @@ def _extract_data(file_name, filters, fields=None, summary=None,
     log.info('... No cached copy of data found, reloading data')
     with tables.openFile(file_name, 'r') as h:
         data = DataFrame()
-        for node in walk_nodes(h.root, filters, classname):
+        if mode == 'walk':
+            iterator = walk_nodes(h.root, filters, classname)
+        else:
+            iterator = p_load_nodes(h.root, filters)
+
+        for node in iterator:
             log.info('... Found node %s', node._v_pathname)
             if type(node) == tables.Table:
                 # Node is a HDF5 table.  Table.read() returns a Numpy record
                 # array (a data structure that is essentially an array with
-                # named columns and nested data structures).  We convert
-                # this record array into a DataFrame and add some metadata
-                # about where it came from.
+                # named columns and nested data structures).  We convert this
+                # record array into a DataFrame and add some metadata about
+                # where it came from.
                 frame = DataFrame.from_records(node.read())
                 frame['_path'] = node._v_pathname
                 frame['_source'] = node._v_name
