@@ -1,20 +1,34 @@
 import numpy as np
-from enthought.enable.api import MarkerTrait, ColorTrait
+from enthought.enable.api import ColorTrait
 from enthought.chaco.api import AbstractOverlay
-from enthought.traits.api import Instance, Any, Int
-from enthought.traits.ui.api import View, Item, VGroup
+from enthought.traits.api import Instance, Array, Int
+from enable import markers
+
+from cns import get_config
+colors = get_config('PAIRED_COLORS_RGB_NORM')
+
+cluster_type_marker = {
+    1:  (3,  markers.CIRCLE_MARKER),
+    2:  (7,  markers.INVERTED_TRIANGLE_MARKER),
+    3:  (7,  markers.TRIANGLE_MARKER),
+    4:  (1,  markers.DOT_MARKER),
+    5:  (3,  markers.DOT_MARKER),
+}
 
 class ExtractedSpikeOverlay(AbstractOverlay):
 
     plot = Instance('enthought.enable.api.Component')
-    timestamps = Any
-    channels = Any
+    
+    timestamps = Array(dtype='float')   # Time in seconds of each event
+    channels = Array(dtype='int')       # 0-based channel for each event
+    clusters = Array(dtype='int')       # Cluster ID for each event
+    cluster_ids = Array(dtype='int')    # List of clusters
+    cluster_types = Array(dtype='int')  # Type of cluster
 
-    marker = MarkerTrait('inverted_triangle')
     marker_size = Int(5)
     line_width = Int(0)
-    fill_color = ColorTrait('red')
     line_color = ColorTrait('white')
+    marker_color = ColorTrait('red')
 
     def overlay(self, component, gc, view_bounds=None, mode="normal"):
         plot = self.plot
@@ -23,25 +37,25 @@ class ExtractedSpikeOverlay(AbstractOverlay):
                 gc.clip_to_rect(component.x, component.y, component.width,
                                 component.height)
                 gc.set_line_width(self.line_width)
-                gc.set_fill_color(self.fill_color_)
                 gc.set_stroke_color(self.line_color_)
 
-                for o, n in zip(plot.screen_offsets, plot.channel_visible):
-                    ts = self.timestamps[self.channels == n]
-                    ts_offset = np.ones(len(ts))*o
-                    ts_screen = plot.index_mapper.map_screen(ts)
-                    points = np.column_stack((ts_screen, ts_offset))
-                    gc.draw_marker_at_points(points, self.marker_size,
-                            self.marker_.kiva_marker)
+                i = 0
+                for c_id, c_type in zip(self.cluster_ids, self.cluster_types):
+                    marker_size, marker_id = cluster_type_marker[c_type]
+                    if c_type in (2, 3):
+                        color = colors[i]
+                        i += 1
+                    else:
+                        color = colors[-1]
+                    gc.set_fill_color(color)
+                    c_mask = self.clusters == c_id
 
-    traits_view = View(
-        VGroup(
-            Item('marker'),
-            Item('marker_size'),
-            Item('line_width'),        
-            Item('fill_color'),
-            Item('line_color'),
-            show_border=True,
-            label='Spike Marker',
-            ),
-        )
+                    for o, n in zip(plot.screen_offsets, plot.channel_visible):
+                        ch_mask = self.channels == n
+                        mask = ch_mask & c_mask
+                        ts = self.timestamps[mask]
+
+                        ts_offset = np.ones(len(ts))*o
+                        ts_screen = plot.index_mapper.map_screen(ts)
+                        points = np.column_stack((ts_screen, ts_offset))
+                        gc.draw_marker_at_points(points, marker_size, marker_id)
