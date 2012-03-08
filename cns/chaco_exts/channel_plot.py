@@ -81,11 +81,12 @@ class ChannelPlot(BaseChannelPlot):
         if not self._screen_cache_valid:
             # Obtain cached data and map to screen
             val_pts = self._cached_data
-            s_val_pts = self.value_mapper.map_screen(val_pts) 
+            s_val_pts = self._map_screen(val_pts) 
             self._cached_screen_data = s_val_pts
 
             # Obtain cached data bounds and create index points
-            n = len(val_pts)
+            #n = len(val_pts)
+            n = val_pts.shape[-1]
             t_screen = self.index_mapper.map_screen(self.index_values[:n])
             self._cached_screen_index = t_screen
 
@@ -93,6 +94,9 @@ class ChannelPlot(BaseChannelPlot):
             self._screen_cache_valid = True
             
         return self._cached_screen_index, self._cached_screen_data
+
+    def _map_screen(self, data):
+        return self.value_mapper.map_screen(data)
 
     def _draw_plot(self, gc, view_bounds=None, mode="normal"):
         self._gather_points()

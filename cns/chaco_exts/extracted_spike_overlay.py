@@ -39,6 +39,9 @@ class ExtractedSpikeOverlay(AbstractOverlay):
                 gc.set_line_width(self.line_width)
                 gc.set_stroke_color(self.line_color_)
 
+                low, high = plot.index_range.low, plot.index_range.high
+                ts_mask = (self.timestamps >= low) & (self.timestamps <= high)
+
                 i = 0
                 for c_id, c_type in zip(self.cluster_ids, self.cluster_types):
                     marker_size, marker_id = cluster_type_marker[c_type]
@@ -52,7 +55,7 @@ class ExtractedSpikeOverlay(AbstractOverlay):
 
                     for o, n in zip(plot.screen_offsets, plot.channel_visible):
                         ch_mask = self.channels == n
-                        mask = ch_mask & c_mask
+                        mask = ch_mask & c_mask & ts_mask
                         ts = self.timestamps[mask]
 
                         ts_offset = np.ones(len(ts))*o

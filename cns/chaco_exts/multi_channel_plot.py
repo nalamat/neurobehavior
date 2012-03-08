@@ -3,11 +3,10 @@ from __future__ import division
 from enthought.traits.api import Instance, on_trait_change
 
 import numpy as np
-from .extremes_channel_plot import ExtremesChannelPlot
-
+from .channel_plot import ChannelPlot
 from enthought.traits.api import List, Float, Property, cached_property
 
-class ExtremesMultiChannelPlot(ExtremesChannelPlot):
+class MultiChannelPlot(ChannelPlot):
 
     source = Instance('cns.channel.MultiChannel')
     
@@ -68,16 +67,9 @@ class ExtremesMultiChannelPlot(ExtremesChannelPlot):
         gc.set_line_width(self.line_width) 
 
         gc.begin_path()
-        if self.draw_mode == 'normal':
-            idx, val = points
-            for v in val:
-                gc.lines(np.c_[idx, v])
-        else:
-            idx, (mins, maxes) = points
-            for lb, ub in zip(mins, maxes):
-                starts = np.column_stack((idx, lb))
-                ends = np.column_stack((idx, ub))
-                gc.line_set(starts, ends)
+        idx, val = points
+        for v in val:
+            gc.lines(np.c_[idx, v])
 
         gc.stroke_path()
         self._draw_default_axes(gc)

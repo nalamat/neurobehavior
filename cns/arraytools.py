@@ -78,16 +78,17 @@ def chunk_samples(x, max_bytes=10e6, block_size=None, axis=-1):
         raise ValueError, "cannot achieve requested chunk size"
     return int(samples)
     
-def chunk_iter(x, chunk_samples, loverlap=0, roverlap=0, padtype='const',
-               axis=-1, ndslice=None):
+def chunk_iter(x, chunk_samples, step_samples=None, loverlap=0, roverlap=0,
+               padtype='const', axis=-1, ndslice=None):
     '''
-    Return an iterable that yields the data in chunks.  Only supports chunking
-    along the last axis at the moment.
+    Return an iterable that yields the data in chunks along the specified axis.  
 
     x : ndarray
         The array that will be chunked
     chunk_samples : int
         Number of samples per chunk along the specified axis
+    step_samples : int or None
+        Number of samples between the first sample of each chunk
     loverlap : int
         Number of samples on the left to overlap with prior chunk (used to
         handle extraction of features that cross chunk boundaries).  These
@@ -164,14 +165,92 @@ def chunk_iter(x, chunk_samples, loverlap=0, roverlap=0, padtype='const',
     >>> print next(iterable)
     [[250 250 251 252 253 254 255 256]
      [500 500 501 502 503 504 505 506]]
+
+    We can also define the step_samples (defined as the number of samples
+    between the right edges of the chunks, not including the right overlap).
+
+    >>> iterable = chunk_iter(x, 5, step_samples=10)
+    >>> print next(iterable)
+    [[  0   1   2   3   4]
+     [250 251 252 253 254]
+     [500 501 502 503 504]
+     [750 751 752 753 754]]
+
+    Note that the next cycle jumps 10 samples ahead
+
+    >>> print next(iterable)
+    [[ 10  11  12  13  14]
+     [260 261 262 263 264]
+     [510 511 512 513 514]
+     [760 761 762 763 764]]
+
+    >>> iterable = chunk_iter(x, 5, step_samples=2)
+    >>> print next(iterable)
+    [[  0   1   2   3   4]
+     [250 251 252 253 254]
+     [500 501 502 503 504]
+     [750 751 752 753 754]]
+
+    Note that the next chunk partially overlaps with the prior chunk
+
+    >>> print next(iterable)
+    [[  2   3   4   5   6]
+     [252 253 254 255 256]
+     [502 503 504 505 506]
+     [752 753 754 755 756]]
+
+    Both overlap and step_samples can be combined to produce fancy chunking
+    behavior.
+
+    >>> iterable = chunk_iter(x, 10, step_samples=5, roverlap=2, loverlap=2)
+    >>> print next(iterable)
+    [[  0   0   0   1   2   3   4   5   6   7   8   9  10  11]
+     [250 250 250 251 252 253 254 255 256 257 258 259 260 261]
+     [500 500 500 501 502 503 504 505 506 507 508 509 510 511]
+     [750 750 750 751 752 753 754 755 756 757 758 759 760 761]]
+
+    >>> print next(iterable)
+    [[  3   4   5   6   7   8   9  10  11  12  13  14  15  16]
+     [253 254 255 256 257 258 259 260 261 262 263 264 265 266]
+     [503 504 505 506 507 508 509 510 511 512 513 514 515 516]
+     [753 754 755 756 757 758 759 760 761 762 763 764 765 766]]
+
+    >>> print next(iterable)[..., 2:-2]
+    [[ 10  11  12  13  14  15  16  17  18  19]
+     [260 261 262 263 264 265 266 267 268 269]
+     [510 511 512 513 514 515 516 517 518 519]
+     [760 761 762 763 764 765 766 767 768 769]]
+
+    One can achieve similar chunking using the set the step_samples instead of
+    the roverlap and loverlap arguments.  However, the appropriate way to
+    achieve the desired chunking behavior may be more intuitive using one
+    approach over the other.
+
+    Typically roverlap and loverlap are used when you have algorithms that may
+    require data from adjacent chunks to properly process the actual chunk
+    itself (e.g. stablizing the edges of a digital filter or performing feature
+    detection where the feature may cross the chunk boundary).  
+
+    In contrast, step_samples is used when you have an algorithm that computes a
+    running metric (e.g. you can set step_samples to smaller than the chunk_size
+    to "smooth out" the running value, or you can set step_samples to greater
+    than the chunk size if you only want a "snapshot").
+
+    Now, if you are performing filtering *and* computing a running metric, you
+    would likely use all three keywords to achieve the optimal chunking
+    behavior.
     '''
     samples = x.shape[axis]
     i = 0
+
+    if step_samples is None:
+        step_samples = chunk_samples
+    
     while i < samples:
         s = slice(i, i+chunk_samples)
         yield slice_overlap(x, s, start_overlap=loverlap, stop_overlap=roverlap,
                             axis=axis, ndslice=ndslice)
-        i += chunk_samples
+        i += step_samples
 
 def axis_slice(a, start=None, stop=None, step=None, axis=-1, ndslice=None):
     """
