@@ -1,10 +1,11 @@
-# This code will require Traits 4
+# Ok, so technically this isn't a script ...
 
 import tables
 import cPickle as pickle
 import numpy as np
 import re
 from os import path
+from numpy.lib import recfunctions
 
 from pyface.api import FileDialog, OK, error, ProgressDialog, \
         information, confirm, YES
@@ -27,16 +28,16 @@ from traitsui.api import TabularEditor
 from traitsui.tabular_adapter import TabularAdapter
 
 from cns import get_config
-from cns.channel import ProcessedFileMultiChannel, FileChannel
+from cns.channel import ProcessedFileMultiChannel, FileChannel, FileMultiChannel
 from cns.chaco_exts.helpers import add_default_grids, add_time_axis
 from cns.chaco_exts.channel_data_range import ChannelDataRange
 from cns.chaco_exts.extremes_multi_channel_plot import ExtremesMultiChannelPlot
+from cns.chaco_exts.multi_channel_plot import MultiChannelPlot
 from cns.chaco_exts.ttl_plot import TTLPlot
 from cns.chaco_exts.channel_range_tool import MultiChannelRangeTool
 from cns.chaco_exts.channel_number_overlay import ChannelNumberOverlay
 from cns.chaco_exts.threshold_overlay import ThresholdOverlay
 from cns.chaco_exts.extracted_spike_overlay import ExtractedSpikeOverlay
-from cns.sigtools import rfft
 
 from cns.analysis import (extract_spikes, median_std, decimate_waveform,
     truncate_waveform, zero_waveform)
@@ -103,6 +104,11 @@ CHANNEL_FORMAT = {
 }
 
 class TrialLogAdapter(TabularAdapter):
+    '''
+    This is a wrapper around the actual trial_log table in the HDF5 file.  Come
+    to think of it, we could implement something reasonably similar for the
+    on-line experiment code.
+    '''
 
     # List of tuples (column_name, field )
     columns = [ ('P',       'parameter'),
@@ -140,7 +146,10 @@ class TrialLogAdapter(TabularAdapter):
         return "{0}:{1:02}".format(*divmod(int(seconds), 60))
 
     def _get_bg_color(self):
-        return COLORS[self.item['ttype']]
+        if self.item['valid']:
+            return COLORS[self.item['ttype']]
+        else:
+            return '#AAAAAA'
 
     def _get_reaction_image(self):
         if self.item['reaction'] == 'early':
@@ -165,9 +174,17 @@ class TrialLogAdapter(TabularAdapter):
         else:
             return '@icons:none_node'   # a gray icon
 
+    def delete(self, object, trait, row):
+        # The delete method is mapped to the delete key on the keyboard.
+        # Instead of actually deleting the trial, we mark it as bad.
+        obj = getattr(object, trait)
+
+        # Flip the flag.  0 = invalid, 1 = valid.
+        obj.cols.valid[row] = not obj.cols.valid[row]
+
 trial_log_editor = TabularEditor(editable=False, 
                                  adapter=TrialLogAdapter(),
-                                 selected='current_trial')
+                                 selected='trial_selected')
 
 class ChannelSetting(HasTraits): 
     # Channel number (used for indexing purposes so this should be zero-based)
@@ -280,24 +297,25 @@ class PhysiologyReviewController(Controller):
             return
 
         fh = tables.openFile(dialog.path, 'a', rootUEP=nodepath)
-        if info.object.data_node and info.object.data_node._v_file.isopen:
-            info.object.data_node._v_file.close()
+        if info.object.data_node and info.object.data_file.isopen:
+            info.object.data_file.close()
 
         # Save the information back to the object
+        info.object.data_file = fh
         info.object.data_node = fh.root
-        info.object.datafile = dialog.path
-        info.object.datapath = nodepath
+        info.object.data_filename = dialog.path
+        info.object.data_pathname = nodepath
         self._update_title(info)
         self.load_settings(info)
 
     def _update_title(self, info):
         if info.object.batchfile:
             template = '{} >> {} - Physiology Review'
-            info.ui.title = template.format(info.object.datafile,
+            info.ui.title = template.format(info.object.data_filename,
                                             info.object.batchfile)
         else:
             template = '{} - Physiology Review'
-            info.ui.title = template.format(info.object.datafile)
+            info.ui.title = template.format(info.object.data_filename)
     
     def open_batchfile(self, info):
         dialog = FileDialog(action="open", 
@@ -340,7 +358,8 @@ class PhysiologyReviewController(Controller):
         for setting in settings:
             records.append(setting.trait_get().values())
         records = np.rec.fromrecords(records, names=setting.trait_get().keys())
-        table = node._v_file.createTable(node, 'channel_metadata', records)
+        table = info.object.data_file.createTable(node, 'channel_metadata',
+                                                  records)
 
         # Save the filtering/referencing settings as attributes in the table
         # node.  This code basically pulls out all of the traits on the
@@ -515,9 +534,8 @@ class PhysiologyReviewController(Controller):
 
         # Suggest a filename based on the filename of the original file (to make
         # it easier for the user to just click "OK").
-        filename = info.object.data_node._v_file.filename
         filename = re.sub(r'(.*)\.(h5|hd5|hdf5)', r'\1_extracted.\2',
-                          filename)
+                          info.object.data_filename)
 
         # Get the output filename from the user
         dialog = FileDialog(action="save as", 
@@ -556,7 +574,7 @@ class PhysiologyReviewController(Controller):
         # Suggest a filename based on the filename of the original file (to make
         # it easier for the user to just click "OK").
         filename = re.sub(r'(.*?)(_raw)?\.(h5|hd5|hdf5)', r'\1_extracted.\3',
-                          info.object.data_node._v_file.filename)
+                          info.object.data_filename)
 
         # Get the output filename from the user
         dialog = FileDialog(action="open", 
@@ -569,9 +587,9 @@ class PhysiologyReviewController(Controller):
         with tables.openFile(dialog.path, 'r') as fh:
             ts = fh.root.event_data.timestamps[:]
             channels = fh.root.event_data.channels[:]-1
-            clusters = fh.root.event_data.assigns[:]
-            cluster_ids = fh.root.event_data._v_attrs['cluster_ids']
-            cluster_types = fh.root.event_data._v_attrs['cluster_labels']
+            clusters = np.ones(len(channels))
+            cluster_ids = [1]
+            cluster_types = [1]
             overlay = ExtractedSpikeOverlay(timestamps=ts,
                                             channels=channels,
                                             clusters=clusters,
@@ -585,9 +603,8 @@ class PhysiologyReviewController(Controller):
         # Suggest a filename based on the filename of the original file (to make
         # it easier for the user to just click "OK").
         wildcard = re.sub(r'(.*?)(_raw)?\.(h5|hd5|hdf5)', r'\1_*_sorted.\3',
-                          path.basename(info.object.data_node._v_file.filename))
+                          path.basename(info.object.data_filename))
         wildcard = 'HDF5 file (*_sorted.hd5)|{}|'.format(wildcard)
-        print wildcard
         # Get the output filename from the user
         dialog = FileDialog(action="open", wildcard=wildcard)
         dialog.open()
@@ -616,6 +633,35 @@ class PhysiologyReviewController(Controller):
             overlay = info.object.spike_overlays.pop()
             info.object.channel_plot.overlays.remove(overlay)
 
+    def overlay_rms(self, info):
+        # Suggest a filename based on the filename of the original file (to make
+        # it easier for the user to just click "OK").
+        wildcard = re.sub(r'(.*?)(_raw)?\.(h5|hd5|hdf5)', r'\1_rms.\3',
+                          path.basename(info.object.data_filename))
+        wildcard = 'HDF5 file (*_rms.hd5)|{}|'.format(wildcard)
+        # Get the output filename from the user
+        dialog = FileDialog(action="open", wildcard=wildcard)
+        dialog.open()
+        if dialog.return_code != OK:
+            return
+
+        fh = tables.openFile(dialog.path, 'r')
+        mc = FileMultiChannel.from_node(fh.root.rms)
+
+        value_mapper = LinearMapper(range=DataRange1D())
+        index_mapper = LinearMapper(range=info.object.index_range)
+        plot = MultiChannelPlot(source=mc, 
+                                value_mapper=value_mapper,
+                                index_mapper=index_mapper,
+                                line_color='blue',
+                                line_width=2.0)
+
+        info.object.channel_plot.sync_trait('channel_spacing', plot)
+        info.object.channel_plot.sync_trait('channel_offset', plot)
+        info.object.channel_plot.sync_trait('channel_visible', plot)
+
+        info.object.plot_container.add(plot)
+
     def _prepare_decimation_settings(self, info):
         kwargs = {}
         kwargs['q'] = np.floor(info.object.channel.fs/600.0)
@@ -640,8 +686,8 @@ class PhysiologyReviewController(Controller):
         if outputfile is None:
             return
         file_info = {
-            'input_file':   info.object.datafile,
-            'input_path':   info.object.datapath,
+            'input_file':   info.object.data_filename,
+            'input_path':   info.object.data_pathname,
             'output_file':  outputfile,
             'output_path':  '/',
             }
@@ -652,8 +698,8 @@ class PhysiologyReviewController(Controller):
         if outputfile is None:
             return
         file_info = {
-            'input_file':   info.object.datafile,
-            'input_path':   info.object.datapath,
+            'input_file':   info.object.data_filename,
+            'input_path':   info.object.data_pathname,
             'output_file':  outputfile,
             'output_path':  '/',
             }
@@ -665,7 +711,7 @@ class PhysiologyReviewController(Controller):
         # it easier for the user to just click "OK").
         filename = re.sub(r'(.*?)(_raw)?\.(h5|hd5|hdf5)',
                           r'\1_{}.\3'.format(extension),
-                          info.object.data_node._v_file.filename)
+                          info.object.data_filename)
 
         # Get the output filename from the user
         dialog = FileDialog(action="save as", 
@@ -744,10 +790,16 @@ class PhysiologyReview(HasTraits):
     spike_overlays      = List(Instance('chaco.api.AbstractOverlay'),
                                transient=True)
 
-    datafile            = File(transient=True)
-    datapath            = Str(transient=True)
-    batchfile           = File(transient=True)
+    # Name of the HDF5 file containing the raw data
+    data_filename       = File(transient=True)
+    # Pathname of the experiment node in the HDF5 file
+    data_pathname       = Str(transient=True)
+    # Actual file node instance
+    data_file           = Any(transient=True)
+    # Actual PyTables node of the experiments file
     data_node           = Any(transient=True)
+
+    batchfile           = File(transient=True)
     channel             = Instance('cns.channel.ProcessedMultiChannel', (),
                                    transient=True)
 
@@ -756,7 +808,8 @@ class PhysiologyReview(HasTraits):
     channel_settings    = List(Instance(ChannelSetting))
     plot_settings       = List(Instance(PlotSetting), transient=True)
     trial_data          = Any(transient=True)
-    current_trial       = Any(transient=True)
+    trial_selected      = Any(transient=True)
+    #trial_dclicked      = Any(transient=True)
     index_range         = Instance(ChannelDataRange, transient=True)
 
     bad_channels        = Property(depends_on='channel_settings.bad')
@@ -814,15 +867,24 @@ class PhysiologyReview(HasTraits):
 
     def _data_node_changed(self, node):
         raw = node.data.physiology.raw
-        channel = ProcessedFileMultiChannel.from_node(raw)
-        self.channel = channel
-        self.trial_data = node.data.trial_log.read()
+        self.channel = ProcessedFileMultiChannel.from_node(raw) 
+
+        # If this is not a modified trial log, let's back it up (call it
+        # "original_trial_log", add a "valid" column and save it back as the
+        # modified trial log.
+        if 'valid' not in node.data.trial_log.colnames:
+            tl = node.data.trial_log.read()
+            tl = recfunctions.append_fields(tl, 'valid', np.ones(len(tl)))
+            node.data.trial_log._f_rename('original_trial_log')
+            self.data_file.createTable(node.data, 'trial_log', tl)
+
+        self.trial_data = node.data.trial_log
         self._update_plot()
 
     def _index_range_default(self):
-        return ChannelDataRange(span=6, update_mode='triggered')
+        return ChannelDataRange(span=6, trig_delay=0.5, update_mode='triggered')
 
-    def _current_trial_changed(self, trial):
+    def _trial_selected_changed(self, trial):
         self.index_range.trigger = trial['start']
 
     def _get_visible_channels(self):
@@ -1048,6 +1110,10 @@ class PhysiologyReview(HasTraits):
                            action='clear_spike_overlays',
                            enabled_when='object.data_node is not None'),
                 ),
+                ActionGroup(
+                    Action(name='Overlay RMS', action='overlay_rms',
+                           enabled_when='object.data_node is not None'),
+                ),
                 name='&Settings',
             ),
             Menu(
@@ -1144,7 +1210,13 @@ def get_experiment_node_dialog(filename):
         return nodes[i]._v_pathname
 
 if __name__ == '__main__':
-    import sys
-    trial_log_editor.adapter.parameters = sys.argv[1:]
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-f', '--filename', type=str, required=False)
+    parser.add_argument('-p', '--parameters', nargs='+', type=str,
+                        required=False)
+
+    args = parser.parse_args()
+    trial_log_editor.adapter.parameters = args.parameters
     review = PhysiologyReview()
     review.configure_traits()

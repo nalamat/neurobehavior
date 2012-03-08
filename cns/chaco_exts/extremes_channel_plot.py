@@ -39,14 +39,14 @@ def decimate_simple(data, downsample):
     # downsampling factor of 5 means that we perform the operation in chunks of
     # 5 samples.  If we have only 13 samples of data, then we cannot decimate
     # the last 3 samples and will simply discard them. 
-    last_dim = data.ndim
-    offset = data.shape[-1] % downsample
     return data[..., ::downsample]
 
 def decimate_extremes(data, downsample):
     # If data is empty, return imediately
-    if data.shape[-1] == 0:
-        return [], []
+    #if data.shape[-1] == 0:
+    #    return [], []
+    if data.size == 0:
+        return np.array([]), np.array([])
 
     # Determine the "fragment" size that we are unable to decimate.  A
     # downsampling factor of 5 means that we perform the operation in chunks of

@@ -616,14 +616,13 @@ class AbstractExperimentController(Controller):
         Revert GUI fields to original values
         '''
         log.debug('Reverting requested changes')
-        #self.model.paradigm = self.shadow_paradigm.clone_traits()
         self.model.paradigm.copy_traits(self.shadow_paradigm)
         self.pending_changes = False
 
-    def value_changed(self, name): 
-        new_value = self.get_current_value(name)
-        old_value = self.old_context.get(name, None)
-        return new_value != old_value
+    #def value_changed(self, name): 
+    #    new_value = self.get_current_value(name)
+    #    old_value = self.old_context.get(name, None)
+    #    return new_value != old_value
 
     def get_current_value(self, name):
         '''

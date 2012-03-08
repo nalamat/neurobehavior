@@ -152,8 +152,5 @@ class MultiChannelRangeTool(ChannelRangeTool):
     @on_trait_change('value_span, component.channel_visible')
     def _update_span(self):
         span = self.value_span
-        visible = len(self.component.channel_visible)
-        self.component.value_mapper.range.high_setting = visible*span
-        self.component.value_mapper.range.low_setting = 0
         self.component.channel_offset = span/2.0
         self.component.channel_spacing = span

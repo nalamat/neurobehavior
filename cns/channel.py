@@ -626,7 +626,7 @@ class MultiChannel(Channel):
 
     def get_range(self, start, end, reference=None, channels=None):
         lb, ub = self._to_bounds(start, end, reference)
-        return self[channels, lb:ub]
+        return self[..., lb:ub][channels]
 
 class ProcessedMultiChannel(MultiChannel):
     '''
