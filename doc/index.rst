@@ -46,10 +46,11 @@ Python scripts and applications
 .. note::
 
     Some operations designed to work with the raw physiology data (e.g.
-    decimating the waveform or extracting spikes) typically operate on the data
-    in segments as the raw data is too large to fit in computer memory.  The
-    size of the segment is defined by CHUNK_SIZE (in cns.settings).  If you are
-    getting memory errors, set CHUNK_SIZE to a smaller value.  
+    decimating the waveform, computing the RMS or extracting spikes) typically
+    operate on the data in segments as the raw data is too large to fit in
+    computer memory.  The size of the segment is defined by CHUNK_SIZE (in
+    cns.settings).  If you are getting memory errors, set CHUNK_SIZE to a
+    smaller value.  
 
     See `overriding defaults defined in cns.settings` for detail on how to
     override this value on a per-user or per-computer basis.
@@ -60,6 +61,12 @@ Python scripts and applications
     station.  Since this usually occurs only at the beginning or end of an
     experiment, use the truncate waveform and zero waveform options in the
     review physiology program.
+
+Edit cohort (edit_cohort.py)
+----------------------------
+
+Create a cohort file for running behavior experiments.  Editing the file after
+creating it is not recommended.
 
 Create missing timeseries data (create_missing_time_data.py)
 ------------------------------------------------------------
@@ -74,15 +81,23 @@ This script is safe to run on newer versions of the file (especially if you want
 the all_spout_epoch array as well) as it checks first to see if the epoch or
 timestamp data is missing before adding it.
 
+Compute RMS (compute_rms.py or launch via review GUI)
+----------------------------
+
+TODO.  Saves to <source_filename>_rms.hd5 by default.
+
 Decimate physiology (decimate.py)
 ---------------------------------
 
-TODO
+TODO.  Saves to <source_filename>_dec.hd5 by default.
 
 Process batchfile (process_batchfile.py)
 ----------------------------------------
 
-TODO
+Extract spikes (no command-line program -- must be launched via the
+review_physiology.py GUI or queued and run using process_batchfile.py).
+
+TODO.  Saves to <source_filename>_extracted.hd5 by default.
 
 Review Physiology (review_physiology.py)
 ----------------------------------------
