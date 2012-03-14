@@ -318,7 +318,8 @@ def running_rms(input_node, output_node, duration, step, processing,
         raise ValueError, 'Unknown algorithm "{}"'.format(algorithm)
     
 
-    iterable = chunk_iter(channel, c_samples-c_loverlap, loverlap=c_loverlap)
+    iterable = chunk_iter(channel, step_samples=c_samples-c_loverlap,
+                          loverlap=c_loverlap)
     for i_chunk, chunk in enumerate(iterable):
 
         # This is a hack to discard the very last chunk if it's the wrong size.
@@ -442,8 +443,8 @@ def running_rms_old(input_node, output_node, duration, step, processing,
     else:
         raise ValueError, 'Unknown algorithm "{}"'.format(algorithm)
 
-    print c_samples, c_step
-    for i_chunk, chunk in enumerate(chunk_iter(channel, c_samples, c_step)):
+    for i_chunk, chunk in enumerate(chunk_iter(channel, step_samples=c_samples,
+                                               l_overlap=c_step)):
         rms.append(compute_rms(chunk)[np.newaxis].T)
 
         if progress_callback(i_chunk*c_step, total_samples, ''):
@@ -528,7 +529,8 @@ def decimate_waveform(input_node, output_node, q=None, N=4, progress_callback=No
     # factor so that we can extract the *correct* samples from each chunk.
     c_samples = chunk_samples(raw, chunk_size, q)
     overlap = 3*len(b)
-    iterable = chunk_iter(raw, c_samples, loverlap=overlap, roverlap=overlap)
+    iterable = chunk_iter(raw, chunk_samples=c_samples, loverlap=overlap,
+                          roverlap=overlap)
 
     for i, chunk in enumerate(iterable):
         chunk = signal.filtfilt(b, a, chunk, padlen=0).astype(raw.dtype)
@@ -815,8 +817,8 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
     # Keep the user updated as to how many candidate spikes they're getting
     tot_features = 0
 
-    iterable = chunk_iter(node, c_samples, loverlap, roverlap,
-                          ndslice=np.s_[channels, :])
+    iterable = chunk_iter(node, chunk_samples=c_samples, loverlap=loverlap,
+                          roverlap=roverlap, ndslice=np.s_[channels, :])
 
     aborted = False
     samples_processed = 0
