@@ -147,6 +147,8 @@ function [spikes] = nb_import_spikes(filename, varargin)
     % divide the indice by the sampling frequency or just read the data stored
     % in /event_data/timestamps which is in units of seconds.
     timestamps = double(h5read(filename, '/event_data/timestamps_n')');
+    timestamps_fs = h5readatt(filename, '/event_data/timestamps_n', 'fs');
+    timestamps_fs = double(timestamps_fs);
 
     % Indices of the events in the file (one-based)
     source_indices = 1:length(timestamps);
@@ -232,10 +234,16 @@ function [spikes] = nb_import_spikes(filename, varargin)
     end
     
     if length(trial_range) == 2, 
-        fs = h5readatt(filename, '/block_data/physiology_epoch', 'fs');
-        lb = round(trial_range(1)*fs);
-        ub = round(trial_range(2)*fs);
-        epochs = double(h5read(filename, '/block_data/physiology_epoch'));
+        % Load the start/end times of each trial and convert to the same
+        % unit as the timestamps_n array (e.g. the unit is 1/sampling 
+        % frequency of the physiology data).
+        trial_log = h5read(filename, '/block_data/trial_log');
+        
+        % Apparently Matlab's h5read doesn't like "end" as a fieldname for
+        % the trial_log structure and converts it to xEnd.
+        epochs = round([trial_log.start, trial_log.xEnd] * timestamps_fs)';
+        lb = round(trial_range(1)*timestamps_fs);
+        ub = round(trial_range(2)*timestamps_fs);
         epochs(1,:) = epochs(1,:)+lb;
         epochs(2,:) = epochs(2,:)+ub;
 
