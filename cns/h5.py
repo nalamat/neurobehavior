@@ -110,24 +110,34 @@ def _parse_xattr(xattr):
     xattr = xattr.replace('../', '/_v_parent/') # replace ../ with _v_parent
     xattr = xattr.replace('+', '/_v_attrs/')    # replace + with _v_attrs
     xattr = xattr.replace('//', '/')            # remove double slashes
-    xattr = xattr.replace('/', '.')             # convert to attribute access
-    xattr = xattr.replace('<.', '<')
-    xattr = xattr.strip('.')                    # remove leading period
+    #xattr = xattr.replace('/', '.')             # convert to attribute access
+    xattr = xattr.replace('</', '<')
+    xattr = xattr.strip('/')                    # remove leading period
     return xattr
 
-def _getattr(obj, xattr):
+def _getattr(node, xattr):
     if xattr.startswith('<'):
-        return _find_ancestor(obj, xattr[1:])
+        return _find_ancestor(node, xattr[1:])
+    elif xattr == '*':
+        return node._f_listNodes()[0]
+    elif xattr == '_v_parent':
+        return node._v_parent
     else:
-        return getattr(obj, xattr)
+        return node._f_getChild(xattr)
 
-def _rgetattr(obj, xattr):
+def _rgetattr(node, xattr):
     try:
-        base, xattr = xattr.split('.', 1)
-        obj = _getattr(obj, base)
-        return _rgetattr(obj, xattr)
-    except Exception, e:
-        return _getattr(obj, xattr)
+        base, xattr = xattr.split('/', 1)
+        # Handle the special cases first
+        if base == '_v_attrs':
+            return node._f_getAttr(xattr)
+        else:
+            node = _getattr(node, base)
+            return _rgetattr(node, xattr)
+    except ValueError:
+        # This means we are on the very last attribute to be fetched (i.e.
+        # there's no more '.' in the xattr to parse. 
+        return _getattr(node, xattr)
 
 def _find_ancestor(obj, xattr):
     if obj == obj._v_parent:
@@ -143,6 +153,8 @@ def rgetattr(node, xattr):
 
     ../
         Move to the parent
+    *
+        First child node
     /name
         Move to the child specified by name
     <ancestor_name
@@ -196,10 +208,11 @@ def rgetattr(node, xattr):
     >>> xgetattr(node, '<+nyu_id')
     132014
     '''
-    xattr = _parse_xattr(xattr)
-    if xattr.startswith('<'):
-        return _find_ancestor(node, xattr[1:])
-    return _rgetattr(node, xattr)
+    parsed_xattr = _parse_xattr(xattr)
+    log.debug('Converted %s to %s for parsing', xattr, parsed_xattr)
+    if parsed_xattr.startswith('<'):
+        return _find_ancestor(node, parsed_xattr[1:])
+    return _rgetattr(node, parsed_xattr)
 
 def node_match(n, filter):
     '''
@@ -389,6 +402,28 @@ def p_list_nodes(file_name, pattern, dereference=True):
         for node in load_nodes(fh.root, pattern[1:]):
             yield node
 
+def extract_node_data(node, fields, summary):
+    # Node is a HDF5 table.  Table.read() returns a Numpy record array (a data
+    # structure that is essentially an array with named columns and nested data
+    # structures).  We convert this record array into a DataFrame and add some
+    # metadata about where it came from.
+    frame = DataFrame.from_records(node.read())
+    frame['_path'] = node._v_pathname
+    frame['_source'] = node._v_name
+
+    if fields is not None:
+        # rgetattr (i.e. "recursive get attribute") is a special function I
+        # wrote that can recursively traverse the object hierarchy and return
+        # the value of the given attribute.
+        for attr, name in fields:
+            frame[name] = rgetattr_or_none(node, attr)
+
+    if summary is not None:
+        for name, func in summary:
+            frame[name] = func(frame, node)
+
+    return frame
+
 @memory.cache(ignore=('file_name',))
 def _extract_data(file_name, filters, fields=None, summary=None,
                   classname='Table', mode='walk', hash=''):
@@ -412,27 +447,7 @@ def _extract_data(file_name, filters, fields=None, summary=None,
         for node in iterator:
             log.info('... Found node %s', node._v_pathname)
             if type(node) == tables.Table:
-                # Node is a HDF5 table.  Table.read() returns a Numpy record
-                # array (a data structure that is essentially an array with
-                # named columns and nested data structures).  We convert this
-                # record array into a DataFrame and add some metadata about
-                # where it came from.
-                frame = DataFrame.from_records(node.read())
-                frame['_path'] = node._v_pathname
-                frame['_source'] = node._v_name
-
-                if fields is not None:
-                    # rgetattr (i.e. "recursive get attribute") is a special
-                    # function I wrote that can recursively traverse the
-                    # object hierarchy and return the value of the given
-                    # attribute.
-                    for attr, name in fields:
-                        frame[name] = rgetattr_or_none(node, attr)
-
-                if summary is not None:
-                    for name, func in summary:
-                        frame[name] = func(frame, node)
-
+                frame = extract_node_data(node, fields, summary)
                 data = data.append(frame, ignore_index=True)
             else:
                 raise NotImplementedError
@@ -454,8 +469,9 @@ def extract_data(input_files, filters, fields=None, summary=None,
         This function calls :func:`_extract_data` for each file.  If
         _extract_data has been called before with this file using the same
         parameters (i.e. filters, fields and summary), a cached copy of the data
-        will be returned.  If the filename or last modified timestamp of the
-        file has changed, the cache will be cleared.
+        will be returned (assuming joblib has been installed).  If the filename
+        or last modified timestamp of the file has changed, the cache will be
+        cleared.
 
         Caching significantly speeds up data analysis because loading the data
         from disk is one of the biggest bottlenecks in the analysis pipeline.
