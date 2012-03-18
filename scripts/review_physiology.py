@@ -28,12 +28,15 @@ from traitsui.api import TabularEditor
 from traitsui.tabular_adapter import TabularAdapter
 
 from cns import get_config
-from cns.channel import ProcessedFileMultiChannel, FileChannel, FileMultiChannel
+from cns.channel import ProcessedFileMultiChannel, FileChannel, \
+        FileMultiChannel, FileEpoch, FileTimeseries
 from cns.chaco_exts.helpers import add_default_grids, add_time_axis
 from cns.chaco_exts.channel_data_range import ChannelDataRange
 from cns.chaco_exts.extremes_multi_channel_plot import ExtremesMultiChannelPlot
 from cns.chaco_exts.multi_channel_plot import MultiChannelPlot
 from cns.chaco_exts.ttl_plot import TTLPlot
+from cns.chaco_exts.epoch_plot import EpochPlot
+from cns.chaco_exts.timeseries_plot import TimeseriesPlot
 from cns.chaco_exts.channel_range_tool import MultiChannelRangeTool
 from cns.chaco_exts.channel_number_overlay import ChannelNumberOverlay
 from cns.chaco_exts.threshold_overlay import ThresholdOverlay
@@ -53,53 +56,78 @@ line_width = 0.5
 
 CHANNEL_FORMAT = {
     'spout_TTL':    {
-        'fill_color':   (0.25, 0.41, 0.88, fill_alpha), 
-        'line_color':   (0.25, 0.41, 0.88, line_alpha), 
-        'line_width':   line_width,
-        'rect_center':  0.25, 
-        'rect_height':  0.2,
+        'fill_color':       (0.25, 0.41, 0.88, fill_alpha), 
+        'line_color':       (0.25, 0.41, 0.88, line_alpha), 
+        'line_width':       line_width,
+        'rect_center':      0.25, 
+        'rect_height':      0.2,
     },
     'signal_TTL':   {
-        'fill_color':   (0, 0, 0, fill_alpha), 
-        'line_color':   (0, 0, 0, line_alpha),
-        'line_width':   line_width, 
-        'rect_height':  0.3, 
-        'rect_center':  0.5,
+        'fill_color':       (0, 0, 0, fill_alpha), 
+        'line_color':       (0, 0, 0, line_alpha),
+        'line_width':       line_width, 
+        'rect_height':      0.3, 
+        'rect_center':      0.5,
     },
     'poke_TTL':     {
-        'fill_color':   (.17, .54, .34, fill_alpha), 
-        'line_color':   (.17, .54, .34, line_alpha), 
-        'rect_center':  0.75,
-        'line_width':   line_width, 
-        'rect_height':  0.2,
+        'fill_color':       (.17, .54, .34, fill_alpha), 
+        'line_color':       (.17, .54, .34, line_alpha), 
+        'rect_center':      0.75,
+        'line_width':       line_width, 
+        'rect_height':      0.2,
     },
     'reaction_TTL': {
-        'fill_color':   (1, 0, 0, fill_alpha), 
-        'line_color':   (1, 0, 0, line_alpha),
-        'line_width':   line_width, 
-        'rect_height':  0.1, 
-        'rect_center':  0.6,
+        'fill_color':       (1, 0, 0, fill_alpha), 
+        'line_color':       (1, 0, 0, line_alpha),
+        'line_width':       line_width, 
+        'rect_height':      0.1, 
+        'rect_center':      0.6,
     },
     'response_TTL': {
-        'fill_color':   (0, 1, 0, fill_alpha), 
-        'line_color':   (0, 1, 0, line_alpha),
-        'line_width':   line_width, 
-        'rect_height':  0.1, 
-        'rect_center':  0.5,
+        'fill_color':       (0, 1, 0, fill_alpha), 
+        'line_color':       (0, 1, 0, line_alpha),
+        'line_width':       line_width, 
+        'rect_height':      0.1, 
+        'rect_center':      0.5,
     },
     'reward_TTL': {
-        'fill_color':   (0, 0, 1, fill_alpha), 
-        'line_color':   (0, 0, 1, line_alpha),
-        'line_width':   line_width, 
-        'rect_height':  0.1, 
-        'rect_center':  0.4,
+        'fill_color':       (0, 0, 1, fill_alpha), 
+        'line_color':       (0, 0, 1, line_alpha),
+        'line_width':       line_width, 
+        'rect_height':      0.1, 
+        'rect_center':      0.4,
     },
     'TO_TTL':   {
-        'fill_color':   (1, 0, 0, fill_alpha), 
-        'line_color':   (1, 0, 0, line_alpha),
-        'line_width':   line_width, 
-        'rect_height':  0.1, 
-        'rect_center':  0.1,
+        'fill_color':       (1, 0, 0, fill_alpha), 
+        'line_color':       (1, 0, 0, line_alpha),
+        'line_width':       line_width, 
+        'rect_height':      0.1, 
+        'rect_center':      0.1,
+    },
+    'response_ts':  {
+        'marker':           'diamond',
+        'marker_color':     (0, 1, 0, fill_alpha),
+        'marker_height':    0.45,
+    },
+    'all_poke_epoch':  {
+        'marker':           'diamond',
+        'marker_color':     (0.34, 0.54, 1.0, fill_alpha),
+        'marker_height':    0.8,
+    },
+    'poke_epoch':  {
+        'marker':           'diamond',
+        'marker_color':     (0.17, 0.54, 0.34, fill_alpha),
+        'marker_height':    0.7,
+    },
+    'signal_epoch':  {
+        'marker':           'diamond',
+        'marker_color':     (0.5, 0.5, 0.5, fill_alpha),
+        'marker_height':    0.6,
+    },
+    'trial_epoch':  {
+        'marker':           'diamond',
+        'marker_color':     (0.75, 0.25, 0.75, fill_alpha),
+        'marker_height':    0.5,
     },
 }
 
@@ -111,7 +139,8 @@ class TrialLogAdapter(TabularAdapter):
     '''
 
     # List of tuples (column_name, field )
-    columns = [ ('P',       'parameter'),
+    columns = [ ('#',       'trial'),
+                ('P',       'parameter'),
                 ('S',       'speaker'),
                 ('Time',    'time'),
                 ('WD',      'reaction'),
@@ -132,6 +161,7 @@ class TrialLogAdapter(TabularAdapter):
     parameter_text = Property
     speaker_text = Property
     time_text = Property
+    trial_text = Property
 
     parameters = List(Str)
 
@@ -173,6 +203,9 @@ class TrialLogAdapter(TabularAdapter):
             return '@icons:dict_node'   # a red icon
         else:
             return '@icons:none_node'   # a gray icon
+
+    def _get_trial_text(self):
+        return str(self.row+1)
 
     def delete(self, object, trait, row):
         # The delete method is mapped to the delete key on the keyboard.
@@ -940,9 +973,17 @@ class PhysiologyReview(HasTraits):
         for name, format in CHANNEL_FORMAT.items():
             try:
                 node = self.data_node.data.contact._f_getChild(name)
-                channel = FileChannel.from_node(node)
-                plot = TTLPlot(source=channel, index_mapper=index_mapper,
-                               value_mapper=value_mapper, **format)
+                if name.endswith('_TTL'):
+                    plot_class = TTLPlot
+                    source = FileChannel.from_node(node)
+                elif name.endswith('_ts'):
+                    plot_class = TimeseriesPlot
+                    source = FileTimeseries.from_node(node)
+                elif name.endswith('_epoch'):
+                    plot_class = EpochPlot
+                    source = FileEpoch.from_node(node)
+                plot = plot_class(source=source, index_mapper=index_mapper,
+                                  value_mapper=value_mapper, **format)
                 container.add(plot)
                 setting = PlotSetting(plot=plot, name=name)
                 self.plot_settings.append(setting)
