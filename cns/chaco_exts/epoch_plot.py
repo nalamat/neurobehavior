@@ -1,10 +1,8 @@
 import numpy as np
 
-#from enthought.chaco.api import BaseXYPlot
 from .channel_plot import ChannelPlot
 from enthought.enable.api import black_color_trait, LineStyle, MarkerTrait
-from enthought.traits.api import Instance, Float, Event, Bool, Enum, \
-        on_trait_change, Str
+from enthought.traits.api import Instance, Float
 
 class EpochPlot(ChannelPlot):
     '''
@@ -22,13 +20,6 @@ class EpochPlot(ChannelPlot):
     marker_height       = Float(0.5)
     line_color          = black_color_trait
     line_style          = LineStyle
-
-    #def _gather_points(self):
-    #    if not self._data_cache_valid:
-    #        range = self.index_mapper.range
-    #        self._cached_data = self.series.get_range(range.low, range.high)
-    #        self._data_cache_valid = True
-    #        self._screen_cache_valid = False
 
     def _get_screen_points(self):
         if not self._screen_cache_valid:
@@ -71,9 +62,3 @@ class EpochPlot(ChannelPlot):
             self.invalidate_draw()
             self._data_cache_valid = False
             self.request_redraw()
-
-    #def _series_changed(self, old, new):
-    #    if old is not None:
-    #        old.on_trait_change(self._data_changed, "updated", remove=True)
-    #    if new is not None:
-    #        new.on_trait_change(self._data_changed, "updated", dispatch="new")

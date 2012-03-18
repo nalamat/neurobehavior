@@ -1,6 +1,8 @@
 from enthought.traits.api import Instance
 from enthought.traits.ui.api import View, Include, VGroup
 
+# The underscore indicates that these are not meant to be used directly as an
+# experiment paradigm
 from ._positive_dt_controller_mixin import PositiveDTControllerMixin
 from ._positive_dt_paradigm_mixin import PositiveDTParadigmMixin
 
@@ -19,18 +21,24 @@ from experiments.pump_paradigm_mixin import PumpParadigmMixin
 from experiments.pump_data_mixin import PumpDataMixin
 
 class Controller(
+        # Note that the order of the superclasses are important here.  Both
+        # PositiveDTControllerMixin and AbstractPositiveController define the
+        # compute_waveform method.  When Python looks for the method, it will
+        # work its way through the list of superclasses until it finds a
+        # compute_waveform method.  We want to make sure that it finds the one
+        # defined in PositiveDTControllerMixin first!
+        PositiveDTControllerMixin,
         AbstractPositiveController, 
         CLControllerMixin,
         PumpControllerMixin,
-        PositiveDTControllerMixin,
         ):
     pass
 
 class Paradigm(
+        PositiveDTParadigmMixin,
         AbstractPositiveParadigm, 
         PumpParadigmMixin,
         CLParadigmMixin,
-        PositiveDTParadigmMixin,
         ):
 
     traits_view = View(

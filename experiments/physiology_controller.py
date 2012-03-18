@@ -133,14 +133,17 @@ class PhysiologyController(Controller):
         self.model.data.epoch.send(zip(starts, ends))
 
         # Get the spikes.  Each channel has a separate buffer for the spikes
-        # detected online.
-        snippet_shape = (-1, SPIKE_SNIPPET_SIZE)
+        # detected online.  Need to add 2 to the snippet size to compensate for
+        # the extra samples provided with the snippet (the timestamp and the
+        # classifier).
+        snippet_shape = (-1, SPIKE_SNIPPET_SIZE+2)
         for i in range(CHANNELS):
             data = self.buffer_spikes[i].read().reshape(snippet_shape)
 
             # First sample of each snippet is the timestamp (as a 32 bit
             # integer) and last sample is the classifier (also as a 32 bit
-            # integer)
+            # integer).  The bits in between should be interpreted as 32-bit
+            # floating point values.
             snip = data[:,1:-1]
             ts = data[:,0].view('int32')
             cl = data[:,-1].view('int32')

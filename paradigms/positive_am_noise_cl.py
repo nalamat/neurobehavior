@@ -19,17 +19,17 @@ from experiments.pump_paradigm_mixin import PumpParadigmMixin
 from experiments.pump_data_mixin import PumpDataMixin
 
 class Controller(
+        PositiveAMNoiseControllerMixin,
         AbstractPositiveController, 
         CLControllerMixin,
-        PumpControllerMixin,
-        PositiveAMNoiseControllerMixin):
+        PumpControllerMixin):
     pass
 
 class Paradigm(
+        PositiveAMNoiseParadigmMixin,
         AbstractPositiveParadigm, 
         PumpParadigmMixin,
         CLParadigmMixin,
-        PositiveAMNoiseParadigmMixin,
         ):
 
     traits_view = View(

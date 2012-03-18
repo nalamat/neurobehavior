@@ -67,6 +67,6 @@ class PhysiologyData(HasTraits):
         for i in range(CHANNELS):
             name = 'spike_{:02}'.format(i+1)
             ch = FileSnippetChannel(node=self.temp_node, name=name,
-                                    dtype=np.float32, snippet_size=SNIPPET_SIZE)
+                    dtype=np.float32, snippet_size=SNIPPET_SIZE)
             channels.append(ch)
         return channels

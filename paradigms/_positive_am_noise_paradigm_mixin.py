@@ -1,6 +1,6 @@
 from traits.api import HasTraits
 from traitsui.api import VGroup
-from experiments.eval import Expression
+from experiments.evaluate import Expression
 
 class PositiveAMNoiseParadigmMixin(HasTraits):
     kw = {'context': True, 'store': 'attribute', 'log': True}

@@ -25,8 +25,8 @@ class CLControllerMixin(HasTraits):
             self.current_sequence = selector(expanded_settings)
     
     def next_setting(self):        
-        # Must be able to handle both the initial (first trial) and repeat
-        # nogo cases as needed.  Check for special cases first.
+        # Must be able to handle both the initial (first trial) and repeat nogo
+        # cases as needed.  Check for special cases first.
         if self.remind_requested:
             self.remind_requested = False
             return self.remind_setting()

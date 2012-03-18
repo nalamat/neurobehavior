@@ -317,6 +317,13 @@ def walk_nodes(where, filter, classname=None, wildcards=None):
 
 LINK_CLASSES = tables.link.SoftLink, tables.link.ExternalLink
 
+def get(filename, xattr):
+    with tables.openFile(filename, 'r') as fh:
+        attr = rgetattr(fh.root, xattr)
+        if isinstance(attr, tables.Leaf):
+            return attr.read()
+        return attr
+
 def p_get_node(node, pattern, dereference=True):
     '''
     Load a single node based on a indeterminate path
@@ -342,7 +349,7 @@ def p_load_nodes(node, pattern, dereference=True):
     TODO (document)
     '''
     if type(pattern) != type([]):
-        pattern = pattern.split('/')
+        pattern = pattern.strip('/').split('/')
 
     # Check to see if the node is a SoftLink or ExternalLink.  If so, get the
     # actual node that the link points to by dereferencing (see the PyTables
@@ -350,16 +357,21 @@ def p_load_nodes(node, pattern, dereference=True):
     if dereference and isinstance(node, LINK_CLASSES):
         node = node()
 
+    # We're at the end of the list.  This is the node we want.
     if len(pattern) == 0:
         yield node
     elif '*' == pattern[0]:
         for n in node._f_iterNodes():
             for n in p_load_nodes(n, pattern[1:]):
-                yield n
+                if n is not None:
+                    yield n
     else:
-        n = node._f_getChild(pattern[0])
-        for n in p_load_nodes(n, pattern[1:]):
-            yield n
+        try:
+            n = node._f_getChild(pattern[0])
+            for n in p_load_nodes(n, pattern[1:]):
+                yield n
+        except tables.NoSuchNodeError:
+            yield None
 
 def p_list_nodes(file_name, pattern, dereference=True):
     '''
@@ -379,7 +391,7 @@ def p_list_nodes(file_name, pattern, dereference=True):
 
 @memory.cache(ignore=('file_name',))
 def _extract_data(file_name, filters, fields=None, summary=None,
-                  classname='Table', hash='', mode='walk'):
+                  classname='Table', mode='walk', hash=''):
     '''
     Not meant for direct use.  This is broken out of :func:`extract_data` so we
     can wrap the code in a caching decorator to speed up loading of data from
@@ -392,8 +404,10 @@ def _extract_data(file_name, filters, fields=None, summary=None,
         data = DataFrame()
         if mode == 'walk':
             iterator = walk_nodes(h.root, filters, classname)
-        else:
+        elif mode == 'pattern':
             iterator = p_load_nodes(h.root, filters)
+        else:
+            raise ValueError, 'Unsupported mode {}'.format(mode)
 
         for node in iterator:
             log.info('... Found node %s', node._v_pathname)
@@ -425,7 +439,7 @@ def _extract_data(file_name, filters, fields=None, summary=None,
     return data
 
 def extract_data(input_files, filters, fields=None, summary=None,
-                 classname='Table'):
+                 classname='Table', mode='walk'):
     '''
     Extracts the data you want into a DataFrame, flattening the HDF5 hierarchy
     in the process.  This results in what is, essentially, a spreadsheet or
@@ -773,7 +787,7 @@ def extract_data(input_files, filters, fields=None, summary=None,
         file_hash = '{}{}'.format(path.basename(file_name),
                                   path.getmtime(file_name))
         frame = _extract_data(file_name, filters, fields, summary, classname,
-                              file_hash)
+                              mode, file_hash)
         frame['_file'] = file_name
         data = data.append(frame, ignore_index=True)
 

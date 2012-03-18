@@ -325,8 +325,13 @@ class Calibration(object):
 
     def get_spl(self, frequencies, voltage=1, gain=0):
         '''
-        Computes expected speaker output (in dB SPL) for tones at the specified
-        frequencies assuming 0 dB attenuation
+        Computes speaker output (in dB SPL) for tones at the specified
+        frequencies assuming 0 dB attenuation.
+        
+        We consider gain separately from the attenuation in case the user is
+        running the signal through an amplifier which has configurable gain.
+        Gain will be whatever value the amplifier gain is set to.  If you have
+        no amplifier in the system, then you would set gain to 0.
 
         Parameters
         ----------
@@ -337,7 +342,7 @@ class Calibration(object):
             peak or RMS depends on how the calibration data was generated.  I
             believe FIRCal uses RMS (either case it's "only" 3 dB difference).
         gain : float (dB power)
-            The output gain of the system
+            The output gain of the system (e.g. the amplifier)
             
         In theory we could support multiple target voltages and gains; however,
         since we can only output a single target voltage and gain for any given
@@ -446,11 +451,11 @@ class Calibration(object):
         ref_phase = np.unwrap(ref_phase)
         return np.interp(frequencies, self.ref_frequencies, ref_phase)
 
-    def get_sf(self, frequency, level, attenuation):
+    def get_sf(self, frequency, level, attenuation, voltage=1, gain=0):
         '''
         Return scaling factor required to achieve required attenuation
         '''
-        spl = self.get_spl(frequency)
+        spl = self.get_spl(frequency, voltage=voltage, gain=gain)
         discrepancy = spl-level-attenuation
         sf = 1.0/(10**(discrepancy/20.0))
         log.debug('%s: output is %f dB SPL, hw atten is %f dB',
@@ -489,7 +494,7 @@ class Calibration(object):
             raise ValueError, "Must provide an expected range"
         frequencies = expected_range[:,0]
         target_spl = expected_range[:,1]
-        max_spl = self.get_max_spl(expected_range[:,0], voltage, gain)
+        max_spl = self.get_spl(frequencies, voltage, gain)
         return np.min(max_spl-target_spl)
 
     def get_nearest_frequency(self, frequencies, mode='round'):

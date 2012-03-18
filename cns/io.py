@@ -127,6 +127,13 @@ def copy_block_data(input_node, output_node):
     '''
     Copy the behavior data (e.g. trial log, timestamps and epochs) over to the
     new node.
+
+    input_node : instance of tables.Group
+        The PyTables group pointing to the root of the experiment node.  The
+        block data will be found under input_node/data/contact/* and
+        input_node/data/physiology/*.
+    output_node : instance of tables.Group
+        The pytables group to where the block data will be copied to.
     '''
     # Will need to update the to_copy list with nodes that can be found for the
     # aversive data structure as well.  It's OK if the node isn't present, it'll
@@ -142,6 +149,11 @@ def copy_block_data(input_node, output_node):
               ]
     for (node_path, node_title) in to_copy:
         try:
+            # Remove the node if it already exists in the destination node
+            if node_title in output_node:
+                output_node._f_getChild(node_title)._f_remove()
+
+            # Now, copy the node data
             node = input_node._f_getChild(node_path)
             node._f_copy(output_node, newname=node_title)
         except AttributeError:

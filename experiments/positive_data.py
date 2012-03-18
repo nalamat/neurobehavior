@@ -54,12 +54,17 @@ edge_falling = lambda TTL: np.r_[0, np.diff(TTL.astype('i'))] == -1
 # longer needed/used.  Also removed the unused store='channel' and store_path
 # attributes from the FileChannel/FileMultiChannel Trait instance definitions
 # because these are no longer needed.
+# V4.1 - 1203017 - When a student modified the paradigm to remove the reaction
+# window and add a delay to the response window, he used the paradigm variable
+# "reaction_window_delay" to set the response window delay.  The naming of this
+# variable is counter-intuitive.  Renamed reaction_window_delay to
+# response_window_delay.
 
 class PositiveData(AbstractExperimentData, SDTDataMixin):
 
     # VERSION is a reserved keyword in HDF5 files, so I use OBJECT_VERSION
     # instead
-    OBJECT_VERSION = Float(4.0, store='attribute')
+    OBJECT_VERSION = Float(4.1, store='attribute')
 
     mask_mode = Enum('none', 'include recent')
     mask_num = Int(25)

@@ -54,7 +54,11 @@ class AbstractPositiveController(AbstractExperimentController):
 
     def set_attenuations(self, att1, att2):
         '''
-        Set attenuators for Out-1 and Out-2 on the RZ6
+        Set attenuators for Out-1 and Out-2 on the RZ6.  If either attenuation
+        is None, then that attenuation is not changed.  For example, to change
+        the attenuation only for Out-2:
+
+        >>> self.set_attenuations(None, 60)
 
         Note that this only sets the hardware attenuation in valid steps (e.g.
         0, 20, 40 and 60 dB).  The remaining attenuation must be realized via
@@ -90,11 +94,11 @@ class AbstractPositiveController(AbstractExperimentController):
         # the RZ6 attenuator values in software rather than hardware.
         att_bits = RZ6.atten_to_bits(att1, att2)
         self.iface_behavior.set_tag('att_bits', att_bits)
-        
+
+        # This is the remaining
         return sw1, sw2
 
     def setup_experiment(self, info):
-
         circuit = join(get_config('RCX_ROOT'), 'positive-behavior-v3')
         self.iface_behavior = self.process.load_circuit(circuit, 'RZ6')
 
@@ -124,8 +128,6 @@ class AbstractPositiveController(AbstractExperimentController):
 
         # Stored in TTL2
         self.model.data.TO_TTL.fs = self.buffer_TTL2.fs
-        self.model.data.TO_safe_TTL.fs = self.buffer_TTL2.fs
-        self.model.data.comm_inhibit_TTL.fs = self.buffer_TTL2.fs
 
         # Timestamp data
         self.model.data.trial_epoch.fs = self.iface_behavior.fs
@@ -137,8 +139,7 @@ class AbstractPositiveController(AbstractExperimentController):
         targets1 = [self.model.data.poke_TTL, self.model.data.spout_TTL,
                     self.model.data.reaction_TTL, self.model.data.signal_TTL,
                     self.model.data.response_TTL, self.model.data.reward_TTL, ]
-        targets2 = [None, self.model.data.TO_TTL,
-                    self.model.data.comm_inhibit_TTL ]
+        targets2 = [None, self.model.data.TO_TTL ]
 
         self.pipeline_TTL1 = deinterleave_bits(targets1)
         self.pipeline_TTL2 = deinterleave_bits(targets2)
@@ -264,18 +265,13 @@ class AbstractPositiveController(AbstractExperimentController):
     def set_intertrial_duration(self, value):
         self.iface_behavior.cset_tag('int_dur_n', value, 's', 'n')
 
-    def set_reaction_window_delay(self, value):
-        self.iface_behavior.cset_tag('react_del_n', value, 's', 'n')
+    def set_response_window_delay(self, value):
+        self.iface_behavior.cset_tag('resp_del_n', value, 's', 'n')
         # Check to see if the conversion of s to n resulted in a value of 0.  If
-        # so, set the delay to 1 sample (0 means that the reaction window never
+        # so, set the delay to 1 sample (0 means that the respion window never
         # triggers due to the nature of the RPvds component)
-        if self.iface_behavior.get_tag('react_del_n') < 2:
-            self.iface_behavior.set_tag('react_del_n', 2)
-        self.current_reaction_window_delay = value
-
-        # We need to be sure to update the duration as well if we adjust this
-        # value
-        self.set_reaction_window_duration(value)
+        if self.iface_behavior.get_tag('resp_del_n') < 2:
+            self.iface_behavior.set_tag('resp_del_n', 2)
 
     def set_response_window_duration(self, value):
         self.iface_behavior.cset_tag('resp_dur_n', value, 's', 'n')
@@ -352,11 +348,11 @@ class AbstractPositiveController(AbstractExperimentController):
         if self.cancel_trigger():
             self.trigger_next()
 
-    def compute_waveform(self, calibration):
+    def compute_waveform(self, calibration, hw_attenuation):
         '''
         Must be implemented by the specific paradigms.
 
-        Should return the waveform (scaled as needed) and the relevant hardware
+        Should return the waveform (scaled as needed) and the relevant
         attenuation value.
         '''
         raise NotImplementedError
@@ -370,14 +366,30 @@ class AbstractPositiveController(AbstractExperimentController):
         speaker = self.get_current_value('speaker')
         self.iface_behavior.set_tag('go?', self.is_go())
 
+        # The RPvds circuit has a flag indicating which speaker to send the
+        # waveform to.  0=primary, 1=secondary (i.e. Out-1 and Out-2,
+        # respectively).
         if speaker == 'primary':
             calibration = self.cal_primary
+            hw_atten = self.current_hw_att1
             self.iface_behavior.set_tag('speaker', 0)
         elif speaker == 'secondary':
             calibration = self.cal_secondary
+            hw_atten = self.current_hw_att2
             self.iface_behavior.set_tag('speaker', 1)
 
-        waveform, attenuation = self.compute_waveform(calibration)
-        self.set_attenuation(self.speaker, attenuation)
-        self.buffer_out.set(waveform)
+        waveform, attenuation = self.compute_waveform(calibration, hw_atten)
+        if speaker == 'primary':
+            sw_att = self.set_attenuations(attenuation, None)[0]
+        elif speaker == 'secondary':
+            sw_att = self.set_attenuations(None, attenuation)[1]
+
+        # Scale by this much to achieve remaining software attenuation
+        sf = 10**(-sw_att/20.0)
+
+        log.debug('Remaining software attenuation of %f dB required', sw_att)
+        log.debug('Scaling waveform by %f to compensate', sf)
+        log.debug('Uploading %d samples', len(waveform))
+
+        self.buffer_out.set(sf*waveform)
         self.iface_behavior.trigger(1)

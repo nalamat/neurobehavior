@@ -1,20 +1,21 @@
 from datetime import datetime, timedelta
 
-from enthought.traits.ui.menu import MenuBar, Menu, ActionGroup, Action, ToolBar
-from enthought.traits.api import HasTraits, Any, Instance, Property, Bool
-from enthought.traits.ui.api import View, Include, VGroup, Item, Tabbed
+from traits.api import HasTraits, Any, Instance, Property, Bool
+from traitsui.api import View, Include, VGroup, Item, Tabbed, TabularEditor
+from traitsui.menu import MenuBar, Menu, ActionGroup, Action, ToolBar
+from traitsui.tabular_adapter import TabularAdapter
+from traitsui.key_bindings import KeyBinding, KeyBindings
 
 from abstract_experiment_data import AbstractExperimentData
 from abstract_experiment_paradigm import AbstractExperimentParadigm
 
-from enthought.traits.ui.api import TabularEditor
-from enthought.traits.ui.tabular_adapter import TabularAdapter
+
 from cns import get_config
 color_names = get_config('COLOR_NAMES')
 
 class ContextAdapter(TabularAdapter):
 
-    columns = [('Parameter'), ('Value'), ('Variable')]
+    columns = ['Parameter', 'Value', 'Variable']
 
     def get_image(self, obj, trait, row, column):
         if column == 0 and self.item[-2]:
@@ -81,6 +82,12 @@ class AbstractExperiment(HasTraits):
     traits_view = View(
             Include('traits_group'), 
             resizable=True, 
+            # Hmm, the keybindings don't seem to be working that well.
+            key_bindings=KeyBindings(
+                KeyBinding(binding1='Ctrl-r', method_name='remind'),
+                KeyBinding(binding1='Ctrl-a', method_name='apply'),
+                KeyBinding(binding1='Ctrl-u', method_name='undo'),
+                ),
             menubar=MenuBar(
                 Menu(
                     ActionGroup(

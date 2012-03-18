@@ -82,6 +82,18 @@ color_names = get_config('COLOR_NAMES')
 
 class TrialSettingAdapter(TabularAdapter):
 
+    default_value = TrialSetting(ttype='GO')
+
+    #def delete(self, obj, trait, row):
+    #    instance = getattr(obj, trait)
+    #    if len(instance) > 3 and instance[row]['ttype'] == 'GO':
+    #        del instance[row]
+    #    else:
+    #        # We need to raise a ValueError to veto the deletion from the GUI,
+    #        # otherwise the object will just disappear (even though it's still
+    #        # in the underlying list)!
+    #        raise ValueError, 'Cannot delete'
+
     def _get_bg_color(self):
         ttype = self.item.ttype
         if ttype == 'NOGO':
@@ -93,10 +105,10 @@ class TrialSettingAdapter(TabularAdapter):
 
 trial_setting_editor = TabularEditor(
     auto_update=True,
-    editable=True, 
-    multi_select=True,
     selected='_selected_setting',
     operations=['edit'],
+    editable=True, 
+    multi_select=True,
     adapter=TrialSettingAdapter(width=150)
 )
 

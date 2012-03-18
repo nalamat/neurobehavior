@@ -14,7 +14,7 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm):
     reward_volume = Expression(25, label='Reward volume (ul)', **kw)
     signal_offset_delay = Expression(0.5, label='Signal offset delay (s)', **kw)
     intertrial_duration = Expression(0.1, label='Intertrial duration (s)', **kw)
-    reaction_window_delay = Expression(0, label='Response delay (s)', **kw)
+    response_window_delay = Expression(0, label='Response delay (s)', **kw)
     response_window_duration = Expression(3, label='Response duration (s)', **kw)
     timeout_duration = Expression(1, label='TO duration (s)', **kw)
     poke_duration = Expression(0.2, label='Poke duration (s)', **kw)
@@ -23,16 +23,17 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm):
     mic_flp = Float(40e3, label='Microphone lowpass cutoff (Hz)', **kw)
 
     abstract_positive_paradigm_group = VGroup(
-            'mic_fhp',
-            'mic_flp',
+            'speaker',
             'signal_offset_delay',
             'intertrial_duration',
-            'reaction_window_delay',
+            'response_window_delay',
             'response_window_duration',
             'timeout_duration',
             'poke_duration',
             'pump_rate',
             'reward_volume',
+            'mic_fhp',
+            'mic_flp',
             label='Paradigm',
             show_border=True,
             )

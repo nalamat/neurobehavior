@@ -35,7 +35,7 @@ class ExperimentToolBar(ToolBar):
     kw      = dict(height=size[0], width=size[1], action=True)
     apply   = SVGButton('Apply', filename=icons['apply'],
                         tooltip='Apply settings', **kw)
-    revert  = SVGButton('Revert', filename=icons['undo'],
+    revert  = SVGButton('Undo', filename=icons['undo'],
                         tooltip='Revert settings', **kw)
     start   = SVGButton('Run', filename=icons['start'],
                         tooltip='Begin experiment', **kw)
@@ -619,10 +619,10 @@ class AbstractExperimentController(Controller):
         self.model.paradigm.copy_traits(self.shadow_paradigm)
         self.pending_changes = False
 
-    #def value_changed(self, name): 
-    #    new_value = self.get_current_value(name)
-    #    old_value = self.old_context.get(name, None)
-    #    return new_value != old_value
+    def value_changed(self, name): 
+        new_value = self.get_current_value(name)
+        old_value = self.old_context.get(name, None)
+        return new_value != old_value
 
     def get_current_value(self, name):
         '''

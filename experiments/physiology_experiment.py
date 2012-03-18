@@ -6,7 +6,7 @@ from enthought.traits.ui.api import VGroup, HGroup, Item, Include, View, \
         InstanceEditor, RangeEditor, HSplit, Tabbed
 from enthought.traits.api import Instance, HasTraits, Float, DelegatesTo, \
      Bool, on_trait_change, Int, on_trait_change, Any, Range, Event, Property,\
-     Tuple, List, cached_property, Button, Enum
+     Tuple, List, cached_property, Button, Enum, Undefined
 from enthought.traits.ui.api import RangeEditor
 
 from physiology_paradigm import PhysiologyParadigm
@@ -250,7 +250,7 @@ class PhysiologyExperiment(HasTraits):
 
         # Create the neural plots
         value_mapper = LinearMapper(range=self.physiology_value_range)
-        plot = ExtremesMultiChannelPlot(source=self.data.processed, 
+        plot = ExtremesMultiChannelPlot(source=self.data.processed,
                 index_mapper=index_mapper, value_mapper=value_mapper)
         self.settings.sync_trait('visible_channels', plot, 'channel_visible', mutual=False)
 
@@ -286,27 +286,43 @@ class PhysiologyExperiment(HasTraits):
 
         self.physiology_container = container
 
-    zero_delay = Button('Reset trigger delay')
+    #zero_delay = Button('Reset trigger delay')
     pause_update = Button('Pause update')
     resume_update = Button('Resume update')
+    update_mode = Enum('continuous', 'paused')
 
-    def _zero_delay_fired(self):
-        self.physiology_index_range.trig_delay = 0
+    #def _zero_delay_fired(self):
+    #    self.physiology_index_range.trig_delay = 0
 
     def _pause_update_fired(self):
-        current_trigger = len(self.data.ts)
-        self.physiology_index_range.trigger = current_trigger
+        self.update_mode = 'paused'
 
     def _resume_update_fired(self):
-        self.physiology_index_range.trigger = -1
+        self.update_mode = 'continuous'
+        trial = self.parent.data.trial_log[-1]
+        self.physiology_index_range.trigger = trial['start']
 
     @on_trait_change('parent.selected_trial')
-    def _update_selected_trigger(self, new):
-        self.physiology_index_range.update_mode = 'triggered'
-        self.physiology_index_range.trigger = new
+    def _update_selected_trigger(self, row):
+        if row is not Undefined:
+            # The trial_log widget reverses the rows so the most recent trial is
+            # row 0.  We can use negative indexing to access the desired trial.
+            # e.g. if it is row 0, then we want the very last trial (e.g. -1).
+            # If it is row 5, then this means that we want the sixth-to-last
+            # trial (e.g. row -6)).
+            start = self.parent.data.trial_log[row]['start']
+            print row, start
+            self.physiology_index_range.update_mode = 'triggered'
+            self.physiology_index_range.trigger = start
+            self.update_mode = 'paused'
+
+    @on_trait_change('data.ts.added')
+    def _update_trigger(self, timestamps):
+        if timestamps is not Undefined and self.update_mode == 'continuous':
+            self.physiology_index_range.trigger = timestamps[-1]
 
     trigger_buttons = HGroup(
-            'zero_delay',
+            #'zero_delay',
             'pause_update',
             'resume_update',
             show_labels=False,

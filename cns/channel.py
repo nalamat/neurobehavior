@@ -31,7 +31,7 @@ class FileMixin(HasTraits):
 
     IMPORTANT! When using this mixin with most subclasses of Channel, the
     FileMixin typically must appear first in the list otherwise you may have
-    some MRO issues.
+    some method resolution order issues.
 
     .. _HDF5: http://www.hdfgroup.org/HDF5/
 
@@ -123,7 +123,6 @@ class FileMixin(HasTraits):
         return (0,)
 
     def __buffer_default(self):
-        shape = self._get_shape()
         log.debug('%s: creating buffer with shape %r', self, self._get_shape())
         atom = tables.Atom.from_dtype(np.dtype(self.dtype))
         log.debug('%s: creating buffer with type %r', self, self.dtype)
@@ -153,90 +152,17 @@ class FileMixin(HasTraits):
     def __repr__(self):
         return '<HDF5Store {}>'.format(self.name)
 
-    #def chunk_samples(self, chunk_bytes):
-    #    '''
-    #    Compute number of samples per channel to load based on the preferred
-    #    memory size of the chunk (as indicated by chunk_bytes).  
-
-    #    See cns.arraytools.chunk_samples for additional documentation.
-    #    '''
-    #    file_chunksize = self._buffer.chunkshape[-1]
-    #    bytes = np.nbytes[self.dtype]
-    #    chunk_samples = chunk_bytes/self.channels/bytes
-    #    chunk_samples = int(chunk_samples/file_chunksize)*file_chunksize
-    #    return chunk_samples
-
-    #def n_chunks(self, chunk_bytes):
-    #    chunk_samples = self.chunk_samples(chunk_bytes)
-    #    samples = self._buffer.shape[-1]
-    #    return int(np.ceil(samples/chunk_samples))
-
-    #def chunk_iter(self, chunk_bytes, channels=None, loverlap=0, roverlap=0):
-    #    '''
-    #    Return an iterable that yields the data in segments based on the
-    #    requested memory size (in bytes) that each segment should be.  This will
-    #    be coerced to a multiple of the underlying chunkshape for efficiency
-    #    reasons.
-
-    #    chunk_bytes
-    #        Total size of chunk (in bytes).  The size of the underlying datatype
-    #        (e.g. 16-bit or 32-bit float) and total number of channels will be
-    #        factored in.  Important!  Even if you only request a subset of the
-    #        channels, this currently assumes that all channels are being loaded
-    #        into memory before discarding the ones that are not requested.
-
-    #    channels
-    #        Channels to extract
-
-    #    loverlap
-    #        Number of samples on the left to overlap with prior chunk (used to
-    #        handle extraction of features that cross chunk boundaries)
-    #    roverlap
-    #        Number of samples on the right to overlap with the next chunk (used
-    #        to handle extraction of features that cross chunk boundaries)
-
-    #    TODO: Set this up for arbitrary dimensions
-    #    '''
-    #    n_samples = self.chunk_samples(chunk_bytes)
-    #    n_chunks = self.n_chunks(chunk_bytes)
-
-    #    # Create a special slice object that returns all channels
-    #    if channels is None:
-    #        channels = slice(None)
-
-    #    for chunk in range(n_chunks):
-    #        i = chunk*n_samples
-    #        lb = i-loverlap
-    #        ub = i+n_samples+roverlap
-
-    #        # If we are on the first chunk or last chunk, we have some
-    #        # special-case handling to take care of.
-    #        lpadding, rpadding = 0, 0
-    #        if lb < 0:
-    #            lpadding = np.abs(lb)
-    #            lb = 0
-    #        if ub > self.n_samples:
-    #            rpadding = ub-self.n_samples
-    #            ub = self.n_samples
-
-    #        chunk_samples = self[channels, lb:ub]
-
-    #        n_channels = chunk_samples.shape[0]
-    #        if lpadding or rpadding:
-    #            yield np.c_[np.ones((n_channels, lpadding)) * np.nan,
-    #                        chunk_samples,
-    #                        np.ones((n_channels, rpadding)) * np.nan]
-    #        yield chunk_samples
-
 class Timeseries(HasTraits):
 
     updated = Event
+    added   = Event
     fs      = Float(attr=True)
     t0      = Float(0, attr=True)
 
     def send(self, timestamps):
-        self.append(timestamps)
-        self.updated = np.array(timestamps)/self.fs
+        if len(timestamps):
+            self.append(timestamps)
+            self.added = np.array(timestamps)/self.fs
 
     def get_range(self, lb, ub):
         ts = self._buffer.read()
@@ -258,6 +184,9 @@ class Timeseries(HasTraits):
         return len(self._buffer)
 
 class FileTimeseries(FileMixin, Timeseries):
+    '''
+    Timeseries class using a HDF5 node as the datastore
+    '''
 
     name  = 'FileTimeseries'
     dtype = Any(np.int32)
@@ -291,6 +220,9 @@ class Epoch(HasTraits):
         return self._buffer[key]/self.fs
 
 class FileEpoch(FileMixin, Epoch):
+    '''
+    Epoch class using a HDF5 node as the datastore
+    '''
 
     name  = 'FileEpoch'
     dtype = Any(np.int32)
@@ -457,7 +389,8 @@ class Channel(HasTraits):
         Convenience method that allows us to use a Channel as a "sink" for a
         processing pipeline.
         '''
-        self.write(data.ravel())
+        if len(data):
+            self.write(data.ravel())
 
     def write(self, data):
         '''
@@ -622,7 +555,8 @@ class MultiChannel(Channel):
         return self.get_range(lb, ub)[channel]
 
     def send(self, data):
-        self.write(data)
+        if len(data):
+            self.write(data)
 
     def get_range(self, start, end, reference=None, channels=None):
         lb, ub = self._to_bounds(start, end, reference)
@@ -777,12 +711,13 @@ class FileSnippetChannel(FileChannel):
         return (0, self.snippet_size)
 
     def send(self, data, timestamps, classifiers):
-        data.shape = (-1, self.snippet_size)
-        self._buffer.append(data)
-        self.classifiers.append(classifiers)
-        self.timestamps.append(timestamps)
-        self.unique_classifiers.update(set(classifiers))
-        self.updated = True
+        if len(data):
+            data.shape = (-1, self.snippet_size)
+            self._buffer.append(data)
+            self.classifiers.append(classifiers)
+            self.timestamps.append(timestamps)
+            self.unique_classifiers.update(set(classifiers))
+            self.updated = True
 
     def get_recent(self, history=1, classifier=None):
         if len(self._buffer) == 0:

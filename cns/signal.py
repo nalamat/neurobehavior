@@ -48,7 +48,7 @@ def generate_envelope(n, ramp_n):
     ramp = cos2ramp(ramp_n)
     return np.r_[ramp, np.ones(n-2*ramp_n), ramp[::-1]]
 
-def am_eq_power(depth):
+def sam_eq_power(depth):
     '''
     Given the modulation depth for a token, return the scaling factor to
     multiply the waveform by so that the power in the modulated token is equal
@@ -56,7 +56,7 @@ def am_eq_power(depth):
     '''
     return (3.0/8.0*depth**2-depth+1)**0.5
 
-def am_eq_phase(depth, direction='positive'):
+def sam_eq_phase(depth, direction='positive'):
     '''
     Given the modulation depth, return the starting phase of the modulation that
     ensures a smooth transition from an unmodulated token to the modulated

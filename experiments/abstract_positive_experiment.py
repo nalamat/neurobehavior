@@ -80,7 +80,6 @@ class TrialLogAdapter(TabularAdapter):
         # on the colors).  I wanted a spout response to have a green icon
         # associated with it (so that green on green means HIT, red on green
         # means MISS), etc.
-        print self.item
         if self.item['response'] == 'spout':
             return '@icons:tuple_node'  # a green icon
         elif self.item['response'] == 'poke':
@@ -144,11 +143,11 @@ class AbstractPositiveExperiment(AbstractExperiment):
                 fill_color=(0, 0, 1, alpha), line_color=(0, 0, 1, 1),
                 line_width=1, rect_height=0.1, rect_center=0.4)
         container.add(plot)
-        plot = TTLPlot(source=self.data.comm_inhibit_TTL, reference=0,
-                index_mapper=index_mapper, value_mapper=value_mapper,
-                fill_color=(0, 1, 1, alpha), line_color=(0, 1, 1, 1),
-                line_width=1, rect_height=0.1, rect_center=0.2)
-        container.add(plot) 
+        #plot = TTLPlot(source=self.data.comm_inhibit_TTL, reference=0,
+        #        index_mapper=index_mapper, value_mapper=value_mapper,
+        #        fill_color=(0, 1, 1, alpha), line_color=(0, 1, 1, 1),
+        #        line_width=1, rect_height=0.1, rect_center=0.2)
+        #container.add(plot) 
         plot = TTLPlot(source=self.data.TO_TTL, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(1, 0, 0, alpha), line_color=(1, 0, 0, 1),
@@ -222,8 +221,8 @@ class AbstractPositiveExperiment(AbstractExperiment):
             VGroup(
                 Item('handler.toolbar', style='custom'),
                 Item('handler.pump_toolbar', style='custom'),
-                Item('object.microphone_plot.sensitivity'),
-                Item('object.microphone_plot.input_gain'),
+                Item('object.microphone_plot.sensitivity', show_label=True),
+                Item('object.microphone_plot.input_gain', show_label=True),
                 Include('status_group'),
                 Tabbed(
                     Item('paradigm', style='custom', editor=InstanceEditor(),

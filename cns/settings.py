@@ -57,8 +57,12 @@ PARADIGM_WILDCARD   = 'Paradigm settings (*.par)|*.par|'
 PHYSIOLOGY_WILDCARD = 'Physiology settings (*.phy)|*.phy|'
 
 # Be sure to update the RPvds circuit, physiology.rcx, with the appropriate
-# snippet size for the SpikeSort component if this value is changed.
-PHYSIOLOGY_SPIKE_SNIPPET_SIZE = 20
+# snippet size for the SpikeSort component if this value is changed.  Note that
+# this does not include the extra two samples included by the RPvds component.
+# The very first sample is the timestamp, the very last sample is a classifier.
+# The actual length of the waveform downloaded from the RPvds is
+# PHYSIOLOGY_SPIKE_SNIPPET_SIZE+2.
+PHYSIOLOGY_SPIKE_SNIPPET_SIZE = 18
 
 # __file__ is a special variable that is available in all Python files (when
 # loaded by the Python interpreter) that contains the path of the current file
