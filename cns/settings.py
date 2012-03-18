@@ -29,21 +29,26 @@ NOISE_DURATION  = 16
 
 try:
     BASE_DIRECTORY  = os.environ['NEUROBEHAVIOR_BASE']
+    neurobehavior_base_defined = True
 except KeyError:
     import warnings
     import textwrap
     # Default to the user's home directory and raise a warning.
-    BASE_DIRECTORY = path.expanduser('~')
-    mesg = '''No NEUROBEHAVIOR_BASE environment variable defined.  Defaulting to
-    the user's home directory, {}.  In the future, it is recommended that you
-    create a base directory where the paradigm settings, calibration data, log
-    files and data files can be stored.  Once this directory is created, create
-    the environment variable, NEUROBEHAVIOR_BASE with the path to the directory
-    as the value.'''
-    warnings.warn(textwrap.dedent(mesg.format(BASE_DIRECTORY)))
+    BASE_DIRECTORY = path.join(path.expanduser('~'), '.neurobehavior')
+    mesg = '''
+    No NEUROBEHAVIOR_BASE environment variable defined.  Defaulting to the
+    user's home directory, {}.  In the future, it is recommended that you create
+    a base directory where the paradigm settings, calibration data, log files
+    and data files can be stored.  Once this directory is created, create the
+    environment variable, NEUROBEHAVIOR_BASE, with the path to the directory as
+    the value.'''
+    mesg = textwrap.dedent(mesg.format(BASE_DIRECTORY))
+    mesg = mesg.replace('\n', ' ')
+    warnings.warn(mesg)
+    neurobehavior_base_defined = False
+    
 
 LOG_ROOT        = path.join(BASE_DIRECTORY, 'logs')        # log files
-TEMP_ROOT       = path.join(BASE_DIRECTORY, 'temp')        # temp files
 DATA_ROOT       = path.join(BASE_DIRECTORY, 'data')        # data files
 COHORT_ROOT     = DATA_ROOT                                # cohort files
 CAL_ROOT        = path.join(BASE_DIRECTORY, 'calibration') # calibration files
@@ -55,6 +60,12 @@ PHYSIOLOGY_ROOT = path.join(SETTINGS_ROOT, 'physiology')
 COHORT_WILDCARD     = 'Cohort files (*.cohort.hd5)|*.cohort.hd5|'
 PARADIGM_WILDCARD   = 'Paradigm settings (*.par)|*.par|'
 PHYSIOLOGY_WILDCARD = 'Physiology settings (*.phy)|*.phy|'
+
+if neurobehavior_base_defined:
+    TEMP_ROOT = path.join(BASE_DIRECTORY, 'temp')        # temp files
+else:
+    import tempfile
+    TEMP_ROOT = tempfile.mkdtemp()
 
 # Be sure to update the RPvds circuit, physiology.rcx, with the appropriate
 # snippet size for the SpikeSort component if this value is changed.  Note that
