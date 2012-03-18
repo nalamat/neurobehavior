@@ -1,7 +1,7 @@
 from enthought.pyface.api import error, information
 from cns.data.ui.cohort import CohortView, CohortViewHandler, CohortEditor
-from cns.data import persistence
-from cns.data.h5_utils import get_or_append_node
+import pickle
+from cns.h5 import get_or_append_node
 import sys
 import tables
 import os
@@ -51,19 +51,6 @@ class ExperimentLauncher(CohortViewHandler):
         if not self.load_file(info):
             sys.exit()
 
-    def load_paradigm(self, info, paradigm_node, paradigm_hash):
-        try:
-            return persistence.load_object(paradigm_node, paradigm_hash)
-        except tables.NoSuchNodeError:
-            mesg = 'No prior paradigm found.  Creating new paradigm.'
-            log.debug(mesg)
-            information(info.ui.control, mesg)
-        except (TraitError, ImportError, persistence.PersistenceReadError), e:
-            mesg = 'Unable to load prior settings.  Creating new paradigm.'
-            log.debug(mesg)
-            log.exception(e)
-            error(info.ui.control, mesg)
-
     def launch_experiment(self, info, selected):
         '''
         Runs specified experiment type.  On successful completion of an
@@ -76,6 +63,7 @@ class ExperimentLauncher(CohortViewHandler):
             item = selected
             if item.store_node._v_isopen:
                 animal_node = item.store_node
+                file = item.store_node._v_file
             else:
                 log.debug('Opening node %r for %r', item.store_node, item)
                 file = tables.openFile(item.store_node_source, 'a',
@@ -98,6 +86,20 @@ class ExperimentLauncher(CohortViewHandler):
             paradigm_hash = paradigm_name + '_' + '_'.join(self.args.rove)
 
             paradigm = self.load_paradigm(info, paradigm_node, paradigm_hash)
+            try:
+                bytes = paradigm_node._v_attrs[paradigm_hash]
+                paradigm = pickle.loads(bytes)
+            except AttributeError as e:
+                log.exception(e)
+                mesg = 'No prior paradigm found.  Creating new paradigm.'
+                log.debug(mesg)
+                information(info.ui.control, mesg)
+            except pickle.UnpicklingError as e:
+                log.exception(e)
+                mesg = 'Unable to load prior settings.  Creating new paradigm.'
+                log.debug(mesg)
+                information(info.ui.control, mesg)
+                # All other exceptions
 
             try:
                 if paradigm is not None:
@@ -114,8 +116,8 @@ class ExperimentLauncher(CohortViewHandler):
                     handler=controller)
 
             if ui.result:
-                persistence.add_or_update_object(model.paradigm, paradigm_node,
-                        paradigm_hash)
+                bytes = pickle.dumps(model.paradigm)
+                paradigm_node._v_attrs[paradigm_hash] = bytes
                 item.processed = True
                 self.last_paradigm = model.paradigm
             
