@@ -4,21 +4,19 @@ from enthought.chaco.api import (LinearMapper, DataRange1D,
         OverlayPlotContainer)
 from enthought.traits.ui.api import VGroup, HGroup, Item, Include, View, \
         InstanceEditor, RangeEditor, HSplit, Tabbed
-from enthought.traits.api import Instance, HasTraits, Float, DelegatesTo, \
-     Bool, on_trait_change, Int, on_trait_change, Any, Range, Event, Property,\
+from enthought.traits.api import Instance, HasTraits, Float, \
+     Bool, on_trait_change, Any, Range, Property,\
      Tuple, List, cached_property, Button, Enum, Undefined
-from enthought.traits.ui.api import RangeEditor
 
 from physiology_paradigm import PhysiologyParadigm
 from physiology_data import PhysiologyData
 from physiology_controller import PhysiologyController
 
-from enthought.chaco.api import PlotAxis, VPlotContainer, PlotAxis
+from enthought.chaco.api import PlotAxis
 from enthought.chaco.tools.api import ZoomTool
 from cns.chaco_exts.tools.window_tool import WindowTool
 from cns.chaco_exts.helpers import add_default_grids, add_time_axis
 from cns.chaco_exts.channel_data_range import ChannelDataRange
-from cns.chaco_exts.timeseries_plot import TimeseriesPlot
 from cns.chaco_exts.extremes_multi_channel_plot import ExtremesMultiChannelPlot
 from cns.chaco_exts.ttl_plot import TTLPlot
 from cns.chaco_exts.epoch_plot import EpochPlot
@@ -365,8 +363,10 @@ class PhysiologyExperiment(HasTraits):
                     Include('physiology_settings_group'),
                     VGroup(
                         HGroup(
-                            Item('visualize_spikes', label='Show sorted spikes?'),
-                            Item('visualize_thresholds', label='Show sort threshold?'),
+                            Item('visualize_spikes', 
+                                 label='Show sorted spikes?'),
+                            Item('visualize_thresholds', 
+                                 label='Show sort threshold?'),
                             show_border=True,
                             ),
                         Item('sort_window_1', style='custom', width=250),
@@ -397,14 +397,22 @@ class PhysiologyExperiment(HasTraits):
             )
 
 if __name__ == '__main__':
+    import os
     import tables
     from cns import get_config
-    from os.path import join
     from tdt import DSPProject
 
-    tempfile = join(get_config('TEMP_ROOT'), 'test_physiology.h5')
-    datafile = tables.openFile(tempfile, 'w')
-    data = PhysiologyData(store_node=datafile.root)
-    #addr = ('localhost', 13131)
-    controller = PhysiologyController(process=DSPProject())
-    PhysiologyExperiment(data=data).configure_traits(handler=controller)
+    # Create a temporary file (we can't create a temporary file using the
+    # standard tempfile functions tables.openFile requires a string, not a
+    # file-like object).
+    tempfile = os.path.join(get_config('TEMP_ROOT'), 'test_physiology.h5')
+
+    # Run the experiment
+    with tables.openFile(tempfile, 'w') as datafile:
+        data = PhysiologyData(store_node=datafile.root)
+        controller = PhysiologyController(process=DSPProject())
+        PhysiologyExperiment(data=data).configure_traits(handler=controller)
+
+    # Delete the temporary file
+    os.unlink(tempfile)
+
