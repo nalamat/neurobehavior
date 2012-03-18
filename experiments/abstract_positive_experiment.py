@@ -143,11 +143,6 @@ class AbstractPositiveExperiment(AbstractExperiment):
                 fill_color=(0, 0, 1, alpha), line_color=(0, 0, 1, 1),
                 line_width=1, rect_height=0.1, rect_center=0.4)
         container.add(plot)
-        #plot = TTLPlot(source=self.data.comm_inhibit_TTL, reference=0,
-        #        index_mapper=index_mapper, value_mapper=value_mapper,
-        #        fill_color=(0, 1, 1, alpha), line_color=(0, 1, 1, 1),
-        #        line_width=1, rect_height=0.1, rect_center=0.2)
-        #container.add(plot) 
         plot = TTLPlot(source=self.data.TO_TTL, reference=0,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 fill_color=(1, 0, 0, alpha), line_color=(1, 0, 0, 1),
@@ -189,7 +184,6 @@ class AbstractPositiveExperiment(AbstractExperiment):
 
     @on_trait_change('data')
     def _generate_experiment_plot(self):
-        plots = {}
         index_range = ChannelDataRange(trig_delay=0)
         index_range.sources = [self.data.spout_TTL]
         index_mapper = LinearMapper(range=index_range)

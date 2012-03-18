@@ -6,7 +6,7 @@ from .evaluate import Expression
 
 class AbstractPositiveParadigm(AbstractExperimentParadigm):
     
-    kw = {'context': True, 'store': 'attribute', 'log': True}
+    kw = {'context': True, 'log': True}
 
     speaker = Expression("random_speaker(0.5)", label='Output Speaker', **kw)
 

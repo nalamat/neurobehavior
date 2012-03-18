@@ -2,13 +2,12 @@ from datetime import datetime, timedelta
 
 from traits.api import HasTraits, Any, Instance, Property, Bool
 from traitsui.api import View, Include, VGroup, Item, Tabbed, TabularEditor
-from traitsui.menu import MenuBar, Menu, ActionGroup, Action, ToolBar
+from traitsui.menu import MenuBar, Menu, ActionGroup, Action
 from traitsui.tabular_adapter import TabularAdapter
 from traitsui.key_bindings import KeyBinding, KeyBindings
 
 from abstract_experiment_data import AbstractExperimentData
 from abstract_experiment_paradigm import AbstractExperimentParadigm
-
 
 from cns import get_config
 color_names = get_config('COLOR_NAMES')
@@ -39,7 +38,7 @@ class AbstractExperiment(HasTraits):
     exp_node            = Any
     data_node           = Any
 
-    paradigm            = Instance(AbstractExperimentParadigm, store='child')
+    paradigm            = Instance(AbstractExperimentParadigm)
     data                = Instance(AbstractExperimentData, store='child')
     start_time          = Instance(datetime, store='attribute')
     stop_time           = Instance(datetime, store='attribute')
