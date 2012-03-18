@@ -13,7 +13,7 @@ class AbstractAversiveParadigm(AbstractExperimentParadigm):
     FM).
     '''
 
-    kw = {'context': True, 'store': 'attribute', 'log': True}
+    kw = {'context': True, 'log': True}
 
     prevent_disarm = Bool(True, label='Prevent disarm of aversive?', **kw)
 
