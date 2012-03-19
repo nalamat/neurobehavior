@@ -73,7 +73,7 @@ else:
 # The very first sample is the timestamp, the very last sample is a classifier.
 # The actual length of the waveform downloaded from the RPvds is
 # PHYSIOLOGY_SPIKE_SNIPPET_SIZE+2.
-PHYSIOLOGY_SPIKE_SNIPPET_SIZE = 18
+PHYSIOLOGY_SPIKE_SNIPPET_SIZE = 26
 
 # __file__ is a special variable that is available in all Python files (when
 # loaded by the Python interpreter) that contains the path of the current file

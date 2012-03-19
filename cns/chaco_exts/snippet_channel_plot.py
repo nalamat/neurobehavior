@@ -12,9 +12,9 @@ class SnippetChannelPlot(BaseChannelPlot):
 
     index_data = Property(depends_on='source.fs, source.snippet_size')
     index_screen = Property(depends_on='index_data')
-    value_data = Property(depends_on='source.updated, last_reset, history')
+    value_data = Property(depends_on='source.added, source.updated, last_reset, history')
     value_screen = Property(depends_on='value_data')
-    classifier_masks = Property(depends_on='source.updated')
+    classifier_masks = Property(depends_on='source.added, source.updated')
 
     colors = List(ColorTrait, ['red', 'green', 'blue', 'orange', 'black'])
 
@@ -70,6 +70,5 @@ class SnippetChannelPlot(BaseChannelPlot):
         self._draw_default_axes(gc)
         gc.restore_state()
 
-    @on_trait_change('source.updated')
-    def _data_changed(self):
+    def _data_added(self, event_data):
         self.invalidate_and_redraw()

@@ -717,7 +717,7 @@ class FileSnippetChannel(FileChannel):
             self.classifiers.append(classifiers)
             self.timestamps.append(timestamps)
             self.unique_classifiers.update(set(classifiers))
-            self.updated = True
+            self.added = data, timestamps, classifiers
 
     def get_recent(self, history=1, classifier=None):
         if len(self._buffer) == 0:
@@ -732,6 +732,7 @@ class FileSnippetChannel(FileChannel):
     def get_recent_average(self, count=1, classifier=None):
         return self.get_recent(count, classifier).mean(0)
 
+'''
 class SnippetChannel(Channel):
 
     snippet_size        = Int
@@ -747,12 +748,14 @@ class SnippetChannel(Channel):
         return self._buffer[key]
 
     def send(self, data, timestamps, classifiers):
+	print 'recieved snippet'
         data.shape = (-1, self.snippet_size)
         self._buffer.append(data)
         self.classifiers.append(classifiers)
         self.timestamps.append(timestamps)
         self.unique_classifiers.update(set(classifiers))
-        self.updated = True
+	print 'firing update event'
+        self.added = True
 
     def get_recent(self, history=1, classifier=None):
         if len(self._buffer) == 0:
@@ -769,6 +772,7 @@ class SnippetChannel(Channel):
 
     def __len__(self):
         return len(self._buffer)
+'''
 
 if __name__ == '__main__':
     import doctest
