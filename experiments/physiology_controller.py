@@ -10,7 +10,6 @@ from cns.pipeline import deinterleave_bits
 CHANNELS = get_config('PHYSIOLOGY_CHANNELS')
 PHYSIOLOGY_WILDCARD = get_config('PHYSIOLOGY_WILDCARD')
 SPIKE_SNIPPET_SIZE = get_config('PHYSIOLOGY_SPIKE_SNIPPET_SIZE')
-PHYSIOLOGY_ROOT = get_config('PHYSIOLOGY_ROOT')
 
 from .utils import load_instance, dump_instance
 
@@ -83,7 +82,7 @@ class PhysiologyController(Controller):
         for i in range(CHANNELS):
             name = 'spike{}'.format(i+1)
             buffer = self.iface_physiology.get_buffer(name, 'r',
-                    block_size=SPIKE_SNIPPET_SIZE)
+                    block_size=SPIKE_SNIPPET_SIZE+2)
             self.buffer_spikes.append(buffer)
 
     @on_trait_change('model.data')
@@ -93,7 +92,7 @@ class PhysiologyController(Controller):
             data_spikes = self.model.data.spikes
             for src, dest in zip(self.buffer_spikes, data_spikes):
                 dest.fs = src.fs
-                dest.snippet_size = SPIKE_SNIPPET_SIZE-2
+                dest.snippet_size = SPIKE_SNIPPET_SIZE
         self.model.data.raw.fs = self.buffer_raw.fs
         self.model.data.processed.fs = self.buffer_filt.fs
         self.model.data.ts.fs = self.iface_physiology.fs
