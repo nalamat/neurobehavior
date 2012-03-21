@@ -1,13 +1,13 @@
 from __future__ import division
-from math import floor, ceil
+from math import ceil
 import numpy as np
 
 from enthought.traits.api import HasTraits, Range, Tuple, Bool, Int, Str, \
-        List, Instance, Property, cached_property, Button, Float, on_trait_change
+        List, Instance, Property, cached_property, Button, Float
 
 from enthought.traits.ui.api import View, VGroup, HGroup, Item, Label, Include
 
-from enthought.traits.ui.api import TableEditor, ObjectColumn, RangeEditor
+from enthought.traits.ui.api import TableEditor, ObjectColumn
 from enthought.traits.ui.extras.checkbox_column import CheckboxColumn
 
 from cns.util import to_list
@@ -18,7 +18,7 @@ class ChannelSetting(HasTraits):
     differential    = Str
     visible         = Bool(True)
     bad             = Bool(False)
-    mapped          = Int
+    #mapped          = Int
 
     # Threshold for candidate spike used in on-line spike sorting
     spike_threshold = Float(0.0005)
@@ -41,12 +41,12 @@ channel_editor = TableEditor(
         sortable=False,
         reorderable=True,
         columns=[
-            ObjectColumn(name='mapped', editable=True, width=10, label='M'),
+            #ObjectColumn(name='mapped', editable=True, width=10, label='M'),
             CheckboxColumn(name='visible', width=10, label='V'), 
             CheckboxColumn(name='bad', width=10, label='B'),
-            ObjectColumn(name='differential'),
-            ObjectColumn(name='sort_summary', label='Sort?', width=20,
-                         editable=False),
+            ObjectColumn(name='differential', width=100),
+            #ObjectColumn(name='sort_summary', label='Sort?', width=20,
+            #$             editable=False),
             ]
         )
 
@@ -178,14 +178,7 @@ class PhysiologyParadigm(HasTraits):
     channel_settings    = List(Instance(ChannelSetting))
 
     def _channel_settings_default(self):
-        return [ChannelSetting(number=i, mapped=i) for i in range(1, 17)]
-
-    # Mapping of channels
-    mapped_channels = Property(depends_on='channel_settings.mapped')
-
-    @cached_property
-    def _get_mapped_channels(self):
-        return [ch.mapped for ch in self.channel_settings]
+        return [ChannelSetting(number=i) for i in range(1, 17)]
 
     # List of the channels visible in the plot
     visible_channels = Property(List, depends_on='channel_settings.visible')

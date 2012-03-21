@@ -54,7 +54,7 @@ class Data(
 
 class Experiment(AbstractPositiveExperiment, CLExperimentMixin):
 
-    data = Instance(Data, (), store='child')
-    paradigm = Instance(Paradigm, (), store='child')
+    data = Instance(Data, ())
+    paradigm = Instance(Paradigm, ())
 
 node_name = 'PositiveAMNoiseCLExperiment'

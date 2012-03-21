@@ -180,9 +180,14 @@ PAIRED_COLORS_RGB_NORM = [
    (1.000, 0.750, 0.500),
    ]
 
-# Format to use when generating time strings (see time.strptime for
-# documentation re the format specifiers to use below)
+# Format to use when generating time strings for use in a HDF5 node pathname
+# (see time.strptime for documentation re the format specifiers to use below)
 TIME_FORMAT = '%Y_%m_%d_%H_%M_%S'
+
+# Format to use when storing datetime strings as attributes in the HDF5 file 
+DATE_FMT = '%Y-%m-%d'
+TIME_FMT = '%H:%M:%S'
+DATETIME_FMT = DATE_FMT + ' ' + TIME_FMT
 
 # Wildcards to use when presenting a GUI prompt to open the relevant file
 PHYSIOLOGY_RAW_WILDCARD = 'Raw (*_raw.hd5)|*_raw.hd5|'

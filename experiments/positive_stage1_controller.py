@@ -37,7 +37,7 @@ class PositiveStage1Controller(AbstractExperimentController):
     def start_experiment(self, info):
         self.invalidate_context()
         self.evaluate_pending_expressions()
-        self.update_signal()
+        self.update_waveform()
         self.iface_behavior.start()
         self.pause()
         self.process.trigger('A', 'high')
@@ -68,9 +68,24 @@ class PositiveStage1Controller(AbstractExperimentController):
             return "Subject controlled"
 
     def _context_updated_fired(self):
+        self.update_waveform()
+
+    def update_waveform(self):
         self.invalidate_context()
         self.evaluate_pending_expressions()
-        waveform, attenuation = self.compute_waveform(self.cal_primary)
+        speaker = self.get_current_value('speaker')
+
+        if speaker == 'primary':
+            calibration = self.cal_primary
+        else:
+            calibration = self.cal_secondary
+
+        waveform, attenuation = self.compute_waveform(calibration)
         self.buffer_signal.set(waveform)
-        self.iface_behavior.set_tag('att_A', attenuation)
-        self.iface_behavior.set_tag('att_B', 120)
+
+        if speaker == 'primary':
+            self.iface_behavior.set_tag('att_A', attenuation)
+            self.iface_behavior.set_tag('att_B', 120)
+        else:
+            self.iface_behavior.set_tag('att_A', 120)
+            self.iface_behavior.set_tag('att_B', attenuation)

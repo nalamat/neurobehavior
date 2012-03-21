@@ -80,7 +80,7 @@ class Paradigm(
         CLParadigmMixin,
         ):
 
-    kw = {'context': True, 'store': 'attribute', 'log': True}
+    kw = {'context': True, 'log': True}
     ramp_duration = Expression(0.0025, label='Ramp duration (s)', **kw)
     frequency = Expression(4000, label='Frequency (Hz)', **kw)
     level = Expression(0.0, label='Level (dB SPL)', **kw)

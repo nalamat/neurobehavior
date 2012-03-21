@@ -25,10 +25,6 @@ class AversiveAnalysisMixin(SDTDataMixin):
 
     Parameters
     ----------
-    exclude_first : int
-        Number of trials at beginning to ignore
-    exclude_last : int
-        Number trials at end to ignore
     contact_offset : float (seconds)
         Start of check period relative to trial timestamp, can be a negative
         value
@@ -51,24 +47,14 @@ class AversiveAnalysisMixin(SDTDataMixin):
         spout during the check period based on `contact_fraction`.
     '''
 
-    # Mask parameters
-    mask_mode = Enum('none', 'exclude', 'include', store='attribute')
-    exclude_first = Int(0, store='attribute')
-    exclude_last = Int(0, store='attribute')
-    include_last = Int(0, store='atribute')
-
     # Analysis parameters
-    contact_offset = Float(0.9, store='attribute')
-    contact_dur = Float(0.1, store='attribute')
-    contact_fraction = Range(0.0, 1.0, 0.5, store='attribute')
+    contact_offset = Float(0.9)
+    contact_dur = Float(0.1)
+    contact_fraction = Range(0.0, 1.0, 0.5)
     contact_reference = Enum('trial start', 'trial end')
 
-    reaction_offset = Float(-1, store='attribute')
-    reaction_dur = Float(3.0, store='attribute')
-
     # Basic analysis of masked data
-    contact_scores = Property(store='array', dtype='f',
-            depends_on='trial_log, contact_dur, contact_offset')
+    contact_scores = Property(depends_on='trial_log, contact_dur, contact_offset')
     on_spout_seq = Property(depends_on='trial_log')
     off_spout_seq = Property(depends_on='trial_log')
     fa_seq = Property(depends_on='trial_log')

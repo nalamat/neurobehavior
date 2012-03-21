@@ -314,7 +314,7 @@ class PhysiologyExperiment(HasTraits):
             self.physiology_index_range.trigger = start
             self.update_mode = 'paused'
 
-    @on_trait_change('data.ts.added')
+    @on_trait_change('data:ts.added')
     def _update_trigger(self, timestamps):
         if timestamps is not Undefined and self.update_mode == 'continuous':
             self.physiology_index_range.trigger = timestamps[-1]
@@ -351,8 +351,6 @@ class PhysiologyExperiment(HasTraits):
                 editor=RangeEditor(low=0, high=5e-3)),
             Item('object.physiology_index_range.trig_delay',
                 label='Trigger delay'),
-            Item('object.physiology_index_range.trigger',
-                label='Trigger number'),
             label='Plot Settings',
             show_border=True,
             )

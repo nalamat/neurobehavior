@@ -7,12 +7,15 @@ from enable import markers
 from cns import get_config
 colors = get_config('PAIRED_COLORS_RGB_NORM')
 
+# The keys are values defined by UMS2000.  As long as the users has not modified 
+# the default labels available, they will map to the label in the comment next
+# to each entry
 cluster_type_marker = {
-    1:  (3,  markers.CIRCLE_MARKER),
-    2:  (7,  markers.INVERTED_TRIANGLE_MARKER),
-    3:  (7,  markers.TRIANGLE_MARKER),
-    4:  (1,  markers.DOT_MARKER),
-    5:  (3,  markers.DOT_MARKER),
+    1:  (3,  markers.CIRCLE_MARKER),            # in process
+    2:  (7,  markers.INVERTED_TRIANGLE_MARKER), # good unit
+    3:  (7,  markers.TRIANGLE_MARKER),          # multi-unit
+    4:  (1,  markers.DOT_MARKER),               # garbage
+    5:  (3,  markers.DOT_MARKER),               # needs outlier removal
 }
 
 class ExtractedSpikeOverlay(AbstractOverlay):

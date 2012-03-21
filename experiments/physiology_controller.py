@@ -15,9 +15,6 @@ from .utils import load_instance, dump_instance
 
 class PhysiologyController(Controller):
 
-    # By convention, all mixin classes should prepend attribute names with the
-    # mixin name (e.g. physiology). This prevents potential namespace
-    # collisions if we are using more than one mixin.
     buffer_                 = Any
     iface_physiology        = Any
     buffer_raw              = Any

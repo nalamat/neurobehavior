@@ -112,10 +112,6 @@ class Controller(
         else:
             raise ValueError, 'Unsupported speaker mode %r' % speaker
 
-    def set_speaker_equalize(self, value):
-        if value:
-            raise NotImplementedError, "Equalization not implemented"
-
 class Paradigm(
         AbstractAversiveParadigm, 
         PumpParadigmMixin,
@@ -126,7 +122,7 @@ class Paradigm(
     repeat_fa = False
     go_probability = 'h_uniform(c_safe, 3, 7)'
 
-    kw = {'context': True, 'store': 'attribute', 'log': True}
+    kw = {'context': True, 'log': True}
 
     fc = Expression(4000, label='Carrier frequency (Hz)', **kw)
     level = Expression(0.0, label='Level (dB SPL)', **kw)
@@ -175,7 +171,7 @@ class Data(AversiveData, AversiveCLDataMixin, PumpDataMixin):
 
 class Experiment(AbstractAversiveExperiment, CLExperimentMixin):
 
-    data = Instance(Data, (), store='child')
-    paradigm = Instance(Paradigm, (), store='child')
+    data = Instance(Data, ())
+    paradigm = Instance(Paradigm, ())
 
 node_name = 'AversiveFMCLExperiment'

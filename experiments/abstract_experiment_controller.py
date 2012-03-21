@@ -1,5 +1,4 @@
 from datetime import datetime
-from cns.data.persistence import add_or_update_object_node
 from cns.data.h5_utils import get_or_append_node
 
 import subprocess
@@ -29,6 +28,9 @@ from physiology_experiment import PhysiologyExperiment
 from physiology_data import PhysiologyData
 from physiology_controller import PhysiologyController
 
+DATETIME_FMT = get_config('DATETIME_FMT')
+DATE_FMT = get_config('DATE_FMT')
+
 class ExperimentToolBar(ToolBar):
 
     size    = 24, 24
@@ -47,6 +49,8 @@ class ExperimentToolBar(ToolBar):
                         tooltip='stop', **kw)
     remind  = SVGButton('Remind', filename=icons['warn'],
                         tooltip='Remind', **kw)
+    cancel_remind = SVGButton('Cancel Remind', filename=icons['warn'],
+            tooltip='Remind', **kw)
     item_kw = dict(show_label=False)
 
     traits_view = View(
@@ -61,6 +65,9 @@ class ExperimentToolBar(ToolBar):
                         **item_kw),
                    '_',
                    Item('remind',
+                        enabled_when="object.handler.state=='paused'",
+                        **item_kw),
+                   Item('cancel_remind',
                         enabled_when="object.handler.state=='paused'",
                         **item_kw),
                    Item('pause',
@@ -126,7 +133,6 @@ class AbstractExperimentController(Controller):
     # name_ = Any are Trait wildcards
     # see http://code.enthought.com/projects/traits/docs
     # /html/traits_user_manual/advanced.html#trait-attribute-name-wildcard)
-    timer_ = Any
 
     # current_* and choice_* are variables tracked by the controller to
     # determine the current "state" of the experiment and what values to use for
@@ -137,12 +143,12 @@ class AbstractExperimentController(Controller):
     # experiment is done.  A good rule of thumb: if the parameter is used as a
     # placeholder for transient data (to compute variables needed for experiment
     # control), it should be left out of the "model". 
-    current_    = Any(current=True)
-    choice_     = Any(choice=True)
+    current_    = Any
+    choice_     = Any
 
     # iface_* and buffer_* are handles to hardware and hardware memory buffers
-    iface_      = Any(iface=True)
-    buffer_     = Any(buffer=True)
+    iface_      = Any
+    buffer_     = Any
 
     # List of tasks to be run during experiment.  Each entry is a tuple
     # (callable, frequency) where frequency is how often the task should be run.
@@ -153,6 +159,7 @@ class AbstractExperimentController(Controller):
     # of 5 corresponds to 500 ms.  However, be warned that this is not
     # deterministic.  If tasks take a while to complete, then the timer "slows
     # down" as a result.
+    timer       = Any
     tasks       = List(Tuple(Callable, Int))
     tick_count  = Int(1)
 
@@ -179,6 +186,8 @@ class AbstractExperimentController(Controller):
     # Address of the hardware server.  If None, defaults to the non-network
     # aware version of the TDTPy library.
     address = Trait(None, None, Tuple(Str, Int))
+
+    start_time = Any
 
     def _process_default(self):
         # Imports typically should be listed at the top of the module (outside
@@ -240,10 +249,12 @@ class AbstractExperimentController(Controller):
             # Create a system tray for notification messages.  Using popups do
             # not seem to work very well.  Either the popups are modal (in which
             # case they block the program from continuing to run) or they
-            # dissappear below the main window.
+            # dissappear below the main window.  I really don't like this
+            # approach, but I can't think of a better way to do it ...
 
             # HACK ALERT! This is a buried import to ensure that I can still run
             # my analysis code.
+
             # Enthought supports both the PySide and Qt4 backend.  PySide is
             # essentially a rewrite of PyQt4.  These backends are not compatible
             # with each other, so we need to be sure to import the backend that
@@ -300,7 +311,7 @@ class AbstractExperimentController(Controller):
         Subclasses must implement `start_experiment`
         '''
         try:
-            node = info.object.data_node
+            node = info.object.experiment_node
 
             # Get the current revision of the program code so that we can
             # properly determine the version used to run the code.  I'm not sure
@@ -315,6 +326,10 @@ class AbstractExperimentController(Controller):
             # Neurobehavior module)
             node._v_attrs['cal_1'] = self.cal_primary
             node._v_attrs['cal_2'] = self.cal_secondary
+
+            self.start_time = datetime.now()
+            node._v_attrs['start_time'] = self.start_time.strftime(DATETIME_FMT)
+            node._v_attrs['date'] = self.start_time.strftime(DATE_FMT)
 
             # setup_experiment should load the necessary circuits and initialize
             # the buffers. This data is required before the hardware process is
@@ -369,8 +384,12 @@ class AbstractExperimentController(Controller):
             log.exception(e)
             error(self.info.ui.control, str(e))
         finally:
-            # Always attempt to save, no matter what!
-            add_or_update_object_node(self.model, self.model.exp_node)
+            # Always attempt to save the data, no matter what happens!
+            node = info.object.experiment_node
+            time = datetime.now()
+            node._v_attrs['stop_time'] = time.strftime('%Y-%m-%d %H:%M%S')
+            node._v_attrs['duration'] = (time-self.start_time).seconds
+            info.object.data.save()
             
     def run_tasks(self):
         for task, frequency in self.tasks:
@@ -396,7 +415,7 @@ class AbstractExperimentController(Controller):
     def remind(self, info=None):
         raise NotImplementedError
 
-    def initialize_experiment(self, info=None):
+    def setup_experiment(self, info=None):
         raise NotImplementedError
 
     def start_experiment(self, info=None):
@@ -536,16 +555,38 @@ class AbstractExperimentController(Controller):
     
     The function must have the following signature set_parameter_name(self,
     value)
-    '''
-    trigger_requested = Bool(True)
 
+    '''
+
+    # Boolean flag indicating whether there are any changes to paradigm
+    # variables that have not been applied.  Currently the apply/revert logic is
+    # not smart enough to handle cases where the user makes a sequence of
+    # changes that results in the final value being equivalent to the original
+    # value.
     pending_changes = Bool(False)
+
+    # A shadow copy of the paradigm where the current values used for the
+    # experiment are stored.  The copy of the paradigm at info.object.paradigm
+    # is a separate copy that is currently being edited via the GUI.
     shadow_paradigm = Any
+
+    # List of expressions that have not yet been evaluated.
     pending_expressions = Dict
+
+    # The current value of all context variables
     current_context = Dict
+
+    # Label of the corresponding variable to use in the GUI
     context_labels = Dict
+
+    # Should the context variable be logged?
     context_log = Dict
+
+    # Copy of the old context (used for comparing with the current context to
+    # determine if a value has changed)
     old_context = Dict
+
+    # Context has changed
     context_updated = Event
 
     # List of name, value, label tuples (used for displaying in the GUI)
@@ -570,10 +611,16 @@ class AbstractExperimentController(Controller):
         Invalidate the current context.  This forces the program to reevaluate
         any values that may have changed.
         '''
-        # Once the context has been invalidated, we need to reevaluate all
-        # expressions so we add the current expressions to the pending
-        # expressions "stack".
-        log.debug('Invalidating context')
+        import warnings
+        warnings.warn('Method has been replaced by refresh_context')
+        self.refresh_context()
+
+    def refresh_context(self):
+        '''
+        Stores a copy of self.current_context in self.old_context, wipes
+        self.current_context, and reloads the expressions from the paradigm.
+        '''
+        log.debug('Refreshing context')
         self.old_context = self.current_context.copy()
         self.current_context = self.model.data.trait_get(context=True)
         self.pending_expressions = self.shadow_paradigm.trait_get(context=True)
@@ -700,6 +747,7 @@ class AbstractExperimentController(Controller):
         self.current_context_list = sorted(context)
         
     def initialize_context(self):
+        log.debug('Initializing context')
         for instance in (self.model.data, self.model.paradigm):
             for name, trait in instance.traits(context=True).items():
                 log.debug('Found context variable {}'.format(name))
@@ -711,3 +759,4 @@ class AbstractExperimentController(Controller):
         self.context_labels['ttype'] = 'Trial type'
         self.context_log['ttype'] = True
         self.shadow_paradigm = self.model.paradigm.clone_traits()
+        self.refresh_context()

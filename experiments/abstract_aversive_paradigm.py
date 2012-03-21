@@ -15,6 +15,7 @@ class AbstractAversiveParadigm(AbstractExperimentParadigm):
 
     kw = {'context': True, 'log': True}
 
+    speaker = Expression("'primary'", label='Output speaker', **kw)
     prevent_disarm = Bool(True, label='Prevent disarm of aversive?', **kw)
 
     # By default, Range provides a slider as the GUI widget.  Note that you can

@@ -64,7 +64,7 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
 
     # VERSION is a reserved keyword in HDF5 files, so I use OBJECT_VERSION
     # instead
-    OBJECT_VERSION = Float(4.1, store='attribute')
+    OBJECT_VERSION = Float(4.1)
 
     mask_mode = Enum('none', 'include recent')
     mask_num = Int(25)
@@ -356,10 +356,8 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
 
     go_indices   = Property(Array('i'), depends_on='ttype_seq')
     nogo_indices = Property(Array('i'), depends_on='ttype_seq')
-    go_trial_count = Property(Int, store='attribute',
-            depends_on='masked_trial_log')
-    nogo_trial_count = Property(Int, store='attribute',
-            depends_on='masked_trial_log')
+    go_trial_count = Property(Int, depends_on='masked_trial_log')
+    nogo_trial_count = Property(Int, depends_on='masked_trial_log')
 
     def _get_indices(self, ttype):
         if len(self.ttype_seq):
@@ -415,3 +413,18 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
     @cached_property
     def _get_cr_seq(self):
         return self.nogo_seq & ~self.spout_seq               
+
+    def save(self):
+        # This function will be called when the user hits the stop button.  This
+        # is where you save extra attributes that were not saved elsewhere.  Be
+        # sure to set mask mode to none otherwise the go/nogo counts that get
+        # saved in the node will be slightly incorrect.
+
+        # Call the PositiveData superclass to save the trial log.
+        self.mask_mode = 'none'
+        self.store_node._v_attrs['OBJECT_VERSION'] = self.OBJECT_VERSION
+        self.store_node._v_attrs['go_trial_count'] = self.go_trial_count
+        self.store_node._v_attrs['nogo_trial_count'] = self.nogo_trial_count
+
+        # Be sure to call this after you set the mask mode!
+        super(PositiveData, self).save()

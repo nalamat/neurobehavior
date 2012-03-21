@@ -124,3 +124,16 @@ class AbstractExperimentData(HasTraits):
             log.debug("Recieved the following columns %r", names)
             raise AttributeError, "Invalid log_trial attempt"
         self.new_trial = kwargs
+
+    def save(self):
+        '''
+        Save all data to the file
+        '''
+        # Dump the trial log table
+        if len(self.trial_log):
+            fh = self.store_node._v_file
+            fh.createTable(self.store_node, 'trial_log', self.trial_log)
+            fh.createTable(self.store_node, 'par_info', self.par_info)
+        else:
+            log.debug('No trials in the trial_log file!')
+

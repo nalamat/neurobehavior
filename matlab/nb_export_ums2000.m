@@ -4,6 +4,11 @@ function [] = nb_export_ums2000(spikes, node_name)
 %   Save cluster and cluster label data back to extracted file for further
 %   analysis.
 
+    % Really, auto-calls are a bit
+    if nargin() == 1;
+        node_name = '';
+    end
+
     filename = spikes.info.detect.source_file;
     source_size = length(spikes.info.detect.source_mask);
     assigns_path = [node_name '/assigns'];

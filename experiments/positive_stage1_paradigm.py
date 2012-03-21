@@ -1,26 +1,7 @@
-from enthought.traits.api import DelegatesTo, Enum, Range
-from enthought.traits.ui.api import View, VGroup, Item, EnumEditor, \
-        InstanceEditor
 from abstract_experiment_paradigm import AbstractExperimentParadigm
-from pump_paradigm_mixin import PumpParadigmMixin
-from signals import signal_options
+from .evaluate import Expression
 
-class PositiveStage1Paradigm(AbstractExperimentParadigm, PumpParadigmMixin):
+class PositiveStage1Paradigm(AbstractExperimentParadigm):
 
-    primary_attenuation = Range(0.0, 120.0, 40)
-    secondary_attenuation = Range(0.0, 120.0, 40)
-    signal = DelegatesTo('selector', store='child')
-    signal = Enum(signal_options.keys(), ignore=True)
-
-    traits_view = View(
-            VGroup(
-                Item('primary_attenuation', label='Primary Attenuation (dB)',
-                    style='text'),
-                Item('secondary_attenuation', 
-                    label='Secondary Attenuation (dB)',
-                    style='text'),
-                Item('signal', editor=EnumEditor(values=signal_options)),
-                Item('signal', editor=InstanceEditor(), style='custom'),
-                show_border=True, label='Signal'
-                ),
-            )
+    speaker = Expression("'primary'", label='Output speaker', context=True,
+            log=True)

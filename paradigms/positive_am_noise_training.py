@@ -4,7 +4,7 @@ from enthought.traits.ui.api import View, Include, VGroup
 from experiments.positive_stage1_data import PositiveStage1Data
 from experiments.positive_stage1_controller import PositiveStage1Controller
 from experiments.positive_stage1_experiment import PositiveStage1Experiment
-from experiments.abstract_experiment_paradigm import AbstractExperimentParadigm
+from experiments.positive_stage1_paradigm import PositiveStage1Paradigm
 
 from ._positive_am_noise_controller_mixin import PositiveAMNoiseControllerMixin
 from ._positive_am_noise_paradigm_mixin import PositiveAMNoiseParadigmMixin
@@ -22,18 +22,13 @@ class Controller(
     # the main appetitive program (positive-behavior-v2 and
     # positive-behavior-v3) and is expecting a signal_dur_n tag in the circuit.
     # Here, we don't need such a tag.
-
     def set_duration(self, value):
-        self._recompute_time()
-        self._recompute_noise_token()
-        self._recompute_sam_envelope()
-        self._recompute_cos_envelope()
-        self.iface_behavior.cset_tag('signal_dur_n', value, 's', 'n')
+        self._time_valid = False
 
 class Paradigm(
-        AbstractExperimentParadigm, 
         PumpParadigmMixin,
         PositiveAMNoiseParadigmMixin,
+        PositiveStage1Paradigm,
         ):
 
     traits_view = View(
@@ -42,6 +37,7 @@ class Paradigm(
                 label='Paradigm',
                 ),
             VGroup(
+                'speaker',
                 Include('signal_group'),
                 label='Sound',
                 ),

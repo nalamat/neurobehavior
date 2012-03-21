@@ -29,8 +29,9 @@ class AbstractAversiveController(AbstractExperimentController):
         else:
             # This assumes that iface_physiology has already been initialized.
             # In the current abstract_experiment_controller, setup_physiology is
-            # called before setup_experiment.
-            self.iface_shock = self.iface_physiology
+            # called before setup_experiment.  self.physiology_handler is a
+            # reference to the PhysiologyController object.
+            self.iface_shock = self.physiology_handler.iface_physiology
 
     def _setup_circuit(self):
         # I have broken this out into a separate function because
@@ -116,12 +117,12 @@ class AbstractAversiveController(AbstractExperimentController):
         self.tasks.append((self.monitor_pump, 5))
         self.tasks.append((self.monitor_behavior, 1))
 
-        # Since we need to make sure that the pump rate and safe signal are
-        # playing before the animal is put in the cage, we invalidate and
-        # configure the context *now*.  This is in contrast to the appetitive
-        # paradigm where the configuration can wait until trigger_next()
-        self.prepare_next()
+        # We need to make sure that the pump rate and safe signal are playing
+        # before the animal is put in the cage, we prepare the next trial *now*
+        # (but don't trigger it).  Furthermore, we need to load the intertrial
+        # buffer with the entire waveform before we start the experiment).
         self.fs_conversion = self.iface_behavior.get_tag('TTL_d')
+        self.prepare_next()
         self.process.trigger('A', 'high')
 
     def remind(self, info=None):
@@ -194,6 +195,10 @@ class AbstractAversiveController(AbstractExperimentController):
     # methods.
     ############################################################################
 
+    def set_attenuations(self, att1, att2):
+        self.iface_behavior.set_tag('att1', att1)
+        self.iface_behavior.set_tag('att2', att2)
+
     def get_reaction_ts(self):
         return self.iface_behavior.get_tag('react|')
 
@@ -238,10 +243,10 @@ class AbstractAversiveController(AbstractExperimentController):
         self.evaluate_pending_expressions(self.current_setting)
         self.update_intertrial()
         self.update_trial()
-        self.iface_behavior.set_tag('warn?', self.is_warn())
 
     def trigger_next(self):
         self.prepare_next()
+        self.iface_behavior.set_tag('warn?', self.is_warn())
         self.iface_behavior.trigger(1)
 
     def set_shock_level(self, value):
@@ -263,14 +268,15 @@ class AbstractAversiveController(AbstractExperimentController):
 
          iface is short for "interface"
          '''
-        print value
         self.iface_behavior.set_tag('do_shock', bool(value))
-        print self.iface_behavior.get_tag('do_shock')
         self.iface_shock.set_tag('shock_level', value/2.0)
 
     def cancel_trigger(self):
         self.iface_behavior.trigger(2)
         return not self.trial_running()
+
+    def cancel_remind(self, info):
+        self.iface_behavior.trigger(2)
 
     def trial_running(self):
         return self.iface_behavior.get_tag('trial_running')
@@ -280,7 +286,6 @@ class AbstractAversiveController(AbstractExperimentController):
             self.prepare_next()
             if self.state == 'running':
                 self.trigger_next()
-
 
     def update_intertrial(self):
         '''
