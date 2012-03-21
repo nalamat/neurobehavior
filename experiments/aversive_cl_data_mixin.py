@@ -62,7 +62,7 @@ class AversiveCLDataMixin(HasTraits):
                                suggested_grid=(0.05, 0.2))
 
     # Summary table containing most of the statistics
-    par_info = Property(store='table', depends_on='masked_trial_log')
+    par_info = Property(depends_on='masked_trial_log')
 
     @cached_property
     def _get_par_fa_count(self):

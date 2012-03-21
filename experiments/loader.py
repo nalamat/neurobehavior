@@ -1,5 +1,5 @@
 from enthought.pyface.api import error, information
-from cns.data.ui.cohort import CohortView, CohortViewHandler, CohortEditor
+from .cohort import Cohort, CohortViewHandler
 import pickle
 from cns.h5 import get_or_append_node
 import sys
@@ -9,7 +9,6 @@ from os.path import join
 from importlib import import_module
 
 from enthought.traits.api import Any, Trait, TraitError
-from enthought.traits.ui.api import View, Item, VGroup, HGroup
 from experiments import trial_setting
 from cns import calibration
 
@@ -20,27 +19,6 @@ from cns import get_config
 from datetime import datetime
 
 time_fmt = get_config('TIME_FORMAT')
-
-class ExperimentCohortView(CohortView):
-
-    path = get_config('COHORT_ROOT')
-    wildcard = get_config('COHORT_WILDCARD')
-
-    traits_view = View(
-        VGroup(
-            HGroup(
-                Item('object.cohort.description', style='readonly',
-                    springy=True),
-                show_border=True,
-                ),
-            Item('object.cohort.animals', editor=CohortEditor(),
-                 show_label=False, style='readonly'),
-        ),
-        title='Cohort',
-        height=400,
-        width=600,
-        resizable=True,
-    )
 
 class ExperimentLauncher(CohortViewHandler):
 
@@ -59,24 +37,16 @@ class ExperimentLauncher(CohortViewHandler):
         paradigm will not be saved.
         '''
 
-        try:
-            item = selected
-            if item.store_node._v_isopen:
-                animal_node = item.store_node
-                file = item.store_node._v_file
-            else:
-                log.debug('Opening node %r for %r', item.store_node, item)
-                file = tables.openFile(item.store_node_source, 'a',
-                                       rootUEP=item.store_node_path)
-                animal_node = file.root
-
+        filename = selected._store_filename
+        pathname = selected._store_pathname
+        with tables.openFile(filename, 'a', rootUEP=pathname) as fh:
             # We need to call prepare_experiment prior to loading a saved
             # paradigm.  prepare_experiment adds the roving parameters as traits
             # on the TrialSetting object.  If a paradigm is loaded before the
             # traits are added, wonky things may happen.
-            store_node = get_or_append_node(animal_node, 'experiments')
+            store_node = get_or_append_node(fh.root, 'experiments')
             model, controller = prepare_experiment(self.args, store_node)
-            model.animal = item
+            model.animal = selected
 
             # Try to load settings from the last time the subject was run.  If
             # we cannot load the settings for whatever reason, notify the user
@@ -85,21 +55,20 @@ class ExperimentLauncher(CohortViewHandler):
             paradigm_name = get_experiment(self.args.type).node_name
             paradigm_hash = paradigm_name + '_' + '_'.join(self.args.rove)
 
-            paradigm = self.load_paradigm(info, paradigm_node, paradigm_hash)
+            # Attempt to load the last used paradigm
+            paradigm = None
             try:
-                bytes = paradigm_node._v_attrs[paradigm_hash]
-                paradigm = pickle.loads(bytes)
-            except AttributeError as e:
+                paradigm = paradigm_node._v_attrs[paradigm_hash]
+            except KeyError as e:
                 log.exception(e)
-                mesg = 'No prior paradigm found.  Creating new paradigm.'
+                mesg = 'No prior paradigm found'
                 log.debug(mesg)
                 information(info.ui.control, mesg)
             except pickle.UnpicklingError as e:
                 log.exception(e)
-                mesg = 'Unable to load prior settings.  Creating new paradigm.'
+                mesg = 'Prior settings found, but unable to load'
                 log.debug(mesg)
                 information(info.ui.control, mesg)
-                # All other exceptions
 
             try:
                 if paradigm is not None:
@@ -107,48 +76,49 @@ class ExperimentLauncher(CohortViewHandler):
                     model.paradigm = paradigm
                 elif self.last_paradigm is not None:
                     log.debug('Animal does not have any prior paradigm.')
-                    log.debug('Using paradigm from previous animal.')
                     model.paradigm = self.last_paradigm
+                    mesg = 'Using paradigm from previous animal'
+                    information(info.ui.control, mesg)
+                    log.debug(mesg)
             except TraitError:
                 log.debug('Prior paradigm is not compatible with experiment')
     
-            ui = model.edit_traits(parent=info.ui.control, kind='livemodal',
-                    handler=controller)
+            try:
+                ui = model.edit_traits(parent=info.ui.control, kind='livemodal',
+                        handler=controller)
+                if len(model.data.trial_log):
+                    # One very nice feature of PyTables is that it will
+                    # automatically pickle classes into strings that can be
+                    # stored as node attributes.
+                    paradigm_node._v_attrs[paradigm_hash] = model.paradigm
+                    self.last_paradigm = model.paradigm
+                    selected.processed = True
+                    log.debug('Saved paradigm for animal to the datafile')
+            except AttributeError, e: 
+                log.exception(e)
+            except SystemError, e:
+                from textwrap import dedent
+                mesg = """\
+                Could not launch experiment.  This likely means that you forgot to
+                turn on a piece of equipment.  Please check and ensure that the RX6,
+                RZ5 and PA5 are turned on.  If you still get this error message,
+                please try power-cycling the rack.  If this still does not fix the
+                error, power-cycle the computer as well.  
+                
+                Please remember that you need to give the equipment rack a minute to
+                boot up once you turn it back on before attempting to launch an
+                experiment.
+                """
+                error(info.ui.control, str(e) + '\n\n' + dedent(mesg))
 
-            if ui.result:
-                bytes = pickle.dumps(model.paradigm)
-                paradigm_node._v_attrs[paradigm_hash] = bytes
-                item.processed = True
-                self.last_paradigm = model.paradigm
-            
-            # Close the file if we opened it
-            try: 
-                file.close()
-            except NameError: 
-                pass
-            
-        except AttributeError, e: 
-            log.exception(e)
-        except SystemError, e:
-            from textwrap import dedent
-            mesg = """\
-            Could not launch experiment.  This likely means that you forgot to
-            turn on a piece of equipment.  Please check and ensure that the RX6,
-            RZ5 and PA5 are turned on.  If you still get this error message,
-            please try power-cycling the rack.  If this still does not fix the
-            error, power-cycle the computer as well.  
-            
-            Please remember that you need to give the equipment rack a minute to
-            boot up once you turn it back on before attempting to launch an
-            experiment.
-            """
-            error(info.ui.control, str(e) + '\n\n' + dedent(mesg))
-
-    def object_dclicked_changed(self, info):
+    # Note the double underscore because the object trait is named _dclicked (it
+    # already has a single underscore in it)
+    def object__dclicked_changed(self, info):
         if info.initialized:
-            self.launch_experiment(info, info.object.selected)
+            self.launch_experiment(info, info.object._selected)
 
 def prepare_experiment(args, store_node):
+
     '''
     Given the arguments passed in via the command-line, configure the
     Experiment, Controller, Data and Paradigm class accordingly and return an
@@ -224,7 +194,7 @@ def prepare_experiment(args, store_node):
     data.parameters = args.analyze
     model = experiment_class(
             store_node=store_node, 
-            exp_node=exp_node,
+            experiment_node=exp_node,
             data_node=data_node, 
             data=data,
             paradigm=paradigm,
@@ -278,7 +248,7 @@ def profile_experiment(args):
 
 def launch_experiment_selector(args):
     handler = ExperimentLauncher(args=args)
-    ExperimentCohortView().configure_traits(handler=handler)
+    Cohort().configure_traits(handler=handler, view='detailed_view')
 
 def inspect_experiment(args):
     '''

@@ -1,29 +1,9 @@
-from enthought.traits.ui.menu import MenuBar, Menu, ActionGroup, Action
 from enthought.traits.api import Str, File, Trait
 from enthought.traits.ui.api import Controller
 from enthought.pyface.api import FileDialog, confirm, NO, error, OK
 import logging
 import os
 log = logging.getLogger(__name__)
-
-def filehandler_menu():
-    open_actions = [Action(name='New', action='new_file',
-                           accelerator='Ctrl+N'),
-                    Action(name='Load...', action='load_file',
-                           accelerator='Ctrl+O')]
-
-    save_actions = [Action(name='Save', action='save_file',
-                           enabled_when='_modified', accelerator='Ctrl+S'),
-                    Action(name='Save as...', action='saveas_file',
-                           enabled_when='_modified')]
-
-    open_actions = ActionGroup(*open_actions)
-    save_actions = ActionGroup(*save_actions)
-    menu = Menu(open_actions, save_actions, name='&File')
-    return menu
-
-def filehandler_menubar():
-    return MenuBar(filehandler_menu())
 
 def get_save_file(path, wildcard):
     wildcard = wildcard.split('|')[1][1:]
@@ -69,8 +49,7 @@ class FileHandler(Controller):
     
     def init(self, info):
         if self.modified_trait is not None:
-            info.object.on_trait_change(self.update_title, 
-                                        self.modified_trait)
+            info.object.on_trait_change(self.update_title, self.modified_trait)
 
     @confirm_if_modified
     def new_file(self, info):

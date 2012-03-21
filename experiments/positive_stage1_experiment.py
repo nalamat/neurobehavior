@@ -87,40 +87,36 @@ class PositiveStage1Experiment(AbstractExperiment):
 
         self.contact_plot = container
 
-    traits_view = View(
-            HSplit(
+    traits_group = HSplit(
+            VGroup(
+                Item('handler.toolbar', style='custom'),
                 VGroup(
-                    Item('handler.toolbar', style='custom'),
-                    VGroup(
-                        Item('handler.status'),
-                        Item('handler.current_time_elapsed', label='Run time'),
-                        style='readonly',
-                        label='Experiment',
-                        show_border=True
-                        ),
-                    VGroup(
-                        Item('handler.pump_toolbar', style='custom',
-                             show_label=False), 
-                        Item('handler.current_volume_dispensed', 
-                             label='Dispensed (mL)', style='readonly'),
-                        Item('object.paradigm.pump_rate'),
-                        Item('object.paradigm.pump_syringe'),
-                        Item('object.paradigm.pump_syringe_diameter', 
-                             label='Diameter (mm)', style='readonly'),
-                        label='Pump Status',
-                        show_border=True,
-                        ),
-                    Item('paradigm', style='custom'),
-                    show_labels=False,
+                    Item('handler.status'),
+                    Item('handler.current_time_elapsed', label='Run time'),
+                    style='readonly',
+                    label='Experiment',
+                    show_border=True
                     ),
-                Tabbed(
-                    Item('contact_plot', editor=ComponentEditor(),
-                        width=600, height=600, label='Experiment overview'),
-                    Item('handler.shell_variables', editor=ShellEditor(),
-                        label='Python shell'),
-                    show_labels=False,
+                VGroup(
+                    Item('handler.pump_toolbar', style='custom',
+                         show_label=False), 
+                    Item('handler.current_volume_dispensed', 
+                         label='Dispensed (mL)', style='readonly'),
+                    Item('object.paradigm.pump_rate'),
+                    Item('object.paradigm.pump_syringe'),
+                    Item('object.paradigm.pump_syringe_diameter', 
+                         label='Diameter (mm)', style='readonly'),
+                    label='Pump Status',
+                    show_border=True,
                     ),
+                Item('paradigm', style='custom'),
+                show_labels=False,
                 ),
-            resizable=True,
-            close_result=False,
-            handler=PositiveStage1Controller)
+            Tabbed(
+                Item('contact_plot', editor=ComponentEditor(),
+                    width=1000, height=600, label='Experiment overview'),
+                Item('handler.shell_variables', editor=ShellEditor(),
+                    label='Python shell'),
+                show_labels=False,
+                ),
+            )

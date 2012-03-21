@@ -23,7 +23,7 @@ class ContextAdapter(TabularAdapter):
     def get_width(self, obj, trait, column):
         return 100
 
-    def get_bg_color(self, obj, trait, row):
+    def get_bg_color(self, obj, trait, row, column=0):
         if self.item[-1]:
             return color_names['light green']
         else:
@@ -35,31 +35,13 @@ class AbstractExperiment(HasTraits):
 
     animal              = Any
     store_node          = Any
-    exp_node            = Any
+    experiment_node     = Any
     data_node           = Any
 
     paradigm            = Instance(AbstractExperimentParadigm)
-    data                = Instance(AbstractExperimentData, store='child')
-    start_time          = Instance(datetime, store='attribute')
-    stop_time           = Instance(datetime, store='attribute')
-    duration            = Property(store='attribute')
-    date                = Property(store='attribute', depends_on='start_time')
+    data                = Instance(AbstractExperimentData)
 
     spool_physiology    = Bool(False)
-
-    def _get_date(self):
-        if self.start_time is None:
-            return datetime.now()
-        else:
-            return self.start_time.date()
-
-    def _get_duration(self):
-        if self.start_time is None:
-            return timedelta()
-        elif self.stop_time is None:
-            return datetime.now()-self.start_time
-        else:
-            return self.stop_time-self.start_time
 
     traits_group = VGroup(
             Item('handler.toolbar', style='custom'),

@@ -9,7 +9,6 @@ import time
 
 MAX_VRMS = get_config('MAX_SPEAKER_DAC_VOLTAGE')
 
-
 import logging
 log = logging.getLogger(__name__)
 
@@ -112,7 +111,7 @@ class PositiveAMNoiseControllerMixin(HasTraits):
         if not self._time_valid:
             log.debug('recomputing time')
             duration = self.get_current_value('duration')
-            self._time = wave.time(self.buffer_out.fs, duration)
+            self._time = wave.time(self.iface_behavior.fs, duration)
             self._time_valid = True
         return self._time
         
@@ -145,7 +144,7 @@ class PositiveAMNoiseControllerMixin(HasTraits):
             order = self.get_current_value('order')
             fc = self.get_current_value('fc')
             bandwidth = self.get_current_value('bandwidth')
-            fs = self.buffer_out.fs
+            fs = self.iface_behavior.fs
 
             # Compute the filter coefficients
             fl = np.clip(fc-0.5*bandwidth, 0, 0.5*fs)
@@ -184,7 +183,7 @@ class PositiveAMNoiseControllerMixin(HasTraits):
             # equal to that of an unmodulated token.
             envelope *= 1.0/wave.sam_eq_power(depth)
 
-            delay_n = int(delay*self.buffer_out.fs)
+            delay_n = int(delay*self.iface_behavior.fs)
             if delay_n > 0:
                 delay_envelope = np.ones(delay_n)
                 envelope = np.concatenate((delay_envelope, envelope[:-delay_n]))
@@ -199,7 +198,7 @@ class PositiveAMNoiseControllerMixin(HasTraits):
             log.debug('recomputing cos envelope')
             t = self._get_time()
             rise_time = self.get_current_value('rise_fall_time')
-            rise_n = int(rise_time*self.buffer_out.fs)
+            rise_n = int(rise_time*self.iface_behavior.fs)
             duration_n = len(t)
             envelope = wave.generate_envelope(duration_n, rise_n) 
             self._cos_envelope = envelope
@@ -210,7 +209,7 @@ class PositiveAMNoiseControllerMixin(HasTraits):
     # Actual waveform computation
     ########################################################################
 
-    def compute_waveform(self, calibration, hw_attenuation):
+    def compute_waveform(self, calibration, hw_attenuation=0):
         # This is where we take the precomputed pieces that we cached and
         # combine them to generate the final waveform that will be uploaded to
         # the buffer.  Note that this function actually does very little because
@@ -244,3 +243,4 @@ class PositiveAMNoiseControllerMixin(HasTraits):
         # the "run" button to start the experiment.
         self.iface_behavior.cset_tag('signal_dur_n', value, 's', 'n')
         self._time_valid = False
+

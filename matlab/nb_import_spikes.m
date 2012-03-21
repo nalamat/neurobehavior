@@ -90,7 +90,14 @@ function [spikes] = nb_import_spikes(filename, varargin)
 %   spikes.channels
 %   spikes.waveforms
 %
+%
+%
 %   spikes.info.detect.extracted_channels
+%   spikes.info.detect.trial_epoch
+%       Lower and upper bound (in seconds) of each trial as computed by the data
+%       acquisition program
+%   spikes.info.detect.trial_epoch_expanded
+%       Lower and upper bound (in seconds) of spikes included in each trial.
 
     % Let the inputParser handle massaging the input into the format we need and
     % setting default values as required.  This is a lot of work that Python
@@ -150,7 +157,9 @@ function [spikes] = nb_import_spikes(filename, varargin)
     timestamps_fs = h5readatt(filename, '/event_data/timestamps_n', 'fs');
     timestamps_fs = double(timestamps_fs);
 
-    % Indices of the events in the file (one-based)
+    % Indices of the events in the file (one-based).  Since we may be sorting a
+    % subset of our data, we need to be able to pair up the sorted results with
+    % the original dataset.
     source_indices = 1:length(timestamps);
     
     % The ordering of the array is C-continguous in the HDF5 file (e.g. the
@@ -201,9 +210,14 @@ function [spikes] = nb_import_spikes(filename, varargin)
         for ch = detect_channels,
             detect_mask = detect_mask | (channels == ch);
         end
+
+        % Winnow down our dataset based on the detect_mask
+        waveforms = waveforms(detect_mask, :, :);
+        timestamps = timestamps(detect_mask);
+        channels = channels(detect_mask);
+        channel_indices = channel_indices(detect_mask);
+        source_indices = source_indices(detect_mask);
     else
-        % We return everything
-        detect_mask = ones(1, length(waveforms));
         detect_channels = extracted_channels;
     end
  
@@ -226,57 +240,54 @@ function [spikes] = nb_import_spikes(filename, varargin)
         % Now, pull out the values for the correct channels and see if any
         % of them are True
         indices = get_indices(artifact_reject, extracted_channels);
-        artifacts = artifacts(:, indices);
-        artifact_mask = any(artifacts, 2)';
-    else
-        % We reject nothing
-        artifact_mask = zeros(1, length(waveforms));
+        artifacts = artifacts(detect_mask, indices);
+        nonartifact_mask = ~any(artifacts, 2)';
+
+        % Winnow down our dataset based on the artifact_mask
+        waveforms = waveforms(nonartifact_mask, :, :);
+        timestamps = timestamps(nonartifact_mask);
+        channels = channels(nonartifact_mask);
+        channel_indices = channel_indices(nonartifact_mask);
+        source_indices = source_indices(nonartifact_mask);
     end
+
+    % Load the start/end times of each trial and convert to the same
+    % unit as the timestamps_n array (e.g. the unit is 1/sampling 
+    % frequency of the physiology data).
+    trial_log = h5read(filename, '/block_data/trial_log');
+    
+    % Apparently Matlab's h5read doesn't like "end" as a fieldname for
+    % the trial_log structure and converts it to xEnd (even though "end" is
+    % a valid fieldname, go figure).
+    epochs = round([trial_log.start, trial_log.xEnd] * timestamps_fs)';
+    spikes.info.detect.trial_epochs = epochs;
+    lb = round(trial_range(1)*timestamps_fs);
+    ub = round(trial_range(2)*timestamps_fs);
+    epochs(1,:) = epochs(1,:)+lb;
+    epochs(2,:) = epochs(2,:)+ub;
+    spikes.info.detect.expanded_trial_epochs = epochs;
     
     if length(trial_range) == 2, 
-        % Load the start/end times of each trial and convert to the same
-        % unit as the timestamps_n array (e.g. the unit is 1/sampling 
-        % frequency of the physiology data).
-        trial_log = h5read(filename, '/block_data/trial_log');
-        
-        % Apparently Matlab's h5read doesn't like "end" as a fieldname for
-        % the trial_log structure and converts it to xEnd.
-        epochs = round([trial_log.start, trial_log.xEnd] * timestamps_fs)';
-        lb = round(trial_range(1)*timestamps_fs);
-        ub = round(trial_range(2)*timestamps_fs);
-        epochs(1,:) = epochs(1,:)+lb;
-        epochs(2,:) = epochs(2,:)+ub;
-
-        % Now, build a mask of all the event times that fall within the
-        % requested range
+        % Filter the event data by including only trials that fall in the range
+        % [trial_start+trial_range(1), trial_end+trial_range(2))
         trial_mask = zeros(1, length(timestamps));
         for i = 1:length(epochs),
             submask = (timestamps >= epochs(1,i)) & (timestamps < epochs(2,i));
             trial_mask = trial_mask | submask;
         end
-    else
-        trial_mask = ones(1, length(timestamps));
+
+        % Winnow down our dataset to those that are within the trial range
+        waveforms = waveforms(trial_mask, :, :);
+        timestamps = timestamps(trial_mask);
+        channels = channels(trial_mask);
+        channel_indices = channel_indices(trial_mask);
+        source_indices = source_indices(trial_mask);
     end
 
-    % Now, cleanup our data according to the masks we have created.
-    mask = detect_mask & ~artifact_mask & trial_mask;
-    waveforms = waveforms(mask, :, :);
-    timestamps = timestamps(mask);
-    channels = channels(mask);
-    channel_indices = channel_indices(mask);
-
-    % This documents the indices of the events that we are carrying along with
-    % us
-    source_indices = source_indices(mask);
-
-    spikes.info.detect.settings = p.Results;
-    spikes.info.detect.source_mask = mask;
-    spikes.info.detect.detect_mask = detect_mask;
-    spikes.info.trial.trial_mask = trial_mask;
-    spikes.info.artifact.artifact_mask = artifact_mask;
-    
     % Information saved in spikes.info.detect.settings reflects the actual
-    % arguments passed to the function, not the values that were actually used.
+    % arguments passed to the function, not the values that were actually used
+    % so we should save both p.REsults as well as *_channels.
+    spikes.info.detect.settings = p.Results;
     spikes.info.detect.detect_channels = detect_channels;
     spikes.info.detect.waveform_channels = waveform_channels;
     spikes.info.detect.window_samples = size(waveforms, 2);
@@ -284,14 +295,40 @@ function [spikes] = nb_import_spikes(filename, varargin)
     
     % Truncate the waveform.  First, if we have fewer events than max_features,
     % then update max_features accordingly.
-    if max_features > length(timestamps),
-        max_features = length(timestamps);
+    if ~isinf(max_features) & (max_features < length(timestamps)),
+        waveforms = waveforms(1:max_features, :, :);
+        timestamps = timestamps(1:max_features);
+        channels = channels(1:max_features);
+        channel_indices = channel_indices(1:max_features);
+        source_indices = source_indices(1:max_features);
     end
-    spikes.waveforms = waveforms(1:max_features, :, :);
-    spikes.timestamps = timestamps(1:max_features);
-    spikes.channels = channels(1:max_features);
-    spikes.channel_indices = channel_indices(1:max_features);
-    spikes.source_indices = source_indices(1:max_features);
+
+    % Create the array indicating trial time
+    trials = zeros(1, length(timestamps));
+    spiketimes = zeros(1, length(timestamps));
+    n_trials = size(epochs, 2);
+    for i = 1:(n_trials-1),
+        start_1 = epochs(1, i);
+        start_2 = epochs(1, i+1);
+        mask = (timestamps >= start_1) & (timestamps < start_2);
+        trials(mask) = i;
+        % Start time of the epoch stored in the epoch array is trial_start+lb.
+        % We need to add the lower bound offset back in to find the true
+        % post-stimulus time.
+        spiketimes(mask) = timestamps(mask)-start_1+lb;
+    end
+    mask = timestamps >= epochs(1, end);
+    trials(mask) = n_trials;
+    spiketimes(mask) = timestamps(mask)-epochs(1, end)-lb;
+
+    spikes.waveforms = waveforms;
+    spikes.timestamps = timestamps;
+    spikes.channels = channels;
+    spikes.channel_indices = channel_indices;
+    spikes.source_indices = source_indices;
+    spikes.trials = trials;
+    spikes.spiketimes = spiketimes / timestamps_fs;
+    spikes.unwrapped_times = timestamps / timestamps_fs;
 end
 
 function [indices] = get_indices(channels, available_channels)

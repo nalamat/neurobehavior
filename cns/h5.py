@@ -71,23 +71,40 @@ from pandas import DataFrame
 from os import path
 
 # Set up the caching system
-try:
-    from joblib import Memory
-    from tempfile import gettempdir
-    temppath = path.join(gettempdir(), 'sane_analysis')
-    memory = Memory(temppath)
-except ImportError:
-    print 'WARNING: joblib module not found, caching will be disabled'
-    # This is a mock class decorator that will be used in lieu of the actual
-    # joblib.Memory class.  This basically is a decorator that passes through
-    # the "decorated" function rather than returning a wrapper.
-    class Memory:
-        def cache(self, func=None, ignore=None, verbose=None, mmap_mode=False):
-            print 'getting called', self, func
-            return func
-    memory = Memory()
+#try:
+#    from joblib import Memory
+#    from tempfile import gettempdir
+#    temppath = path.join(gettempdir(), 'sane_analysis')
+#    memory = Memory(temppath)
+#except ImportError:
+#    print 'WARNING: joblib module not found, caching will be disabled'
+#    # This is a mock class decorator that will be used in lieu of the actual
+#    # joblib.Memory class.  This basically is a decorator that passes through
+#    # the "decorated" function rather than returning a wrapper.
+#    class Memory:
+#        def cache(self, func=None, ignore=None, verbose=None, mmap_mode=False):
+#            print 'getting called', self, func
+#            return func
+#    memory = Memory()
 
 log = logging.getLogger(__name__)
+
+name_lookup = {'group':     'Group',
+               'earray':    'EArray',
+               'array':     'Array',
+               'table':     'Table'}
+
+def get_or_append_node(node, name, type='group', *arg, **kw):
+    try:
+        return getattr(node, name)
+    except tables.NoSuchNodeError:
+        return append_node(node, name, type, *arg, **kw)
+
+def append_node(node, name, type='group', *arg, **kw):
+    log.debug('appending %r to node %r', name, node._v_pathname)
+    type = name_lookup[type.lower()]
+    func = getattr(node._v_file, 'create' + type)
+    return func(node, name, *arg, **kw)
 
 def rgetattr_or_none(obj, xattr):
     '''
@@ -424,7 +441,7 @@ def extract_node_data(node, fields, summary):
 
     return frame
 
-@memory.cache(ignore=('file_name',))
+#@memory.cache(ignore=('file_name',))
 def _extract_data(file_name, filters, fields=None, summary=None,
                   classname='Table', mode='walk', hash=''):
     '''

@@ -1,5 +1,5 @@
 #from cns import settings
-from cns.data.ui.cohort import CohortView
+from experiments.cohort import Cohort
 
 if __name__ == '__main__':
-    CohortView().configure_traits(view='edit_view')
+    Cohort().configure_traits(view='edit_view')

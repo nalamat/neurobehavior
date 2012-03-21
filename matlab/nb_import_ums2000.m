@@ -11,12 +11,19 @@ function [spikes] = nb_import_ums2000(filename, sort, varargin)
 %   sort : boolean
 %       Run spike sorting algorithms before returning
 %
+%   optional parameters
+%   -------------------
+%   All parameters supported by NB_IMPORT_SPIKES ar
+%
 %   Important information
 %   ---------------------
-%   * See IMPORT_SPIKES for a list of the optional arguments that you can pass
-%     along.
-%   * You must use Brad's version of UMS2000 with this code (unless they agree
-%     to incorporate Brad's changes into the UMS2000 package).
+%   * See NB_IMPORT_SPIKES for a list of the optional arguments that you can
+%     pass along.
+%   * You must use the modified version of some files from UMS2000. They are
+%     present in this folder as remove_outliers.m and reintegrate_outliers.m.
+%     By virtue of Matlab's lack of namespaces, we can simply ensure that the
+%     modified version gets called by putting this folder at the top of Matlab's
+%     path.
 %
 %   Returns struct containing spike waveform data that can be used directly by
 %   UltraMegaSort2000.
@@ -48,17 +55,13 @@ function [spikes] = nb_import_ums2000(filename, sort, varargin)
     extra_fields = {'channels', 'source_indices', 'channel_indices'};
     spikes.params.extra_fields = extra_fields;
     
-    spikes.spiketimes = spikes.timestamps./spikes.params.Fs;
-    spikes.unwrapped_times = spikes.spiketimes;
-    spikes.trials = ones(1, length(spikes.timestamps), 'single');
-
     % Now, let's reformat some of the fields so the same data structure is
     % compatible with UltraMegaSort2000.  Note that we upcast a lot of the
     % datatypes to double simply because Matlab (and some functions in UMS2000)
     % do not seem to deal well with non-double datatypes.
     align_sample = h5readatt(filename, '/event_data', 'samples_before')+1.0;
     spikes.info.detect.align_sample = double(align_sample);
-    spikes.info.detect.dur = [spikes.spiketimes(end)];
+    spikes.info.detect.dur = [spikes.unwrapped_times(end)];
     stds = double(h5readatt(filename, '/event_data', 'noise_std'));
     thresh = double(h5readatt(filename, '/event_data', 'threshold'));
     
@@ -101,6 +104,7 @@ function [spikes] = nb_import_ums2000(filename, sort, varargin)
             full_ylb = (y-1)*window_samples+1;
             full_yub = y*window_samples;
 
+            % Indices of our covariance matrix that will be passed to UMS2000.
             e_xlb = (i-1)*window_samples+1;
             e_xub = i*window_samples;
             e_ylb = (j-1)*window_samples+1;

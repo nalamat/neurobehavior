@@ -16,7 +16,7 @@ class AversiveData(AbstractExperimentData, AversiveAnalysisMixin):
     analysis of this data is made.
     '''
     
-    OBJECT_VERSION = Float(3.1, store='attribute')
+    OBJECT_VERSION = Float(3.1)
 
     mask_mode = Enum('none', 'include recent')
     mask_num = Int(25)
@@ -45,18 +45,12 @@ class AversiveData(AbstractExperimentData, AversiveAnalysisMixin):
     #-------------------------------------------------------------------
     # Raw data
     #------------------------------------------------------------------- 
-    contact_digital = Instance(FileChannel, 
-            store='channel', store_path='contact/contact_digital')
-    contact_digital_mean = Instance(FileChannel, 
-            store='channel', store_path='contact/contact_digital_mean')
-    contact_analog = Instance(FileChannel, 
-            store='channel', store_path='contact/contact_analog')
-    trial_running = Instance(FileChannel, 
-            store='channel', store_path='contact/trial_running')
-    shock_running = Instance(FileChannel, 
-            store='channel', store_path='contact/shock_running')
-    warn_running = Instance(FileChannel, 
-            store='channel', store_path='contact/warn_running')
+    contact_digital = Instance(FileChannel)
+    contact_digital_mean = Instance(FileChannel)
+    contact_analog = Instance(FileChannel)
+    trial_running = Instance(FileChannel)
+    shock_running = Instance(FileChannel)
+    warn_running = Instance(FileChannel)
 
     trial_epoch     = Instance(FileEpoch)
     spout_epoch     = Instance(FileEpoch)
@@ -158,7 +152,7 @@ class AversiveData(AbstractExperimentData, AversiveAnalysisMixin):
     def _get_par_warn_mask(self):
         return [self.warn_seq & m for m in self.par_mask]
 
-    warn_trial_count = Property(Int, store='attribute', depends_on='trial_log')
+    warn_trial_count = Property(Int, depends_on='trial_log')
 
     @cached_property
     def _get_warn_trial_count(self):
@@ -168,6 +162,37 @@ class AversiveData(AbstractExperimentData, AversiveAnalysisMixin):
     def _get_c_safe(self):
         return self.rcount(self.safe_seq)
 
+    safe_trial_count = Property(Int, depends_on='trial_log')
+
+    @cached_property
+    def _get_safe_trial_count(self):
+        return np.sum(self.safe_seq)
+
     @cached_property
     def _get_c_nogo(self):
         return self.c_safe
+
+    def save(self):
+        # This function will be called when the user hits the stop button.  This
+        # is where you save extra attributes that were not saved elsewhere.  Be
+        # sure to set mask mode to none otherwise the go/nogo counts that get
+        # saved in the node will be slightly incorrect.
+
+        self.mask_mode = 'none'
+        self.store_node._v_attrs['OBJECT_VERSION'] = self.OBJECT_VERSION
+        self.store_node._v_attrs['warn_trial_count'] = self.warn_trial_count
+        self.store_node._v_attrs['safe_trial_count'] = self.safe_trial_count
+
+        # Store the contact settings
+        self.store_node._v_attrs['contact_offset'] = self.contact_offset
+        self.store_node._v_attrs['contact_dur'] = self.contact_dur
+        self.store_node._v_attrs['contact_fraction'] = self.contact_fraction
+        self.store_node._v_attrs['contact_reference'] = self.contact_reference
+        fh = self.store_node._v_file
+
+        if len(self.contact_scores):
+            fh.createArray(self.store_node, 'contact_scores',
+                    self.contact_scores)
+
+        # This is what saves the trial_log and par_info table.
+        super(AversiveData, self).save()

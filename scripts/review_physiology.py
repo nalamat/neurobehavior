@@ -1,5 +1,8 @@
 # Ok, so technically this isn't a script ...
 
+from enthought.traits.api import push_exception_handler
+push_exception_handler(reraise_exceptions=True)
+
 import tables
 import cPickle as pickle
 import numpy as np
@@ -10,12 +13,12 @@ from numpy.lib import recfunctions
 from pyface.api import FileDialog, OK, error, ProgressDialog, \
         information, confirm, YES
 from enable.api import Component, ComponentEditor
-from chaco.api import (LinearMapper, DataRange1D, OverlayPlotContainer,
-                       LogMapper, ArrayDataSource, LinePlot)
+from chaco.api import (LinearMapper, DataRange1D, OverlayPlotContainer)
+                       
 from traitsui.api import VGroup, Item, View, \
         HSplit, Tabbed, Controller
 from traits.api import Instance, HasTraits, Float, DelegatesTo, \
-     Bool, Int, Any, Event, Property,\
+     CBool, Int, Any, Event, Property,\
      List, cached_property, Str, Enum, File, Range
 
 # Used for displaying the checkboxes for channel/plot visibility config
@@ -225,11 +228,11 @@ class ChannelSetting(HasTraits):
     # Channel number (used for GUI purposes so this should be one-based)
     gui_index       = Property(depends_on='index')
     # Should the channel be plotted?
-    visible         = Bool(True)
+    visible         = CBool(True)
     # Is the channel bad?
-    bad             = Bool(False)
+    bad             = CBool(False)
     # Should this be included in the extracted data?
-    extract         = Bool(False)
+    extract         = CBool(False)
     # Noise floor (computed using the algorighm recommended by the spike sorting
     # article on scholarpedia)
     std             = Float(np.nan)
@@ -248,10 +251,15 @@ class ChannelSetting(HasTraits):
     # Channel type
     classification = Enum('None', 'single-unit', 'multi-unit', 'artifact',
                           'hash', 'gross discharge')
+
+    # We need to use a CBool datatype for the traits below because when loading
+    # from the HDF5 file, PyTables returns a numpy.bool_ datatype which is not
+    # recognized by the Bool trait as a valid boolean type.
+
     # Does the channel have an auditory response?
-    auditory_response = Bool(False)
+    auditory_response = CBool(False)
     # Does the channel have a behavior response?
-    behavior_response = Bool(False)
+    behavior_response = CBool(False)
 
     @cached_property
     def _get_gui_index(self):
@@ -276,7 +284,10 @@ channel_editor = TableEditor(
         CheckboxColumn(name='bad', width=5, label='B'),
         CheckboxColumn(name='extract', width=5, label='E'),
         ObjectColumn(name='th_std', width=5, label='T'),
-        ObjectColumn(name='artifact_std', width=5, label='A'),
+        # The default "style" for the edit widget of a range trait uses a
+        # slider.  However, this is difficult to use when imbedded in the table
+        # editor.  Let's force it to be a simple field (text-entry).
+        ObjectColumn(name='artifact_std', width=5, label='A', style='text'),
         ObjectColumn(name='std_mv', width=25, label=u'\u03C3 (mV)',
                      format='%.3f', editable=False),
         ObjectColumn(name='classification', width=50, label='Classification'),
@@ -567,7 +578,7 @@ class PhysiologyReviewController(Controller):
 
         # Suggest a filename based on the filename of the original file (to make
         # it easier for the user to just click "OK").
-        filename = re.sub(r'(.*)\.(h5|hd5|hdf5)', r'\1_extracted.\2',
+        filename = re.sub(r'(.*?)(_raw)?\.(h5|hd5|hdf5)', r'\1_extracted.\3',
                           info.object.data_filename)
 
         # Get the output filename from the user
@@ -586,8 +597,8 @@ class PhysiologyReviewController(Controller):
             # going on since this is a fairly lengthy process.
             dialog = ProgressDialog(title='Exporting data', 
                                     min=0,
-                                    max=info.object.channel.shape[-1],
                                     can_cancel=True,
+                                    max=int(info.object.channel.shape[-1]),
                                     message='Initializing ...')
 
             # Define a function that, when called, updates the dialog ... 
@@ -635,9 +646,9 @@ class PhysiologyReviewController(Controller):
     def overlay_sorted_spikes(self, info):
         # Suggest a filename based on the filename of the original file (to make
         # it easier for the user to just click "OK").
-        wildcard = re.sub(r'(.*?)(_raw)?\.(h5|hd5|hdf5)', r'\1_*_sorted.\3',
+        wildcard = re.sub(r'(.*?)(_raw)?\.(h5|hd5|hdf5)', r'\1_*_sorted.mat',
                           path.basename(info.object.data_filename))
-        wildcard = 'HDF5 file (*_sorted.hd5)|{}|'.format(wildcard)
+        wildcard = 'MAT file (*_sorted.mat)|{}|'.format(wildcard)
         # Get the output filename from the user
         dialog = FileDialog(action="open", wildcard=wildcard)
         dialog.open()
@@ -647,9 +658,17 @@ class PhysiologyReviewController(Controller):
         with tables.openFile(dialog.path, 'r') as fh:
             ts = fh.root.unwrapped_times[:].ravel()
             channels = fh.root.channels[:].ravel()-1
-            clusters = fh.root.assigns[:].ravel()
-            cluster_ids = fh.root.labels[0].ravel()
-            cluster_types = fh.root.labels[1].ravel()
+
+            # Check to see if the data has been sorted yet.  If not, just mark
+            # all the spikes as "in process".
+            if 'assigns' in fh.root:
+                clusters = fh.root.assigns[:].ravel()
+                cluster_ids = fh.root.labels[0].ravel()
+                cluster_types = fh.root.labels[1].ravel()
+            else:
+                clusters = np.ones(len(channels))
+                cluster_ids = [1]
+                cluster_types = [1]
 
             overlay = ExtractedSpikeOverlay(timestamps=ts,
                                             channels=channels,
@@ -852,7 +871,7 @@ class PhysiologyReview(HasTraits):
     artifact_thresholds = Property(depends_on='channel_settings.artifact_threshold')
 
     channel_dclicked        = Event
-    channel_dclick_toggle   = Bool(False, transient=True)
+    channel_dclick_toggle   = CBool(False, transient=True)
     channel_dclick_cache    = Any
 
     # Settings.  Be sure to include setting=True to indicate the value should be
@@ -870,8 +889,8 @@ class PhysiologyReview(HasTraits):
     std_ub              = Int(-1, setting=True) # upper bound (in samples)
 
     # What to show
-    artifact_overlay_visible    = Bool(True)
-    threshold_overlay_visible   = Bool(True)
+    artifact_overlay_visible    = CBool(True)
+    threshold_overlay_visible   = CBool(True)
 
     def _trial_data_default(self):
         return []

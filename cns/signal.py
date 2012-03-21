@@ -71,10 +71,10 @@ def sam_eq_phase(depth, direction='positive'):
     if depth == 0:
         # This is the easy case
         return 0
-    eq_power = am_eq_power(depth)
+    eq_power = sam_eq_power(depth)
     z = 2.0/depth*eq_power-2.0/depth+1
     phi = np.arccos(z)
-    return 2*pi-phi if direction == 'positive' else phi
+    return 2*np.pi-phi if direction == 'positive' else phi
 
 def rms(waveform):
     '''

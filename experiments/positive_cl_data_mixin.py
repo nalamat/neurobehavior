@@ -138,7 +138,7 @@ class PositiveCLDataMixin(HasTraits):
         return self.apply_mask(stats.nanstd, self.par_go_mask,
                 self.resp_time_seq)
 
-    par_info = Property(store='table', depends_on='par_dprime')
+    par_info = Property(depends_on='par_dprime')
 
     @cached_property
     def _get_par_info(self):

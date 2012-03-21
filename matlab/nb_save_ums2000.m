@@ -4,6 +4,11 @@ function [filename] = nb_save_ums2000(spikes, file_extension)
 %   This is a simple wrapper around Matlab's save function that ensures that the
 %   v7.3 format (e.g. a HDF5 container) is used for saving the data.  This
 %   allows Python to read this data back in using PyTables.
+%
+%   For some reason, Matlab refuses to acknowledge that a file with any
+%   extension other than *.mat might possibly be a Matlab file, so we need to
+%   use the *.mat extension rather than the *.hd5 extension.  Fortunately,
+%   Python places no such silly limitations on your file-naming strategy.
 
     % The user did not specify the filename, so let's pull it out of the
     % spikes structure since import_ums2000 saves the filename to a field in the
@@ -17,6 +22,6 @@ function [filename] = nb_save_ums2000(spikes, file_extension)
         file_extension = [file_extension '_' int2str(ch)];
     end
     filename = [spikes.base_filename '_' file_extension];
-    filename = [filename '_sorted.hd5'];
+    filename = [filename '_sorted.mat'];
     
     save(filename, '-struct', 'spikes', '-v7.3');

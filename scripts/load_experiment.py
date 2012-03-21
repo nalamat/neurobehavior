@@ -1,79 +1,60 @@
 #!python
 
+# IMPORTANT!  Do not import any portion of the Neurobehavior code (e.g. cns,
+# experiments, paradigms, etc. until after the comment indicating it is safe to
+# do so in the code below.
 import sys
 import argparse
 import logging
 import logging.config
 from time import strftime
 from os import path
-time_format = '[%(asctime)s] :: %(name)s - %(levelname)s - %(message)s'
-simple_format = '%(name)s - %(levelname)s - %(message)s'
 
-# Set up the logging file.  If a path has been defined, save the file to that
-# path.  If not, save the logging data to a temporary file.
-from cns import get_config
+def configure_logging(filename):
+    time_format = '[%(asctime)s] :: %(name)s - %(levelname)s - %(message)s'
+    simple_format = '%(name)s - %(levelname)s - %(message)s'
 
-log_root = get_config('LOG_ROOT') 
-if path.exists(log_root):
-    filename = path.join(log_root, strftime('%Y%m%d_%H%M.log'))
-else:
-    import tempfile
-    import warnings
-    import textwrap
-    fh = tempfile.NamedTemporaryFile(delete=False)
-    filename = fh.name
-    mesg = '''
-    The folder for storing log files, {}, does not exist.  the log file will be
-    saved to the temporary file {}.  In the future, please create the folder,
-    {}, or update your NEUROBEHAVIOR_SETTINGS and/or NEUROBEHAVIOR_BASE to point
-    to the appropriate log file directory.'''
-    mesg = mesg.format(log_root, filename, log_root)
-    warnings.warn(textwrap.dedent(mesg).replace('\n', ''))
-
-logging_config = {
-        'version': 1,
-        'formatters': {
-            'time': { 'format': time_format },
-            'simple': { 'format': simple_format },
-            },
-        'handlers': {
-            # This is what gets printed out to the console 
-            'console': {
-                'class': 'logging.StreamHandler',
-                'formatter': 'simple',
-                'level': 'DEBUG',
+    logging_config = {
+            'version': 1,
+            'formatters': {
+                'time': { 'format': time_format },
+                'simple': { 'format': simple_format },
                 },
-            # This is what gets saved to the file
-            'file': {
-                'class': 'logging.FileHandler',
-                'formatter': 'time',
-                'filename': filename,
-                'level': 'WARNING',
-                }
-            },
-        # This is where you would change the logging level of specific modules.
-        # This is very helpful when you are trying to debug a very specific
-        # module and want to turn off the messages from other modules.
-        'loggers': {
-            # This module complains if you pass zero-length data to it for
-            # plotting.  However, we initialize the plots with zero-length data
-            # in the beginning of the experiment since we don't have any trials
-            # yet.  Let's silence this module.
-            'enthought.chaco.barplot': { 'level': 'CRITICAL', },
-            'experiments': { 'level': 'DEBUG' },
-            'paradigms': { 'level': 'DEBUG' },
-            'tdt': { 'level': 'INFO' },
-            'cns': { 'level': 'WARN' },
-            'cns.data': { 'level': 'DEBUG' },
-            'neurogen': { 'level': 'WARN' },
-            },
-        'root': {
-            'handlers': ['console', 'file'],
-            },
-        }
-
-logging.config.dictConfig(logging_config)
-log = logging.getLogger()
+            'handlers': {
+                # This is what gets printed out to the console 
+                'console': {
+                    'class': 'logging.StreamHandler',
+                    'formatter': 'simple',
+                    'level': 'DEBUG',
+                    },
+                # This is what gets saved to the file
+                'file': {
+                    'class': 'logging.FileHandler',
+                    'formatter': 'time',
+                    'filename': filename,
+                    'level': 'WARNING',
+                    }
+                },
+            # This is where you would change the logging level of specific modules.
+            # This is very helpful when you are trying to debug a very specific
+            # module and want to turn off the messages from other modules.
+            'loggers': {
+                # This module complains if you pass zero-length data to it for
+                # plotting.  However, we initialize the plots with zero-length data
+                # in the beginning of the experiment since we don't have any trials
+                # yet.  Let's silence this module.
+                'enthought.chaco.barplot': { 'level': 'CRITICAL', },
+                'experiments': { 'level': 'DEBUG' },
+                'paradigms': { 'level': 'DEBUG' },
+                'tdt': { 'level': 'INFO' },
+                'cns': { 'level': 'WARN' },
+                'cns.data': { 'level': 'DEBUG' },
+                },
+            'root': {
+                'handlers': ['console', 'file'],
+                },
+            }
+    logging.config.dictConfig(logging_config)
 
 class VerifyUniqueParameters(argparse.Action):
 
@@ -113,7 +94,7 @@ the system path based on its current directory.  This option is not throughly
 tested.  Use at your own risk.'''
 
 SERVER_HELP = '''TDT RPC server address (in the format hostname:port).  For
-example, localhost:13131 or regina.cns.nyu.edu:13131.'''
+example, localhost:3333 or regina.cns.nyu.edu:3333.'''
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Launch experiment")
@@ -129,6 +110,10 @@ if __name__ == '__main__':
     parser.add_argument('--repeats', 
                         help='Specify number of repeats for each trial setting',
                         action='store_true', default=False)
+
+    #debug_choices = ['regular', 'verbose', 'annoying', 'obnoxious']
+    parser.add_argument('--debug', action='store_true',
+                        help='Prevents some exceptions from being silenced')
 
     group = parser.add_mutually_exclusive_group()
     group.add_argument('-p', '--profile', dest='mode', action='store_const',
@@ -161,6 +146,15 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    #if args.debug:
+    if True:
+        # By default, exceptions that occur in the trait change handlers (i.e.
+        # the callback functions) are silenced.  When debugging, it's often
+        # helpful for these exceptions to propagate into the main thread so we
+        # can identify the source of the issue.
+        from enthought.traits.api import push_exception_handler
+        push_exception_handler(reraise_exceptions=True)
+
     if args.modify_path:
         from os.path import join, dirname, abspath, normpath
         from glob import glob
@@ -170,12 +164,39 @@ if __name__ == '__main__':
             sys.path.insert(0, module_path)
             print "Added {} to the Python path".format(module_path)
 
+    # DEFER ALL NEUROBEHAVIOR SPECIFIC IMPORTS UNTIL AFTER THIS POINT!  The
+    # above block modifies the Python path for people who are actively
+    # developing Neurobehavior but do not wish to modify the system path (for
+    # whatever reason).
+
+    # Since we may be modifying the path to point to a development version of
+    # neurobehavior rather than the default that is installed (via the
+    # --modify-path command line flag), we need to wait to import the experiment
+    # loader as well as cns until the path has been updated.
+    from experiments import loader
+    from cns import get_config
+
+    # Configure the logging
+    log_root = get_config('LOG_ROOT') 
+    if path.exists(log_root):
+        log_filename = path.join(log_root, strftime('%Y%m%d_%H%M.log'))
+    else:
+        import tempfile
+        import warnings
+        import textwrap
+        fh = tempfile.NamedTemporaryFile(delete=False)
+        log_filename = fh.name
+        mesg = '''
+        The folder for storing log files, {}, does not exist.  the log file will be
+        saved to the temporary file {}.  In the future, please create the folder,
+        {}, or update your NEUROBEHAVIOR_SETTINGS and/or NEUROBEHAVIOR_BASE to point
+        to the appropriate log file directory.'''
+        mesg = mesg.format(log_root, log_filename, log_root)
+        warnings.warn(textwrap.dedent(mesg).replace('\n', ''))
+
+    configure_logging(log_filename)
+
     try:
-        # Since we may be modifying the path to point to a development version
-        # of neurobehavior rather than the default that is installed (via the
-        # --modify-path command line flag), we need to wait to import the
-        # experiment loader until the path has been updated.
-        from experiments import loader
 
         # Do some additional checking of argument list to make sure it is valid
         if args.mode != 'inspect':
@@ -205,10 +226,12 @@ if __name__ == '__main__':
         traceback.print_exc(file=sys.stdout)
 
         # Now, if we are running from a terminal, don't exit until the user hits
-        # enter so they have time to read the error message.  Note that the
-        # error message will be properly logged as well.
+        # enter so they have time to read the error message (if the terminal is
+        # launched via a Windows shortcut, then it often closes before the user
+        # can read the message).  Note that the error message will be logged to
+        # the file as well (assuming you've configured the levels properly).
         if isatty(sys.stdout.fileno()):
             raw_input("Hit enter to exit")
 
     finally:
-        print "Log file saved to ", filename
+        print "Log file saved to ", log_filename

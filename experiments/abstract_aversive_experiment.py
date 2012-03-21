@@ -174,9 +174,7 @@ class AbstractAversiveExperiment(AbstractExperiment):
                 VGroup(
                     VGroup(
                         Item('object.data.mask_mode'),
-                        Item('object.data.include_last'), 
-                        Item('object.data.exclude_first'),
-                        Item('object.data.exclude_last'),
+                        Item('object.data.mask_num'), 
                         label='Mask settings',
                         show_border=True,
                         ),
