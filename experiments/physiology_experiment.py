@@ -1,9 +1,9 @@
 import numpy as np
-from enthought.enable.api import Component, ComponentEditor
+from enthought.enable.api import Component, ComponentEditor 
 from enthought.chaco.api import (LinearMapper, DataRange1D,
         OverlayPlotContainer)
 from enthought.traits.ui.api import VGroup, HGroup, Item, Include, View, \
-        InstanceEditor, RangeEditor, HSplit, Tabbed
+        InstanceEditor, RangeEditor, HSplit, Tabbed, ShellEditor
 from enthought.traits.api import Instance, HasTraits, Float, \
      Bool, on_trait_change, Any, Range, Property,\
      Tuple, List, cached_property, Button, Enum, Undefined
@@ -168,7 +168,7 @@ class PhysiologyExperiment(HasTraits):
     channel_sort             = Property(depends_on='sort_window_+.channel')
 
     channel                 = Enum('processed', 'raw')
-    channel_mode            = Enum('TDT', 'TBSI', 'Test')
+    channel_mode            = Enum('TBSI', 'TDT', 'Test')
 
     # Overlays
     spike_overlay            = Instance(SpikeOverlay)
@@ -381,10 +381,14 @@ class PhysiologyExperiment(HasTraits):
                         label='GUI settings'
                         ),
                     ),
-                Item('physiology_container', 
-                    editor=ComponentEditor(width=500, height=800), 
-                    width=500,
-                    resizable=True),
+                Tabbed(
+                    Item('physiology_container', 
+                        editor=ComponentEditor(width=500, height=800), 
+                        width=500,
+                        resizable=True),
+                    Item('handler.shell_variables', editor=ShellEditor()),
+                    show_labels=False,
+                ),
                 show_labels=False,
                 ),
             menubar=create_menubar(),

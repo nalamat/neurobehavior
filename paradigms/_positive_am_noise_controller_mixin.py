@@ -224,7 +224,12 @@ class PositiveAMNoiseControllerMixin(HasTraits):
         # Compute the required attenuation 
         level = self.get_current_value('level')
         fc = self.get_current_value('fc')
-        attenuation = calibration.get_spl(fc, voltage=MAX_VRMS)-level
+        spl = calibration.get_spl(fc, voltage=MAX_VRMS)
+        attenuation = spl-level
+        log.debug('Speaker output %.2f dB SPL at %.2f Hz using %.2f Vrms', 
+                  spl, fc, MAX_VRMS)
+        log.debug('Need %.2f dB attenuation to achieve %.2f dB SPL',
+                  attenuation, level)
 
         # Get the cached waveforms.  Always use the self._get_waveform_name() methods
         # rather than self._waveform_name because the self._get_waveform_name()

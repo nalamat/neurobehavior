@@ -3,7 +3,7 @@ from __future__ import division
 from abstract_experiment_data import AbstractExperimentData
 from sdt_data_mixin import SDTDataMixin
 from enthought.traits.api import Instance, Int, Float, \
-    cached_property, Array, Property, Enum
+    cached_property, Array, Property, Enum, Bool
 import numpy as np
 from cns.data.h5_utils import get_or_append_node
 
@@ -110,9 +110,22 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
     all_poke_epoch  = Instance(FileEpoch)
     response_ts     = Instance(FileTimeseries)
 
+    # If True, save to datafile otherwise use a temporary file for storing the
+    # mic data.
+    save_microphone = Bool(False)
+
     def _microphone_default(self):
-        return FileChannel(node=self.store_node, name='microphone',
-                dtype=np.float32)
+        if self.save_microphone:
+            node = self.store_node
+        else:
+            from cns import get_config
+            import tables
+            from os import path
+            filename = path.join(get_config('TEMP_ROOT'), 'microphone.h5')
+            log.debug('saving microphone data to %s', filename)
+            tempfile = tables.openFile(filename, 'w')
+            node = tempfile.root
+        return FileChannel(node=node, name='microphone', dtype=np.float32)
 
     def _poke_TTL_default(self):
         return self._create_channel('poke_TTL', np.bool)

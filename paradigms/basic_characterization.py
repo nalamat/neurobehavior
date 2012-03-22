@@ -1,8 +1,5 @@
-from enthought.traits.api import Instance, on_trait_change, Range, Bool, \
-        Button, Any
-from enthought.traits.ui.api import View, Include, VSplit, VGroup, Item, \
-        HGroup, spring, RangeEditor
-from enthought.enable.api import Component, ComponentEditor
+from traits.api import Instance, on_trait_change, Range, Button, Any, HasTraits
+from traitsui.api import View, VGroup, Item, HGroup, spring
 from cns.channel import FileChannel
 from enthought.chaco.api import DataRange1D, LinearMapper
 from cns.chaco_exts.rms_channel_plot import RMSChannelPlot
@@ -10,22 +7,16 @@ from cns.chaco_exts.rms_channel_plot import RMSChannelPlot
 from os.path import join
 from cns import get_config
 
-from experiments import (
-    # Required base classes
-    AbstractExperiment,
-    AbstractExperimentData,
-    AbstractExperimentController,
-    ExperimentToolBar,
-    AbstractExperimentParadigm
-    )
+from experiments.abstract_experiment import AbstractExperiment
+from experiments.abstract_experiment_data import AbstractExperimentData
+from experiments.abstract_experiment_controller import AbstractExperimentController
+from experiments.abstract_experiment_controller import ExperimentToolBar
 
 class BasicCharacterizationToolbar(ExperimentToolBar):
 
     traits_view = View(
             HGroup(
                 Item('start', enabled_when="object.handler.state=='halted'"),
-                Item('resume', enabled_when="object.handler.state=='paused'"),
-                Item('pause', enabled_when="object.handler.state=='running'"),
                 spring,
                 show_labels=False,
                 springy=True,
@@ -121,9 +112,8 @@ class Controller(AbstractExperimentController):
     def get_ts(self):
         return -1
 
-class Paradigm(AbstractExperimentParadigm):
+class Paradigm(HasTraits):
     
-    commutator_inhibit = Bool(False)
     mute_speakers = Button
     swap_speakers = Button
     _old_speaker_settings = Any(None)
@@ -165,7 +155,6 @@ class Paradigm(AbstractExperimentParadigm):
                     'primary_attenuation',
                     'secondary_attenuation',
                     ),
-                'commutator_inhibit',
                 'trial_duration',
                 'token_duration',
                 Item('center_frequency'),
@@ -195,7 +184,7 @@ class Experiment(AbstractExperiment):
 
 class Data(AbstractExperimentData):
 
-    microphone = Instance(FileChannel, store='channel', store_path='microphone')
+    microphone = Instance(FileChannel)
 
     def _microphone_default(self):
         return FileChannel(node=self.store_node, name='microphone',

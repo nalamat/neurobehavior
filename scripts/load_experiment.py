@@ -1,5 +1,16 @@
 #!python
 
+import os
+
+# Ensure that ETS toolkit will default to PyQt4 and use the PyQt (instead of
+# the less stable PySide backend) if we load it
+os.environ['ETS_TOOLKIT'] = 'qt4' 
+
+# This is very important since there's a memory leak when using PySide.  This
+# has been fixed in the latest revision of enthought.enable; however, it
+# probably will not appear until a version of ETS > 7.2-2.
+os.environ['QT_API'] = 'pyqt'
+
 # IMPORTANT!  Do not import any portion of the Neurobehavior code (e.g. cns,
 # experiments, paradigms, etc. until after the comment indicating it is safe to
 # do so in the code below.
@@ -46,9 +57,11 @@ def configure_logging(filename):
                 'enthought.chaco.barplot': { 'level': 'CRITICAL', },
                 'experiments': { 'level': 'DEBUG' },
                 'paradigms': { 'level': 'DEBUG' },
+                'cns': { 'level': 'DEBUG' },
+                'cns.chaco_exts': { 'level': 'INFO' },
+                'cns.channel': { 'level': 'INFO' },
                 'tdt': { 'level': 'INFO' },
-                'cns': { 'level': 'WARN' },
-                'cns.data': { 'level': 'DEBUG' },
+        'new_era': { 'level': 'DEBUG' },
                 },
             'root': {
                 'handlers': ['console', 'file'],
@@ -119,6 +132,9 @@ if __name__ == '__main__':
     group.add_argument('-p', '--profile', dest='mode', action='store_const',
                        const='profile', default='regular', 
                        help='Profile experiment') 
+    group.add_argument('--memory', dest='mode', action='store_const',
+                       const='memory', default='regular', 
+                       help='Graph memory usage') 
     group.add_argument('-t', '--test', dest='mode', action='store_const',
                        const='test', help='Test experiment') 
     group.add_argument('-i', '--inspect', dest='mode', action='store_const',
@@ -132,6 +148,9 @@ if __name__ == '__main__':
 
     #parser.add_argument('--paradigm', help='Paradigm settings file to load')
     #parser.add_argument('--physiology', help='Physiology settings file to load')
+
+    parser.add_argument('--save-microphone', action='store_true',
+            help='Save microphone data?', default=False)
 
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--cal', action=VerifyCalibration, nargs=2, default=None,
@@ -217,6 +236,8 @@ if __name__ == '__main__':
             loader.test_experiment(args)
         elif args.mode == 'inspect':
             loader.inspect_experiment(args)
+        elif args.mode == 'memory':
+            loader.objgraph_experiment(args)
         else:
             loader.launch_experiment_selector(args)
 

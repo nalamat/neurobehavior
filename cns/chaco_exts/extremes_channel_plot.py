@@ -149,24 +149,23 @@ class ExtremesChannelPlot(ChannelPlot):
         if len(points[0]) == 0:
             return
 
-        gc.save_state()
-        gc.clip_to_rect(self.x, self.y, self.width, self.height)
-        gc.set_stroke_color(self.line_color_)
-        gc.set_line_width(self.line_width) 
+        with gc:
+            gc.clip_to_rect(self.x, self.y, self.width, self.height)
+            gc.set_stroke_color(self.line_color_)
+            gc.set_line_width(self.line_width) 
 
-        gc.begin_path()
-        if self.draw_mode == 'normal':
-            idx, val = points
-            gc.lines(np.c_[idx, val])
-        else:
-            idx, (mins, maxes) = points
-            starts = np.column_stack((idx, mins))
-            ends = np.column_stack((idx, maxes))
-            gc.line_set(starts, ends)
+            gc.begin_path()
+            if self.draw_mode == 'normal':
+                idx, val = points
+                gc.lines(np.c_[idx, val])
+            else:
+                idx, (mins, maxes) = points
+                starts = np.column_stack((idx, mins))
+                ends = np.column_stack((idx, maxes))
+                gc.line_set(starts, ends)
 
-        gc.stroke_path()
-        self._draw_default_axes(gc)
-        gc.restore_state()
+            gc.stroke_path()
+            self._draw_default_axes(gc)
 
     traits_view = View(
             Item('dec_points', label='Samples per pixel'),

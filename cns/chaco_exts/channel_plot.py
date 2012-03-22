@@ -4,6 +4,9 @@ from base_channel_plot import BaseChannelPlot
 import numpy as np
 from enthought.traits.api import Bool, Property, cached_property, Int
 
+import logging
+log = logging.getLogger(__name__)
+
 class ChannelPlot(BaseChannelPlot):
     '''
     Designed for efficiently handling time series data stored in a channel.
@@ -35,6 +38,7 @@ class ChannelPlot(BaseChannelPlot):
         be displayed in the visible range)
         '''
         if self.source is not None:
+            log.debug('index mapper was updated')
             fs = self.source.fs
             # Channels contain continuous data starting at t0.  We do not want
             # to compute time values less than t0.
@@ -66,14 +70,10 @@ class ChannelPlot(BaseChannelPlot):
         data_width = (range.high-range.low)*self.source.fs
         return np.floor((data_width/screen_width)/self.dec_points)
 
-    def _preprocess_data(self, data):
-        return data
-
     def _gather_points(self):
         if not self._data_cache_valid:
             range = self.index_mapper.range
-            data = self.source.get_range(range.low, range.high)
-            self._cached_data = self._preprocess_data(data)
+            self._cached_data = self.source.get_range(range.low, range.high)
             self._data_cache_valid = True
             self._screen_cache_valid = False
 
@@ -104,17 +104,27 @@ class ChannelPlot(BaseChannelPlot):
         self._render(gc, points)
 
     def _render(self, gc, points):
-        idx, val = points
-        if len(idx) == 0:
+        if len(points[0]) == 0:
             return
-        gc.save_state()
-        gc.set_antialias(True)
-        gc.clip_to_rect(self.x, self.y, self.width, self.height)
-        gc.set_stroke_color(self.line_color_)
-        gc.set_line_width(self.line_width) 
-        gc.begin_path()
-        gc.lines(np.column_stack((idx, val)))
-        gc.stroke_path()
-        self._draw_default_axes(gc)
-        gc.restore_state()
+        with gc:
+            gc.set_antialias(True)
+            gc.clip_to_rect(self.x, self.y, self.width, self.height)
+            gc.set_stroke_color(self.line_color_)
+            gc.set_line_width(self.line_width) 
+            gc.begin_path()
+            gc.lines(np.c_[points])
+            gc.stroke_path()
+            self._draw_default_axes(gc)
 
+    def _data_added(self, bounds):
+        # We need to be smart about the data added event.  If we're not tracking
+        # the index range, then the data that has changed *may* be off-screen.
+        # In which case, we're doing a *lot* of work to redraw the exact same
+        # picture.
+        data_lb, data_ub = bounds
+        s_lb, s_ub = self.index_range.low, self.index_range.high
+        if (s_lb <= data_lb < s_ub) or (s_lb <= data_ub < s_ub):
+            self._invalidate_data()
+
+    def _data_changed(self):
+        self._invalidate_data()

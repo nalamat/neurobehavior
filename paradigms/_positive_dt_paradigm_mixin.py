@@ -4,9 +4,9 @@ from traitsui.tabular_adapter import TabularAdapter
 
 from experiments.evaluate import Expression
 
-class PositiveDTParadigmMixin(HasTraits):
+class DTParadigmMixin(HasTraits):
 
-    kw = {'context': True, 'store': 'attribute', 'log': True}
+    kw = {'context': True, 'log': True}
 
     fc = Expression(2e3, label='Center frequency (Hz)', **kw)
     level = Expression(20, label='Level (dB SPL)', help='Test', **kw)
@@ -22,8 +22,8 @@ class PositiveDTParadigmMixin(HasTraits):
     # floating point value, 80.0).  By indicating that this is a list of CFloat,
     # the string value will automatically be converted to the correct type, a
     # floating-point value.
-    expected_speaker_range = List(List(CFloat), [[2e3, 20.0]], minlen=1, context=True,
-            log=False)
+    expected_speaker_range = List(List(CFloat), [[2e3, 20.0]], minlen=1,
+                                  context=True, log=False)
 
     dt_group = VGroup(
             VGroup(

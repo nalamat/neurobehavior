@@ -1,15 +1,14 @@
-from enthought.traits.api import (HasTraits, Instance, List, Float,
-                                  on_trait_change, Bool, Int, Any, Dict)
-from enthought.traits.ui.api import View, VGroup, Item, HGroup
+from traits.api import (HasTraits, Instance, List, Float, on_trait_change)
+from traitsui.api import Item, HGroup
 
-from enthought.chaco.api import (OverlayPlotContainer, DataRange1D, PlotAxis,
-                                 ScatterPlot, LinearMapper, ArrayDataSource, LinePlot)
-from enthought.chaco.tools.api import PanTool, ZoomTool
+from chaco.api import (OverlayPlotContainer, DataRange1D, PlotAxis, ScatterPlot,
+                       LinearMapper, ArrayDataSource, LinePlot)
+from chaco.tools.api import ZoomTool
 
-from enthought.enable.api import Component, ComponentEditor
+from enable.api import ComponentEditor
 import numpy as np
 
-from enthought.chaco.function_data_source import FunctionDataSource
+from chaco.function_data_source import FunctionDataSource
 from cns import get_config
 from .maximum_likelihood import p_yes
 
@@ -44,16 +43,16 @@ class _MLDataSource(FunctionDataSource):
         else:
             self._data = np.array([], dtype='f')
     
-class MaximumLikelihoodExperimentMixin(HasTraits):
+class MLExperimentMixin(HasTraits):
             
     # Tracking sequence
-    ml_track_plot = Instance('enthought.enable.api.Component')
+    ml_track_plot = Instance('enable.api.Component')
     ml_track_data = List()
     
     # Best fit maximum likelihood plot
-    ml_plot = Instance('enthought.enable.api.Component')
+    ml_plot = Instance('enable.api.Component')
     ml_index = Instance(FunctionDataSource)
-    ml_value = Instance(_MLDataSource)
+    ml_value = Instance(_MLDataSource, ())
     
     def _ml_track_data_default(self):
         sources = []
@@ -80,9 +79,9 @@ class MaximumLikelihoodExperimentMixin(HasTraits):
         v_miss.set_data(par_seq[~hit_seq])
 
     @on_trait_change('data.ml_coefficients')
-    def _update_ml_plot(self):
+    def _update_ml_plot(self, value):
         self.ml_value.set_coefficients(*self.data.ml_coefficients)
-    
+
     def _ml_plot_default(self):
         container = OverlayPlotContainer(padding=CHACO_AXES_PADDING)
         index_range = DataRange1D()
@@ -98,11 +97,13 @@ class MaximumLikelihoodExperimentMixin(HasTraits):
 
         # Create the datasources for the psychometric function
         self.ml_index = FunctionDataSource(data_range=index_range, func=_xfunc)
-        self.ml_value = _MLDataSource(data_range=index_range)
+        self.ml_value.data_range = index_range
         line = LinePlot(index=self.ml_index, value=self.ml_value,
                         index_mapper=index_mapper, value_mapper=value_mapper)
-        line.overlays.append(PlotAxis(line, orientation='left', title='Yes probability'))
-        line.overlays.append(PlotAxis(line, orientation='bottom', title='Parameter'))
+        ax = PlotAxis(line, orientation='left', title='Yes probability')
+        line.overlays.append(ax)
+        ax = PlotAxis(line, orientation='bottom', title='Parameter')
+        line.overlays.append(ax)
         container.add(line)
         
         #line.tools.append(PanTool(line, constrain=True, constrain_key=None,

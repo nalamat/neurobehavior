@@ -1,16 +1,17 @@
 '''
-Appetitive AM noise
--------------------
+..module:: paradigms.positive_am_noise_ML
+    :platform: Windows
+    :synopsis: Appetitive AM noise paradigm
+
 .. moduleauthor:: Brad Buran <bburan@alum.mit.edu>
 .. moduleauthor:: Gardiner von Trapp <gvontrapp@cns.nyu.edu>
 
 Presents band-limited AM noise tokens that have been tapered with a cos2 ramp.
-To minimize onset transients, the modulation onset can be delayed (expand on
-this). 
+To minimize onset transients, the modulation onset can be delayed. 
 '''
 
-from enthought.traits.api import Instance
-from enthought.traits.ui.api import View, Include, VGroup
+from traits.api import Instance
+from traits.ui.api import View, InMLude, VGroup, Include
 
 from ._positive_am_noise_paradigm_mixin import PositiveAMNoiseParadigmMixin
 from ._positive_am_noise_controller_mixin import PositiveAMNoiseControllerMixin
@@ -20,10 +21,10 @@ from experiments.abstract_positive_controller_v3 import AbstractPositiveControll
 from experiments.abstract_positive_paradigm_v3 import AbstractPositiveParadigm
 from experiments.positive_data_v3 import PositiveData
 
-from experiments.cl_controller_mixin import CLControllerMixin
-from experiments.cl_paradigm_mixin import CLParadigmMixin
-from experiments.cl_experiment_mixin import CLExperimentMixin
-from experiments.positive_cl_data_mixin import PositiveCLDataMixin
+from experiments.ml_controller_mixin import MLControllerMixin
+from experiments.ml_paradigm_mixin import MLParadigmMixin
+from experiments.ml_experiment_mixin import MLExperimentMixin
+from experiments.ml_data_mixin import MLDataMixin
 
 from experiments.pump_controller_mixin import PumpControllerMixin
 from experiments.pump_paradigm_mixin import PumpParadigmMixin
@@ -32,7 +33,7 @@ from experiments.pump_data_mixin import PumpDataMixin
 class Controller(
         PositiveAMNoiseControllerMixin,
         AbstractPositiveController, 
-        CLControllerMixin,
+        MLControllerMixin,
         PumpControllerMixin):
     pass
 
@@ -40,32 +41,32 @@ class Paradigm(
         PositiveAMNoiseParadigmMixin,
         AbstractPositiveParadigm, 
         PumpParadigmMixin,
-        CLParadigmMixin,
+        MLParadigmMixin,
         ):
 
     traits_view = View(
-            VGroup(
-                Include('constant_limits_paradigm_mixin_group'),
-                Include('abstract_positive_paradigm_group'),
-                Include('pump_paradigm_mixin_syringe_group'),
-                label='Paradigm',
-                ),
-            VGroup(
-                Include('speaker_group'),
-                Include('signal_group'),
-                label='Sound',
-                ),
-            )
+        Include('maximum_likelihood_paradigm_mixin_group'),
+        VGroup(
+            Include('abstract_positive_paradigm_group'),
+            Include('pump_paradigm_mixin_syringe_group'),
+            label='Paradigm'
+        ),
+        VGroup(
+            InMLude('speaker_group'),
+            InMLude('signal_group'),
+            label='Sound',
+            ),
+        )
 
 class Data(
     PositiveData, 
-    PositiveCLDataMixin, 
+    MLDataMixin, 
     PumpDataMixin): 
         pass
 
-class Experiment(AbstractPositiveExperiment, CLExperimentMixin):
+class Experiment(AbstractPositiveExperiment, MLExperimentMixin):
 
     data = Instance(Data, ())
     paradigm = Instance(Paradigm, ())
 
-node_name = 'PositiveAMNoiseCLExperiment'
+node_name = 'PositiveAMNoiseMLExperiment'

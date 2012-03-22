@@ -1,10 +1,18 @@
+'''
+Appetitive comodulation masking release (continuous noise)
+----------------------------------------------------------
+.. moduleauthor:: Brad Buran <bburan@alum.mit.edu>
+.. moduleauthor:: Antje Ihlefeld <ai33@nyu.edu>
+
+TODO: Description
+'''
+
 from __future__ import division
 
 from os import path
 
-from enthought.traits.api import Instance, File, List, Any, Int, Bool, Enum
-from enthought.traits.ui.api import View, Include, VSplit, VGroup, Item
-from enthought.enable.api import Component, ComponentEditor
+from enthought.traits.api import Instance, File, Any, Int, Bool
+from enthought.traits.ui.api import View, Include, VGroup
 
 from experiments.evaluate import Expression
 
@@ -27,10 +35,10 @@ import numpy as np
 import logging
 log = logging.getLogger(__name__)
 
-from experiments.abstract_positive_experiment import AbstractPositiveExperiment
-from experiments.abstract_positive_controller import AbstractPositiveController
-from experiments.abstract_positive_paradigm import AbstractPositiveParadigm
-from experiments.positive_data import PositiveData
+from experiments.abstract_positive_experiment_v3 import AbstractPositiveExperiment
+from experiments.abstract_positive_controller_v3 import AbstractPositiveController
+from experiments.abstract_positive_paradigm_v3 import AbstractPositiveParadigm
+from experiments.positive_data_v3 import PositiveData
 from experiments.positive_cl_data_mixin import PositiveCLDataMixin
 from experiments.cl_experiment_mixin import CLExperimentMixin
 

@@ -67,8 +67,7 @@ class TTLPlot(ChannelPlot):
         y = np.ones(n) * screen_low
         height = np.ones(n) * screen_height
 
-        gc.save_state()
-        try:
+        with gc:
             gc.set_antialias(True)
             gc.clip_to_rect(self.x, self.y, self.width, self.height)
 
@@ -84,5 +83,3 @@ class TTLPlot(ChannelPlot):
             gc.draw_path()
 
             self._draw_default_axes(gc)
-        finally:
-            gc.restore_state()

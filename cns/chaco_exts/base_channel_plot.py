@@ -29,16 +29,3 @@ class BaseChannelPlot(BaseXYPlot):
             new.on_trait_change(self._data_changed, "changed", dispatch="new")
             new.on_trait_change(self._data_added, "added", dispatch="new")
             new.on_trait_change(self._index_mapper_updated, "fs", dispatch="new")
-
-    def _data_added(self, bounds):
-        # We need to be smart about the data added event.  If we're not tracking
-        # the index range, then the data that has changed *may* be off-screen.
-        # In which case, we're doing a *lot* of work to redraw the exact same
-        # picture.
-        data_lb, data_ub = bounds
-        s_lb, s_ub = self.index_range.low, self.index_range.high
-        if (s_lb <= data_lb < s_ub) or (s_lb <= data_ub < s_ub):
-            self._invalidate_data()
-
-    def _data_changed(self):
-        self._invalidate_data()

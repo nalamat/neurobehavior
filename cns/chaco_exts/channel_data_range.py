@@ -1,7 +1,10 @@
 from __future__ import division
 
 from enthought.chaco.api import DataRange1D
-from enthought.traits.api import Float, List, Instance, Enum
+from enthought.traits.api import Float, List, Instance, Enum, on_trait_change
+
+import logging
+log = logging.getLogger(__name__)
 
 class ChannelDataRange(DataRange1D):
 
@@ -28,12 +31,14 @@ class ChannelDataRange(DataRange1D):
         bounds = [s.get_bounds()[1] for s in self.sources if s.get_size()>0]
         return 0 if len(bounds) == 0 else max(bounds)
 
+    @on_trait_change('sources.added')
     def refresh(self):
         '''
         Keep this very simple.  The user cannot change low/high settings.  If
         they use this data range, the assumption is that they've decided they
         want tracking.
         '''
+        log.debug('refreshing channel data range')
         span = self.span
         if self.update_mode == 'auto':
             # Update the bounds as soon as the data scrolls into the next span
@@ -61,23 +66,16 @@ class ChannelDataRange(DataRange1D):
             self._high_value = high_value
             self.updated = (low_value, high_value)
 
-    def _sources_changed(self, old, new):
-        for source in old:
-            source.on_trait_change(self.refresh, 'added', remove=True)
-        for source in new:
-            source.on_trait_change(self.refresh, 'added')
-        self.refresh()
+    #def _sources_changed(self, old, new):
+    #    for source in old:
+    #        source.on_trait_change(self.refresh, 'added', remove=True)
+    #    for source in new:
+    #        source.on_trait_change(self.refresh, 'added')
+    #    self.refresh()
 
-    def _sources_items_changed(self, event):
-        for source in event.removed:
-            source.on_trait_change(self.refresh, 'added', remove=True)
-        for source in event.added:
-            source.on_trait_change(self.refresh, 'added')
-        self.refresh()
-
-    def _timeseries_changed(self, old, new):
-        if old is not None:
-            old.on_trait_change(self.refresh, 'updated', remove=True)
-        if new is not None:
-            new.on_trait_change(self.refresh, 'updated')
-        self.refresh()
+    #def _sources_items_changed(self, event):
+    #    for source in event.removed:
+    #        source.on_trait_change(self.refresh, 'added', remove=True)
+    #    for source in event.added:
+    #        source.on_trait_change(self.refresh, 'added')
+    #    self.refresh()

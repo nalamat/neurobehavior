@@ -1,3 +1,14 @@
+'''
+..module:: experiments.abstract_positive_experiment_v3
+    :platform: Windows
+    :synopsis: Base class for appetitive paradigms
+
+.. moduleauthor:: Brad Buran <bburan@alum.mit.edu>
+.. moduleauthor:: Gardiner von Trapp <gvontrapp@cns.nyu.edu>
+
+A version of the appetitive paradigm that does not include a reaction window.
+'''
+
 from enthought.traits.api import Instance, Int, Float, Any, Bool
 from enthought.traits.ui.api import View, Item, HGroup, spring
 from abstract_experiment_controller import AbstractExperimentController
@@ -40,8 +51,13 @@ class AbstractPositiveController(AbstractExperimentController):
     toolbar = Instance(PositiveExperimentToolBar, (), toolbar=True)
     fs_conversion = Int
 
-    current_hw_att1 = Float(120)
-    current_hw_att2 = Float(120)
+    kw = {'context': True, 'log': True, 'immediate': True}
+    hw_att1 = Float(120, label='Out-A attenuation', **kw)
+    hw_att2 = Float(120, label='Out-B attenuation', **kw)
+
+    sw_att = Float(120, label='Software attenuation', **kw)
+    waveform_rms = Float(-1, label='Waveform RMS', **kw)
+    waveform_sf = Float(np.nan, label='Waveform scaling factor', **kw)
 
     pipeline_TTL1   = Any
     pipeline_TTL2   = Any
@@ -77,17 +93,17 @@ class AbstractPositiveController(AbstractExperimentController):
         log.debug('Attempting to change attenuation to %r and %r', att1, att2)
 
         if att1 is None:
-            att1 = self.current_hw_att1
+            att1 = self.hw_att1
         if att2 is None:
-            att2 = self.current_hw_att2
+            att2 = self.hw_att2
         hw1, sw1 = RZ6.split_attenuation(att1)
         hw2, sw2 = RZ6.split_attenuation(att2)
 
-        if hw1 != self.current_hw_att1:
-            self.current_hw_att1 = hw1
+        if hw1 != self.hw_att1:
+            self.hw_att1 = hw1
             log.debug('Updated primary attenuation to %.2f', hw1)
-        if hw2 != self.current_hw_att2:
-            self.current_hw_att2 = hw2
+        if hw2 != self.hw_att2:
+            self.hw_att2 = hw2
             log.debug('Updated secondary attenuation to %.2f', hw2)
 
         # For efficiency reasons, we prefer to do most of the computation for
@@ -241,8 +257,6 @@ class AbstractPositiveController(AbstractExperimentController):
                     self.log_trial(
                             ts_start=np.floor(ts_start/self.fs_conversion), 
                             ts_end=np.floor(ts_end/self.fs_conversion),
-                            primary_hw_attenuation=self.current_hw_att1,
-                            secondary_hw_attenuation=self.current_hw_att2,
                             response=response,
                             )
                     break
@@ -371,11 +385,11 @@ class AbstractPositiveController(AbstractExperimentController):
         # respectively).
         if speaker == 'primary':
             calibration = self.cal_primary
-            hw_atten = self.current_hw_att1
+            hw_atten = self.hw_att1
             self.iface_behavior.set_tag('speaker', 0)
         elif speaker == 'secondary':
             calibration = self.cal_secondary
-            hw_atten = self.current_hw_att2
+            hw_atten = self.hw_att2
             self.iface_behavior.set_tag('speaker', 1)
 
         waveform, attenuation = self.compute_waveform(calibration, hw_atten)
@@ -386,6 +400,11 @@ class AbstractPositiveController(AbstractExperimentController):
 
         # Scale by this much to achieve remaining software attenuation
         sf = 10**(-sw_att/20.0)
+
+        # Save some information about these that will be stored in the tria log
+        self.sw_att = sw_att
+        self.waveform_sf = sf
+        self.waveform_rms = sf*(np.mean(waveform**2)**0.5)
 
         log.debug('Remaining software attenuation of %f dB required', sw_att)
         log.debug('Scaling waveform by %f to compensate', sf)

@@ -1,4 +1,4 @@
-from enthought.traits.api import Int, Any
+from enthought.traits.api import Int, Any, Float
 from cns.pipeline import deinterleave_bits
 from abstract_experiment_controller import AbstractExperimentController
 from cns import get_config
@@ -15,6 +15,10 @@ class AbstractAversiveController(AbstractExperimentController):
     # (critcal for computing lick_offset, etc).
     fs_conversion = Int
     pipeline_TTL = Any
+
+    kw = {'context': True, 'log': True, 'immediate': True}
+    hw_att1 = Float(120, **kw)
+    hw_att2 = Float(120, **kw)
 
     def _setup_shock(self):
         # First, we need to load the circuit we need to control the shocker.
@@ -182,7 +186,7 @@ class AbstractAversiveController(AbstractExperimentController):
                 self.model.data.reaction_ts.send([react_ts])
                 self.current_react_ts = react_ts
 
-            # Only trigger StimulusInfothe next trial if the system is running (if someone
+            # Only trigger the next trial if the system is running (if someone
             # presents a manual reminder, then the system will be in the
             # "paused" state)
             if self.state == 'running':
@@ -196,8 +200,21 @@ class AbstractAversiveController(AbstractExperimentController):
     ############################################################################
 
     def set_attenuations(self, att1, att2):
-        self.iface_behavior.set_tag('att1', att1)
-        self.iface_behavior.set_tag('att2', att2)
+        # Attenuations can be None, in which case it means don't change
+        # attenuation
+        if att1 is None:
+            att1 = self.hw_att1
+        if att2 is None:
+            att2 = self.hw_att2
+
+        if att1 != self.hw_att1:
+            self.hw_att1 = att1
+            self.iface_behavior.set_tag('att1', att1)
+            log.debug('Updated primary attenuation to %.2f', att1)
+        if att2 != self.hw_att2:
+            self.hw_att2 = att2
+            self.iface_behavior.set_tag('att2', att2)
+            log.debug('Updated secondary attenuation to %.2f', att2)
 
     def get_reaction_ts(self):
         return self.iface_behavior.get_tag('react|')

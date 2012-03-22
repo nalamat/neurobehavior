@@ -9,14 +9,18 @@ class TrialSetting(HasTraits):
     ttype = Enum('GO', 'NOGO', 'GO_REMIND', 'NOGO_REPEAT', label='Trial type',
                  store='attribute', context=True, log=True)
     
-    def __init__(self, ttype, **kwargs):
+    def __init__(self, ttype, *args, **kwargs):
         kwargs['ttype'] = ttype
+        # We'll accept positional arguments and assume that they are provided in
+        # the order specified in _parameters (we've already processed ttype so
+        # we start with the second element in _parameters)
+        for parameter, value in zip(self._parameters[1:], args):
+            kwargs[parameter] = value
         super(TrialSetting, self).__init__(**kwargs)
         
-    # How should the object appear under various contexts (GUI, command line,
-    # etc)
-
     def traits_view(self):
+        # How should the object appear under various contexts (GUI, command
+        # line, etc)
         return View(VGroup(*self._parameters))
 
     def __str__(self):
@@ -83,16 +87,6 @@ color_names = get_config('COLOR_NAMES')
 class TrialSettingAdapter(TabularAdapter):
 
     default_value = TrialSetting(ttype='GO')
-
-    #def delete(self, obj, trait, row):
-    #    instance = getattr(obj, trait)
-    #    if len(instance) > 3 and instance[row]['ttype'] == 'GO':
-    #        del instance[row]
-    #    else:
-    #        # We need to raise a ValueError to veto the deletion from the GUI,
-    #        # otherwise the object will just disappear (even though it's still
-    #        # in the underlying list)!
-    #        raise ValueError, 'Cannot delete'
 
     def _get_bg_color(self):
         ttype = self.item.ttype

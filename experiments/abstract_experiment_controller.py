@@ -3,6 +3,7 @@ from cns.data.h5_utils import get_or_append_node
 
 import subprocess
 from os import path
+import os
 
 from .evaluate import evaluate_value, evaluate_expressions
 
@@ -37,7 +38,7 @@ class ExperimentToolBar(ToolBar):
     kw      = dict(height=size[0], width=size[1], action=True)
     apply   = SVGButton('Apply', filename=icons['apply'],
                         tooltip='Apply settings', **kw)
-    revert  = SVGButton('Undo', filename=icons['undo'],
+    revert  = SVGButton('Revert', filename=icons['undo'],
                         tooltip='Revert settings', **kw)
     start   = SVGButton('Run', filename=icons['start'],
                         tooltip='Begin experiment', **kw)
@@ -122,9 +123,16 @@ class AbstractExperimentController(Controller):
 
     shell_variables = Dict
 
+    # These define what variables will be available in the Python shell.  Right
+    # now we can't add various stuff such as the data and interface classes
+    # because they have not been created yet.  I'm not sure how we can update
+    # the Python shell with new instances once the experiment has started
+    # running.
     def _shell_variables_default(self):
-        return dict(controller=self)
+        return dict(controller=self, c=self)
 
+    # If you add a toolbar, be sure to set toolbar=True so that the controller
+    # knows that the toolbar instance needs to be "installed".
     toolbar = Instance(ExperimentToolBar, (), toolbar=True)
     
     state = Enum('halted', 'paused', 'running', 'manual', 'disconnected',
@@ -144,7 +152,7 @@ class AbstractExperimentController(Controller):
     # placeholder for transient data (to compute variables needed for experiment
     # control), it should be left out of the "model". 
     current_    = Any
-    choice_     = Any
+    #choice_     = Any
 
     # iface_* and buffer_* are handles to hardware and hardware memory buffers
     iface_      = Any
@@ -176,17 +184,13 @@ class AbstractExperimentController(Controller):
     
     physiology_handler = Instance(PhysiologyController)
 
-    # A value less than 0 indicates that the hardware attenuators have not been
-    # configured yet and should be.
-    current_hw_att1 = Float(-1)
-    current_hw_att2 = Float(-1)
-
     status = Property(Str, depends_on='state, current_setting')
 
     # Address of the hardware server.  If None, defaults to the non-network
     # aware version of the TDTPy library.
     address = Trait(None, None, Tuple(Str, Int))
 
+    # Start time of the experiment, in seconds
     start_time = Any
 
     def _process_default(self):
@@ -228,7 +232,7 @@ class AbstractExperimentController(Controller):
             self.model = info.object
 
             # The toolbars need a reference to the handler (i.e. this class) so
-            # they can communicate button-presses.
+            # they can communicate button-presses to the controller.
             for toolbar in self.trait_names(toolbar=True):
                 getattr(self, toolbar).install(self, info)
 
@@ -310,6 +314,10 @@ class AbstractExperimentController(Controller):
 
         Subclasses must implement `start_experiment`
         '''
+        if self.state != 'halted':
+            # Don't attempt to start experiment, it is already running or has
+            # stopped.
+            return
         try:
             node = info.object.experiment_node
 
@@ -317,9 +325,23 @@ class AbstractExperimentController(Controller):
             # properly determine the version used to run the code.  I'm not sure
             # what happens if Hg is not installed on the computer.  However, we
             # currently don't have to deal with that use-case.
-            dir = path.abspath(path.dirname(__file__))
-            rev_id = subprocess.check_output('hg id --cwd {}'.format(dir))
-            node._v_attrs['neurobehavior_revision'] = rev_id
+            try:
+                dir = path.abspath(path.dirname(__file__))
+                rev_id = subprocess.check_output('hg id --cwd {}'.format(dir))
+                node._v_attrs['neurobehavior_revision'] = rev_id
+            except:
+                import warnings
+                mesg = "Unable to store changset ID of Neurobehavior"
+                warnings.warn(mesg)
+                self.notify(mesg)
+
+            # Store the value of all the settings when the experiment was
+            # launched
+            for k, v in get_config().items():
+                node._v_attrs['setting_' + k] = v
+
+            # Get the computer host name so we know which computer was used
+            node._v_attrs['computer'] = os.environ['COMPUTERNAME']
 
             # This will actually store a pickled copy of the calibration data
             # that can *only* be recovered with Python (and a copy of the
@@ -480,6 +502,8 @@ class AbstractExperimentController(Controller):
         for key, value in self.context_log.items():
             if value:
                 kwargs[key] = self.current_context[key]
+        for key, value in self.shadow_paradigm.trait_get(context=True).items():
+            kwargs['expression_{}'.format(key)] = '{}'.format(value)
         self.model.data.log_trial(**kwargs)
 
     def log_event(self, name, message, ts=None):
@@ -537,8 +561,9 @@ class AbstractExperimentController(Controller):
     
     Supported metadata
     ------------------
-    ignore
-        Do not monitor the trait for changes
+    context
+        Include in the context namespace.  Note that for a Trait to be logged,
+        it must also be
     immediate
         Apply the changes immediately (i.e. do not queue the changes)
         
@@ -592,7 +617,7 @@ class AbstractExperimentController(Controller):
     # List of name, value, label tuples (used for displaying in the GUI)
     current_context_list = List
 
-    @on_trait_change('model.paradigm.+container*.+context')
+    @on_trait_change('model.paradigm.+container*.+context, +context')
     def handle_change(self, instance, name, old, new):
         # When a paradigm value has changed while the experiment is running,
         # indicate that changes are pending
@@ -622,7 +647,8 @@ class AbstractExperimentController(Controller):
         '''
         log.debug('Refreshing context')
         self.old_context = self.current_context.copy()
-        self.current_context = self.model.data.trait_get(context=True)
+        self.current_context = self.trait_get(context=True)
+        self.current_context.update(self.model.data.trait_get(context=True))
         self.pending_expressions = self.shadow_paradigm.trait_get(context=True)
 
     def apply(self, info=None):
@@ -748,7 +774,7 @@ class AbstractExperimentController(Controller):
         
     def initialize_context(self):
         log.debug('Initializing context')
-        for instance in (self.model.data, self.model.paradigm):
+        for instance in (self.model.data, self.model.paradigm, self):
             for name, trait in instance.traits(context=True).items():
                 log.debug('Found context variable {}'.format(name))
                 self.context_labels[name] = trait.label

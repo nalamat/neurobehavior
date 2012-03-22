@@ -127,13 +127,17 @@ class AbstractExperimentData(HasTraits):
 
     def save(self):
         '''
-        Save all data to the file
+        Called by stop_experiment when the stop button is pressed.  This is your
+        chance to save relevant data.
         '''
         # Dump the trial log table
+        fh = self.store_node._v_file
         if len(self.trial_log):
-            fh = self.store_node._v_file
             fh.createTable(self.store_node, 'trial_log', self.trial_log)
-            fh.createTable(self.store_node, 'par_info', self.par_info)
         else:
             log.debug('No trials in the trial_log file!')
+        if len(self.par_info):
+            fh.createTable(self.store_node, 'par_info', self.par_info)
+        else:
+            log.debug('No par_info')
 

@@ -2,8 +2,10 @@ from __future__ import division
 
 import ast
 import numpy as np
-from enthought.traits.ui.api import TextEditor
-from enthought.traits.api import Callable, HasTraits
+from traits.api import HasTraits
+
+import logging
+log = logging.getLogger(__name__)
 
 '''
 Available attributes for evaluating experiment parameters.
@@ -209,10 +211,14 @@ def evaluate_value(parameter, expressions, context=None):
         # Catch NameErrors and convert them to EvaluationErrors
         mesg = """
         Unable to evaluate '{}' because {} or has a circular reference (either
-        directly or indirectly via other variables) to '{}'"""
+        directly or indirectly via other variables) to '{}'.  Alternatively, you
+        may be generating an exception in the method 'set_{}'.  If this is the
+        case, the exception will have been logged somewhere in the stacktrace.
+        Check the logging output for more detail."""
+        log.exception(e)
         import textwrap
         mesg = textwrap.dedent(mesg).strip().replace('\n', ' ')
-        raise EvaluationError, mesg.format(parameter, e, parameter)
+        raise EvaluationError, mesg.format(parameter, e, parameter, parameter)
 
 def evaluate_expressions(expressions, current_context):
     '''
@@ -228,6 +234,15 @@ class Expression(TraitType):
 
     info_text = 'a Python value or expression'
     default_value = ParameterExpression('None')
+
+    def post_setattr(self, object, name, value):
+        if not isinstance(value, ParameterExpression):
+            value = ParameterExpression(value)
+            object.__dict__[name] = value
+
+    def init(self):
+        if not isinstance(self.default_value, ParameterExpression):
+            self.default_value = ParameterExpression(self.default_value)
 
     def validate(self, object, name, value):
         if isinstance(value, ParameterExpression):
@@ -295,14 +310,15 @@ class TestTraits(HasTraits):
         print 'changed'
 
 if __name__ == '__main__':
+    pass
     #parameters = {'a': ParameterExpression('1'), 'b': ParameterExpression('a')}
     #evaluate_value('a', parameters)
     #context = {}
     #evaluate_expressions(parameters, context)
     #print parameters, context
-    import doctest
-    doctest.testmod()
-    unittest.main()
+    #import doctest
+    #doctest.testmod()
+    #unittest.main()
     #t = TestTraits()
     #t.a = ParameterExpression('b+4')
     #t.a = ParameterExpression('b+4')
