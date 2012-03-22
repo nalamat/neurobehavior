@@ -1,9 +1,16 @@
+'''
+Aversive FM/AM tone paradigm
+----------------------------
+.. moduleauthor:: Brad Buran <bburan@alum.mit.edu>
+
+TODO: Desription
+'''
 from enthought.traits.api import Instance
 from enthought.traits.ui.api import View, VGroup, Item, Include
 from experiments.evaluate import Expression
 from os.path import join
 from cns import get_config
-from cns.signal import am_eq_power, am_eq_phase
+from cns.signal import sam_eq_power, sam_eq_phase
 import numpy as np
 
 from experiments.abstract_aversive_experiment import AbstractAversiveExperiment
@@ -82,8 +89,8 @@ class Controller(
 
         am_amplitude = am_depth/2.0
         am_shift = 1-am_amplitude
-        am_phase = am_eq_phase(am_depth, am_direction)
-        am_sf = 1.0/am_eq_power(am_depth)
+        am_phase = sam_eq_phase(am_depth, am_direction)
+        am_sf = 1.0/sam_eq_power(am_depth)
 
         self.iface_behavior.set_tag('am_amplitude', am_amplitude)
         self.iface_behavior.set_tag('am_shift', am_shift)
@@ -97,18 +104,22 @@ class Controller(
         self.notify(mesg.format(value, coerced_value))
         self.set_current_value('fc', coerced_value)
 
-    def set_level(self, value):
+    def set_speaker(self, speaker):
+        self._update_attenuation()
+
+    def set_level(self, level):
+        self._update_attenuation()
+
+    def _update_attenuation(self):
+        level = self.get_current_value('level')
         speaker = self.get_current_value('speaker')
         fc = self.get_current_value('fc')
-
         if speaker == 'primary':
-            att = self.cal_primary.get_attenuation(fc, value)
-            self.iface_behavior.set_tag('att1', att)
-            self.iface_behavior.set_tag('att2', 120.0)
+            att = self.cal_primary.get_attenuation(fc, level)
+            self.set_attenuations(att, 120)
         elif speaker == 'secondary':
-            att = self.cal_secondary.get_attenuation(fc, value)
-            self.iface_behavior.set_tag('att2', att)
-            self.iface_behavior.set_tag('att1', 120.0)
+            att = self.cal_secondary.get_attenuation(fc, level)
+            self.set_attenuations(120, att)
         else:
             raise ValueError, 'Unsupported speaker mode %r' % speaker
 
@@ -134,6 +145,7 @@ class Paradigm(
     am_direction = Expression("'positive'", **kw)
 
     signal_group = VGroup(
+            'speaker',
             'fc',
             'level',
             'fm_depth',

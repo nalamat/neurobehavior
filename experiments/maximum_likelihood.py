@@ -5,6 +5,7 @@ def sweetpoint(a, m, k):
     Compute point of minimum variance when estimating sigmoid
     a (false alarm rate), m (midpoint of function) and k (slope)
     '''
+    print a, m, k
     return m+(k**-1)*np.log((1+(1+a*a)**0.5)/2.0)
 
 p_yes = lambda a, m, k, x: a + (1-a)*(1+np.exp(-k*(x-m)))**-1

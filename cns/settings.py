@@ -9,11 +9,6 @@ variable points to.
 import os, re, logging
 from os import path
 
-# Ensure that ETS toolkit will default to PyQt4 and use the PyQt (instead of
-# the less stable PySide backend) if we load it
-os.environ['ETS_TOOLKIT'] = 'qt4' 
-#os.environ['QT_API'] = 'pyqt'
-
 # Maximum (safe) output voltage for DACs to speaker
 MAX_SPEAKER_DAC_VOLTAGE = 7
 

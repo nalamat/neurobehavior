@@ -30,11 +30,16 @@ def set_config(setting, value):
     '''
     setattr(_settings, setting, value)
     
-def get_config(setting):
+def get_config(setting=None):
     '''
     Get value of setting
     '''
-    return getattr(_settings, setting) 
+    if setting is not None:
+        return getattr(_settings, setting) 
+    else:
+        setting_names = [s for s in dir(_settings) if s.upper() == s]
+        setting_values = [getattr(_settings, s) for s in setting_names]
+        return dict(zip(setting_names, setting_values))
 
 def get_settings():
     '''

@@ -11,7 +11,7 @@ log = logging.getLogger(__name__)
 def decimate_rms(data, downsample):
     # If data is empty, return imediately
     if data.shape[-1] == 0:
-        return [], []
+        return np.array([])
 
     # Determine the "fragment" size that we are unable to decimate.  A
     # downsampling factor of 5 means that we perform the operation in chunks of
@@ -114,6 +114,8 @@ class RMSChannelPlot(ChannelPlot):
 
         gc.begin_path()
         idx, val = points
+        log.debug('rendering idx with shape %r from %r', idx.shape, self.source)
+        log.debug('rendering val with shape %r from %r', val.shape, self.source)
         gc.lines(np.c_[idx, val])
         gc.line_to(idx[-1], self.y)
         gc.line_to(idx[0], self.y)

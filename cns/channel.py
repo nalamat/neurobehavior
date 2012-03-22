@@ -6,6 +6,12 @@
     :platform: Unix, Windows, OSX
     :synopsis: Provides containers for timeseries data
 .. moduleauthor:: Brad Buran <bburan@alum.mit.edu>
+
+The majority of these containers are backed by a HDF5 datastore (e.g. an EArray)
+for acquiring and caching data.  If you just want a temporary dataset, create a
+temporary array.  However, if you wish to have an in-memory datastore, you can
+define a MemoryMixin class (see :class:`FileMixin`) that implements a
+__getitem__ method.
 '''
 
 from enthought.traits.api import HasTraits, Property, Array, Int, Event, \
@@ -342,15 +348,12 @@ class Channel(HasTraits):
     def _to_bounds(self, start, end, reference=None):
         if start > end:
             raise ValueError("Start time must be < end time")
-
         if reference is not None:
             ref_idx = self.to_index(reference)
         else:
             ref_idx = 0
-
         lb = max(0, self.to_index(start)+ref_idx)
         ub = max(0, self.to_index(end)+ref_idx)
-
         return lb, ub
 
     def get_range(self, start, end, reference=None):
@@ -367,6 +370,7 @@ class Channel(HasTraits):
             Set to -1 to get the most recent range
         '''
         lb, ub = self._to_bounds(start, end, reference)
+        log.debug('%s: %d:%d requested', self, lb, ub)
         return self[..., lb:ub]
 
     def get_size(self):
@@ -731,48 +735,6 @@ class FileSnippetChannel(FileChannel):
 
     def get_recent_average(self, count=1, classifier=None):
         return self.get_recent(count, classifier).mean(0)
-
-'''
-class SnippetChannel(Channel):
-
-    snippet_size        = Int
-    timestamps          = Array(dtype='int32')
-    classifiers         = Array(dtype='int32')
-    unique_classifiers  = Property(Set, depends_on='classifiers')
-
-    @cached_property
-    def _get_unique_classifiers(self):
-        return np.unique(self.classifiers)
-
-    def __getitem__(self, key):
-        return self._buffer[key]
-
-    def send(self, data, timestamps, classifiers):
-	print 'recieved snippet'
-        data.shape = (-1, self.snippet_size)
-        self._buffer.append(data)
-        self.classifiers.append(classifiers)
-        self.timestamps.append(timestamps)
-        self.unique_classifiers.update(set(classifiers))
-	print 'firing update event'
-        self.added = True
-
-    def get_recent(self, history=1, classifier=None):
-        if len(self._buffer) == 0:
-            return np.array([]).reshape((-1, self.snippet_size))
-        spikes = self._buffer[-history:]
-        if classifier is not None:
-            classifiers = self.classifiers[-history:]
-            mask = classifiers[:] == classifier
-            return spikes[mask]
-        return spikes
-
-    def get_recent_average(self, count=1, classifier=None):
-        return self.get_recent(count, classifier).mean(0)
-
-    def __len__(self):
-        return len(self._buffer)
-'''
 
 if __name__ == '__main__':
     import doctest

@@ -6,9 +6,10 @@ from .evaluate import Expression
 
 class AbstractPositiveParadigm(AbstractExperimentParadigm):
     
-    kw = {'context': True, 'store': 'attribute', 'log': True}
+    kw = {'context': True, 'log': True}
 
-    auto_iti = Expression('uniform(1, 2)', label='ITI for automatic mode', **kw)
+    speaker = Expression("random_speaker(0.5)", label='Output Speaker', **kw)
+
     pump_rate = Expression(1.5, label='Pump rate (ml/min)', **kw)
     reward_volume = Expression(25, label='Reward volume (ul)', **kw)
     signal_offset_delay = Expression(0.5, label='Signal offset delay (s)', **kw)
@@ -23,9 +24,7 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm):
     mic_flp = Float(40e3, label='Microphone lowpass cutoff (Hz)', **kw)
 
     abstract_positive_paradigm_group = VGroup(
-            'auto_iti',
-            'mic_fhp',
-            'mic_flp',
+            'speaker',
             'signal_offset_delay',
             'intertrial_duration',
             'reaction_window_delay',
@@ -35,6 +34,8 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm):
             'poke_duration',
             'pump_rate',
             'reward_volume',
+            'mic_fhp',
+            'mic_flp',
             label='Paradigm',
             show_border=True,
             )

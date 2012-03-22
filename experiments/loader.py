@@ -84,16 +84,15 @@ class ExperimentLauncher(CohortViewHandler):
                 log.debug('Prior paradigm is not compatible with experiment')
     
             try:
-                ui = model.edit_traits(parent=info.ui.control, kind='livemodal',
-                        handler=controller)
-                if len(model.data.trial_log):
-                    # One very nice feature of PyTables is that it will
-                    # automatically pickle classes into strings that can be
-                    # stored as node attributes.
-                    paradigm_node._v_attrs[paradigm_hash] = model.paradigm
-                    self.last_paradigm = model.paradigm
-                    selected.processed = True
-                    log.debug('Saved paradigm for animal to the datafile')
+                model.edit_traits(parent=info.ui.control, kind='livemodal',
+                                  handler=controller)
+                # One very nice feature of PyTables is that it will
+                # automatically pickle classes into strings that can be
+                # stored as node attributes.
+                paradigm_node._v_attrs[paradigm_hash] = model.paradigm
+                self.last_paradigm = model.paradigm
+                selected.processed = True
+                log.debug('Saved paradigm for animal to the datafile')
             except AttributeError, e: 
                 log.exception(e)
             except SystemError, e:
@@ -190,7 +189,8 @@ def prepare_experiment(args, store_node):
     # Prepare the classes. This really is a lot of boilerplate to link up
     # parameters with paradigms, etc, to facilitate analysis
     paradigm = paradigm_class()
-    data = data_class(store_node=data_node)
+    data = data_class(store_node=data_node,
+                      save_microphone=args.save_microphone)
     data.parameters = args.analyze
     model = experiment_class(
             store_node=store_node, 
@@ -245,6 +245,17 @@ def profile_experiment(args):
     import pstats
     p = pstats.Stats(profile_data_file)
     p.strip_dirs().sort_stats('cumulative').print_stats(50)
+
+#def objgraph_experiment(args):
+#    profile_data_file = join(get_config('TEMP_ROOT'), 'profile.dmp')
+#    cProfile.runctx('test_experiment(args)', globals(), {'args': args},
+#                    filename=profile_data_file)
+#
+#    # Once experiment is done, print out some statistics
+#    import pstats
+#    p = pstats.Stats(profile_data_file)
+#    p.strip_dirs().sort_stats('cumulative').print_stats(50)
+
 
 def launch_experiment_selector(args):
     handler = ExperimentLauncher(args=args)

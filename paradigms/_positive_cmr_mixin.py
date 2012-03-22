@@ -5,8 +5,6 @@ from os import path
 import logging
 log = logging.getLogger(__name__)
 
-from tdt.device import RZ6
-
 class PositiveCMRParadigmMixin(HasTraits):
 
     go_filename = File(context=True, log=False, label='GO filename')

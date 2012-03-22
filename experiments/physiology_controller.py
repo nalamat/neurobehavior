@@ -1,4 +1,5 @@
-from enthought.traits.api import (Instance, Any, List, on_trait_change, Enum)
+from enthought.traits.api import (Instance, Any, List, on_trait_change, Enum,
+                                  Dict)
 
 from enthought.traits.ui.api import Controller
 from enthought.pyface.timer.api import Timer
@@ -27,6 +28,16 @@ class PhysiologyController(Controller):
     process                 = Instance('tdt.DSPProject')
     timer                   = Instance(Timer)
     parent                  = Any
+
+    shell_variables         = Dict
+
+    # These define what variables will be available in the Python shell.  Right
+    # now we can't add various stuff such as the data and interface classes
+    # because they have not been created yet.  I'm not sure how we can update
+    # the Python shell with new instances once the experiment has started
+    # running.
+    def _shell_variables_default(self):
+        return dict(controller=self, c=self)
 
     def init(self, info):
         self.setup_physiology()

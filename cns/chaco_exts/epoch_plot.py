@@ -34,27 +34,26 @@ class EpochPlot(ChannelPlot):
         if len(points) == 0:
             return
 
-        gc.save_state()
-        gc.set_antialias(True)
-        gc.clip_to_rect(self.x, self.y, self.width, self.height)
+        with gc:
+            gc.set_antialias(True)
+            gc.clip_to_rect(self.x, self.y, self.width, self.height)
 
-        gc.set_fill_color(self.marker_color_)
-        gc.set_stroke_color(self.marker_edge_color_)
-        gc.set_line_width(self.marker_edge_width) 
-        gc.set_line_join(0) # Curved
+            gc.set_fill_color(self.marker_color_)
+            gc.set_stroke_color(self.marker_edge_color_)
+            gc.set_line_width(self.marker_edge_width) 
+            gc.set_line_join(0) # Curved
 
-        starts = points[:,(0,2)]
-        ends = points[:,(1,2)]
+            starts = points[:,(0,2)]
+            ends = points[:,(1,2)]
 
-        gc.line_set(starts, ends)
-        gc.stroke_path()
-        gc.draw_marker_at_points(starts, self.marker_size,
-                self.marker_.kiva_marker)
-        gc.draw_marker_at_points(ends, self.marker_size,
-                self.marker_.kiva_marker)
+            gc.line_set(starts, ends)
+            gc.stroke_path()
+            gc.draw_marker_at_points(starts, self.marker_size,
+                    self.marker_.kiva_marker)
+            gc.draw_marker_at_points(ends, self.marker_size,
+                    self.marker_.kiva_marker)
 
-        self._draw_default_axes(gc)
-        gc.restore_state()
+            self._draw_default_axes(gc)
 
     def _data_added(self, timestamps):
         # Only fire an update if the changed data is within bounds

@@ -1,65 +1,66 @@
+'''
+..module:: paradigms.positive_cmr
+    :platform: Windows
+    :synopsis: Appetitive comodulation masking release paradigm
+
+.. moduleauthor:: Brad Buran <bburan@alum.mit.edu>
+
+'''
+
 from enthought.traits.api import Instance
-from enthought.traits.ui.api import View, Include, VSplit, VGroup, Item
-from enthought.enable.api import Component, ComponentEditor
+from enthought.traits.ui.api import View, Include, VGroup
 
-from experiments import (
-        # Controller and mixins
-        AbstractPositiveController,
-        MaximumLikelihoodControllerMixin, 
-        PumpControllerMixin,
-        TemporalIntegrationControllerMixin,
+from ._positive_dt_controller_mixin import DTControllerMixin
+from ._positive_dt_paradigm_mixin import DTParadigmMixin
 
-        # Paradigm and mixins
-        AbstractPositiveParadigm,
-        MaximumLikelihoodParadigmMixin,
-        PumpParadigmMixin,
-        TemporalIntegrationParadigmMixin,
+from experiments.abstract_positive_experiment_v2 import AbstractPositiveExperiment
+from experiments.abstract_positive_controller_v2 import AbstractPositiveController
+from experiments.abstract_positive_paradigm_v2 import AbstractPositiveParadigm
+from experiments.positive_data_v2 import PositiveData
 
-        # The experiment object
-        AbstractPositiveExperiment,
-        MaximumLikelihoodExperimentMixin,
+from experiments.ml_controller_mixin import MLControllerMixin
+from experiments.ml_paradigm_mixin import MLParadigmMixin
+from experiments.ml_experiment_mixin import MLExperimentMixin
+from experiments.ml_data_mixin import MLDataMixin
 
-        # Data
-        PositiveData,
-        MaximumLikelihoodDataMixin
-        )
+from experiments.pump_controller_mixin import PumpControllerMixin
+from experiments.pump_paradigm_mixin import PumpParadigmMixin
+from experiments.pump_data_mixin import PumpDataMixin
 
 class Controller(
+        DTControllerMixin,
         AbstractPositiveController, 
-        MaximumLikelihoodControllerMixin,
-        PumpControllerMixin,
-        TemporalIntegrationControllerMixin):
-
+        MLControllerMixin,
+        PumpControllerMixin):
     pass
 
 class Paradigm(
-        AbstractPositiveParadigm, 
-        PumpParadigmMixin,
-        MaximumLikelihoodParadigmMixin,
-        TemporalIntegrationParadigmMixin,
-        ):
+    DTParadigmMixin,
+    AbstractPositiveParadigm, 
+    PumpParadigmMixin,
+    MLParadigmMixin):
 
     traits_view = View(
+        Include('maximum_likelihood_paradigm_mixin_group'),
+        VGroup(
             Include('abstract_positive_paradigm_group'),
-            Include('maximum_likelihood_paradigm_mixin_group'),
-            Include('temporal_integration_group'),
             Include('pump_paradigm_mixin_syringe_group'),
-            )
+            label='Paradigm'
+        ),
+        VGroup(
+            Include('dt_group'),
+            Include('speaker_group'),
+            label='Sound'
+        )
+    )
 
-class Data(PositiveData, MaximumLikelihoodDataMixin):
+class Data(PositiveData, MLDataMixin, PumpDataMixin):
     pass
 
-class Experiment(AbstractPositiveExperiment, MaximumLikelihoodExperimentMixin):
+class Experiment(AbstractPositiveExperiment, MLExperimentMixin):
 
     data = Instance(Data, ())
     paradigm = Instance(Paradigm, ())
-
-    traits_view = View(
-            Include('traits_group'),
-            resizable=True,
-            height=0.9,
-            width=0.9,
-            handler=Controller)
 
 node_name = 'PositiveDTCLExperiment'
 

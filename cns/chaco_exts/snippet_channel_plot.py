@@ -70,5 +70,9 @@ class SnippetChannelPlot(BaseChannelPlot):
         self._draw_default_axes(gc)
         gc.restore_state()
 
+    def _data_changed(self, event_data):
+        self.invalidate_and_redraw()
+
     def _data_added(self, event_data):
         self.invalidate_and_redraw()
+

@@ -1,5 +1,5 @@
 import numpy as np
-from traits.api import HasTraits, Bool, Property, Any
+from traits.api import HasTraits, Bool, Any, Float
 from cns import signal as wave
 from cns import get_config
 
@@ -8,7 +8,14 @@ MAX_VRMS = get_config('MAX_SPEAKER_DAC_VOLTAGE')
 import logging
 log = logging.getLogger(__name__)
 
-class PositiveDTControllerMixin(HasTraits):
+class DTControllerMixin(HasTraits):
+
+    # Scaling factor used for the waveform.  Must call it "dt" because the
+    # superclass already defines a waveform_sf that is overwritten by the
+    # superclass trigger_next method.
+    kw = {'context': True, 'log': True, 'immediate': True}
+    dt_waveform_sf  = Float(np.nan, label='DT scaling factor', **kw)
+    dt_waveform_error = Bool(False, label='DT waveform error?', **kw)
     
     # This paradigm demonstrates how one can cache some of the computations
     # underlying the waveform generation.  Essentially we cache the "pieces" of
@@ -25,7 +32,8 @@ class PositiveDTControllerMixin(HasTraits):
     def set_expected_speaker_range(self, value):
         att1 = self.cal_primary.get_best_attenuation(value, voltage=MAX_VRMS)
         att2 = self.cal_secondary.get_best_attenuation(value, voltage=MAX_VRMS)
-        log.debug('Best attenuations are %.2f and %.2f', att1, att2)
+        log.debug('Best attenuations are %.2f and %.2f assuming a VRMS of %f',
+                att1, att2, MAX_VRMS)
         self.set_attenuations(att1, att2)
 
     #########################################################################
@@ -149,11 +157,22 @@ class PositiveDTControllerMixin(HasTraits):
         
         # Given the calibration file and hardware attenuation (which we do not
         # wish to change), compute the appropriate scaling factor for the
-        # waveform.
+        # waveform.  Although we configured the hardware attenuators assuming
+        # the maximum Vrms voltage specified in cns.settings, we have computed
+        # the waveform using a Vrms of 1 (technically it's off by sqrt(2)/2).
         fc = self.get_current_value('fc')
         level = self.get_current_value('level')
         sf = calibration.get_sf(fc, level, hw_attenuation, voltage=1, gain=0)
         log.debug('Scaling factor is %f', sf)
+        if sf > MAX_VRMS:
+            self.dt_waveform_error = True
+            mesg = 'Requested sound level too high for expected speaker ' \
+                   'range. Signal will be distorted.  '
+            self.notify(mesg)
+        else:
+            self.dt_waveform_error = False
+
+        self.dt_waveform_sf = sf
 
         # Scale the waveform and return None (because we already handle setting
         # the hardware attenuation via the self.set_expected_speaker_range

@@ -3,13 +3,13 @@ from enthought.traits.ui.api import View, Include, VGroup
 
 # The underscore indicates that these are not meant to be used directly as an
 # experiment paradigm
-from ._positive_dt_controller_mixin import PositiveDTControllerMixin
-from ._positive_dt_paradigm_mixin import PositiveDTParadigmMixin
+from ._positive_dt_controller_mixin import DTControllerMixin
+from ._positive_dt_paradigm_mixin import DTParadigmMixin
 
-from experiments.abstract_positive_experiment import AbstractPositiveExperiment
-from experiments.abstract_positive_controller import AbstractPositiveController
-from experiments.abstract_positive_paradigm import AbstractPositiveParadigm
-from experiments.positive_data import PositiveData
+from experiments.abstract_positive_experiment_v2 import AbstractPositiveExperiment
+from experiments.abstract_positive_controller_v2 import AbstractPositiveController
+from experiments.abstract_positive_paradigm_v2 import AbstractPositiveParadigm
+from experiments.positive_data_v2 import PositiveData
 
 from experiments.cl_controller_mixin import CLControllerMixin
 from experiments.cl_paradigm_mixin import CLParadigmMixin
@@ -27,7 +27,7 @@ class Controller(
         # work its way through the list of superclasses until it finds a
         # compute_waveform method.  We want to make sure that it finds the one
         # defined in PositiveDTControllerMixin first!
-        PositiveDTControllerMixin,
+        DTControllerMixin,
         AbstractPositiveController, 
         CLControllerMixin,
         PumpControllerMixin,
@@ -35,7 +35,7 @@ class Controller(
     pass
 
 class Paradigm(
-        PositiveDTParadigmMixin,
+        DTParadigmMixin,
         AbstractPositiveParadigm, 
         PumpParadigmMixin,
         CLParadigmMixin,
@@ -59,7 +59,7 @@ class Data(PositiveData, PositiveCLDataMixin, PumpDataMixin): pass
 
 class Experiment(AbstractPositiveExperiment, CLExperimentMixin):
 
-    data = Instance(Data, (), store='child')
-    paradigm = Instance(Paradigm, (), store='child')
+    data = Instance(Data, ())
+    paradigm = Instance(Paradigm, ())
 
 node_name = 'PositiveDTCLExperiment'

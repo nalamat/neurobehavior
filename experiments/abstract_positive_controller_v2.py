@@ -1,5 +1,4 @@
-from enthought.savage.traits.ui.svg_button import SVGButton
-from enthought.traits.api import Str, Property, Instance, Int, Float
+from enthought.traits.api import Instance, Int, Float
 from enthought.traits.ui.api import View, Item, HGroup, spring
 from abstract_experiment_controller import AbstractExperimentController
 from abstract_experiment_controller import ExperimentToolBar
@@ -7,7 +6,6 @@ from cns.pipeline import deinterleave_bits
 from tdt.device import RZ6
 
 from cns import get_config
-from cns.widgets import icons
 from os.path import join
 
 import numpy as np
@@ -17,11 +15,6 @@ log = logging.getLogger(__name__)
 
 class PositiveExperimentToolBar(ExperimentToolBar):
 
-    kw = dict(height=24, width=24, action=True)
-    start_auto = SVGButton('Start auto', filename=icons.resume, tooltip='Pause', **kw)
-    stop_auto = SVGButton('Stop auto', filename=icons.pause, 
-            tooltip='Resume automatic data collection', **kw)
-    
     traits_view = View(
             HGroup(
                 Item('apply',
@@ -35,11 +28,6 @@ class PositiveExperimentToolBar(ExperimentToolBar):
                      enabled_when="object.handler.state not in ['halted', 'complete']",),
                 Item('stop',
                      enabled_when="object.handler.state in ['running','paused','manual']",),
-                '_',
-                Item('start_auto',
-                     enabled_when="object.handler.state in ['running','manual']",),
-                Item('stop_auto',
-                     enabled_when="object.handler.state in ['auto','manual']"),
                 spring,
                 springy=True,
                 show_labels=False,
@@ -53,10 +41,13 @@ class AbstractPositiveController(AbstractExperimentController):
     toolbar = Instance(PositiveExperimentToolBar, (), toolbar=True)
     fs_conversion = Int
 
-    hw_att1 = Float(120, context=True, log=True, label='Out-A att', immediate=True)
-    hw_att2 = Float(120, context=True, log=True, label='Out-B att', immediate=True)
-    out_1_rms = Float(-1, context=True, log=True, label='Waveform 1 RMS', immediate=True)
-    out_2_rms = Float(-1, context=True, log=True, label='Waveform 2 RMS', immediate=True)
+    kw = {'context': True, 'log': True, 'immediate': True}
+    hw_att1 = Float(120, label='Out-A attenuation', **kw)
+    hw_att2 = Float(120, label='Out-B attenuation', **kw)
+
+    sw_att = Float(120, label='Software attenuation', **kw)
+    waveform_rms = Float(-1, label='Waveform RMS', **kw)
+    waveform_sf = Float(np.nan, label='Waveform scaling factor', **kw)
 
     def start_auto(self, info=None):
         self.state = 'auto'
@@ -66,8 +57,22 @@ class AbstractPositiveController(AbstractExperimentController):
         self.state = 'running'
         self.iface_behavior.trigger(2)
         self.iface_behavior.trigger(5)
+        
+    def set_attenuations(self, att1, att2):
+        '''
+        Set attenuators for Out-1 and Out-2 on the RZ6.  If either attenuation
+        is None, then that attenuation is not changed.  For example, to change
+        the attenuation only for Out-2:
 
-    def set_attenuations(self, att1, att2, check=True):
+        >>> self.set_attenuations(None, 60)
+
+        Note that this only sets the hardware attenuation in valid steps (e.g.
+        0, 20, 40 and 60 dB).  The remaining attenuation must be realized via
+        scaling of the waveform before it is uploaded to the signal buffer.
+
+        Returns the remaining attenuation that needs to be achieved via scaling
+        the waveform.
+        '''
         # TDT's built-in attenuators for the RZ6 function in 20 dB steps, so we
         # need to determine the next greater step size for the attenuator.  The
         # maximum hardware attenuation is 60 dB.
@@ -81,19 +86,20 @@ class AbstractPositiveController(AbstractExperimentController):
         hw2, sw2 = RZ6.split_attenuation(att2)
 
         if hw1 != self.hw_att1:
-            if check and self.get_current_value('fixed_attenuation'):
-                raise ValueError, 'Cannot change primary attenuation'
             self.hw_att1 = hw1
-            self.output_primary.hw_attenuation = hw1
             log.debug('Updated primary attenuation to %.2f', hw1)
         if hw2 != self.hw_att2:
-            if check and self.get_current_value('fixed_attenuation'):
-                raise ValueError, 'Cannot change secondary attenuation'
             self.hw_att2 = hw2
-            self.output_secondary.hw_attenuation = hw2
             log.debug('Updated secondary attenuation to %.2f', hw2)
+
+        # For efficiency reasons, we prefer to do most of the computation for
+        # the RZ6 attenuator values in software rather than hardware.
         att_bits = RZ6.atten_to_bits(att1, att2)
         self.iface_behavior.set_tag('att_bits', att_bits)
+
+        # This is the remaining
+        return sw1, sw2
+
 
     def setup_experiment(self, info):
         circuit = join(get_config('RCX_ROOT'), 'positive-behavior-v2')
@@ -125,7 +131,6 @@ class AbstractPositiveController(AbstractExperimentController):
 
         # Stored in TTL2
         self.model.data.TO_TTL.fs = self.buffer_TTL2.fs
-        self.model.data.TO_safe_TTL.fs = self.buffer_TTL2.fs
 
         # Timestamp data
         self.model.data.trial_epoch.fs = self.iface_behavior.fs
@@ -216,8 +221,6 @@ class AbstractPositiveController(AbstractExperimentController):
                     self.log_trial(
                             ts_start=np.floor(ts_start/self.fs_conversion), 
                             ts_end=np.floor(ts_end/self.fs_conversion),
-                            #primary_hw_attenuation=self.current_hw_att1,
-                            #secondary_hw_attenuation=self.current_hw_att2,
                             )
                     break
                 except ValueError, e:
@@ -256,7 +259,7 @@ class AbstractPositiveController(AbstractExperimentController):
         # We need to be sure to update the duration as well if we adjust this
         # value
         duration = self.get_current_value('reaction_window_duration')
-        self.set_reaction_window_duration(value)
+        self.set_reaction_window_duration(duration)
 
     def set_reaction_window_duration(self, value):
         delay = self.get_current_value('reaction_window_delay')
@@ -267,9 +270,6 @@ class AbstractPositiveController(AbstractExperimentController):
 
     def set_signal_offset_delay(self, value):
         self.iface_behavior.cset_tag('sig_offset_del_n', value, 's', 'n')
-
-    def set_poke_duration(self, value):
-        self.iface_behavior.cset_tag('poke_dur_n', value, 's', 'n')
 
     def get_ts(self, req_unit=None):
         return self.iface_behavior.get_tag('zTime')
@@ -349,43 +349,35 @@ class AbstractPositiveController(AbstractExperimentController):
         speaker = self.get_current_value('speaker')
         self.iface_behavior.set_tag('go?', self.is_go())
 
-        # The outputs will automatically handle scaling the waveform given
-        # the current hardware attenuation settings.
+        # The RPvds circuit has a flag indicating which speaker to send the
+        # waveform to.  0=primary, 1=secondary (i.e. Out-1 and Out-2,
+        # respectively).
         if speaker == 'primary':
+            calibration = self.cal_primary
+            hw_atten = self.hw_att1
             self.iface_behavior.set_tag('speaker', 0)
-            att1, waveform, clip, floor = self.output_primary.realize()
-            att2 = None
-            self.out_1_rms = np.mean(waveform**2)**0.5
-            self.out_2_rms = 0
         elif speaker == 'secondary':
+            calibration = self.cal_secondary
+            hw_atten = self.hw_att2
             self.iface_behavior.set_tag('speaker', 1)
-            att2, waveform, clip, floor = self.output_secondary.realize()
-            att1 = None
-            self.out_1_rms = 0
-            self.out_2_rms = np.mean(waveform**2)**0.5
 
-        clip_mesg = 'The {} output exceeds the maximum limits of the system'
-        floor_mesg = 'The {} output is below the noise floor of the system'
+        waveform, attenuation = self.compute_waveform(calibration, hw_atten)
+        if speaker == 'primary':
+            sw_att = self.set_attenuations(attenuation, None)[0]
+        elif speaker == 'secondary':
+            sw_att = self.set_attenuations(None, attenuation)[1]
 
-        message = ''
-        if clip:
-            message += clip_mesg.format(speaker)
-            mesg = '''
-            The current experiment settings will produce a distorted signal.
-            Please review your settings carefully and correct any discrepancies
-            you observe.
-            '''
-            import textwrap
-            mesg = textwrap.dedent(mesg).strip().replace('\n', ' ')
-            mesg = message + '\n\n' + mesg
-            self.handle_error(mesg)
+        # Scale by this much to achieve remaining software attenuation
+        sf = 10**(-sw_att/20.0)
 
-        # set_attenuations has a built-in safety check to ensure attenuation has
-        # not changed.  If it has, indeed, changed and fixed_attenuation is
-        # True, then an error will be raised.
-        self.set_attenuations(att1, att2)
-        self.buffer_out.set(waveform)
+        # Save some information about these that will be stored in the tria log
+        self.sw_att = sw_att
+        self.waveform_sf = sf
+        self.waveform_rms = sf*(np.mean(waveform**2)**0.5)
+
+        log.debug('Remaining software attenuation of %f dB required', sw_att)
+        log.debug('Scaling waveform by %f to compensate', sf)
+        log.debug('Uploading %d samples', len(waveform))
+
+        self.buffer_out.set(sf*waveform)
         self.iface_behavior.trigger(1)
-
-        if self.state == 'auto':
-            self.iface_behavior.trigger(3)
