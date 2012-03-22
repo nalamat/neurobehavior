@@ -2,14 +2,16 @@
 '''
 Created on Jul 20, 2010
 
-@author: Brad Buran
+..moduleauthor:: Brad Buran <bburan@alum.mit.edu>
 
 Code dependencies
 =================
 
+pytables (tables)
+    Python interface for the HDF5 library
 pandas
     Provides a R-style DataFrame object that can facilitate data analysis.
-joblib
+joblib (optional)
     Caches function results.  Used to speed up loading and aggregating data from
     the HDF5 files.
     
@@ -18,27 +20,27 @@ However, sometimes you need to manually force the cache to clear.  The function
 extract_data (which loads data from the HDF5 file) uses joblib to cache its
 results.  To clear the cache::
 
-    >>> from cns import h5
-    >>> h5.memory.clear()
+    from cns import h5
+    h5.memory.clear()
     
 Before you can understand how the code works, you need to understand a little
 about how the HDF5 data structure is represented in Python.  PyTables has a
 really nice API (application programming interface) that we can use to access
 the nodes stored in the file.  First, open a handle to the file::
 
-    >>> fh = tables.openFile('filename', 'r')
+    fh = tables.openFile('filename', 'r')
 
 The top-level node can be accessed via an attribute called root::
 
-    >>> root = fh.root
+    root = fh.root
 
 A child node can be accessed via it's name::
 
-    >>> animal = fh.root.Cohort_0.animals.Animal_0
+    animal = fh.root.Cohort_0.animals.Animal_0
 
 Alternatively, you can request the pathname::
 
-    >>> animal = fh.getNode('/Cohort_0/animals/Animal_0')
+    animal = fh.getNode('/Cohort_0/animals/Animal_0')
 
 The attributes of the animal are stored in a special node called _v_attrs.  This
 is a PyTables-specific feature, other HDF5 libraries may have different ways of
@@ -46,21 +48,15 @@ accessing the attribute.  These attributes are the same ones you see when
 selecting "show properties" from the context menu and selecting the "attributes"
 tab.  There are several ways to access the attributes::
 
-    >>> nyu_id = fh.root.Cohort_0.animals.Animal_0._v_attrs.nyu_id
+    nyu_id = fh.root.Cohort_0.animals.Animal_0._v_attrs.nyu_id
 
-    - or -
+    nyu_id = fh.root.Cohort_0.animals.Animal_0._v_attrs['nyu_id']
 
-    >>> nyu_id = fh.root.Cohort_0.animals.Animal_0._v_attrs['nyu_id']
+    animal = fh.getNode('/Cohort_0/animals/Animal_0')
+    nyu_id = animal.getAttr('nyu_id')
 
-    - or -
-
-    >>> animal = fh.getNode('/Cohort_0/animals/Animal_0')
-    >>> nyu_id = animal.getAttr('nyu_id')
-
-    - or -
-
-    >>> animal = fh.getNode('/Cohort_0/animals/Animal_0')
-    >>> nyu_id = animal._v_attrs.nyu_id
+    animal = fh.getNode('/Cohort_0/animals/Animal_0')
+    nyu_id = animal._v_attrs.nyu_id
 '''
 
 import re
@@ -140,7 +136,19 @@ def _getattr(node, xattr):
     elif xattr == '_v_parent':
         return node._v_parent
     else:
-        return node._f_getChild(xattr)
+        # Try to get the child node named xattr.  If it fails, see if the
+        # regular getattr method works (e.g. special attributes such as
+        # _v_pathname and _v_name can only be accessed via getattr).
+        try:
+            # If the node is an instance of tables.Leaf, then it will not have
+            # the _f_getChild method and raises an AttributeError.  If the node
+            # is an instance of tables.Group, then it will have the _f_getChild
+            # method and raise a tables.NoSuchNodeError (a subclass of
+            # AttributeError) if the node does not exist.  We can capture both
+            # and fall back to the getattr approach.
+            return node._f_getChild(xattr)
+        except AttributeError:
+            return getattr(node, xattr)
 
 def _rgetattr(node, xattr):
     try:
@@ -166,34 +174,34 @@ def _find_ancestor(obj, xattr):
 
 def rgetattr(node, xattr):
     '''
-    Recursive extended getattr that works with the PyTables HDF5 hierarchy
+    Recursive extended getattr that works with the PyTables HDF5 hierarchy::
 
-    ../
-        Move to the parent
-    *
-        First child node
-    /name
-        Move to the child specified by name
-    <ancestor_name
-        Find the nearest ancestor whose name matches ancestor_name
-    <+attribute
-        Find the nearest ancestor that has the specified attribute
-    +attribute
-        Get the value of the attribute
+        ../
+            Move to the parent
+        *
+            First child node
+        /name
+            Move to the child specified by name
+        <ancestor_name
+            Find the nearest ancestor whose name matches ancestor_name
+        <+attribute
+            Find the nearest ancestor that has the specified attribute
+        +attribute
+            Get the value of the attribute
 
-    _v_name
-        Name of the current node
-    ../_v_name
-        Name of the parent node
-    ../../_v_name
-        Name of the grandparent node
-    paradigm+bandwidth
-        Value of the bandwidth attribute on the child node named 'paradigm'
-    ../paradigm+bandwidth
-        Value of the bandwidth attribute on the sibling node named 'paradigm'
-        (i.e. check to see if the parent of the current node has a child node
-        named 'paradigm' and get the value of bandwidth attribute on this child
-        node).
+        _v_name
+            Name of the current node
+        ../_v_name
+            Name of the parent node
+        ../../_v_name
+            Name of the grandparent node
+        paradigm+bandwidth
+            Value of the bandwidth attribute on the child node named 'paradigm'
+        ../paradigm+bandwidth
+            Value of the bandwidth attribute on the sibling node named 'paradigm'
+            (i.e. check to see if the parent of the current node has a child node
+            named 'paradigm' and get the value of bandwidth attribute on this child
+            node).
 
     Given the following HDF5 hierarchy::
 
@@ -215,15 +223,18 @@ def rgetattr(node, xattr):
                         trial_log
                         contact_data
 
-    >>> node = root.Animal_0.Experiments.Experiment_1.data.trial_log
-    >>> xgetattr(node, '../')
-    data
-    >>> xgetattr(node, '../..')
-    Experiment_1
-    >>> xgetattr(node, '../paradigm/+bandwidth')
-    5000
-    >>> xgetattr(node, '<+nyu_id')
-    132014
+    You can expect the following behavior::
+
+        >>> node = root.Animal_0.Experiments.Experiment_1.data.trial_log
+        >>> xgetattr(node, '../')
+        data
+        >>> xgetattr(node, '../..')
+        Experiment_1
+        >>> xgetattr(node, '../paradigm/+bandwidth')
+        5000
+        >>> xgetattr(node, '<+nyu_id')
+        132014
+
     '''
     parsed_xattr = _parse_xattr(xattr)
     log.debug('Converted %s to %s for parsing', xattr, parsed_xattr)
@@ -297,7 +308,10 @@ def walk_nodes(where, filter, classname=None, wildcards=None):
     If you have ever worked with pathnames via the command line, you may
     recognize that the path separators work in an identical fashion.
 
-    Filter examples:
+    Filter examples::
+
+        ('_v_name', re.compile('[dD]data').match)
+            Matches all nodes named 'Data' or 'data'
 
         ('_v_name', re.compile('^\d+.*').match) 
             Matches all nodes whose name begins with a sequence of numbers
@@ -323,23 +337,26 @@ def walk_nodes(where, filter, classname=None, wildcards=None):
     If all of the attributes are found for the given node and the attribute
     values meet the filter criterion, the node is added to the list.
 
-    To return all nodes with the attribute klass='Animal'
-    >>> fh = tables.openFile('example_data.h5', 'r')
-    >>> filter = ('_v_attrs.klass', 'Animal')
-    >>> iterator = walk_nodes(fh.root, filter)
-    >>> animal_nodes = list(iterator)
+    To return all nodes that store animal data::
 
-    To return all nodes who have a subnode, data, with the attribute 'klass'
-    whose value is a string beginning with 'RawAversiveData'.
-    >>> fh = tables.openFile('example_data.h5', 'r')
-    >>> base_node = fh.root.Cohort_0.animals.Animal_0.experiments
-    >>> filter = ('data.klass', re.compile('RawAversiveData.*').match)
-    >>> experiment_nodes = list(walk_nodes(base_node, filter))
+        fh = tables.openFile('example_data.h5', 'r')
+        filter = ('+animal_id', lambda x: True)
+        iterator = walk_nodes(fh.root, filter)
+        animal_nodes = list(iterator)
 
-    To return all nodes whose name matches a given pattern
-    >>> fh = tables.openFile('example_data.h5', 'r')
-    >>> filter = ('_v_name', re.compile('^Animal_\d+').match)
-    >>> animal_nodes = list(walk_nodes(fh.root, filter))
+    To return all nodes who have a subnode, data, that has a name beginning with
+    'RawAversiveData'::
+
+        fh = tables.openFile('example_data.h5', 'r')
+        base_node = fh.root.Cohort_0.animals.Animal_0.experiments
+        filter = ('data._v_name', re.compile('RawAversiveData.*').match)
+        experiment_nodes = list(walk_nodes(base_node, filter))
+
+    To return all nodes whose name matches a given pattern::
+
+        fh = tables.openFile('example_data.h5', 'r')
+        filter = ('_v_name', re.compile('^Animal_\d+').match)
+        animal_nodes = list(walk_nodes(fh.root, filter))
     '''
     for node in where._f_walkNodes(classname=classname):
         if node_match(node, filter):
@@ -367,10 +384,11 @@ def p_get_node(node, pattern, dereference=True):
 
     In this example, the file only containes a single physiology experiment.
     However, the parent node is PositiveDTCL_2011_09_09_11_59_58.  You would not
-    know what the exact name of this node is without checking it first.
+    know what the exact name of this node is without checking it first::
 
-    >>> fh = tables.openFile('110909_G1_tail_behavior_raw.hd5', 'r')
-    >>> trial_log = p_load_node(fh.root, '*/data/trial_log')
+        fh = tables.openFile('110909_G1_tail_behavior_raw.hd5', 'r')
+        trial_log = p_load_node(fh.root, '*/data/trial_log')
+
     '''
     return list(p_load_nodes(node, pattern, dereference))[0]
 

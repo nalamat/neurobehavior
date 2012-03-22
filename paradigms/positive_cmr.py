@@ -345,6 +345,8 @@ class Paradigm(
     # by the training program (and therefore not in the "mixin")
     go_probability = Expression('0.5 if c_nogo < 5 else 1', 
             label='Go probability', log=False, context=True)
+
+    # Repeat the FA?
     repeat_fa = Bool(True, label='Repeat if FA?', log=True, context=True)
     nogo_filename = File(context=True, log=False, label='NOGO filename')
     go_filename = File(context=True, log=False, label='GO filename')
