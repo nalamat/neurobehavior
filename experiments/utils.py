@@ -1,5 +1,12 @@
 from enthought.pyface.api import FileDialog, OK
 import pickle
+import tables
+from os import path
+
+from cns import get_config
+
+import logging
+log = logging.getLogger(__name__)
 
 def get_save_file(path, wildcard):
     wildcard_base = wildcard.split('|')[1][1:]
@@ -25,3 +32,14 @@ def dump_instance(instance, path, wildcard):
             pickle.dump(instance, outfile)
         return True
     return False
+
+def get_temp_mic_node():
+    filename = path.join(get_config('TEMP_ROOT'), 'microphone.h5')
+    log.debug('saving microphone data to %s', filename)
+    tempfile = tables.openFile(filename, 'a')
+
+    # If the file already exists from a prior experiment, then we should
+    # remove the existing microphone node.
+    if 'microphone' in tempfile.root:
+        tempfile.root.microphone._f_remove()
+    return tempfile.root
