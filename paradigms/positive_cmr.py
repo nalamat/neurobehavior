@@ -1,8 +1,8 @@
 '''
 Appetitive comodulation masking release (continuous noise)
 ----------------------------------------------------------
-.. moduleauthor:: Brad Buran <bburan@alum.mit.edu>
 .. moduleauthor:: Antje Ihlefeld <ai33@nyu.edu>
+.. moduleauthor:: Brad Buran <bburan@alum.mit.edu>
 
 TODO: Description
 '''
@@ -183,6 +183,7 @@ class Controller(
         # attenuators are set.
         att_bits = RZ6.atten_to_bits(atten, atten)
         self.iface_behavior.set_tag('att_bits', att_bits)
+        self._update_masker_sf()
    
     def trigger_next(self):
         # This function is *required* to be called.  This basically calls the
@@ -296,7 +297,9 @@ class Controller(
             self.iface_behavior.set_tag('go?', 0)
         
         self.set_current_value('target_level', TL)
-        self.set_current_value('masker_level',ML)
+        #self.set_current_value('masker_level',ML)
+        #self.set_current_value('masker_level',ML)
+        ML = self.get_current_value('masker_level')
         self.set_current_value('TMR',TL-ML)
         self.set_current_value('target_number',TargetNo)
         #self.set_current_value('masker_number',TokenNo)
@@ -345,8 +348,6 @@ class Paradigm(
     # by the training program (and therefore not in the "mixin")
     go_probability = Expression('0.5 if c_nogo < 5 else 1', 
             label='Go probability', log=False, context=True)
-
-    # Repeat the FA?
     repeat_fa = Bool(True, label='Repeat if FA?', log=True, context=True)
     nogo_filename = File(context=True, log=False, label='NOGO filename')
     go_filename = File(context=True, log=False, label='GO filename')

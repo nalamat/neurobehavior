@@ -298,7 +298,7 @@ class AbstractAversiveController(AbstractExperimentController):
     def trial_running(self):
         return self.iface_behavior.get_tag('trial_running')
 
-    def _context_updated_fired(self):
+    def context_updated(self):
         if self.cancel_trigger():
             self.prepare_next()
             if self.state == 'running':

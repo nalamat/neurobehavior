@@ -336,7 +336,7 @@ class AbstractPositiveController(AbstractExperimentController):
     def set_mic_flp(self, value):
         self.iface_behavior.set_tag('FiltLP', value)
 
-    def _context_updated_fired(self):
+    def context_updated(self):
         if self.cancel_trigger():
             self.trigger_next()
 

@@ -212,9 +212,10 @@ def evaluate_value(parameter, expressions, context=None):
         mesg = """
         Unable to evaluate '{}' because {} or has a circular reference (either
         directly or indirectly via other variables) to '{}'.  Alternatively, you
-        may be generating an exception in the method 'set_{}'.  If this is the
-        case, the exception will have been logged somewhere in the stacktrace.
-        Check the logging output for more detail."""
+        may be generating an exception in the method 'set_{}'.  
+        
+        If this is the case, the exception will have been logged somewhere
+        deeper in the stacktrace.  Check the logging output for more detail."""
         log.exception(e)
         import textwrap
         mesg = textwrap.dedent(mesg).strip().replace('\n', ' ')

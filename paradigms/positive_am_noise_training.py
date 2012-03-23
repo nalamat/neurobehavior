@@ -33,13 +33,9 @@ class Paradigm(
 
     traits_view = View(
             VGroup(
-                Include('pump_paradigm_mixin_syringe_group'),
-                label='Paradigm',
-                ),
-            VGroup(
                 'speaker',
                 Include('signal_group'),
-                label='Sound',
+                #label='Sound',
                 ),
             )
 
