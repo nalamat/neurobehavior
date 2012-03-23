@@ -2,14 +2,13 @@ from __future__ import division
 
 from abstract_experiment_data import AbstractExperimentData
 from sdt_data_mixin import SDTDataMixin
-from enthought.traits.api import Instance, List, CFloat, Int, Float, \
-    Range, DelegatesTo, cached_property, on_trait_change, Array, Event, \
-    Property, Undefined, Callable, Str, Enum, Bool, Int, Str, Tuple, CList
-from enthought.traits.ui.api import VGroup, Item, View
+from enthought.traits.api import Instance, Float, \
+        cached_property, Array, Property, Enum, Bool, Int
 import numpy as np
 from cns.data.h5_utils import get_or_append_node
 
 from cns.channel import FileTimeseries, FileChannel, FileEpoch
+from .utils import get_temp_mic_node
 
 import logging
 log = logging.getLogger(__name__)
@@ -107,12 +106,7 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
         if self.save_microphone:
             node = self.store_node
         else:
-            from cns import get_config
-            import tables
-            from os import path
-            filename = path.join(get_config('TEMP_ROOT'), 'microphone.h5')
-            tempfile = tables.openFile(filename, 'w')
-            node = tempfile.root
+            node = get_temp_mic_node()
         return FileChannel(node=node, name='microphone', dtype=np.float32)
 
     def _poke_TTL_default(self):

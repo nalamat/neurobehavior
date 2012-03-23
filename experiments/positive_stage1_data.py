@@ -2,7 +2,8 @@ from traits.api import Instance, Bool
 from cns.channel import FileChannel
 import numpy as np
 
-from abstract_experiment_data import AbstractExperimentData
+from .abstract_experiment_data import AbstractExperimentData
+from .util import get_temp_mic_node
 
 import logging
 log = logging.getLogger(__name__)
@@ -19,13 +20,7 @@ class PositiveStage1Data(AbstractExperimentData):
         if self.save_microphone:
             node = self.store_node
         else:
-            from cns import get_config
-            import tables
-            from os import path
-            filename = path.join(get_config('TEMP_ROOT'), 'microphone.h5')
-            log.debug('saving microphone data to %s', filename)
-            tempfile = tables.openFile(filename, 'w')
-            node = tempfile.root
+            node = get_temp_mic_node()
         return FileChannel(node=node, name='microphone', dtype=np.float32)
 
     override_TTL = Instance(FileChannel)
