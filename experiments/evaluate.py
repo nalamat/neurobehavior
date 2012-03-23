@@ -1,15 +1,4 @@
-from __future__ import division
-
-import ast
-import numpy as np
-from traits.api import HasTraits
-
-import logging
-log = logging.getLogger(__name__)
-
 '''
-Available attributes for evaluating experiment parameters.
-
     random
         Numpy's random module.  Provides access to all the functions and
         distributions available within this module.
@@ -25,7 +14,14 @@ Available attributes for evaluating experiment parameters.
         Ensure value falls within bounds
     '''
 
-class EvaluationError(NameError): pass
+from __future__ import division
+
+import ast
+import numpy as np
+from traits.api import HasTraits, on_trait_change, TraitType
+
+import logging
+log = logging.getLogger(__name__)
 
 def choice(sequence):
     i = np.random.randint(0, len(sequence))
@@ -125,9 +121,9 @@ class ParameterExpression(object):
                     self._cache_valid = True
                     self._cached_value = result
             except NameError:
-                # This is the one error we will allow since it suggests the
+                # This is the one error we will allow since it may suggest the
                 # expression requires values not present in the global
-                # namespace.
+                # namespace (but we don't know that for sure ...)
                 pass
         else:
             self._dependencies = []
@@ -183,43 +179,24 @@ def evaluate_value(parameter, expressions, context=None):
     If an expression is evaluated, it is removed from the stack of expressions
     and added to the context.
     '''
-    try:
-        if context is None:
-            context = {}
+    if context is None:
+        context = {}
 
-        if parameter in context:
-            del expressions[parameter]
-            return context
-
-        expression = expressions[parameter]
+    if parameter in context:
         del expressions[parameter]
-
-        if isinstance(expression, ParameterExpression):
-            for d in expression._dependencies:
-                if d in expressions:
-                    evaluate_value(d, expressions, context)
-            context[parameter] = expression.evaluate(context)
-        else:
-            context[parameter] = expression
         return context
-    except EvaluationError, e:
-        # Add an empty catch block here because EvaluationError is a subclass of
-        # NameError and we only want to catch explicit instances of NameError so
-        # we can convert them to EvaluationErrors.
-        raise
-    except NameError, e:
-        # Catch NameErrors and convert them to EvaluationErrors
-        mesg = """
-        Unable to evaluate '{}' because {} or has a circular reference (either
-        directly or indirectly via other variables) to '{}'.  Alternatively, you
-        may be generating an exception in the method 'set_{}'.  
-        
-        If this is the case, the exception will have been logged somewhere
-        deeper in the stacktrace.  Check the logging output for more detail."""
-        log.exception(e)
-        import textwrap
-        mesg = textwrap.dedent(mesg).strip().replace('\n', ' ')
-        raise EvaluationError, mesg.format(parameter, e, parameter, parameter)
+
+    expression = expressions[parameter]
+    del expressions[parameter]
+
+    if isinstance(expression, ParameterExpression):
+        for d in expression._dependencies:
+            if d in expressions:
+                evaluate_value(d, expressions, context)
+        context[parameter] = expression.evaluate(context)
+    else:
+        context[parameter] = expression
+    return context
 
 def evaluate_expressions(expressions, current_context):
     '''
@@ -228,8 +205,6 @@ def evaluate_expressions(expressions, current_context):
     while expressions:
         name = expressions.keys()[0]
         evaluate_value(name, expressions, current_context)
-
-from enthought.traits.api import TraitType
 
 class Expression(TraitType):
 
@@ -300,7 +275,6 @@ class TestExpressions(unittest.TestCase):
         obj = TestTraits()
         obj.a = 'a+5'
 
-from enthought.traits.api import HasTraits, on_trait_change
 
 class TestTraits(HasTraits):
      
