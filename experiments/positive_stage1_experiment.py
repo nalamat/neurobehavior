@@ -1,6 +1,6 @@
 from enthought.traits.api import Instance, Any
 from enthought.traits.ui.api import (View, HSplit, VGroup, Item, Tabbed,
-                                     ShellEditor)
+                                     ShellEditor, Include)
 
 from enthought.enable.api import Component, ComponentEditor
 from enthought.chaco.api import DataRange1D, LinearMapper, \
@@ -109,7 +109,11 @@ class PositiveStage1Experiment(AbstractExperiment):
                     label='Pump Status',
                     show_border=True,
                     ),
-                Item('paradigm', style='custom'),
+                Tabbed(
+                    Item('paradigm', style='custom'),
+                    Include('context_group'),
+                    show_labels=False,
+                ),
                 show_labels=False,
                 ),
             Tabbed(

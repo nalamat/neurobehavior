@@ -18,10 +18,7 @@ from ._positive_cmr_mixin import PositiveCMRControllerMixin
 from experiments.positive_stage1_data import PositiveStage1Data
 from experiments.positive_stage1_controller import PositiveStage1Controller
 from experiments.positive_stage1_experiment import PositiveStage1Experiment
-from experiments.abstract_experiment_paradigm import AbstractExperimentParadigm
-
-from ._positive_am_noise_controller_mixin import PositiveAMNoiseControllerMixin
-from ._positive_am_noise_paradigm_mixin import PositiveAMNoiseParadigmMixin
+from experiments.positive_stage1_paradigm import PositiveStage1Paradigm
 
 from experiments.pump_controller_mixin import PumpControllerMixin
 from experiments.pump_paradigm_mixin import PumpParadigmMixin
@@ -29,7 +26,6 @@ from experiments.pump_data_mixin import PumpDataMixin
 
 
 from cns import get_config
-from time import time
 
 import logging
 log = logging.getLogger(__name__)
@@ -81,7 +77,7 @@ class Controller(
         # get_current_value('masker_filename') should cause the
         # set_masker_filename() method to be called right away.
         self.invalidate_context()
-        masker_filename = self.get_current_value('masker_filename')
+        self.get_current_value('masker_filename')
         super(Controller, self).start_experiment(info)
     
     # This gets called when someone presses the "cycle" button (or,
@@ -94,18 +90,32 @@ class Controller(
         log.debug('Cycle button pressed')
         self.update_signal()
 
-    def set_hw_att(self, atten):
+    def set_hw_att(self, hw_atten):
         # Update the hardware attenuators.  Set att_B to 120 since we only use
         # the primary output by default.
         speaker = self.get_current_value('speaker')
         if speaker == 'primary':
-            self.iface_behavior.set_tag('att_A', atten)
+            self.iface_behavior.set_tag('att_A', hw_atten)
             self.iface_behavior.set_tag('att_B', 120)
         else:
             self.iface_behavior.set_tag('att_A', 120)
-            self.iface_behavior.set_tag('att_B', atten)
+            self.iface_behavior.set_tag('att_B', hw_atten)
+
+        log.debug('Updated hardware attenuators')
+
+        # The masker scaling factor depends on the hardware attenuation value,
+        # so we need to be sure to configure that as well.
+        self._update_masker_sf()
         
-    def update_signal(self):
+    def update_waveform(self):
+        # Force a recomputation of all variables by clearing the cached values
+        self.invalidate_context()
+
+        # Now, do the actual recomputation of all variables, calling
+        # set_variable_name as needed.
+        self.evaluate_pending_expressions()
+
+        # Now, upload the waveform.
         log.debug('uploading new target to the RPvds circuit')
 
         hw_att = self.get_current_value('hw_att')
@@ -133,24 +143,22 @@ class Controller(
         self.buffer_target.set(target)
     
         self.set_current_value('target_level', TL)
-        self.set_current_value('masker_level',ML)
+        #self.set_current_value('masker_level',ML)
+        ML = self.get_current_value('masker_level')
         self.set_current_value('TMR',TL-ML)
         self.set_current_value('target_number',TargetNo)
         self.set_current_value('center_frequency',FC)
 
 class Paradigm(
         PositiveCMRParadigmMixin,
-        AbstractExperimentParadigm, 
+        PositiveStage1Paradigm, 
         PumpParadigmMixin,
         ):
 
     traits_view = View(
             VGroup(
-                Include('pump_paradigm_mixin_syringe_group'),
-                label='Paradigm',
-                ),
-            VGroup(
                 Include('signal_group'),
+                'speaker',
                 'hw_att',
                 'go_filename',
                 'masker_filename',
@@ -159,11 +167,11 @@ class Paradigm(
                 ),
             )
 
-class Data(PositiveStage1Data): pass
+class Data(PositiveStage1Data, PumpDataMixin): pass
 
 class Experiment(PositiveStage1Experiment):
 
-    data = Instance(Data, (), store='child')
-    paradigm = Instance(Paradigm, (), store='child')
+    data = Instance(Data, ())
+    paradigm = Instance(Paradigm, ())
 
 node_name = 'CMRTraining'

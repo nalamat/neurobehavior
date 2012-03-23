@@ -136,7 +136,7 @@ class AbstractExperimentData(HasTraits):
             fh.createTable(self.store_node, 'trial_log', self.trial_log)
         else:
             log.debug('No trials in the trial_log file!')
-        if len(self.par_info):
+        if hasattr(self, 'par_info') and len(self.par_info):
             fh.createTable(self.store_node, 'par_info', self.par_info)
         else:
             log.debug('No par_info')

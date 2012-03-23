@@ -358,7 +358,12 @@ class AbstractPositiveController(AbstractExperimentController):
     def set_mic_flp(self, value):
         self.iface_behavior.set_tag('FiltLP', value)
 
-    def _context_updated_fired(self):
+    def context_updated(self):
+        '''
+        Check to see if it's possible to cancel the next trial.  If so,
+        recompute the waveform and trial settings based on the new values
+        provided by the user.  If not, just wait until after the trial is over.
+        '''
         if self.cancel_trigger():
             self.trigger_next()
 

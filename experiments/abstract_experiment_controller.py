@@ -611,9 +611,6 @@ class AbstractExperimentController(Controller):
     # determine if a value has changed)
     old_context = Dict
 
-    # Context has changed
-    context_updated = Event
-
     # List of name, value, label tuples (used for displaying in the GUI)
     current_context_list = List
 
@@ -652,10 +649,13 @@ class AbstractExperimentController(Controller):
         self.pending_expressions = self.shadow_paradigm.trait_get(context=True)
 
     def apply(self, info=None):
+        '''
+        This method is called when the apply button is pressed
+        '''
         log.debug('Applying requested changes')
         try:
             # First, we do a quick check to ensure the validity of the
-            # expressiosn the user entered by evaluating them.  If the
+            # expressions the user entered by evaluating them.  If the
             # evaluation passes, we will make the assumption that the
             # expressiosn are valid as entered.  However, this will *not* catch
             # all edge cases or situations where actually applying the change
@@ -665,11 +665,17 @@ class AbstractExperimentController(Controller):
             evaluate_expressions(pending_expressions, current_context)
 
             # If we've made it this far, then let's go ahead and copy the
-            # changes over.  We'll apply them as well if a trial is not
-            # currently running.
+            # changes over to our shadow_paradigm.  We'll apply the requested
+            # changes immediately if a trial is not currently running.
             self.shadow_paradigm.copy_traits(self.model.paradigm)
             self.pending_changes = False
-            self.context_updated = True
+
+            # Subclasses need to define this function (e.g.
+            # abstract_positive_controller and abstract_aversive_controller)
+            # because only those subclases know when it's safe to apply the
+            # changes (e.g. the positive paradigms will check to make sure that
+            # a trial is not running before applying the changes).
+            self.context_updated()
         except Exception, e:
             # A problem occured when attempting to apply the context. 
             # the changes and notify the user.  Hopefully we never reach this
@@ -683,6 +689,13 @@ class AbstractExperimentController(Controller):
             mesg = textwrap.dedent(mesg).strip().replace('\n', ' ')
             mesg += '\n\nError message: ' + str(e)
             error(info.ui.control, message=mesg, title='Error applying changes')
+
+    def context_updated(self):
+        '''
+        This can be overriden in subclasses to implement logic for updating the
+        experiment when the apply button is pressed
+        '''
+        pass
 
     def revert(self, info=None):
         '''

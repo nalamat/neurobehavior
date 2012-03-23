@@ -2,11 +2,55 @@ from os.path import join
 from cns import get_config
 from cns.pipeline import deinterleave_bits
 from abstract_experiment_controller import AbstractExperimentController
-from enthought.traits.api import Any
+from abstract_experiment_controller import ExperimentToolBar
+from enthought.traits.api import Any, Instance
+
+from enthought.savage.traits.ui.svg_button import SVGButton
+
+from traitsui.api import Item, View, HGroup, spring
+from cns.widgets.icons import icons
+
+class PositiveStage1ToolBar(ExperimentToolBar):
+
+    size    = 24, 24
+    kw      = dict(height=size[0], width=size[1], action=True)
+
+    manual = SVGButton('Manual', filename=icons['pause'],
+                        tooltip='Manual control', **kw)
+
+    automatic  = SVGButton('Automatic', filename=icons['resume'],
+                           tooltip='Auto mode', **kw)
+    
+    item_kw = dict(show_label=False)
+    traits_view = View(
+            HGroup(Item('apply',
+                        enabled_when="object.handler.pending_changes"),
+                   Item('revert',
+                        enabled_when="object.handler.pending_changes",),
+                   Item('start',
+                        enabled_when="object.handler.state=='halted'",),
+                   '_',
+                   Item('manual', 
+                        enabled_when="object.handler.state=='running'",
+                        **item_kw),
+                   Item('automatic',
+                        enabled_when="object.handler.state=='paused'",
+                        **item_kw),
+                   Item('stop',
+                        enabled_when="object.handler.state in " +\
+                                     "['running', 'paused', 'manual']",),
+                   spring,
+                   springy=True,
+                   show_labels=False,
+                   ),
+            kind='subpanel',
+            )
 
 class PositiveStage1Controller(AbstractExperimentController):
 
     pipeline_TTL = Any
+
+    toolbar = Instance(PositiveStage1ToolBar, (), toolbar=True)
 
     def setup_experiment(self, info):
         circuit = join(get_config('RCX_ROOT'), 'positive-behavior-stage1')
@@ -39,16 +83,16 @@ class PositiveStage1Controller(AbstractExperimentController):
         self.evaluate_pending_expressions()
         self.update_waveform()
         self.iface_behavior.start()
-        self.pause()
+        self.manual()
         self.process.trigger('A', 'high')
         self.tasks.append((self.monitor_pump, 5))
         self.tasks.append((self.monitor_behavior, 1))
 
-    def resume(self, info=None):
+    def automatic(self, info=None):
         self.iface_behavior.set_tag('free_run?', 1)
         self.state = 'running'
 
-    def pause(self, info=None):
+    def manual(self, info=None):
         self.iface_behavior.set_tag('free_run?', 0)
         self.state = 'paused'
 
@@ -67,7 +111,7 @@ class PositiveStage1Controller(AbstractExperimentController):
         else:
             return "Subject controlled"
 
-    def _context_updated_fired(self):
+    def context_updated(self):
         self.update_waveform()
 
     def update_waveform(self):
@@ -89,3 +133,4 @@ class PositiveStage1Controller(AbstractExperimentController):
         else:
             self.iface_behavior.set_tag('att_A', 120)
             self.iface_behavior.set_tag('att_B', attenuation)
+

@@ -1,6 +1,7 @@
-from traits.api import HasTraits, File, Int, Enum, Any, List
+from traits.api import HasTraits, File, Int, Enum, Any, List, Float
 import numpy as np
 from os import path
+import time
 
 import logging
 log = logging.getLogger(__name__)
@@ -30,7 +31,10 @@ class PositiveCMRControllerMixin(HasTraits):
     masker_memmap = Any
     masker_index = Any
 
-    current_masker_sf = Any
+    # Update the value stored in current_context immediately rather than having
+    # the user hit the "apply" button.
+    current_masker_sf = Float(0, context=True, log=True, immediate=True,
+                              label='Masker scaling factor')
 
     def set_masker_filename(self, filename):
         if not path.exists(filename):
@@ -42,7 +46,19 @@ class PositiveCMRControllerMixin(HasTraits):
         self.update_masker()
 
     def set_masker_level(self, level):
-        dBSPL_RMS1 = calibration.get_spl(frequencies=1e3, voltage=1)
+        self._update_masker_sf()
+
+    def _update_masker_sf(self):
+        speaker = self.get_current_value('speaker')
+        if speaker == 'primary':
+            calibration = self.cal_primary
+        else:
+            calibration = self.cal_secondary
+
+        hw_att = self.get_current_value('hw_att')
+        level = self.get_current_value('masker_level')
+
+        dBSPL_RMS1 = calibration.get_spl(frequencies=1e3, voltage=1)-hw_att
         old_sf = self.current_masker_sf
         new_sf = 10.0**((level-dBSPL_RMS1)/20.0)
         self.current_masker_sf = new_sf
@@ -53,7 +69,7 @@ class PositiveCMRControllerMixin(HasTraits):
         # is.  There are blogs online about this, but this is fine for now.
         log.debug('ramping masker sf from %f to %f', old_sf, new_sf)
         tick = time.time()
-        for sf in ramp:
+        for sf in ramp_sf:
             # We are relying on the fact that the method below will take ~21.4
             # usec to execute.  This means that the ramp will be ~1ms.  This is
             # not guaranteed though.
