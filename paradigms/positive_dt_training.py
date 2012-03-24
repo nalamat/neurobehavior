@@ -4,10 +4,10 @@ from enthought.traits.ui.api import View, Include, VGroup
 from experiments.positive_stage1_data import PositiveStage1Data
 from experiments.positive_stage1_controller import PositiveStage1Controller
 from experiments.positive_stage1_experiment import PositiveStage1Experiment
-from experiments.abstract_experiment_paradigm import AbstractExperimentParadigm
+from experiments.positive_stage1_paradigm import PositiveStage1Paradigm
 
-from ._positive_dt_controller_mixin import PositiveDTControllerMixin
-from ._positive_dt_paradigm_mixin import PositiveDTParadigmMixin
+from ._positive_dt_controller_mixin import DTControllerMixin
+from ._positive_dt_paradigm_mixin import DTParadigmMixin
 
 from experiments.pump_controller_mixin import PumpControllerMixin
 from experiments.pump_paradigm_mixin import PumpParadigmMixin
@@ -16,7 +16,7 @@ from experiments.pump_data_mixin import PumpDataMixin
 class Controller(
         PositiveStage1Controller,
         PumpControllerMixin,
-        PositiveDTControllerMixin):
+        DTControllerMixin):
 
     # Override the set_duration method in TemporalIntegrationControllerMixin
     # which is primarily targeted towards the main appetitive program
@@ -29,19 +29,15 @@ class Controller(
         self._recompute_envelope()
 
 class Paradigm(
-        AbstractExperimentParadigm, 
         PumpParadigmMixin,
-        PositiveDTParadigmMixin,
+        DTParadigmMixin,
+        PositiveStage1Paradigm,
         ):
 
     traits_view = View(
             VGroup(
-                Include('pump_paradigm_mixin_syringe_group'),
-                label='Paradigm',
-                ),
-            VGroup(
-                Include('temporal_integration_group'),
-                label='Sound',
+                'speaker',
+                Include('dt_group'),
                 ),
             )
 

@@ -256,7 +256,7 @@ class Controller(
         F, E, FC, ML, TL, TokenNo, TargetNo = settings
         
         #masker_file = r'E:\programs\ANTJE CMR\CMR\stimuli\M{}{}{}{}.stim'.format(int(F), int(E), int(FC), int(TokenNo))
-        target_file = r'E:\programs\ANTJE CMR\CMR\stimuli\T{}{}.stim'.format(int(FC), int(TargetNo))
+        target_file = r'C:\Experimental_Software\sounds\CMR\stimuli\T{}{}.stim'.format(int(FC), int(TargetNo))
         
         #masker = np.fromfile(masker_file, dtype=np.float32)
         target = np.fromfile(target_file, dtype=np.float32)

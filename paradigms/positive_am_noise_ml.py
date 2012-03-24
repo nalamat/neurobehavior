@@ -11,7 +11,7 @@ To minimize onset transients, the modulation onset can be delayed.
 '''
 
 from traits.api import Instance
-from traits.ui.api import View, InMLude, VGroup, Include
+from traitsui.api import View, Include, VGroup, Include
 
 from ._positive_am_noise_paradigm_mixin import PositiveAMNoiseParadigmMixin
 from ._positive_am_noise_controller_mixin import PositiveAMNoiseControllerMixin
@@ -52,8 +52,8 @@ class Paradigm(
             label='Paradigm'
         ),
         VGroup(
-            InMLude('speaker_group'),
-            InMLude('signal_group'),
+            Include('speaker_group'),
+            Include('signal_group'),
             label='Sound',
             ),
         )

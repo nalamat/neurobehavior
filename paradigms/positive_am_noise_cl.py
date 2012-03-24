@@ -9,8 +9,8 @@ To minimize onset transients, the modulation onset can be delayed (expand on
 this). 
 '''
 
-from enthought.traits.api import Instance
-from enthought.traits.ui.api import View, Include, VGroup
+from traits.api import Instance
+from traitsui.api import View, Include, VGroup
 
 from ._positive_am_noise_paradigm_mixin import PositiveAMNoiseParadigmMixin
 from ._positive_am_noise_controller_mixin import PositiveAMNoiseControllerMixin
