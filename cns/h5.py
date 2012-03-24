@@ -544,6 +544,8 @@ def extract_data(input_files, filters, fields=None, summary=None,
     classname : { 'Table' }
         Only 'Table' is supported for now
 
+    mode : {'walk': 'pattern'}
+
     Typical HDF5 file structure
     ---------------------------
     Cohort_{number}

@@ -1,6 +1,68 @@
 Python scripts and applications
 ===============================
 
+Running experiments
+-------------------
+
+Edit cohort (edit_cohort.py)
+............................
+
+Create a cohort file for running behavior experiments.  Editing the file
+manually or via edit_cohort.py after it has been created is *not recommended*.
+
+Load experiment (load_experiment.py)
+....................................
+
+For information on how to use this script, pass the -h flag to the command::
+
+    c:\\> load_experiment.py -h
+
+Which will give you the following message::
+
+    usage: load_experiment.py [-h] [-r ROVE [ROVE ...]] [-a ANALYZE [ANALYZE ...]]
+                              [--repeats] [--debug]
+                              [-p | --memory | -t | -i | -f FILE] [-n]
+                              [--address ADDRESS] [--save-microphone]
+                              [--cal CAL CAL | --att] [--equalized]
+                              [--modify-path]
+                              type
+
+    Launch experiment
+
+    positional arguments:
+      type                  The type of experiment to launch
+
+    optional arguments:
+      -h, --help            show this help message and exit
+      -r ROVE [ROVE ...], --rove ROVE [ROVE ...]
+                            Parameter(s) to rove
+      -a ANALYZE [ANALYZE ...], --analyze ANALYZE [ANALYZE ...]
+                            Parameter(s) to analyze
+      --repeats             Specify number of repeats for each trial setting
+      --debug               Prevents some exceptions from being silenced
+      -p, --profile         Profile experiment
+      --memory              Graph memory usage
+      -t, --test            Test experiment
+      -i, --inspect         Print available parameters
+      -f FILE, --file FILE  File to save data to
+      -n, --neural          Acquire neurophysiology
+      --address ADDRESS     TDT RPC server address (in the format hostname:port).
+                            For example, localhost:3333 or
+                            regina.cns.nyu.edu:3333.
+      --save-microphone     Save microphone data?
+      --cal CAL CAL         Calibration files to use for primary and secondary
+                            speaker
+      --att                 Treat signal level as an attenuation value
+      --equalized           Use equalized calibration?
+      --modify-path         Although virtualenv is recommended as the best tool
+                            for managing stable and developmental verisons of
+                            Neurobehavior on a single computer, programmers coming
+                            from Matlab tend to prefer the approach of creating a
+                            copy of the program to a new folder each time and
+                            having the program update the system path based on its
+                            current directory. This option is not throughly
+                            tested. Use at your own risk.
+
 .. note::
 
     Some of the analysis operations designed to work with the raw physiology
@@ -20,14 +82,11 @@ Python scripts and applications
     experiment, use the truncate waveform and zero waveform options in the
     review physiology program.
 
-Edit cohort (edit_cohort.py)
-----------------------------
-
-Create a cohort file for running behavior experiments.  Editing the file
-manually or via edit_cohort.py after it has been created is *not recommended*.
+Analyzing data
+--------------
 
 Create missing timeseries data (create_missing_time_data.py)
-------------------------------------------------------------
+............................................................
 
 The earliest appetitive physiology experiments (up until ~ the first week of
 September, 2011) contain only TTL data sampled at a low resolution.  The
@@ -40,17 +99,17 @@ the all_spout_epoch array as well) as it checks first to see if the epoch or
 timestamp data is missing before adding it.
 
 Compute RMS (compute_rms.py or launch via review GUI)
-----------------------------
+.....................................................
 
 TODO.  Saves to <source_filename>_rms.hd5 by default.
 
 Decimate physiology (decimate.py)
----------------------------------
+.................................
 
 TODO.  Saves to <source_filename>_dec.hd5 by default.
 
 Process batchfile (process_batchfile.py)
-----------------------------------------
+........................................
 
 Extract spikes (no command-line program -- must be launched via the
 review_physiology.py GUI or queued and run using process_batchfile.py).
@@ -58,7 +117,7 @@ review_physiology.py GUI or queued and run using process_batchfile.py).
 TODO.  Saves to <source_filename>_extracted.hd5 by default.
 
 Review Physiology (review_physiology.py)
-----------------------------------------
+........................................
 
 Supports files with multiple physiology experiments (even though the recommended
 approach is to have a single experiment per file).  This allows you to curate
@@ -119,7 +178,7 @@ The following actions can be performed:
 
     compute noise floor
         Computes the noise floor using a 16 second chunk (this can be overridden
-        by the cns.setting variable `NOISE_DURATION`)
+        by the :module:`cns.setting` variable `NOISE_DURATION`)
     zero waveform
         Zeros out the physiology data before the lower bound of the visible
         screen

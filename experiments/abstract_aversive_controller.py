@@ -273,12 +273,12 @@ class AbstractAversiveController(AbstractExperimentController):
          When set to manual high, use the lower scale to read the meter.
         
          * iface_shock is a reference to the tdt.DSPCircuit that communicates
-         with the RZ5 (i.e. the shock-controller.rcx circuit when running
-         behavior only or the physiology.rcx circuit when running both phys and
-         behavior)
+           with the RZ5 (i.e. the shock-controller.rcx circuit when running
+           behavior only or the physiology.rcx circuit when running both phys
+           and behavior)
          * iface_behavior is a reference to the tdt.DSPCircuit that
-         communicates with the RZ6 (i.e. the aversive-behavior.rcx or one of the
-         modified versions such as the aversive-behavior-fmam.rcx)
+           communicates with the RZ6 (i.e. the aversive-behavior.rcx or one of
+           the modified versions such as the aversive-behavior-fmam.rcx)
          
          We need to disable the shock trigger when shock_level is set to 0
          because the shocker still generates a small current at this level.

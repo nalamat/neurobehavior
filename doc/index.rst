@@ -1,8 +1,13 @@
+Neurobehavior User's Guide
+=================
+Neurophysiology experiments in behaving subjects
+------------------------------------------------
 
-Welcome to NeuroBehavior's documentation!
-=========================================
+:Author: **Brad Buran**
+:Contributors: Gardiner von Trapp, Antje Ihelfeld
 
-Contents:
+Contents
+--------
 
 .. toctree::
    :maxdepth: 2
@@ -12,9 +17,10 @@ Contents:
    matlab.rst
    paradigms.rst
    h5_api.rst
+   calibration_api.rst
 
 Indices and tables
-==================
+------------------
 
 * :ref:`genindex`
 * :ref:`modindex`

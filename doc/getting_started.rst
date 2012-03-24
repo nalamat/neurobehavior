@@ -8,8 +8,8 @@ All the standard Python approaches to getting set up will work.  However, I
 recommend you install this as local copy that you can edit if you wish to create
 new paradigms (e.g. add the root neurobehavior folder to the PYTHONPATH
 environment variable).  Right now there is a hard-coded limitation (controlled
-by the function experiments.loader.get_experiment) that requires all experiment
-paradigms to be inside the paradigms package.  
+by :func:`experiments.loader.get_experiment`) that requires all experiment
+paradigms to be inside the :mod:`paradigms` package.  
 
 The approach I recommend is to use Python's pip tool.  First, let's make sure
 that it's installed (PythonXY and Enthought's Python Distribution do not come
@@ -37,7 +37,28 @@ control system and pip requires the Hg binary to checkout a copy of TDTPy::
 
 Now, install a local (editable) copy of Neurobehavior::
 
-    $ pip install -e hg+http://bitbucket.org/bburan/tdtpy#egg=tdt
+    $ pip install -e hg+http://bitbucket.org/bburan/neurobehavior#egg=neurobehavior
+
+Setting up for experiments
+--------------------------
+
+If you plan to run the code in the experiments or paradigms module, it is
+recommended you set up a place on your hard disk to store the relevant files.
+The suggested folder structure is below::
+
+    data/
+    settings/
+        paradigm/
+        physiology/
+    calibration/
+    temp/
+    logs/
+
+Once you've set up this folder, create an environment variable,
+NEUROBEHAVIOR_BASE, that points to the folder containing the data, settings,
+calibration, temp and logs folder, e.g.::
+
+    setx NEUROBEHAVIOR_SETTINGS d:\\>
 
 Overriding defaults defined in cns.settings
 -------------------------------------------
@@ -67,3 +88,24 @@ command shell as an administrator to do so)::
     Antje pointed out that naming it settings.py might be confusing so it's best
     to use a different name.
 
+Example local_settings.py file to override the default syringe, calibration
+file, and colors used in the experiments::
+
+    CAL_PRIMARY = 'd:\\calibration\\110911_Vifa_Tweeter_1.cal'
+    SYRINGE_DEFAULT = 'B-D 20cc (plastic)'
+
+    # Those colors Brad chose for the trial log table are plain ugly.  Let's use
+    # better colors.  Colors must be specified as RGB tuples.
+    EXPERIMENT_COLORS  = {
+        'GO_REMIND':    (0.32, 0.13, 0.45),
+        'GO':           (0.11, 0.11, 0.11),
+        'NOGO_REPEAT':  (0.32, 0.32, 0),
+        'NOGO':         (1, 0, 1),
+        }
+
+.. note::
+
+    You cannot import the cns module in your local_settings.py file because the
+    import of cns will trigger a circular import (when importing cns, the module
+    will attempt to import the local settings file so it can read the values
+    stored in it).

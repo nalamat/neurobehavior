@@ -128,7 +128,6 @@ SYRINGE_DATA = {
         'B-D 10cc (glass)'      : 14.20,
         }
 
-
 # By convention, settings are in all caps.  Print these to the log file to
 # facilitate debugging other users' programs.
 log = logging.getLogger()

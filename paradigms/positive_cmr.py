@@ -5,6 +5,12 @@ Appetitive comodulation masking release (continuous noise)
 .. moduleauthor:: Brad Buran <bburan@alum.mit.edu>
 
 TODO: Description
+
+.. autoclass:: paradigms.positive_cmr.Paradigm
+    :inherited-members:
+    :members:
+    :undoc-members:
+
 '''
 
 from __future__ import division
@@ -343,12 +349,13 @@ class Paradigm(
     Defines the parameters required by the experiment (e.g. duration of various
     events, frequency of the stimulus, which speaker is active, etc.).
     '''
-    
+
     # Parameters specific to the actual appetitive paradigm that are not needed
     # by the training program (and therefore not in the "mixin")
     go_probability = Expression('0.5 if c_nogo < 5 else 1', 
             label='Go probability', log=False, context=True)
     repeat_fa = Bool(True, label='Repeat if FA?', log=True, context=True)
+
     nogo_filename = File(context=True, log=False, label='NOGO filename')
     go_filename = File(context=True, log=False, label='GO filename')
     
