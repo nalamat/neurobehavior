@@ -1,9 +1,8 @@
 Matlab functions
 ================
 
-.. warn::
-
-    Sorry guys.  You'll just have to read the in-line function documentation 
+**Sorry guys.  You'll just have to read the in-line function documentation since
+Sphinx doesn't have native support for Matlab files.**
 
 If you have both Chronux and UltraMegaSort2000 on your Matlab path, be sure to
 remove the spikesort folder (and all subfolders) in Chronux from the path
@@ -12,3 +11,4 @@ UltraMegaSort2000.  Alternatively, if you wish to use Chronux for spike sorting,
 you should remove UltraMegaSort2000 from the Matlab path.
 
 Aren't namespaces a great idea?
+

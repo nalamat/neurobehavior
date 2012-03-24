@@ -120,6 +120,7 @@ class ParameterExpression(object):
                     # just in case the globals function returns a random value).
                     self._cache_valid = True
                     self._cached_value = result
+
             except NameError:
                 # This is the one error we will allow since it may suggest the
                 # expression requires values not present in the global

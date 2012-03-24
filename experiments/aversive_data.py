@@ -56,16 +56,6 @@ class AversiveData(AbstractExperimentData, AversiveAnalysisMixin):
     spout_epoch     = Instance(FileEpoch)
     reaction_ts     = Instance(FileTimeseries)
 
-    '''
-    During the addition of an optical sensor, changes were made to how the
-    AversiveData object stores the contact data.  We acquired data from both
-    sensors: a "touch" (for electrical) and "optical" channel.  These were
-    stored under touch_digital and optical_digital, respectively.  However, old
-    AversiveData objects continue to use contact_digital.  During the
-    transition, I forgot to ensure that some of the new AversiveData (V2)
-    objects implemented a contact_digital alias.
-    '''
-
     def log_trial(self, **kwargs):
         kwargs['start'] = kwargs['ts_start']/self.contact_digital.fs
         kwargs['end'] = kwargs['ts_end']/self.contact_digital.fs

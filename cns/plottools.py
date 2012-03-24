@@ -66,6 +66,8 @@ class AxesIterator(object):
         If True, share the x-axis between axes
     sharey
         If True, share the y-axis between axes
+    adjust_spines
+        If True, adjust spines using Brad's preferred axes style
 
     sharex and sharey are attributes that can be modified at any time during
     iteration to change the sharing behavior.
@@ -100,16 +102,18 @@ class AxesIterator(object):
             kw['sharey'] = self.current_axes
         self.current_axes = pylab.subplot(self.n_rows, self.n_cols, self.i,
                                           **kw)
-        #firstcol = (self.i % self.n_cols) == 1
-        #lastrow = self.i > (self.n_cols*(self.n_rows-1))
-        #if firstcol and lastrow:
-        #    adjust_spines(self.current_axes, ('bottom', 'left'))
-        #elif firstcol:
-        #    adjust_spines(self.current_axes, ('left'))
-        #elif lastrow:
-        #    adjust_spines(self.current_axes, ('bottom'))
-        #else:
-        #    adjust_spines(self.current_axes, ())
+
+        if adjust_spines:
+            firstcol = (self.i % self.n_cols) == 1
+            lastrow = self.i > (self.n_cols*(self.n_rows-1))
+            if firstcol and lastrow:
+                adjust_spines(self.current_axes, ('bottom', 'left'))
+            elif firstcol:
+                adjust_spines(self.current_axes, ('left'))
+            elif lastrow:
+                adjust_spines(self.current_axes, ('bottom'))
+            else:
+                adjust_spines(self.current_axes, ())
         return self.current_axes, g
     
 def figure_generator(max_groups):
