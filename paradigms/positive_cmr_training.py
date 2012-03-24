@@ -126,7 +126,7 @@ class Controller(
         # Eventually you'll probably want to move these to cns.settings that way
         # you can override it on a per-computer basis via the local-settings.py
         # file that's referenced by NEUROBEHAVIOR_SETTINGS
-        target_directory = r'E:\programs\ANTJE CMR\CMR\stimuli'
+        target_directory = r'C:\Experimental_Software\sounds\CMR\stimuli'
         target_filename = 'T{}{}.stim'.format(int(FC), int(TargetNo))
         target_file = path.join(target_directory, target_filename)
         target = np.fromfile(target_file, dtype=np.float32)

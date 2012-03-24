@@ -3,7 +3,7 @@ from cns.channel import FileChannel
 import numpy as np
 
 from .abstract_experiment_data import AbstractExperimentData
-from .util import get_temp_mic_node
+from .utils import get_temp_mic_node
 
 import logging
 log = logging.getLogger(__name__)

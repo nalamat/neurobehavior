@@ -8,7 +8,7 @@ import numpy as np
 from cns.data.h5_utils import get_or_append_node
 
 from cns.channel import FileTimeseries, FileChannel, FileEpoch
-from .util import get_temp_mic_node
+from .utils import get_temp_mic_node
 
 import logging
 log = logging.getLogger(__name__)

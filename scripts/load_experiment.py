@@ -43,7 +43,7 @@ def configure_logging(filename):
                     'class': 'logging.FileHandler',
                     'formatter': 'time',
                     'filename': filename,
-                    'level': 'WARNING',
+                    'level': 'DEBUG',
                     }
                 },
             # This is where you would change the logging level of specific modules.
@@ -163,7 +163,12 @@ if __name__ == '__main__':
     parser.add_argument('--modify-path', action='store_true',
             dest='modify_path', default=False, help=LIB_ROOT_HELP)
 
+    #parser.add_argument('--rebase', type=str, default=None)
+
     args = parser.parse_args()
+
+    #if args.rebase is not None:
+    #    os.environ['NEUROBEHAVIOR_BASE'] = path.abspath(args.rebase)
 
     #if args.debug:
     if True:
@@ -213,7 +218,12 @@ if __name__ == '__main__':
         mesg = mesg.format(log_root, log_filename, log_root)
         warnings.warn(textwrap.dedent(mesg).replace('\n', ''))
 
+
     configure_logging(log_filename)
+
+    ###############################################################################
+    # Everything after this point will get stored to the log file
+    ###############################################################################
 
     try:
 

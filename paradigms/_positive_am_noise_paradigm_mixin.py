@@ -3,7 +3,7 @@ from traitsui.api import VGroup
 from experiments.evaluate import Expression
 
 class PositiveAMNoiseParadigmMixin(HasTraits):
-    kw = {'context': True, 'store': 'attribute', 'log': True}
+    kw = {'context': True, 'log': True}
 
     # SAM envelope properties
     modulation_onset = Expression('0.3', label='Modulation onset (s)', **kw)
