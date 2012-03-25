@@ -13,6 +13,28 @@
 
 import sys, os
 
+MOCK_MODULES = ('numpy', 'tables', 'traits.api', 'traitsui.api', 'pyface.api',
+                'enable.api', 'pyface.timer.api', 'pandas', 'tdt', 'tdt.device')
+
+class Mock(object):
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def __call__(self, *args, **kwargs):
+        return Mock()
+
+    @classmethod
+    def __getattr__(self, name):
+        if name in ('__file__', '__path__'):
+            return '/dev/null'
+        elif name[0] == name[0].upper():
+            return type(name, (), {})
+        else:
+            return Mock()
+
+for mock in  MOCK_MODULES:
+    sys.modules[mock] = Mock()
+
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
