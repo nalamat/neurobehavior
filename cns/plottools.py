@@ -68,20 +68,27 @@ class AxesIterator(object):
         If True, share the y-axis between axes
     adjust_spines
         If True, adjust spines using Brad's preferred axes style
+    max_groups
+        Maximum number of axes per figure. A new figure will be generated each
+        time the axes reaches the maximum.  If set to infinity, all axes will be
+        squeezed onto a single figure (even if there's a million of them).
 
     sharex and sharey are attributes that can be modified at any time during
     iteration to change the sharing behavior.
     '''
 
-    def __init__(self, groups, extra=0, sharex=True, sharey=True):
+    def __init__(self, groups, extra=0, sharex=True, sharey=True,
+                 max_groups=np.inf):
         self.sharex = sharex
         self.sharey = sharey
         self.groups = groups
         self.group_iter = iter(groups)
-        self.n_groups = len(self.groups) + extra
+        self.max_groups = max_groups
+        self.n_groups = min(len(self.groups)+extra, self.max_groups)
         self.n_rows, self.n_cols = best_rowscols(self.n_groups)
         self.i = 0
         self.current_axes = None
+        self.figures = []
 
     def __iter__(self):
         return self
@@ -93,15 +100,20 @@ class AxesIterator(object):
         # make sure we have not reached the end of the sequence before adding
         # the new plot to the graph.
         g = self.group_iter.next()
-        self.i += 1
+
+        if self.i == 0:
+            self.current_figure = pylab.figure()
+            self.figures.append(self.current_figure)
+        self.i = (self.i + 1) % self.max_groups
 
         kw = {}
         if self.sharex:
             kw['sharex'] = self.current_axes
         if self.sharey:
             kw['sharey'] = self.current_axes
-        self.current_axes = pylab.subplot(self.n_rows, self.n_cols, self.i,
-                                          **kw)
+        ax = self.current_figure.add_subplot(self.n_rows, self.n_cols, self.i,
+                                             **kw)
+        self.current_axes = ax
 
         if adjust_spines:
             firstcol = (self.i % self.n_cols) == 1
