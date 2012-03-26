@@ -409,7 +409,7 @@ class AbstractExperimentController(Controller):
             # Always attempt to save the data, no matter what happens!
             node = info.object.experiment_node
             time = datetime.now()
-            node._v_attrs['stop_time'] = time.strftime('%Y-%m-%d %H:%M%S')
+            node._v_attrs['stop_time'] = time.strftime(DATETIME_FMT)
             node._v_attrs['duration'] = (time-self.start_time).seconds
             info.object.data.save()
             
