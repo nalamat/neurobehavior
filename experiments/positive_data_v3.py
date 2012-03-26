@@ -71,6 +71,9 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
     mask_num = Int(25)
     masked_trial_log = Property(depends_on='mask_+, trial_log')
 
+    # This is affected by the mask_mode and mask_num settings and cna be used to
+    # adjust the subset of the trial_log that is analyzed in the on-line
+    # experiment.
     def _get_masked_trial_log(self):
         if self.mask_mode == 'none':
             return self.trial_log
