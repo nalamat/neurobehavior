@@ -136,6 +136,12 @@ class PositiveAMNoiseControllerMixin(HasTraits):
         # Compute the filtered waveform using the cached noise waveform.  Note
         # that we do this caching because computing filter coefficients can be a
         # CPU-intensive process (not to mention the actual filtering).
+
+        # Note that if you start to rove the seed, then you may want to
+        # implement additional enhancements to the caching strategy since you
+        # don't need to recompute the filter coefficients, just filter the new
+        # noise token (computing filter coefficients is the most time-consuming
+        # part of the waveform computation). 
         if not self._filtered_noise_token_valid:
             log.debug('recomputing filtered noise token')
             # Get the current values of the parameters
@@ -156,6 +162,11 @@ class PositiveAMNoiseControllerMixin(HasTraits):
 
             # Filter and cache the token
             token = signal.filtfilt(b, a, noise_token)
+
+            # TODO: LOOK AT THIS!  This renormalizes the noise token after being
+            # filtered.  It would also make sense to scale up the waveform to
+            # MAX_VRMS (e.g. MAX_VRMS = get_config('MAX_SPEAKER_DAC_VOLTAGE'))
+            token = token/np.mean(token**2)**0.5
             self._filtered_noise_token = token
             self._filtered_noise_token_valid = True
 
@@ -173,9 +184,9 @@ class PositiveAMNoiseControllerMixin(HasTraits):
             t = self._get_time()
 
             if delay == 0: 
-                eq_phase = wave.sam_eq_phase(depth, direction)
-            else:
                 eq_phase = -np.pi
+            else:
+                eq_phase = wave.sam_eq_phase(depth, direction)
 
             envelope = depth/2*np.cos(2*np.pi*fm*t+eq_phase)+1-depth/2
 
@@ -240,6 +251,20 @@ class PositiveAMNoiseControllerMixin(HasTraits):
         sam_envelope = self._get_sam_envelope()
         cos_envelope = self._get_cos_envelope()
 
+        # Note that the parent class (AbstractPositiveController.trigger_next)
+        # will handle splitting the attenuation into a hardware portion (e.g.
+        # steps of 0, 20, 40, 60) and software portion.  The waveform will then
+        # be scaled to achieve the software portion before getting uploaded to
+        # the DSP buffer.  If you wanted to handle the logic of setting the
+        # hardware attenuation and scaling the waveform appropriately, you can
+        # do so in this function and return a value of None for the waveform
+        # attenuation.  If trigger_next() recieves a value of None, then it will
+        # not touch the hardware attenuation or scale the waveform.
+        #
+        # Very important!  You should use the method
+        # self.set_attenuations(primary, secondary) to set the hardware
+        # attenuators since the attenuation approach may depend on the circuit
+        # (e.g. some circuits use the AudioOut macro, some don't).  
         return token*sam_envelope*cos_envelope, attenuation
 
     def set_duration(self, value):
