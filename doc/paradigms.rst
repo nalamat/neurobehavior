@@ -116,36 +116,40 @@ How the expressions work
 
 To compute the value only once per trial, you would do the following steps::
 
-    paradigm.poke_duration = 'uniform(0.2, 0.4)'
-    print controller.get_current_value('poke_duration')
-    print controller.get_current_value('poke_duration')
-    controller.invalidate_current_context()
-    print controller.get_current_value('poke_duration')
+    >>> paradigm.poke_duration = 'uniform(0.2, 0.4)'
+    >>> print controller.get_current_value('poke_duration')
+    0.321
+    >>> print controller.get_current_value('poke_duration')
+    0.321
+    >>> controller.refresh_context()
+    >>> print controller.get_current_value('poke_duration')
+    0.462
 
 Both the aversive and appetitive controllers invalidate the cache after each
 trial, forcing a recomputation of all expressions::
 
-    paradigm.poke_duration = 0.5
-    controller.invalidate_context()
-    print controller.get_current_value('poke_duration')
+    >>> paradigm.poke_duration = 0.5
+    >>> controller.refresh_context()
+    >>> print controller.get_current_value('poke_duration')
+    0.743
 
 Why is the poke_duration still set to a random value?  Remember that you must
 apply any changes you make to the paradigm before they are reflected in the
 actual experiment itself.  When you apply a change, the context cache is
 invalidated, so there is no need to call invalidate_current_context as well::
 
-    controller.apply()
-    controller.get_current_value('poke_duration')
+    >>> controller.apply()
+    >>> controller.get_current_value('poke_duration')
+    0.5
 
 Before you start the next trial, you must ensure that all remaining expressions
 on the stack get evaluated as well::
 
     controller.evaluate_pending_expressions()
 
-This is handled by the function _apply_context_changes defined in the
-AbstractExperimentController.  The function gets called whenever the items in
-the current_context dictionary change (e.g. either items get added, removed or
-changed). 
+This is handled by :func:`AbstractExperimentController._apply_context_changes`.
+The function gets called whenever the items in current_context change (e.g.
+either items get added, removed or changed). 
 
 When you call :func:`AbstractExperimentcontroller.invalidate_context`, this sets
 current_context to an empty dictionary (e.g. the values are no longer valid
@@ -200,6 +204,39 @@ Known bugs with the experiment paradigms
 
 Available Paradigms
 ===================
+
+The framework that these paradigms are built on allow the user to::
+
+    * Rove almost any of the variables specified in the paradigm
+
+    * Rove multiple variables
+
+    * Specify expressions for most of the variables.  These expressions can use
+      the value of other variables.
+
+    * Change the value of any variable during an experiment.
+
+This allows you to create a single paradigm that can handle a variety of tasks
+quite easily.  For example, the `positive_dt_cl` paradigm is being used to ask
+several questions::
+
+    * By roving `level` for 50 trials at a time before switching to a new tone
+      duration, one can explore the subject's temporal integration window.
+
+    * In roving `duration` and `level`, a certain duration and level pair can be
+      made more frequent.
+
+    * By modifying the `go_probability` expression on a session-by-session
+      basis, one can ask whether the frequency of go trials influences the
+      subject's criterion.
+
+Before you start to write a new experiment, you should ask whether one of the
+existing experiments will serve your needs.  It may be as simple as roving
+certain parameters in lockstep or using an expression for a certain value.
+
+It may be as simple as adding a new variable to the experiment.  If this new
+variable can be added while maintaining backwards-compatibility, you can modify
+the existing experiment.  Otherwise, simply make a copy of the relevant files.
 
 .. automodule:: paradigms
     :members:

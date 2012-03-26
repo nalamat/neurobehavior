@@ -226,9 +226,11 @@ def rgetattr(node, xattr):
     You can expect the following behavior::
 
         >>> node = root.Animal_0.Experiments.Experiment_1.data.trial_log
-        >>> xgetattr(node, '../')
+        >>> xgetattr(node, '../_v_name')
         data
-        >>> xgetattr(node, '../..')
+        >>> xgetattr(node, '..')._v_name
+        data
+        >>> xgetattr(node, '../..')._v_name
         Experiment_1
         >>> xgetattr(node, '../paradigm/+bandwidth')
         5000
@@ -289,7 +291,7 @@ def walk_nodes(where, filter, classname=None, wildcards=None):
     Attributes may be specified relative to the nodes of interest using the '/'
     POSIX-style path separator.
 
-    Attribute examples:
+    Attribute examples::
 
         _v_name
             Name of the current node
@@ -319,13 +321,13 @@ def walk_nodes(where, filter, classname=None, wildcards=None):
         ('_v_name', 'par_info')
             Matches all nodes whose name is exactly 'par_info'
 
-        ('..start_time', lambda x: (strptime(x).date()-date.today()).days <= 7)
+        ('../../+start_time', lambda x: (strptime(x).date()-date.today()).days <= 7)
             Matches all nodes whose grandparent (two levels up) contains an
             attribute, start_time, that evaluates to a date that is within the
             last week.  Useful for restricting your analysis to data collected
             recently.
 
-    Valuable node attributes:
+    Useful node attributes::
 
         _v_name
             Name of the node
@@ -337,12 +339,22 @@ def walk_nodes(where, filter, classname=None, wildcards=None):
     If all of the attributes are found for the given node and the attribute
     values meet the filter criterion, the node is added to the list.
 
-    To return all nodes that store animal data::
+    To return all nodes that store animal data (note that the iterator approach
+    is standard Python-fu)::
 
         fh = tables.openFile('example_data.h5', 'r')
         filter = ('+animal_id', lambda x: True)
         iterator = walk_nodes(fh.root, filter)
         animal_nodes = list(iterator)
+
+    If you want to walk over the results one at a time, the above can be
+    rewritten::
+
+        fh = tables.openFile('example_data.h5', 'r')
+        filter = ('+animal_id', lambda x: True)
+        for animal_node in walk_nodes(fh.root, filter):
+            # Do something with the node, e.g.:
+            process_node(animal_node)
 
     To return all nodes who have a subnode, data, that has a name beginning with
     'RawAversiveData'::

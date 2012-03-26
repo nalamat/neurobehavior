@@ -1,15 +1,26 @@
 '''
 Appetitive comodulation masking release (continuous noise)
 ----------------------------------------------------------
-.. moduleauthor:: Antje Ihlefeld <ai33@nyu.edu>
-.. moduleauthor:: Brad Buran <bburan@alum.mit.edu>
+:Author: **Brad Buran <bburan@alum.mit.edu>**
+:Author: **Antje Ihlefeld <ai33@nyu.edu>**
+:Method: Constant limits go-nogo
+:Status: Alpha.  Currently under development and testing.
 
-TODO: Description
+    param1 : unit
+        description
+    param2 : unit
+        description
 
-.. autoclass:: paradigms.positive_cmr.Paradigm
-    :inherited-members:
-    :members:
-    :undoc-members:
+This paradigm differs slightly from positive_dt_cl and positive_am_noise_cl in
+several key respects::
+
+    * The sequence of go/nogo tokens are defined by a csv (comma separated
+      values)
+
+    * The target is added to a continuous masker
+
+    * Both the target and masker waveforms are pre-computed using a Matlab
+      script and saved to a float32 binary file.
 
 '''
 
@@ -26,7 +37,6 @@ from cns import get_config
 from cns.pipeline import deinterleave_bits
 
 from tdt.device import RZ6
-
 from time import time
 
 # These mixins are shared with the positive_cmr_training paradigm.  I use the

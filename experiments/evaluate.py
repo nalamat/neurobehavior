@@ -276,7 +276,6 @@ class TestExpressions(unittest.TestCase):
         obj = TestTraits()
         obj.a = 'a+5'
 
-
 class TestTraits(HasTraits):
      
     a = Expression('a+4', context=True)
