@@ -78,7 +78,7 @@ class AxesIterator(object):
     '''
 
     def __init__(self, groups, extra=0, sharex=True, sharey=True,
-                 max_groups=np.inf):
+                 max_groups=np.inf, adjust_spines=False):
         self.sharex = sharex
         self.sharey = sharey
         self.groups = groups
@@ -89,6 +89,7 @@ class AxesIterator(object):
         self.i = 0
         self.current_axes = None
         self.figures = []
+        self.adjust_spines = adjust_spines
 
     def __iter__(self):
         return self
@@ -115,7 +116,7 @@ class AxesIterator(object):
                                              **kw)
         self.current_axes = ax
 
-        if adjust_spines:
+        if self.adjust_spines:
             firstcol = (self.i % self.n_cols) == 1
             lastrow = self.i > (self.n_cols*(self.n_rows-1))
             if firstcol and lastrow:
