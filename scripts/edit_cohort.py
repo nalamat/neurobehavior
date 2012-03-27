@@ -1,4 +1,3 @@
-#from cns import settings
 from experiments.cohort import Cohort
 
 if __name__ == '__main__':
