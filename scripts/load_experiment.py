@@ -160,9 +160,6 @@ if __name__ == '__main__':
     parser.add_argument('--equalized', action='store_true',
             help='Use equalized calibration?', default=False)
 
-    parser.add_argument('--modify-path', action='store_true',
-            dest='modify_path', default=False, help=LIB_ROOT_HELP)
-
     #parser.add_argument('--rebase', type=str, default=None)
 
     args = parser.parse_args()
@@ -179,24 +176,6 @@ if __name__ == '__main__':
         from enthought.traits.api import push_exception_handler
         push_exception_handler(reraise_exceptions=True)
 
-    if args.modify_path:
-        from os.path import join, dirname, abspath, normpath
-        from glob import glob
-        search_string = join(dirname(__file__), '../../*/setup.py')
-        for module_path in glob(search_string):
-            module_path = normpath(abspath(dirname(module_path)))
-            sys.path.insert(0, module_path)
-            print "Added {} to the Python path".format(module_path)
-
-    # DEFER ALL NEUROBEHAVIOR SPECIFIC IMPORTS UNTIL AFTER THIS POINT!  The
-    # above block modifies the Python path for people who are actively
-    # developing Neurobehavior but do not wish to modify the system path (for
-    # whatever reason).
-
-    # Since we may be modifying the path to point to a development version of
-    # neurobehavior rather than the default that is installed (via the
-    # --modify-path command line flag), we need to wait to import the experiment
-    # loader as well as cns until the path has been updated.
     from experiments import loader
     from cns import get_config
 
@@ -217,7 +196,6 @@ if __name__ == '__main__':
         to the appropriate log file directory.'''
         mesg = mesg.format(log_root, log_filename, log_root)
         warnings.warn(textwrap.dedent(mesg).replace('\n', ''))
-
 
     configure_logging(log_filename)
 
