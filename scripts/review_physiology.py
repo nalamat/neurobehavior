@@ -34,7 +34,7 @@ from cns import get_config
 from cns.channel import ProcessedFileMultiChannel, FileChannel, \
         FileMultiChannel, FileEpoch, FileTimeseries
 
-from ..cns.chaco_exts.helpers import add_default_grids, add_time_axis
+from cns.chaco_exts.helpers import add_default_grids, add_time_axis
 from cns.chaco_exts.channel_data_range import ChannelDataRange
 from cns.chaco_exts.extremes_multi_channel_plot import ExtremesMultiChannelPlot
 from cns.chaco_exts.multi_channel_plot import MultiChannelPlot
