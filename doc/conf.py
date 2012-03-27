@@ -14,7 +14,8 @@
 import sys, os
 
 MOCK_MODULES = ('numpy', 'tables', 'traits.api', 'traitsui.api', 'pyface.api',
-                'enable.api', 'pyface.timer.api', 'pandas', 'tdt', 'tdt.device')
+                'enable.api', 'pyface.timer.api', 'pandas', 'tdt', 'tdt.device',
+                'experiments.evaluate')
 
 class Mock(object):
     def __init__(self, *args, **kwargs):
@@ -32,8 +33,8 @@ class Mock(object):
         else:
             return Mock()
 
-for mock in  MOCK_MODULES:
-    sys.modules[mock] = Mock()
+#for mock in  MOCK_MODULES:
+#    sys.modules[mock] = Mock()
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
