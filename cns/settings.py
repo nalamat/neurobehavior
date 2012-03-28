@@ -50,6 +50,7 @@ CAL_ROOT        = path.join(BASE_DIRECTORY, 'calibration') # calibration files
 SETTINGS_ROOT   = path.join(BASE_DIRECTORY, 'settings')
 PARADIGM_ROOT   = path.join(SETTINGS_ROOT, 'paradigm')
 PHYSIOLOGY_ROOT = path.join(SETTINGS_ROOT, 'physiology')
+SOUND_PATH      = path.join(BASE_DIRECTORY, 'sound_files') # sound data
 
 # Default filename extensions used by the FileBrowser dialog to open/save files.
 COHORT_WILDCARD     = 'Cohort files (*.cohort.hd5)|*.cohort.hd5|'
