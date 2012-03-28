@@ -1,6 +1,39 @@
 Experiment paradigms
 ====================
 
+The framework that these paradigms are built on allow the user to::
+
+    * Rove almost any of the variables specified in the paradigm
+
+    * Rove multiple variables
+
+    * Specify expressions for most of the variables.  These expressions can use
+      the value of other variables.
+
+    * Change the value of any variable during an experiment.
+
+This allows you to create a single paradigm that can handle a variety of tasks
+quite easily.  For example, the `positive_dt_cl` paradigm is being used to ask
+several questions::
+
+    * By roving `level` for 50 trials at a time before switching to a new tone
+      duration, one can explore the subject's temporal integration window.
+
+    * In roving `duration` and `level`, a certain duration and level pair can be
+      made more frequent.
+
+    * By modifying the `go_probability` expression on a session-by-session
+      basis, one can ask whether the frequency of go trials influences the
+      subject's criterion.
+
+Before you start to write a new experiment, you should ask whether one of the
+existing experiments will serve your needs.  It may be as simple as roving
+certain parameters in lockstep or using an expression for a certain value.
+
+It may be as simple as adding a new variable to the experiment.  If this new
+variable can be added while maintaining backwards-compatibility, you can modify
+the existing experiment.  Otherwise, simply make a copy of the relevant files.
+
 Defining an experiment
 ----------------------
 
@@ -178,6 +211,17 @@ The apply/revert handler
 
 TODO
 
+Available Paradigms
+===================
+
+.. automodule:: paradigms.positive_cmr
+
+.. automodule:: paradigms.positive_am_noise_cl
+
+.. automodule:: paradigms.positive_dt_cl
+
+.. automodule:: paradigms.positive_dt_ml
+
 Known bugs with the experiment paradigms
 ========================================
 
@@ -201,48 +245,4 @@ Known bugs with the experiment paradigms
   PhysiologySettings objects.  This module is a bit finicky (if you rename your
   experiment paradigms, etc, this may break the ability to load your saved
   settings.
-
-Available Paradigms
-===================
-
-The framework that these paradigms are built on allow the user to::
-
-    * Rove almost any of the variables specified in the paradigm
-
-    * Rove multiple variables
-
-    * Specify expressions for most of the variables.  These expressions can use
-      the value of other variables.
-
-    * Change the value of any variable during an experiment.
-
-This allows you to create a single paradigm that can handle a variety of tasks
-quite easily.  For example, the `positive_dt_cl` paradigm is being used to ask
-several questions::
-
-    * By roving `level` for 50 trials at a time before switching to a new tone
-      duration, one can explore the subject's temporal integration window.
-
-    * In roving `duration` and `level`, a certain duration and level pair can be
-      made more frequent.
-
-    * By modifying the `go_probability` expression on a session-by-session
-      basis, one can ask whether the frequency of go trials influences the
-      subject's criterion.
-
-Before you start to write a new experiment, you should ask whether one of the
-existing experiments will serve your needs.  It may be as simple as roving
-certain parameters in lockstep or using an expression for a certain value.
-
-It may be as simple as adding a new variable to the experiment.  If this new
-variable can be added while maintaining backwards-compatibility, you can modify
-the existing experiment.  Otherwise, simply make a copy of the relevant files.
-
-.. automodule:: paradigms
-    :members:
-
-.. automodule:: paradigms.positive_cmr
-
-.. automodule:: paradigms.positive_am_noise_cl
-    :members:
 
