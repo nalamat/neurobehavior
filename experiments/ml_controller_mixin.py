@@ -1,7 +1,7 @@
 from functools import partial
 import numpy as np
 from enthought.traits.api import HasTraits, Bool
-from .maximum_likelihood import MaximumLikelihood, p_yes
+from .maximum_likelihood import MaximumLikelihood
 from .trial_setting import TrialSetting
 
 def percent_correct(a, m, k, p):
@@ -59,6 +59,7 @@ class MLControllerMixin(HasTraits):
 
         # A reminder request overrides all other options here
         if self.remind_requested:
+            self.remind_requested = False
             setting = self.get_current_value('remind_setting')
             return TrialSetting('GO_REMIND', setting)
 
