@@ -75,6 +75,13 @@ class Controller(
     random_generator = Any
     random_seed = Int
 
+    # To save a variable in a trial log column that is computed by your code on each trial.  Immediate tells the underlying code that the change to the value applies to the *current* trial not the next trial.
+    # - context means to monitor the variable
+    # -- immediate means that the change applies to the current trial (plus it bypasses the apply/revert button)
+    # -- log means to save it as a column in the trial log
+    # immedate and log are meaningless by themselves
+    #some_trial_variable = Int(log=True, immediate=True, context=True)
+
     def setup_experiment(self, info):
         circuit = path.join(get_config('RCX_ROOT'), 'positive-behavior-contmask-v4')
         self.iface_behavior = self.process.load_circuit(circuit, 'RZ6')
@@ -272,7 +279,11 @@ class Controller(
         F, E, FC, ML, TL, TokenNo, TargetNo = settings
         
         #masker_file = r'E:\programs\ANTJE CMR\CMR\stimuli\M{}{}{}{}.stim'.format(int(F), int(E), int(FC), int(TokenNo))
-        target_file = r'C:\Experimental_Software\sounds\CMR\stimuli\T{}{}.stim'.format(int(FC), int(TargetNo))
+
+        target_file = path.join(get_config('SOUND_PATH'), 'CMR\stimuli\T{}{}.stim')
+        target_file = target_file.format(int(FC), int(TargetNo))
+        #target_file = r'e:\Experimental_Software\sounds\CMR\stimuli\T{}{}.stim'.format(int(FC), int(TargetNo))
+
         
         #masker = np.fromfile(masker_file, dtype=np.float32)
         target = np.fromfile(target_file, dtype=np.float32)
@@ -281,6 +292,7 @@ class Controller(
         # you are playing a tone at the specified frequency and voltage (i.e.
         # Vrms)
         dBSPL_RMS1 = cal.get_spl(frequencies=1e3, voltage=1)
+        #self.some_trial_variable = dBSPL_RMS1
 
         # Scale waveforms so that we get desired stimulus level assuming 0 dB of
         # attenuation
