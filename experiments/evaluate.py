@@ -58,28 +58,28 @@ def toss(x=0.5):
     '''
     return np.random.uniform() <= x
 
-def get_dependencies(string):
-    '''
-    Parse a Python expression to determine what names are required to evaluate
-    it.  Useful for determining dependencies.
-
-    >>> get_dependencies('x+1')
-    ('x',)
-
-    >>> get_dependencies('32**0.5')
-    ()
-
-    >>> get_dependencies('sqrt(x)+y')
-    ('sqrt', 'x', 'y')
-
-    >>> get_dependencies('range(x)+numpy.random()')
-    ('numpy', 'range', 'x')
-
-    '''
-    tree = ast.parse(string)
-    result = [node.id for node in ast.walk(tree) if isinstance(node, ast.Name)]
-    result.sort()
-    return tuple(result)
+#def get_dependencies(string):
+#    '''
+#    Parse a Python expression to determine what names are required to evaluate
+#    it.  Useful for determining dependencies.
+#
+#    >>> get_dependencies('x+1')
+#    ('x',)
+#
+#    >>> get_dependencies('32**0.5')
+#    ()
+#
+#    >>> get_dependencies('sqrt(x)+y')
+#    ('sqrt', 'x', 'y')
+#
+#    >>> get_dependencies('range(x)+numpy.random()')
+#    ('numpy', 'range', 'x')
+#
+#    '''
+#    tree = ast.parse(string)
+#    result = [node.id for node in ast.walk(tree) if isinstance(node, ast.Name)]
+#    result.sort()
+#    return tuple(result)
 
 class ParameterExpression(object):
 
@@ -100,7 +100,8 @@ class ParameterExpression(object):
         if isinstance(value, basestring):
             self._expression = value
             self._code = compile(self._expression, '<string>', 'eval')
-            self._dependencies = get_dependencies(self._expression)
+            #self._dependencies = get_dependencies(self._expression)
+            self._dependencies = self._code.co_names
             self._cache_valid = False
             self._cached_value = None
 
