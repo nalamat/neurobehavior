@@ -1,8 +1,9 @@
 '''
 Appetitive comodulation masking release (continuous noise)
 ----------------------------------------------------------
-:Author: **Brad Buran <bburan@alum.mit.edu>**
-:Author: **Antje Ihlefeld <ai33@nyu.edu>**
+:Authors: **Brad Buran <bburan@alum.mit.edu>**
+          **Antje Ihlefeld <ai33@nyu.edu>**
+
 :Method: Constant limits go-nogo
 :Status: Alpha.  Currently under development and testing.
 
@@ -11,17 +12,25 @@ Appetitive comodulation masking release (continuous noise)
     param2 : unit
         description
 
-This paradigm differs slightly from positive_dt_cl and positive_am_noise_cl in
-several key respects::
+Although this is a constant limits go-nogo paradigm, there are several key
+differences between this paradigm and `positive_dt_cl` and
+`positive_am_noise_cl`::
 
-    * The sequence of go/nogo tokens are defined by a csv (comma separated
-      values)
+    * The sequence of go/nogo tokens are read in from a csv (comma separated
+    values) file (specified by `go_filename` and `nogo_filename`).
 
-    * The target is added to a continuous masker
+    * The target is added to a continuous masker (masker is specified by
+    `masker_filename` which must contain float32 values stored as binary).
 
-    * Both the target and masker waveforms are pre-computed using a Matlab
-      script and saved to a float32 binary file.
+    * Both the target and masker waveforms are pregenerated using a script
+    and saved to a file in float32 binary format.  The correct file to read for
+    the target is determined by data stored in the `go_filename` and
+    `nogo_filename` CSV files.
 
+Due to the nature of how the target and masker are generated and combined, the
+experimenter must determine the appropriate hardware attenuation.  There is a
+field under the paradigm tab in the GUI that allows the hardware attenuation to
+be set to the appropriate step (e.g. 0, 20, 40 or 60 dB).
 '''
 
 from __future__ import division

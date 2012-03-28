@@ -1,9 +1,22 @@
 '''
-..module:: paradigms.positive_cmr
-    :platform: Windows
-    :synopsis: Appetitive comodulation masking release paradigm
+Appetitive temporal integration (maximum likelihood method)
+-----------------------------------------------------------
+:Author: Brad Buran <bburan@alum.mit.edu>
+:Method: Adaptive go-nogo (using maximum likelihood)
+:Status: Beta.  Has been tested and used on human primates; however, this needs
+to be tested on nonhuman subjects to determine efficacy.
 
-.. moduleauthor:: Brad Buran <bburan@alum.mit.edu>
+Available parameters
+....................
+fc : Hz
+    Center frequency (Hz).  Will be coerced to the nearest frequency for
+    which calibration data is available.  Assumes that the frequency of
+level : db SPL
+    Level of tone
+duration : seconds
+    Duration of tone (from ramp onset to ramp offset)
+rise_fall_time : seconds 
+    Rise/fall time of cos^2 envelope 
 
 '''
 

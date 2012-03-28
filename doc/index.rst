@@ -4,7 +4,7 @@ Neurophysiology experiments in behaving subjects
 ------------------------------------------------
 
 :Author: **Brad Buran**
-:Contributors: Gardiner von Trapp, Antje Ihelfeld
+:Contributors: Gardiner von Trapp, Antje Ihlefeld
 
 Contents
 --------

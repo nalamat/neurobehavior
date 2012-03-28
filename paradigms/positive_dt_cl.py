@@ -1,20 +1,21 @@
 '''
-Appetitive temporal integration (tone detection)
-------------------------------------------------
-
+Appetitive temporal integration (constant limits)
+-------------------------------------------------
 :Author: **Brad Buran <bburan@alum.mit.edu>**
 :Method: Constant limits go-nogo
 :Status: Stable.  Has been tested and used extensively for several months.
 
-    fc : Hz
-        Center frequency (Hz).  Will be coerced to the nearest frequency for
-        which calibration data is available.  Assumes that the frequency of
-    level : db SPL
-        Level of tone
-    duration : seconds
-        Duration of tone (from ramp onset to ramp offset)
-    rise_fall_time : seconds 
-        Rise/fall time of cos^2 envelope 
+Available parameters
+....................
+fc : Hz
+    Center frequency (Hz).  Will be coerced to the nearest frequency for
+    which calibration data is available.  Assumes that the frequency of
+level : db SPL
+    Level of tone
+duration : seconds
+    Duration of tone (from ramp onset to ramp offset)
+rise_fall_time : seconds 
+    Rise/fall time of cos^2 envelope 
 
 '''
 from enthought.traits.api import Instance
