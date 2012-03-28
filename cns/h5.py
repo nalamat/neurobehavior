@@ -274,10 +274,26 @@ def node_match(n, filter):
                 return False
     return True
 
-def walk_nodes(where, filter, classname=None, wildcards=None):
+def iter_nodes(where, filter, classname=None):
+    '''
+    Non-recursive version of func:`walk_nodes` that only inspects the immediate
+    children of the node specified by `where`.
+
+    This is an iterator.  To obtain a list (this is standard Python-fu)::
+
+        list(iter_nodes(fh.root, ('_v_name', 'trial_log)))
+    '''
+    for node in where._f_iterNodes(classname=classname):
+        if node_match(node, filter):
+            yield node
+
+def walk_nodes(where, filter, classname=None):
     '''
     Starting at the specifide node, `walk_nodes` visits each node in the
-    hierarchy, returning a list of all nodes that match the filter criteria.
+    hierarchy below `where`, returning a list of all nodes that match the filter
+    criteria.  This is a recursive function that visits children, grandchildren,
+    great-grandchildren, etc., nodes.  For a non-recursive function that only
+    inspects the immediate children see :func:`iter_nodes`.
 
     Filters are specified as a sequence of tuples, (attribute, filter).  As
     each node is visited, each filter is called with the corresponding value of
@@ -399,14 +415,29 @@ def p_get_node(node, pattern, dereference=True):
     know what the exact name of this node is without checking it first::
 
         fh = tables.openFile('110909_G1_tail_behavior_raw.hd5', 'r')
-        trial_log = p_load_node(fh.root, '*/data/trial_log')
+        trial_log = p_get_node(fh.root, '*/data/trial_log')
 
     '''
-    return list(p_load_nodes(node, pattern, dereference))[0]
+    return list(p_iter_nodes(node, pattern, dereference))[0]
 
-def p_load_nodes(node, pattern, dereference=True):
+def p_iter_nodes(node, pattern, dereference=True):
     '''
-    TODO (document)
+    Iterator that returns mulitple nodes based on an indeterminate path
+
+    Used to obtain nodes that can be reached by the specified pattern.  that can
+    be reached by the specified pattern.  The pattern may contain wildcards to
+    indicate that the name of the intermediate node is unknown.
+
+    Given a file containing multiple animals and experiments (i.e. a cohort
+    file) you can iterate through all the trial logs stored in it.  Note the
+    wildcard in the search pattern where the animal name (e.g. LeftF) or the
+    experiment name (e.g. PositiveDTCL_2011_11_11_11_11_11) would be::
+
+        fh = tables.openFile('G1_dt_behavior.cohort.hd5', 'r')
+        pattern = '/Cohort_0/animals/*/experiments/*/data/trial_log'
+        for trial_log in p_iter_nodes(fh.root, pattern):
+            # do something with the trial_log
+
     '''
     if type(pattern) != type([]):
         pattern = pattern.strip('/').split('/')
@@ -422,13 +453,13 @@ def p_load_nodes(node, pattern, dereference=True):
         yield node
     elif '*' == pattern[0]:
         for n in node._f_iterNodes():
-            for n in p_load_nodes(n, pattern[1:]):
+            for n in p_iter_nodes(n, pattern[1:]):
                 if n is not None:
                     yield n
     else:
         try:
             n = node._f_getChild(pattern[0])
-            for n in p_load_nodes(n, pattern[1:]):
+            for n in p_iter_nodes(n, pattern[1:]):
                 yield n
         except tables.NoSuchNodeError:
             yield None
@@ -446,7 +477,7 @@ def p_list_nodes(file_name, pattern, dereference=True):
         pattern = pattern.split('/')
         if pattern[0] != '':
             raise ValueError, 'Pattern must begin with /'
-        for node in load_nodes(fh.root, pattern[1:]):
+        for node in p_iter_nodes(fh.root, pattern[1:]):
             yield node
 
 def extract_node_data(node, fields, summary):
@@ -487,7 +518,7 @@ def _extract_data(file_name, filters, fields=None, summary=None,
         if mode == 'walk':
             iterator = walk_nodes(h.root, filters, classname)
         elif mode == 'pattern':
-            iterator = p_load_nodes(h.root, filters)
+            iterator = p_iter_nodes(h.root, filters)
         else:
             raise ValueError, 'Unsupported mode {}'.format(mode)
 
