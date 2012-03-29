@@ -131,7 +131,7 @@ class Paradigm(
 
     editable_nogo = False
     repeat_fa = False
-    go_probability = 'h_uniform(c_safe, 3, 7)'
+    go_probability = 'h_uniform(c_safe, 3, 6)'
 
     kw = {'context': True, 'log': True}
 
