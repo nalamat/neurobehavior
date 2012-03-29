@@ -58,6 +58,8 @@ class AbstractPositiveController(AbstractExperimentController):
     sw_att = Float(120, label='Software attenuation', **kw)
     waveform_rms = Float(-1, label='Waveform RMS', **kw)
     waveform_sf = Float(np.nan, label='Waveform scaling factor', **kw)
+    waveform_min = Float(np.nan, label='Waveform max', **kw)
+    waveform_max = Float(np.nan, label='Waveform max', **kw)
 
     pipeline_TTL1   = Any
     pipeline_TTL2   = Any
@@ -398,6 +400,12 @@ class AbstractPositiveController(AbstractExperimentController):
             self.iface_behavior.set_tag('speaker', 1)
 
         waveform, attenuation = self.compute_waveform(calibration, hw_atten)
+        log.debug('You are now inside %s.trigger_next()', __name__)
+        log.debug('compute_waveform() has requested an attenuation of %f',
+                  attenuation)
+
+        log.debug('Now configuring the hardware attenuation')
+        log.debug('This step computes the best hardware attenuation')
         if speaker == 'primary':
             sw_att = self.set_attenuations(attenuation, None)[0]
         elif speaker == 'secondary':
@@ -410,10 +418,16 @@ class AbstractPositiveController(AbstractExperimentController):
         self.sw_att = sw_att
         self.waveform_sf = sf
         self.waveform_rms = sf*(np.mean(waveform**2)**0.5)
+        waveform = waveform * sf
+
+        self.waveform_min = waveform.min()
+        self.waveform_max = waveform.max()
 
         log.debug('Remaining software attenuation of %f dB required', sw_att)
         log.debug('Scaling waveform by %f to compensate', sf)
+        log.debug('Waveform spans %f to %f Volts (peak to peak)',
+                  self.waveform_min, self.waveform_max)
         log.debug('Uploading %d samples', len(waveform))
 
-        self.buffer_out.set(sf*waveform)
+        self.buffer_out.set(waveform)
         self.iface_behavior.trigger(1)
