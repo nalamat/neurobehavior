@@ -4,6 +4,21 @@ Getting Started
 Installing the code
 -------------------
 
+Installing Python
+.................
+
+ * Download and install Enthought Python Distribution (32-bit)
+
+ * Download and install the correct version of PyQt4 (see what version of Python
+   comes with Enthought Python Distribution.  As of 3/29/11 it was Python 2.7).
+   You need to match both the Python number and the architecture (32-bit or
+   64-bit).  Since you installed the 32-bit Enthought Python Distribution, you
+   would download the 32-bit version of PyQt4.
+
+
+Installing Neurobehavior
+........................
+
 All the standard Python approaches to getting set up will work.  However, I
 recommend you install this as local copy that you can edit if you wish to create
 new paradigms (e.g. add the root neurobehavior folder to the PYTHONPATH
@@ -38,6 +53,11 @@ control system and pip requires the Hg binary to checkout a copy of TDTPy::
 Now, install a local (editable) copy of Neurobehavior::
 
     $ pip install -e hg+http://bitbucket.org/bburan/neurobehavior#egg=neurobehavior
+
+Now, install the Neurobehavior dependencies::
+
+    $ pip install hg+http://bitbucket.org/bburan/tdtpy
+    $ pip install hg+http://bitbucket.org/bburan/new-era
 
 Setting up for experiments
 --------------------------
