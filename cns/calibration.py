@@ -1,3 +1,4 @@
+from os import path
 from cns.sigtools import patodb, dbtopa
 
 from scipy import signal
@@ -89,6 +90,8 @@ def load_mat_cal(name, equalized=False):
     Note that the FIRCal compensates for what it thinks the reference gain is so
     max SPL reflects what you will expect given an output gain of 0 dB.
     '''
+    if not path.exists(name):
+        raise IOError, 'Calibration file {} does not exist'.format(name)
     # Helper functions for accessing scalar and vector values stored in the
     # Matlab structure
     get_scalar = lambda x: x.ravel()[0].ravel()[0]
