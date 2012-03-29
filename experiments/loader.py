@@ -171,6 +171,12 @@ def prepare_experiment(args, store_node):
             cal1_filename = get_config('CAL_PRIMARY')
             cal2_filename = get_config('CAL_SECONDARY')
 
+        if cal1_filename is None:
+            raise IOError, 'Unable to find a calibration file for the ' \
+                           'primary speaker'
+        if cal2_filename is None:
+            raise IOError, 'Unable to find a calibration file for the ' \
+                           'secondary speaker'
         cal1 = calibration.load_mat_cal(cal1_filename, args.equalized)
         log.debug('Loaded calibration file %s for primary', cal1_filename)
         cal2 = calibration.load_mat_cal(cal2_filename, args.equalized)
