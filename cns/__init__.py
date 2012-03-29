@@ -20,6 +20,8 @@ def load_settings():
             setattr(settings, setting, value)
     except KeyError:
         log.debug('No NEUROBEHAVIOR_SETTINGS defined')
+    except IOError:
+        log.debug('%s file defined by NEUROBEHAVIOR_SETTINGS is missing', path)
     return settings
         
 _settings = load_settings()
