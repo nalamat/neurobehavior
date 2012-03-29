@@ -1,4 +1,4 @@
-from traits.api import HasTraits, Any, Bool
+from traits.api import HasTraits, Any, Bool, Float
 
 # For generating the signal
 from cns import signal as wave
@@ -17,6 +17,8 @@ class PositiveAMNoiseControllerMixin(HasTraits):
     #########################################################################
     # Cached data to speed up computation
     #########################################################################
+
+    token_scaling_factor = Float(1.5, context=True, log=True, immediate=True)
 
     _time = Any
     _cos_envelope = Any
@@ -221,6 +223,7 @@ class PositiveAMNoiseControllerMixin(HasTraits):
     ########################################################################
 
     def compute_waveform(self, calibration, hw_attenuation=0):
+        log.debug('You are now inside %s.compute_waveform()', __name__)
         # This is where we take the precomputed pieces that we cached and
         # combine them to generate the final waveform that will be uploaded to
         # the buffer.  Note that this function actually does very little because
@@ -235,10 +238,35 @@ class PositiveAMNoiseControllerMixin(HasTraits):
         # Compute the required attenuation 
         level = self.get_current_value('level')
         fc = self.get_current_value('fc')
-        spl = calibration.get_spl(fc, voltage=MAX_VRMS)
+
+        # This is the SPL that will come out of the speaker for a 1 Vrms pure
+        # tone at the center frequency of the noise.  This is a very rough proxy
+        # for generating noise at the desired spectrum level in lieu of a better
+        # calibration using an equalized speaker and/or waveform that
+        # compensates for inconsistent speaker output across the frequency
+        # range.
+        # 
+        # Since the calibration data was most likely generated using a 3 Vrms
+        # tone, calibration.get_spl will look up the SPL value for a 3 Vrms tone
+        # (let's assume it's 130 dB SPL).  Then, the next step is to compute the
+        # expected difference in output between a 1 Vrms and 3 Vrms tone.  Given
+        #
+        #   -9.54 dB = 20*log10(1./3.)
+        #
+        # The 1 Vrms tone will be 9.54 dB quieter than the 3 Vrms tone assuming
+        # all other settings are the same (e.g. the hardware attenuation is the
+        # same).  This means a 1 Vrms tone will generate ~120 dB SPL at 0 dB
+        # attenuation (calibration.get_spl returns the expected SPL given 0 dB
+        # of attenuation).
+        spl = calibration.get_spl(fc, voltage=1)
+
+        # We now know that a 1 Vrms tone will generate 120 dB SPL; however, we
+        # want our level to be 85 dB SPL, so we need to attenuate the waveform
+        # by 120-85 = 35 dB.
         attenuation = spl-level
+
         log.debug('Speaker output %.2f dB SPL at %.2f Hz using %.2f Vrms', 
-                  spl, fc, MAX_VRMS)
+                  spl, fc, 1)
         log.debug('Need %.2f dB attenuation to achieve %.2f dB SPL',
                   attenuation, level)
 
@@ -247,9 +275,46 @@ class PositiveAMNoiseControllerMixin(HasTraits):
         # method will check to see if the waveform needs to be recomputed.  If
         # the waveform does not need to be recomputed, the cached value will be
         # returned.
-        token = self._get_filtered_noise_token()
+        #
+        # Here, self._get_filtered_noise_token() has normalized the waveform to
+        # and the 1 Vrms waveform 
+        # 1 Vrms (which is what we assumed would be the value when determining
+        # the attenuation in the steps above).  Now, we could upscale the
+        # waveform if we wanted, e.g.:
+        #
+        #   waveform = waveform * 6
+        #
+        # Since the waveform was 1 Vrms before, it will now be 6 Vrms.  This
+        # means that we need to compensate for this.
+        #
+        #   20*log10(6/1.) = 15.56 dB
+        #
+        # This means that the noise token will now be 16 dB louder than we had
+        # assumed when computing the attenuation.  So, if we were to do this, we
+        # would need to add 16 dB to the attenuation:
+        #
+        #   attenuation = attenuation + 16
+        #
+        # The reason we would want to make the Vrms larger and increase the
+        # hardware attenuation accordingly is to compensate for "noise" that's
+        # inherent in the DAC output.  The assumption is that the DAC output has
+        # a higher noise-floor than the output of the hardware attenuator.  We
+        # should amke sure that the min/max of the output (Voltage peak-to-peak)
+        # is never > 10 otherwise it may clip.  Since the DAC has a maximum
+        # output of +/- 10 Volts and the 1 Vrms waveform 
+        token_sf = self.token_scaling_factor
+        token = self._get_filtered_noise_token() * token_sf
         sam_envelope = self._get_sam_envelope()
         cos_envelope = self._get_cos_envelope()
+
+        log.debug('Scaling waveform so it has %f Vrms', token_sf)
+
+        # Compensate attenuation for the token scaling factor
+        compensation = 20*np.log10(token_sf/1.)
+        attenuation = attenuation + compensation
+
+        log.debug('Increasing attenuation by %f to compensate', compensation)
+        log.debug('Attenuation is now %f', attenuation)
 
         # Note that the parent class (AbstractPositiveController.trigger_next)
         # will handle splitting the attenuation into a hardware portion (e.g.
@@ -265,7 +330,10 @@ class PositiveAMNoiseControllerMixin(HasTraits):
         # self.set_attenuations(primary, secondary) to set the hardware
         # attenuators since the attenuation approach may depend on the circuit
         # (e.g. some circuits use the AudioOut macro, some don't).  
-        return token*sam_envelope*cos_envelope, attenuation
+        waveform = token*sam_envelope*cos_envelope
+        log.debug('Waveform spans %f to %f volts (peak to peak)',
+                  waveform.min(), waveform.max())
+        return waveform, attenuation
 
     def set_duration(self, value):
         # Note that I don't worry about the sampling frequency of the buffer_out
@@ -273,4 +341,3 @@ class PositiveAMNoiseControllerMixin(HasTraits):
         # the "run" button to start the experiment.
         self.iface_behavior.cset_tag('signal_dur_n', value, 's', 'n')
         self._time_valid = False
-
