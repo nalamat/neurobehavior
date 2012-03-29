@@ -29,9 +29,12 @@ def load_animal(node):
     kwargs['identifier'] = node._f_getAttr('identifier')
     kwargs['sex'] = node._f_getAttr('sex')
     date_string = node._f_getAttr('birth')
-    if date_string is not None:
+    try:
         kwargs['birth'] = datetime.datetime.strptime(date_string,
                                                      birth_fmt).date()
+    except ValueError:
+        log.debug('Unable to parse birthdate string %r from %r', date_string,
+                node)
     kwargs['parents'] = node._f_getAttr('parents')
 
     # Store information on how to access the animal if we need
