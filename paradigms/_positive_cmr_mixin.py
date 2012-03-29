@@ -111,38 +111,42 @@ class PositiveCMRControllerMixin(HasTraits):
 
     def update_masker(self):
         # Get the correct calibration file
-        speaker = self.get_current_value('speaker')
-        if speaker == 'primary':
-            cal = self.cal_primary
-        else:
-            cal = self.cal_secondary
+        #speaker = self.get_current_value('speaker')
+        #if speaker == 'primary':
+        #    cal = self.cal_primary
+        #else:
+        #    cal = self.cal_secondary
 
         # Check to see how much data can be uploaded to the masker buffer right
         # now and do so
         samples = self.buffer_masker.available()
         log.debug('%d samples need to be written to the buffer', samples)
 
-        dBSPL_RMS1 = cal.get_spl(frequencies=1e3, voltage=1)
-        masker_level = self.get_current_value('masker_level')
+        #dBSPL_RMS1 = cal.get_spl(frequencies=1e3, voltage=1)
+        #masker_level = self.get_current_value('masker_level')
 
         # Check if we need to wrap around to the beginning of the masker file
         if (samples + self.masker_index) > len(self.masker_memmap):
+            log.debug('Near end of masker file.  Splitting into two reads.')
             # Write the last few samples remaining from the end of the masker
             # file
             masker = self.masker_memmap[self.masker_index:]
-            masker = 10**((masker_level-dBSPL_RMS1)/20)*masker
+            #masker = 10**((masker_level-dBSPL_RMS1)/20)*masker
             self.buffer_masker.write(masker)
+            log.debug('Uploaded %d samples to the masker', len(masker))
+            #log.debug('Vrms of uploaded waveform is %f', np.mean(masker**2)**0.5)
 
             # Reset the pointer to the beginning of the masker file and update
             # the number of remaining samples to be written
             self.masker_index = 0
-            log.debug('Uploaded %d samples to the masker', len(masker))
             samples -= len(masker)
             log.debug('%%%%% Wrapping around to beginning of masker file')
 
         masker = self.masker_memmap[self.masker_index:self.masker_index+samples]
-        masker = 10**((masker_level-dBSPL_RMS1)/20)*masker
+        #masker = 10**((masker_level-dBSPL_RMS1)/20)*masker
+        log.debug('Uploaded %d samples to the masker', samples)
+        #log.debug('Vrms of uploaded waveform is %f', np.mean(masker**2)**0.5)
+
         self.buffer_masker.write(masker)
         self.masker_index = self.masker_index + samples
-        log.debug('Uploaded %d samples to the masker', samples)
-
+        log.debug('Masker index is now %d', self.masker_index)
