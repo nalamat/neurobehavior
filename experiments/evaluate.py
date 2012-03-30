@@ -1,24 +1,8 @@
-'''
-    random
-        Numpy's random module.  Provides access to all the functions and
-        distributions available within this module.
-    arange
-    randint(low, high)
-        Return random integer within the range [low, high]
-    uniform(low, high)
-        Draw sample from uniform distribution in the interval [low, high)
-    exponential(scale)
-        Draw sample from exponential distribution with scale parameter (i.e.
-        :math:`\\beta')
-    clip(value, lb, ub)
-        Ensure value falls within bounds
-    '''
-
 from __future__ import division
 
-import ast
 import numpy as np
 from traits.api import HasTraits, on_trait_change, TraitType
+from time import time
 
 import logging
 log = logging.getLogger(__name__)
@@ -58,31 +42,41 @@ def toss(x=0.5):
     '''
     return np.random.uniform() <= x
 
-#def get_dependencies(string):
-#    '''
-#    Parse a Python expression to determine what names are required to evaluate
-#    it.  Useful for determining dependencies.
-#
-#    >>> get_dependencies('x+1')
-#    ('x',)
-#
-#    >>> get_dependencies('32**0.5')
-#    ()
-#
-#    >>> get_dependencies('sqrt(x)+y')
-#    ('sqrt', 'x', 'y')
-#
-#    >>> get_dependencies('range(x)+numpy.random()')
-#    ('numpy', 'range', 'x')
-#
-#    '''
-#    tree = ast.parse(string)
-#    result = [node.id for node in ast.walk(tree) if isinstance(node, ast.Name)]
-#    result.sort()
-#    return tuple(result)
-
 class ParameterExpression(object):
+    '''
+    The namespace in which the function is evaluated includes all variables
+    defined with `context=True` metadata in the `Paradigm`, `Controller` or
+    `Data` class.
 
+    In addition to the above variables, the following names are available:
+
+    random
+        This is a reference to `numpy.random`.  All the classes and functions
+        available in this package can be accessed, e.g. random.beta.pdf(0.5, 1,
+        1).
+    arange
+        Reference to :func:`numpy.arange`.
+    randint
+        Reference to :func:`numpy.random.randint`
+    uniform
+        Reference to :func:`numpy.random.uniform`
+    exponential
+        Reference to :func:`numpy.random.exponential`
+    clip
+        Reference to :func:`numpy.clip`
+    toss
+        Reference to `experiments.evaluate.toss`
+    random_speaker
+        Reference to `experiments.evaluate.random_speaker`
+    h_uniform
+        Reference to `experiments.evaluate.h_uniform`
+    time
+        Reference to :func:`time.time`
+    np
+        Reference to :mod:`numpy`
+    '''
+
+    # List of functions that are available to evaluate expressions with
     GLOBALS = {
             'random':           np.random,
             'arange':           np.arange,
@@ -94,6 +88,8 @@ class ParameterExpression(object):
             'toss':             toss,
             'random_speaker':   random_speaker,
             'h_uniform':        h_uniform,
+            'time':             time,
+            'np':               np,
             }
 
     def __init__(self, value):

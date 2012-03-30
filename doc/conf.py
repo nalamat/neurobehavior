@@ -50,7 +50,10 @@ sys.path.insert(0, os.path.abspath('..'))
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.doctest', 'sphinx.ext.todo',
         'sphinx.ext.coverage', 'sphinx.ext.pngmath',
-        'sphinx.ext.viewcode', 'numpydoc', ]
+        'sphinx.ext.viewcode', 'numpydoc', 'sphinx.ext.intersphinx' ]
+
+intersphinx_mapping = {'http://docs.python.org/': None,
+                       'http://docs.scipy.org/doc/numpy': None}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
