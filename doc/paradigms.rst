@@ -105,6 +105,11 @@ builtin functions along with others deemed useful for behavior experiments.  The
 value of each parameter is computed only once when get_current_value is called.
 The result is cached.
 
+Available expressions
+.....................
+
+.. autoclass:: experiments.evaluate.ParameterExpression
+
 Handling GO/WARN probability
 ............................
 

@@ -1,9 +1,45 @@
 '''
 Aversive AM noise
 -----------------
-.. moduleauthor:: Brad Buran <bburan@alum.mit.edu>
+:Authors:   Brad Buran <bburan@alum.mit.edu>
 
-TODO: description
+Presents broadband AM noise tokens that are embedded in continuous background
+broadband noise.  The background noise is generated using a uniform distribution
+in the range (-1, 1) that has been seeded with the time (in seconds) from the
+system clock at the start of the experiment.  This means that the seed used for
+generating the intertrial noise will vary from experiment to experiment. 
+
+The noise tokens (both warn and safe) are generated using value of the `seed`
+variable.  If frozen noise is used, this means that both the safe and warn
+trials will use the exact same noise waveform with the only difference being the
+modulation depth (or whatever parameter is being roved).
+
+Historically, most data in the Sanes lab has been collected using non-frozen
+noise.  Hence, the appropriate value to use for the seed will be `randint(1,
+2**31-1)`.
+
+Available parameters
+....................
+attenuation : float (dB)
+    Desired attenuation (based on a 1 Vrms waveform).  Since this is broadband
+    noise I have not bothered to determine the appropriate equivalent SPL since
+    our calibration file only contains tone data.  The appropriate attenuation
+    value can be determined empirically using the B&K system.
+fm : float (Hz)
+    Modulation frequency
+modulation_depth : float in range [0, 1]
+    Depth of modulation (as a fraction)
+modulation_direction : {'positive', 'negative'}
+    Initial direction of modulation if starting phase is nonzero.
+duration : float (seconds)
+    Duration of full token (including onset/offset ramps)
+seed : integer
+    Seed to use for noise token.  Set the seed to a positive integer for
+    "frozen" noise.  If you want a random seed on each token, you must use an
+    expression.  To sample from the full range of possible integers (the maximum
+    value for a 32-bit signed integer is `2**31-1`), the appropriate expression
+    would be `randint(1, 2**31-1)`.  Alternatively, the expression
+    `int(time()*1e3)` would give you random seeds based on the system clock.
 '''
 
 from enthought.traits.api import Instance, Any, Int

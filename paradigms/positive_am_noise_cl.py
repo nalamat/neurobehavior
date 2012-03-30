@@ -31,9 +31,12 @@ duration : float (seconds)
 rise_fall_time : float (seconds)
     Duration of cosine squared onset/offset ramp
 seed : integer
-    Seed to use for noise token.  If seed is > 0, the noise token (both go and
-    nogo) will be "frozen".  If you want a random seed on each token, you must
-    use an expression (e.g. `randint(1, 100e3)`).
+    Seed to use for noise token.  Set the seed to a positive integer for
+    "frozen" noise.  If you want a random seed on each token, you must use an
+    expression.  To sample from the full range of possible integers (the maximum
+    value for a 32-bit signed integer is `2**31-1`), the appropriate expression
+    would be `randint(1, 2**31-1)`.  Alternatively, the expression
+    `int(time()*1e3)` would give you random seeds based on the system clock.
 fc : float (Hz)
     Center frequency of noise band
 bandwidth : float (Hz)
