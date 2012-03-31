@@ -11,6 +11,7 @@ from experiments.abstract_experiment import AbstractExperiment
 from experiments.abstract_experiment_data import AbstractExperimentData
 from experiments.abstract_experiment_controller import AbstractExperimentController
 from experiments.abstract_experiment_controller import ExperimentToolBar
+from experiments.abstract_experiment_paradigm import AbstractExperimentParadigm
 
 class BasicCharacterizationToolbar(ExperimentToolBar):
 
@@ -97,10 +98,6 @@ class Controller(AbstractExperimentController):
         self.iface_audio.set_tag('m_amplitude', amplitude)
         self.iface_audio.set_tag('m_shift', offset)
 
-    @on_trait_change('model.paradigm.commutator_inhibit')
-    def set_commutator_inhibit(self, value):
-        self.iface_audio.set_tag('comm_inhibit', value)
-
     @on_trait_change('model.paradigm.primary_attenuation')
     def set_primary_attenuation(self, value):
         self.iface_audio.set_tag('att_A', value)
@@ -112,7 +109,7 @@ class Controller(AbstractExperimentController):
     def get_ts(self):
         return -1
 
-class Paradigm(HasTraits):
+class Paradigm(AbstractExperimentParadigm):
     
     mute_speakers = Button
     swap_speakers = Button
@@ -171,7 +168,7 @@ class Experiment(AbstractExperiment):
     def _add_experiment_plots(self, index_mapper, container, alpha=0.25):
         value_range = DataRange1D(low_setting=-20, high_setting=80)
         value_mapper = LinearMapper(range=value_range)
-        plot = RMSChannelPlot(channel=self.data.microphone,
+        plot = RMSChannelPlot(source=self.data.microphone,
                 index_mapper=index_mapper, value_mapper=value_mapper,
                 line_color=(0.2, 0.2, 0.2, 0.50))
         container.add(plot)
