@@ -6,9 +6,9 @@ Created on Mar 29, 2010
 
 import numpy as np
 
-from enthought.traits.api import HasTraits, Str, Float, Any, Property, \
+from traits.api import HasTraits, Str, Float, Any, Property, \
         Instance,  Array, Tuple, Enum, Trait
-from enthought.traits.ui.api import View, Item, VGroup
+from traitsui.api import View, Item, VGroup
 
 class Standard(HasTraits):
 

@@ -1,4 +1,4 @@
-from enthought.traits.api import HasTraits, Float, Any
+from traits.api import HasTraits, Float, Any
 import numpy as np
 
 class PumpDataMixin(HasTraits):

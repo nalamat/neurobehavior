@@ -1,5 +1,5 @@
-from enthought.traits.api import Float
-from enthought.traits.ui.api import View, VGroup, Include
+from traits.api import Float
+from traitsui.api import View, VGroup, Include
 
 from .abstract_experiment_paradigm import AbstractExperimentParadigm
 from .evaluate import Expression

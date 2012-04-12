@@ -1,4 +1,4 @@
-from enthought.traits.api import HasTraits, Float, Bool, List, Str
+from traits.api import HasTraits, Float, Bool, List, Str
 from traitsui.api import VGroup, View, Item, ListStrEditor
 from .evaluate import Expression
 

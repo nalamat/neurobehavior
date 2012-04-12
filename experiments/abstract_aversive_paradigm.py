@@ -1,5 +1,5 @@
-from enthought.traits.api import Bool
-from enthought.traits.ui.api import VGroup
+from traits.api import Bool
+from traitsui.api import VGroup
 
 from abstract_experiment_paradigm import AbstractExperimentParadigm
 

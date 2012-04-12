@@ -1,7 +1,7 @@
 import numpy as np
-from enthought.enable.api import ColorTrait
-from enthought.chaco.api import AbstractOverlay
-from enthought.traits.api import Instance, Array, Int
+from enable.api import ColorTrait
+from chaco.api import AbstractOverlay
+from traits.api import Instance, Array, Int
 from enable import markers
 
 from cns import get_config
@@ -20,7 +20,7 @@ cluster_type_marker = {
 
 class ExtractedSpikeOverlay(AbstractOverlay):
 
-    plot = Instance('enthought.enable.api.Component')
+    plot = Instance('enable.api.Component')
     
     timestamps = Array(dtype='float')   # Time in seconds of each event
     channels = Array(dtype='int')       # 0-based channel for each event

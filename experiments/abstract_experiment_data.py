@@ -2,7 +2,7 @@ import numpy as np
 import logging
 log = logging.getLogger(__name__)
 
-from enthought.traits.api import (List, Property, Tuple, cached_property, Any,
+from traits.api import (List, Property, Tuple, cached_property, Any,
                                   Int, Event, HasTraits)
 
 from cns.data.h5_utils import get_or_append_node

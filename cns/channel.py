@@ -14,7 +14,7 @@ define a MemoryMixin class (see :class:`FileMixin`) that implements a
 __getitem__ method.
 '''
 
-from enthought.traits.api import HasTraits, Property, Array, Int, Event, \
+from traits.api import HasTraits, Property, Array, Int, Event, \
     Instance, on_trait_change, Bool, Any, String, Float, cached_property, \
     Enum, Set
 import numpy as np

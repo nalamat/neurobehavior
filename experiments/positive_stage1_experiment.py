@@ -1,9 +1,9 @@
-from enthought.traits.api import Instance, Any
-from enthought.traits.ui.api import (View, HSplit, VGroup, Item, Tabbed,
+from traits.api import Instance, Any
+from traitsui.api import (View, HSplit, VGroup, Item, Tabbed,
                                      ShellEditor, Include)
 
-from enthought.enable.api import Component, ComponentEditor
-from enthought.chaco.api import DataRange1D, LinearMapper, \
+from enable.api import Component, ComponentEditor
+from chaco.api import DataRange1D, LinearMapper, \
         PlotGrid, OverlayPlotContainer
 
 from cns.chaco_exts.channel_data_range import ChannelDataRange

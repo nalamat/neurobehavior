@@ -2,7 +2,7 @@ from __future__ import division
 
 from abstract_experiment_data import AbstractExperimentData
 from sdt_data_mixin import SDTDataMixin
-from enthought.traits.api import Instance, Int, Float, \
+from traits.api import Instance, Int, Float, \
     cached_property, Array, Property, Enum, Bool
 import numpy as np
 from cns.data.h5_utils import get_or_append_node

@@ -2,13 +2,13 @@ from os.path import join
 import numpy as np
 from cns.chaco_exts.snippet_channel_plot import SnippetChannelPlot
 
-from enthought.enable.api import Component, ComponentEditor, Window
-from enthought.traits.api import HasTraits, Instance, Button, Any
-from enthought.traits.ui.api import Item, Group, View, Controller
-from enthought.pyface.timer.api import Timer
-from enthought.chaco.api import (LinearMapper, DataRange1D,
+from enable.api import Component, ComponentEditor, Window
+from traits.api import HasTraits, Instance, Button, Any
+from traitsui.api import Item, Group, View, Controller
+from pyface.timer.api import Timer
+from chaco.api import (LinearMapper, DataRange1D,
         OverlayPlotContainer, PlotAxis)
-from enthought.chaco.tools.api import ZoomTool, PanTool
+from chaco.tools.api import ZoomTool, PanTool
 
 from tdt import DSPCircuit
 from cns import get_config

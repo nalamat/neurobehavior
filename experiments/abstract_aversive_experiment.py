@@ -1,8 +1,8 @@
-from enthought.traits.api import Instance, on_trait_change, Float, Property
-from enthought.traits.ui.api import (Item, VGroup, HSplit, Tabbed, Include,
+from traits.api import Instance, on_trait_change, Float, Property
+from traitsui.api import (Item, VGroup, HSplit, Tabbed, Include,
         ShellEditor)
-from enthought.enable.api import Component, ComponentEditor
-from enthought.chaco.api import DataRange1D, LinearMapper, \
+from enable.api import Component, ComponentEditor
+from chaco.api import DataRange1D, LinearMapper, \
         OverlayPlotContainer
 
 from cns.chaco_exts.channel_data_range import ChannelDataRange
@@ -17,9 +17,9 @@ from abstract_experiment import AbstractExperiment
 import logging
 log = logging.getLogger(__name__)
 
-from enthought.traits.ui.api import TabularEditor
-from enthought.traits.ui.tabular_adapter import TabularAdapter
-from enthought.traits.api import *
+from traitsui.api import TabularEditor
+from traitsui.tabular_adapter import TabularAdapter
+from traits.api import *
 
 from cns import get_config
 COLORS = get_config('EXPERIMENT_COLORS')

@@ -1,8 +1,8 @@
-from enthought.traits.api import (Instance, Any, List, on_trait_change, Enum,
+from traits.api import (Instance, Any, List, on_trait_change, Enum,
                                   Dict)
 
-from enthought.traits.ui.api import Controller
-from enthought.pyface.timer.api import Timer
+from traitsui.api import Controller
+from pyface.timer.api import Timer
 
 from cns import get_config
 from os.path import join

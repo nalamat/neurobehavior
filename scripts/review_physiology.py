@@ -1,6 +1,6 @@
 # Ok, so technically this isn't a script ...
 
-from enthought.traits.api import push_exception_handler
+from traits.api import push_exception_handler
 push_exception_handler(reraise_exceptions=True)
 
 import tables

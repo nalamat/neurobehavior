@@ -2,13 +2,13 @@ from __future__ import division
 from math import ceil
 import numpy as np
 
-from enthought.traits.api import HasTraits, Range, Tuple, Bool, Int, Str, \
+from traits.api import HasTraits, Range, Tuple, Bool, Int, Str, \
         List, Instance, Property, cached_property, Button, Float
 
-from enthought.traits.ui.api import View, VGroup, HGroup, Item, Label, Include
+from traitsui.api import View, VGroup, HGroup, Item, Label, Include
 
-from enthought.traits.ui.api import TableEditor, ObjectColumn
-from enthought.traits.ui.extras.checkbox_column import CheckboxColumn
+from traitsui.api import TableEditor, ObjectColumn
+from traitsui.extras.checkbox_column import CheckboxColumn
 
 from cns.util import to_list
 

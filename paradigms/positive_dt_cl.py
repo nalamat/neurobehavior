@@ -18,8 +18,8 @@ rise_fall_time : seconds
     Rise/fall time of cos^2 envelope 
 
 '''
-from enthought.traits.api import Instance
-from enthought.traits.ui.api import View, Include, VGroup
+from traits.api import Instance
+from traitsui.api import View, Include, VGroup
 
 # The underscore indicates that these are not meant to be used directly as an
 # experiment paradigm
