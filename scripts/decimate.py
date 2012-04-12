@@ -2,19 +2,8 @@ from os import path
 import re
 import tables
 
-from glob import glob
-import argparse
-
 from cns.analysis import decimate_waveform
 from cns.io import update_progress
-
-class GlobPath(argparse.Action):
-
-    def __call__(self, parser, args, values, option_string=None):
-        filenames = []
-        for filename in values:
-            filenames.extend(glob(filename))
-        setattr(args, self.dest, filenames)
 
 def main(infile, force_overwrite=False):
     fh_in = tables.openFile(infile, 'r')
@@ -35,13 +24,15 @@ def main(infile, force_overwrite=False):
         raise ValueError, mesg
 
 if __name__ == '__main__':
+    import argparse
     parser = argparse.ArgumentParser(description='Decimate files')
-    parser.add_argument('files',  nargs='+', action=GlobPath, 
-                        help='Files to decimate')
+    parser.add_argument('files',  nargs='+', help='Files to decimate')
     parser.add_argument('--force-overwrite', action='store_true',
                         help='Overwrite existing output files')
     args = parser.parse_args()
 
     for filename in args.files:
-        main(filename, args.force_overwrite)
-
+        try:
+            main(filename, args.force_overwrite)
+        except Exception, e:
+            print e
