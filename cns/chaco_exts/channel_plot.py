@@ -2,7 +2,7 @@ from __future__ import division
 
 from base_channel_plot import BaseChannelPlot
 import numpy as np
-from enthought.traits.api import Bool, Property, cached_property, Int
+from traits.api import Bool, Property, cached_property, Int
 
 import logging
 log = logging.getLogger(__name__)

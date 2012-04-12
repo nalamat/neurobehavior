@@ -2,7 +2,7 @@ import tables
 from tempfile import mkdtemp
 from os import path
 from cns import get_config
-from enthought.traits.api import HasTraits, Instance, List, Any
+from traits.api import HasTraits, Instance, List, Any
 from cns.channel import (FileMultiChannel, FileChannel, FileSnippetChannel,
                          FileTimeseries, FileEpoch)
 import numpy as np

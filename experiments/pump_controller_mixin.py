@@ -1,7 +1,7 @@
 from cns.widgets.toolbar import ToolBar
-from enthought.traits.ui.api import View, HGroup, Item
-from enthought.traits.api import Instance, Bool, HasTraits, Tuple, Float
-from enthought.savage.traits.ui.svg_button import SVGButton
+from traitsui.api import View, HGroup, Item
+from traits.api import Instance, Bool, HasTraits, Tuple, Float
+from enable.savage.trait_defs.ui.svg_button import SVGButton
 from cns.widgets.icons import icons
 
 class PumpToolBar(ToolBar):

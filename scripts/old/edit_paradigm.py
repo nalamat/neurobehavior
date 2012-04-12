@@ -1,7 +1,7 @@
 from cns.experiment.paradigm import AversiveParadigm
 from cns.widgets.handler import FileHandler, filehandler_menubar
-from enthought.traits.api import Instance, HasTraits, Bool, on_trait_change
-from enthought.traits.ui.api import View, Item, InstanceEditor
+from traits.api import Instance, HasTraits, Bool, on_trait_change
+from traitsui.api import View, Item, InstanceEditor
 import cns
 import pickle
 import settings

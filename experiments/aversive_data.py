@@ -2,7 +2,7 @@ from __future__ import division
 from cns.channel import FileTimeseries, FileChannel, FileEpoch
 from abstract_experiment_data import AbstractExperimentData
 
-from enthought.traits.api import (Instance, Int, Float, cached_property,
+from traits.api import (Instance, Int, Float, cached_property,
                                   Property, Enum)
 
 import numpy as np

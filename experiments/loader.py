@@ -1,4 +1,4 @@
-from enthought.pyface.api import error, information
+from pyface.api import error, information
 from .cohort import Cohort, CohortViewHandler
 import pickle
 from cns.h5 import get_or_append_node
@@ -9,7 +9,7 @@ from os.path import join
 from importlib import import_module
 from glob import glob
 
-from enthought.traits.api import Any, Trait, TraitError
+from traits.api import Any, Trait, TraitError
 from experiments import trial_setting
 from cns import calibration
 

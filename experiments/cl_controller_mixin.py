@@ -1,4 +1,4 @@
-from enthought.traits.api import HasTraits, Bool
+from traits.api import HasTraits, Bool
 import numpy as np
 from cns import choice
 

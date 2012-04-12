@@ -1,5 +1,5 @@
-from enthought.traits.api import Instance, Int, Float
-from enthought.traits.ui.api import View, Item, HGroup, spring
+from traits.api import Instance, Int, Float
+from traitsui.api import View, Item, HGroup, spring
 from abstract_experiment_controller import AbstractExperimentController
 from abstract_experiment_controller import ExperimentToolBar
 from cns.pipeline import deinterleave_bits
