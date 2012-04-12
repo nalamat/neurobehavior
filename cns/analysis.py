@@ -317,11 +317,9 @@ def running_rms(input_node, output_node, duration, step, processing,
     else:
         raise ValueError, 'Unknown algorithm "{}"'.format(algorithm)
     
+    iterable = chunk_iter(channel, c_samples, step_samples=c_samples-c_loverlap)
 
-    iterable = chunk_iter(channel, step_samples=c_samples-c_loverlap,
-                          loverlap=c_loverlap)
     for i_chunk, chunk in enumerate(iterable):
-
         # This is a hack to discard the very last chunk if it's the wrong size.
         # Eventually I need to come up with better logic here ...
         if chunk.shape[-1] != c_samples:
@@ -331,15 +329,9 @@ def running_rms(input_node, output_node, duration, step, processing,
         ch_stride, s_stride = chunk.strides
         strides = ch_stride, window_step*s_stride, s_stride
         chunk = as_strided(chunk, new_shape, strides)
+        rms.append(compute_rms(chunk))
 
-        # Create an expression to be evaluated using the numexpr package
-        #exp = tables.Expr('sum(chunk**2, axis=1)')
-        #exp.setOutput(rms)
-        #exp.eval()
-
-        result = compute_rms(chunk)
-        rms.append(result)
-
+        print i_chunk*c_samples
         if progress_callback(i_chunk*c_samples, total_samples, ''):
             aborted = True
             break
