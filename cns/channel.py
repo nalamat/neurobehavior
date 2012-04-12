@@ -14,7 +14,7 @@ define a MemoryMixin class (see :class:`FileMixin`) that implements a
 __getitem__ method.
 '''
 
-from enthought.traits.api import HasTraits, Property, Array, Int, Event, \
+from traits.api import HasTraits, Property, Array, Int, Event, \
     Instance, on_trait_change, Bool, Any, String, Float, cached_property, \
     Enum, Set
 import numpy as np
@@ -42,7 +42,7 @@ class FileMixin(HasTraits):
     .. _HDF5: http://www.hdfgroup.org/HDF5/
 
     Properties
-    ==========
+    ----------
     dtype
         Default is float64.  It is a good idea to set dtype appropriately for
         the waveform (e.g. use a boolean dtype for TTL data) to minimize file
@@ -59,7 +59,7 @@ class FileMixin(HasTraits):
         array.
 
     Compression properties
-    ======================
+    ----------------------
     compression_level
         Between 0 and 9, with 0=uncompressed and 9=maximum
     compression_type
