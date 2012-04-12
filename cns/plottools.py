@@ -105,7 +105,10 @@ class AxesIterator(object):
         if self.i == 0:
             self.current_figure = pylab.figure()
             self.figures.append(self.current_figure)
-        self.i = (self.i + 1) % self.max_groups
+        if not np.isinf(self.max_groups):
+            self.i = (self.i + 1) % self.max_groups
+        else:
+            self.i += 1
 
         kw = {}
         if self.sharex:
