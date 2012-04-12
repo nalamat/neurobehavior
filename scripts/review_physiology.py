@@ -47,7 +47,7 @@ from cns.chaco_exts.threshold_overlay import ThresholdOverlay
 from cns.chaco_exts.extracted_spike_overlay import ExtractedSpikeOverlay
 
 from cns.analysis import (extract_spikes, median_std, decimate_waveform,
-    truncate_waveform, zero_waveform)
+    truncate_waveform, zero_waveform, running_rms)
 
 COLORS = get_config('EXPERIMENT_COLORS')
 RAW_WILDCARD = get_config('PHYSIOLOGY_RAW_WILDCARD')
@@ -531,6 +531,16 @@ class PhysiologyReviewController(Controller):
         information(info.ui.control, "Zeroed waveform.  Be sure to run "
                     "ptrepack or h5repack to recompress the file.")
 
+    def _prepare_processing_settings(self, info):
+        # Compile our referencing and filtering instructions
+        processing = {}
+        processing['filter_freq_lp'] = info.object.filter_freq_lp
+        processing['filter_freq_hp'] = info.object.filter_freq_hp
+        processing['filter_order'] = info.object.filter_order
+        processing['filter_btype'] = info.object.filter_btype
+        processing['bad_channels'] = info.object.bad_channels
+        processing['diff_mode'] = info.object.diff_mode
+        return processing
 
     def _prepare_extract_settings(self, info):
         settings = [s for s in info.object.channel_settings if s.extract]
@@ -547,14 +557,7 @@ class PhysiologyReviewController(Controller):
 
         kwargs = {}
 
-        # Compile our referencing and filtering instructions
-        processing = {}
-        processing['filter_freq_lp'] = info.object.filter_freq_lp
-        processing['filter_freq_hp'] = info.object.filter_freq_hp
-        processing['filter_order'] = info.object.filter_order
-        processing['filter_btype'] = info.object.filter_btype
-        processing['bad_channels'] = info.object.bad_channels
-        processing['diff_mode'] = info.object.diff_mode
+        processing = self._prepare_processing_settings(info)
 
         # Gather the arguments required by the spike extraction routine
         kwargs['processing'] = processing
@@ -568,6 +571,38 @@ class PhysiologyReviewController(Controller):
 
         return kwargs
 
+    def compute_rms(self, info):
+        filename = get_save_filename(info.object.data_filename, 'rms')
+        if filename is None:
+            return
+
+        with tables.openFile(filename, 'w') as fh_out:
+            output_node = fh_out.root
+            input_node = info.object.data_node
+            processing = self._prepare_processing_settings(info)
+
+            # Create a progress dialog that keeps the user up-to-date on what's
+            # going on since this is a fairly lengthy process.
+            dialog = ProgressDialog(title='Exporting data', 
+                                    min=0,
+                                    can_cancel=True,
+                                    max=int(info.object.channel.shape[-1]),
+                                    message='Initializing ...')
+
+            # Define a function that, when called, updates the dialog ... 
+            dialog.open()
+
+            def callback(samples, max_samples, mesg):
+                if samples == max_samples:
+                    dialog.close()
+                dialog.change_message(mesg)
+                cont, skip = dialog.update(samples)
+                return not cont
+
+            running_rms(input_node, output_node, 1, 1, processing=processing,
+                        progress_callback=callback, algorithm='median')
+
+
     def extract_spikes(self, info):
         # Compile the necessary arguments to pass along to extract_spikes.  If
         # the helper method returns None, this means that there was a problem
@@ -577,20 +612,11 @@ class PhysiologyReviewController(Controller):
         if kwargs is None:
             return
 
-        # Suggest a filename based on the filename of the original file (to make
-        # it easier for the user to just click "OK").
-        filename = re.sub(r'(.*?)(_raw)?\.(h5|hd5|hdf5)', r'\1_extracted.\3',
-                          info.object.data_filename)
-
-        # Get the output filename from the user
-        dialog = FileDialog(action="save as", 
-                            wildcard='HDF5 file (*.hd5)|*.hd5|',
-                            default_path=filename)
-        dialog.open()
-        if dialog.return_code != OK:
+        filename = get_save_filename(info.object.data_filename, 'extracted')
+        if filename is None:
             return
 
-        with tables.openFile(dialog.path, 'w') as fh_out:
+        with tables.openFile(filename, 'w') as fh_out:
             kwargs['input_node'] = info.object.data_node
             kwargs['output_node'] = fh_out.root
 
@@ -1188,6 +1214,10 @@ class PhysiologyReview(HasTraits):
                            accelerator='Ctrl+C',
                            enabled_when='object.data_node is not None'
                           ),
+                    Action(name='Compute running RMS', 
+                           action='compute_rms',
+                           enabled_when='object.data_node is not None'
+                          ),
                 ),
                 ActionGroup(
                     Action(name='Extract spikes',
@@ -1270,10 +1300,26 @@ def get_experiment_node_dialog(filename):
         i = options.index(dialog.experiment)
         return nodes[i]._v_pathname
 
+def get_save_filename(raw_filename, suggested_ending):
+    # Suggest a filename based on the filename of the original file (to make
+    # it easier for the user to just click "OK").
+    search_pattern = r'(.*?)(_raw)?\.(h5|hd5|hdf5)'
+    sub_pattern = r'\1_{}.\3'.format(suggested_ending)
+    filename = re.sub(search_pattern, sub_pattern, raw_filename) 
+
+    # Get the output filename from the user
+    dialog = FileDialog(action="save as", 
+                        wildcard='HDF5 file (*.hd5)|*.hd5|',
+                        default_path=filename)
+    dialog.open()
+    if dialog.return_code != OK:
+        return
+    return dialog.path
+
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('-f', '--filename', type=str, required=False)
+    #parser.add_argument('-f', '--filename', type=str, required=False)
     parser.add_argument('-p', '--parameters', nargs='+', type=str,
                         required=False)
 
