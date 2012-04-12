@@ -14,6 +14,7 @@ def main(infile, force_overwrite=False):
         outfile = re.sub(r'(.*)_raw\.hd5', r'\1_rms.hd5', infile)
         if path.exists(outfile) and not force_overwrite:
             raise IOError, '{} already exists'.format(outfile)
+
         fh_out = tables.openFile(outfile, 'w')
         output_node = fh_out.root
         input_node = fh_in.root._f_listNodes()[0]
@@ -30,7 +31,7 @@ def main(infile, force_overwrite=False):
         raise ValueError, mesg
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Decimate files')
+    parser = argparse.ArgumentParser(description='Compute RMS of physiology')
     parser.add_argument('files',  nargs='+', help='Files to decimate')
     parser.add_argument('--force-overwrite', action='store_true',
                         help='Overwrite existing output files')
