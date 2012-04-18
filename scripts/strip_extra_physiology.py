@@ -2,15 +2,6 @@ import argparse
 from subprocess import call
 import re
 import tables 
-from glob import glob
-
-class GlobPath(argparse.Action):
-
-    def __call__(self, parser, args, values, option_string=None):
-        filenames = []
-        for filename in values:
-            filenames.extend(glob(filename))
-        setattr(args, self.dest, filenames)
 
 def main(filename, dry_run=False):
     file_edited = False
@@ -48,8 +39,7 @@ def main(filename, dry_run=False):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser("Strip redundant data from physiology files")
-    parser.add_argument('files',  nargs='+', action=GlobPath, 
-                        help='Files to decimate')
+    parser.add_argument('files',  nargs='+', help='Files to simplify')
     parser.add_argument('--dry-run', action='store_true',
                         help="Show actions without modifying the file")
     args = parser.parse_args()
