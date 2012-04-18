@@ -11,17 +11,6 @@ pytables (tables)
     Python interface for the HDF5 library
 pandas
     Provides a R-style DataFrame object that can facilitate data analysis.
-joblib (optional)
-    Caches function results.  Used to speed up loading and aggregating data from
-    the HDF5 files.
-    
-In general, joblib is pretty good at detecting when the cache is invalid.
-However, sometimes you need to manually force the cache to clear.  The function
-extract_data (which loads data from the HDF5 file) uses joblib to cache its
-results.  To clear the cache::
-
-    from cns import h5
-    h5.memory.clear()
     
 Before you can understand how the code works, you need to understand a little
 about how the HDF5 data structure is represented in Python.  PyTables has a
@@ -65,23 +54,6 @@ import logging
 from datetime import datetime
 from pandas import DataFrame
 from os import path
-
-# Set up the caching system
-#try:
-#    from joblib import Memory
-#    from tempfile import gettempdir
-#    temppath = path.join(gettempdir(), 'sane_analysis')
-#    memory = Memory(temppath)
-#except ImportError:
-#    print 'WARNING: joblib module not found, caching will be disabled'
-#    # This is a mock class decorator that will be used in lieu of the actual
-#    # joblib.Memory class.  This basically is a decorator that passes through
-#    # the "decorated" function rather than returning a wrapper.
-#    class Memory:
-#        def cache(self, func=None, ignore=None, verbose=None, mmap_mode=False):
-#            print 'getting called', self, func
-#            return func
-#    memory = Memory()
 
 log = logging.getLogger(__name__)
 
@@ -417,8 +389,20 @@ def p_get_node(node, pattern, dereference=True):
         fh = tables.openFile('110909_G1_tail_behavior_raw.hd5', 'r')
         trial_log = p_get_node(fh.root, '*/data/trial_log')
 
+    If the tables.File instance is passed in, the search begins at fh.root,
+    e.g., the above code is equivalent to::
+
+        fh = tables.openFile('110909_G1_tail_behavior_raw.hd5', 'r')
+        trial_log = p_get_node(fh, '*/data/trial_log')
+
     '''
+    if isinstance(node, tables.File):
+        node = node.root
     return list(p_iter_nodes(node, pattern, dereference))[0]
+
+def p_read(filename, pattern, dereference=True):
+    with tables.openFile(filename, 'r') as fh:
+        return p_get_node(fh.root, pattern, dereference).read()
 
 def p_iter_nodes(node, pattern, dereference=True):
     '''
