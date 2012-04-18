@@ -131,8 +131,14 @@ class AxesIterator(object):
             else:
                 adjust_spines(self.current_axes, ())
         return self.current_axes, g
-    
+
 def figure_generator(max_groups):
+    '''
+    If you don't know beforehand how many plots you need to generate, but want
+    to put a fixed number of plots on each figure, this will handle the logic of
+    creating new figures and spacing out the axes appropriately (based on
+    max_groups).
+    '''
     i = 0
     rows, cols = best_rowscols(max_groups)
     while True:
@@ -142,3 +148,39 @@ def figure_generator(max_groups):
         adjust_spines(ax, ('bottom', 'left'))
         yield ax
         i = (i + 1) % max_groups
+
+class FigureGenerator(object):
+
+    def __init__(self, max_groups, save_pattern=None, auto_close=False):
+        self.max_groups = max_groups
+        self.i = 0
+        self.rows, self.cols = best_rowscols(max_groups)
+        self.figures = []
+        self.figure_count = 0
+        self.current_figure = None
+        self.save_pattern = save_pattern
+        self.auto_close = auto_close
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        if self.i == 0:
+            if self.current_figure and self.save_pattern:
+                filename = self.save_pattern.format(self.figure_count)
+                self.current_figure.savefig(filename)
+            old_figure = self.current_figure
+            self.current_figure = pylab.figure()
+            self.figure_count += 1
+
+            # If closing automatically, don't keep track of old figures
+            # otherwise maintain a list of the open handles
+            if self.auto_close and old_figure:
+                pylab.close(old_figure)
+            else:
+                self.figures.append(self.current_figure)
+
+        ax = self.current_figure.add_subplot(self.rows, self.cols, self.i+1)
+        adjust_spines(ax, ('bottom', 'left'))
+        self.i = (self.i + 1) % self.max_groups
+        return ax
