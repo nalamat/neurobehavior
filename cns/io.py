@@ -121,7 +121,9 @@ def import_spikes(filename, channel, cluster_id=None):
         mask = fh.root.event_data.channels[:] == channel
         if cluster_id is not None:
             mask = mask & (fh.root.event_data.assigns[:].ravel() == cluster_id)
-        return fh.root.event_data.timestamps[mask].astype('d')
+        et = fh.root.event_data.timestamps[mask].astype('d')
+        et.sort()
+        return et
 
 def copy_block_data(input_node, output_node):
     '''
