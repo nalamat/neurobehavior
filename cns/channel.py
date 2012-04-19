@@ -553,7 +553,9 @@ class RAMChannel(Channel):
 
 class MultiChannel(Channel):
 
-    channels = Int(8, attr=True)
+    # Default to 0 to make it clear that the class has not been properly
+    # initialized
+    channels = Int(0, attr=True)
 
     def get_channel_range(self, channel, lb, ub):
         return self.get_range(lb, ub)[channel]
@@ -611,7 +613,13 @@ class ProcessedMultiChannel(MultiChannel):
             return np.identity(self.channels)
         else:
             matrix = np.identity(self.channels)
+
+            # If all but one channel is bad, this will raise a
+            # ZeroDivisionError.  I'm going to let this error "bubble up" since
+            # the user should realize that they are no longer referencing their
+            # data in that situation.
             weight = 1.0/(self.channels-1-len(self.bad_channels))
+
             for r in range(self.channels):
                 if r in self.bad_channels:
                     matrix[r, r] = 0
