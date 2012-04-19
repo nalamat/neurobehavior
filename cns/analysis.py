@@ -319,6 +319,7 @@ def running_rms(input_node, output_node, duration, step, processing,
     
     iterable = chunk_iter(channel, c_samples, step_samples=c_samples-c_loverlap)
 
+    aborted = False
     for i_chunk, chunk in enumerate(iterable):
         # This is a hack to discard the very last chunk if it's the wrong size.
         # Eventually I need to come up with better logic here ...
@@ -331,10 +332,11 @@ def running_rms(input_node, output_node, duration, step, processing,
         chunk = as_strided(chunk, new_shape, strides)
         rms.append(compute_rms(chunk))
 
-        print i_chunk*c_samples
         if progress_callback(i_chunk*c_samples, total_samples, ''):
             aborted = True
             break
+
+    rms._v_attrs['aborted'] = aborted
 
 def running_rms_old(input_node, output_node, duration, step, processing,
                 algorithm='median', progress_callback=None):
@@ -557,6 +559,10 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
                    chunk_size=default_chunk_size, include_block_data=True):
     '''
     Extracts spikes.  Lots of options.
+
+    All channel arguments to this function must be 0-based; however, when the
+    metadata is written to the output_node, the `bad_channels` and
+    `extracted_channels` are stored as 1-based.
 
     Parameters
     ----------
