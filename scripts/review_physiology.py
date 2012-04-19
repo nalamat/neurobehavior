@@ -1,5 +1,3 @@
-# Ok, so technically this isn't a script ...
-
 from traits.api import push_exception_handler
 push_exception_handler(reraise_exceptions=True)
 
@@ -10,16 +8,14 @@ import re
 from os import path
 from numpy.lib import recfunctions
 
-from pyface.api import FileDialog, OK, error, ProgressDialog, \
-        information, confirm, YES
+from pyface.api import FileDialog, OK, error, ProgressDialog, information, \
+        confirm, YES
 from enable.api import Component, ComponentEditor
-from chaco.api import (LinearMapper, DataRange1D, OverlayPlotContainer)
+from chaco.api import LinearMapper, DataRange1D, OverlayPlotContainer
                        
-from traitsui.api import VGroup, Item, View, \
-        HSplit, Tabbed, Controller
-from traits.api import Instance, HasTraits, Float, DelegatesTo, \
-     CBool, Int, Any, Event, Property,\
-     List, cached_property, Str, Enum, File, Range
+from traitsui.api import VGroup, Item, View, HSplit, Tabbed, Controller
+from traits.api import Instance, HasTraits, Float, DelegatesTo, CBool, Int, \
+        Any, Event, Property, List, cached_property, Str, Enum, File, Range
 
 # Used for displaying the checkboxes for channel/plot visibility config
 from traitsui.api import TableEditor, ObjectColumn, EnumEditor
