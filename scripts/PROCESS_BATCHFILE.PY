@@ -5,7 +5,7 @@ import tables
 from os import path
 
 from cns import analysis
-from cns.iotools import update_progress
+from cns.io import update_progress
 
 def main(batchfile, force_overwrite=False):
     '''
