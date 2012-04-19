@@ -9,7 +9,11 @@ def main(extracted_filename):
         raw_filename = extracted_filename.replace('extracted', 'raw')
 
         if 'rms' in fh.root:
-            # The file already contains this data
+            fs = fh.root.rms.rms._v_attrs['fs']
+            last_trial = fh.root.block_data.trial_log.cols.end[-1]
+            dur = fh.root.rms.rms.shape[-1]/fs
+            mesg = 'Already has RMS of duration {}.  Last trial ends at {}.'
+            print mesg.format(dur, last_trial)
             return
 
         processing['filter_freq_lp'] = fh.root.filter._v_attrs.fc_lowpass
@@ -34,4 +38,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     for filename in args.files:
         print 'Processing file', filename
-        main(filename)
+        try:
+            main(filename)
+        except Exception as e:
+            print e
+            pass
