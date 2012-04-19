@@ -10,16 +10,15 @@ def update_progress(i, n, mesg):
     '''
     Progress bar for use with the command line
     '''
-    max_chars = 60
+    max_chars = 40
     progress = i/n
     num_chars = int(progress*max_chars)
     num_left = max_chars-num_chars
     # The \r tells the cursor to return to the beginning of the line rather than
     # starting a new line.  This allows us to have a progressbar-style display
     # in the console window.
-    sys.stdout.write('\r[{}{}] {:.2f}%'.format('#'*num_chars, 
-                                               ' '*num_left,
-                                               progress*100))
+    sys.stdout.write('\r[{}{}] {:.0f}% {}'.format('#'*num_chars, ' '*num_left,
+                                                  progress*100, mesg))
     return False
 
 def get_experiment_node(filename=None):
