@@ -445,8 +445,9 @@ def running_rms_old(input_node, output_node, duration, step, processing,
             aborted = True
             break
 
-def decimate_waveform(input_node, output_node, q=None, N=4, progress_callback=None,
-                      chunk_size=default_chunk_size, include_block_data=True):
+def decimate_waveform(input_node, output_node, q=None, dec_fs=600.0, N=4,
+                      progress_callback=None, chunk_size=default_chunk_size,
+                      include_block_data=True):
     '''
     Decimates the waveform data to a lower sampling frequency using a lowpass
     filter cutoff.  
@@ -471,8 +472,11 @@ def decimate_waveform(input_node, output_node, q=None, N=4, progress_callback=No
     output_node : instance of tables.Group
     q : { None, int }
         The downsampling (i.e. decimation) factor.  If None, q will be set to
-        floor(source_fs/600) (i.e. the output sampling frequency will be as
-        close to 600 Hz as without being less than 600 Hz). 
+        floor(source_fs/dec_fs) (i.e. the output sampling frequency will be as
+        close to dec_fs as without being less than dec_fs). 
+    dec_fs : { 600.0, float }
+        Used to compute the downsampling factor, q, if one is not provided (see
+        documentation for q above).
     N : int
         The filter order to use
     progress_callback : callable
@@ -499,7 +503,7 @@ def decimate_waveform(input_node, output_node, q=None, N=4, progress_callback=No
     raw = input_node.data.physiology.raw
     source_fs = raw._v_attrs['fs']
     if q is None:
-        q = np.floor(source_fs/600.0)
+        q = np.floor(source_fs/dec_fs)
     target_fs = source_fs/q
 
     n_channels, n_samples = raw.shape
