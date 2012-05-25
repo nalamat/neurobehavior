@@ -6,6 +6,10 @@ from __future__ import division
 import pylab
 import numpy as np
 
+def add_panel_id(ax, id):
+    ax.text(-0.1, 1.05, str(id), transform=ax.transAxes,
+            fontweight='bold', fontsize='xx-large')
+
 def color_iterator(grouping, cmap='jet'):
     '''
     Given a Matplotlib colormap, iterate through the color range in equal-sized
@@ -78,7 +82,8 @@ class AxesIterator(object):
     '''
 
     def __init__(self, groups, extra=0, sharex=True, sharey=True,
-                 max_groups=np.inf, adjust_spines=False):
+                 max_groups=np.inf, adjust_spines=False, save_pattern=None):
+
         self.sharex = sharex
         self.sharey = sharey
         self.groups = groups
@@ -90,30 +95,47 @@ class AxesIterator(object):
         self.current_axes = None
         self.figures = []
         self.adjust_spines = adjust_spines
+        self.current_figure = None
+        self.figure_count = 0
+        self.save_pattern = save_pattern
 
     def __iter__(self):
         return self
 
     def next(self):
+        g = self.group_iter.next()
+        ax = self.next_axes()
+        return  ax, g
+
+    def next_axes(self, sharex=None, sharey=None):
         # When the call to group_iter.next() raises a StopIteration exception,
         # this exception must also bubble up and terminate this generator as
         # well.  We call group_iter.next() at the very beginning as a check to
         # make sure we have not reached the end of the sequence before adding
         # the new plot to the graph.
-        g = self.group_iter.next()
+        if sharex is None:
+            sharex = self.sharex
+        if sharey is None:
+            sharey = self.sharey
 
+        #if not np.isinf(self.max_groups):
         if self.i == 0:
+            if self.current_figure and self.save_pattern:
+                filename = self.save_pattern.format(self.figure_count)
+                self.current_figure.savefig(filename)
             self.current_figure = pylab.figure()
+            self.figure_count += 1
             self.figures.append(self.current_figure)
+
         if not np.isinf(self.max_groups):
             self.i = (self.i + 1) % self.max_groups
         else:
             self.i += 1
 
         kw = {}
-        if self.sharex:
+        if sharex:
             kw['sharex'] = self.current_axes
-        if self.sharey:
+        if sharey:
             kw['sharey'] = self.current_axes
         ax = self.current_figure.add_subplot(self.n_rows, self.n_cols, self.i,
                                              **kw)
@@ -130,7 +152,13 @@ class AxesIterator(object):
                 adjust_spines(self.current_axes, ('bottom'))
             else:
                 adjust_spines(self.current_axes, ())
-        return self.current_axes, g
+        return self.current_axes
+
+    def __del__(self):
+        # Be sure to save the final figure
+        if self.current_figure and self.save_pattern:
+            filename = self.save_pattern.format(self.figure_count)
+            self.current_figure.savefig(filename)
 
 def figure_generator(max_groups):
     '''
@@ -164,11 +192,14 @@ class FigureGenerator(object):
     def __iter__(self):
         return self
 
+    def _save_current_figure(self):
+        if self.current_figure and self.save_pattern:
+            filename = self.save_pattern.format(self.figure_count)
+            self.current_figure.savefig(filename)
+
     def next(self):
         if self.i == 0:
-            if self.current_figure and self.save_pattern:
-                filename = self.save_pattern.format(self.figure_count)
-                self.current_figure.savefig(filename)
+            self._save_current_figure()
             old_figure = self.current_figure
             self.current_figure = pylab.figure()
             self.figure_count += 1
@@ -184,3 +215,6 @@ class FigureGenerator(object):
         adjust_spines(ax, ('bottom', 'left'))
         self.i = (self.i + 1) % self.max_groups
         return ax
+
+    def __del__(self):
+        self._save_current_figure()
