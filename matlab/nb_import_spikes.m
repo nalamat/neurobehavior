@@ -51,6 +51,20 @@ function [spikes] = nb_import_spikes(filename, varargin)
 %           do not reject any event
 %       Keep in mind that you have access to the waveforms so you can
 %       perform your own reject algorithm
+%   trial_range_mode : {'individual', 'block'}
+%       Controls how the trial_range parameter is handled.  The trial_range is
+%       specified as [lower, upper].  
+%           individual
+%               Include only spikes occuring within trial_start+lower to
+%               trial_end+upper for each trial.  Excludes the inter-trial region.
+%           block
+%               Include only spikes occuring within trial_start+lower of the
+%               first trial to trial_end+upper of the last trial.  This includes
+%               the inter-trial region but excludes the region before and after
+%               the subject is performing trials.
+%           exact
+%               Someday it would be nice to be able to specify the exact time
+%               range to include, but this is currently not implemented.
 %   trial_range : Empty or length 2 (lower, upper)
 %       If not empty, return only events that occur during a trial.  The lower
 %       and upper bound indicate how many seconds before and after the trial to
@@ -62,9 +76,10 @@ function [spikes] = nb_import_spikes(filename, varargin)
 %           (1, 2)
 %               One second after start of trial to one second after end of 
 %               trial
-%       Trial times are obtained from the physiology_epoch block.  However,
+%       Trial times could be obtained from the physiology_epoch block.  However,
 %       older datafiles did not save these times, so they will be obtained from
-%       the less accurate trial_log column, 'start'.
+%       the less accurate trial_log column, 'start'.  Eventually, this code can
+%       be updated to use the physiology_epoch block instead.
 %   max_features : integer (default inf)
 %       Maximum number of events to return (useful for debugging since the
 %       clustering algorithms can often be slow when working with a large number
@@ -80,7 +95,7 @@ function [spikes] = nb_import_spikes(filename, varargin)
 %   event times) that just needs a tiny bit of tweaking before it is 100%
 %   compatible with UMS2000 or Chronux.
 %
-%   TODO: Complete documenting the fields of the structure...
+%   TODO: Complete documenting the fields of the structure... (volunteers?)
 %
 %   spikes.source_indices (one-based)
 %       Index of the event in the source file.  Useful for reintegrating the
@@ -89,9 +104,6 @@ function [spikes] = nb_import_spikes(filename, varargin)
 %   spikes.timestamps
 %   spikes.channels
 %   spikes.waveforms
-%
-%
-%
 %   spikes.info.detect.extracted_channels
 %   spikes.info.detect.trial_epoch
 %       Lower and upper bound (in seconds) of each trial as computed by the data
@@ -116,6 +128,8 @@ function [spikes] = nb_import_spikes(filename, varargin)
     p.addParamValue('trial_range', [], ...
                     @(x) isvector(x) && (length(x) == 2 || isempty(x)) ...
                    );
+    p.addParamValue('trial_range_mode', 'block', ...
+                    @(x) strcmpi(x, 'block') || strcmpi(x, 'trial')),
     p.addParamValue('waveform_gain', 1, @isscalar);
     p.parse(filename, varargin{:});
 
@@ -128,6 +142,7 @@ function [spikes] = nb_import_spikes(filename, varargin)
     artifact_reject = p.Results.artifact_reject;
     trial_range = p.Results.trial_range;
     waveform_gain = p.Results.waveform_gain;
+    trial_range_mode = p.Results.trial_range_mode;
 
     % Empty arrays means that the user wants to default to the value specified
     % via the channels argument.  If channels is also empty, this defaults to
@@ -261,19 +276,32 @@ function [spikes] = nb_import_spikes(filename, varargin)
     % a valid fieldname, go figure).
     epochs = round([trial_log.start, trial_log.xEnd] * timestamps_fs)';
     spikes.info.detect.trial_epochs = epochs;
-    lb = round(trial_range(1)*timestamps_fs);
-    ub = round(trial_range(2)*timestamps_fs);
-    epochs(1,:) = epochs(1,:)+lb;
-    epochs(2,:) = epochs(2,:)+ub;
-    spikes.info.detect.expanded_trial_epochs = epochs;
     
     if length(trial_range) == 2, 
-        % Filter the event data by including only trials that fall in the range
-        % [trial_start+trial_range(1), trial_end+trial_range(2))
-        trial_mask = zeros(1, length(timestamps));
-        for i = 1:length(epochs),
-            submask = (timestamps >= epochs(1,i)) & (timestamps < epochs(2,i));
-            trial_mask = trial_mask | submask;
+        lb = round(trial_range(1)*timestamps_fs);
+        ub = round(trial_range(2)*timestamps_fs);
+
+        if strcmpi(trial_range_mode, 'individual')
+            % Unlike Python's Numpy, this triggers a *copy* of the entire array,
+            % meaning that expanded_epochs does not point to the same object as
+            % epochs.
+            expanded_epochs = epochs;
+            expanded_epochs(1,:) = expanded_epochs(1,:)+lb;
+            expanded_epochs(2,:) = expanded_epochs(2,:)+ub;
+            spikes.info.detect.expanded_trial_epochs = expanded_epochs;
+
+            % Filter the event data by including only events that fall in the
+            % range [trial_start+trial_range(1), trial_end+trial_range(2))
+            trial_mask = zeros(1, length(timestamps));
+            for i = 1:length(expanded_epochs),
+                submask = (timestamps >= expanded_epochs(1,i)) & ...
+                          (timestamps < expanded_epochs(2,i));
+                trial_mask = trial_mask | submask;
+            end
+        else
+            block_start = epochs(1,1)+lb;
+            block_end = epochs(2,end)+ub;
+            trial_mask = (timestamps >= block_start) & (timestamps < block_end);
         end
 
         % Winnow down our dataset to those that are within the trial range
@@ -282,6 +310,9 @@ function [spikes] = nb_import_spikes(filename, varargin)
         channels = channels(trial_mask);
         channel_indices = channel_indices(trial_mask);
         source_indices = source_indices(trial_mask);
+    else
+        lb = 0;
+        ub = 0;
     end
 
     % Information saved in spikes.info.detect.settings reflects the actual
@@ -304,31 +335,32 @@ function [spikes] = nb_import_spikes(filename, varargin)
     end
 
     % Create the array indicating trial time
-    trials = zeros(1, length(timestamps));
-    spiketimes = zeros(1, length(timestamps));
-    n_trials = size(epochs, 2);
-    for i = 1:(n_trials-1),
-        start_1 = epochs(1, i);
-        start_2 = epochs(1, i+1);
-        mask = (timestamps >= start_1) & (timestamps < start_2);
-        trials(mask) = i;
-        % Start time of the epoch stored in the epoch array is trial_start+lb.
-        % We need to add the lower bound offset back in to find the true
-        % post-stimulus time.
-        spiketimes(mask) = timestamps(mask)-start_1+lb;
-    end
-    mask = timestamps >= epochs(1, end);
-    trials(mask) = n_trials;
-    spiketimes(mask) = timestamps(mask)-epochs(1, end)-lb;
+    %trials = zeros(1, length(timestamps));
+    %spiketimes = zeros(1, length(timestamps));
+    %n_trials = size(epochs, 2);
+    %for i = 1:(n_trials-1),
+    %    start_1 = epochs(1, i);
+    %    start_2 = epochs(1, i+1);
+    %    mask = (timestamps >= start_1) & (timestamps < start_2);
+    %    trials(mask) = i;
+    %    % Start time of the epoch stored in the epoch array is trial_start+lb.
+    %    % We need to add the lower bound offset back in to find the true
+    %    % post-stimulus time.
+    %    spiketimes(mask) = timestamps(mask)-start_1+lb;
+    %end
+    %mask = timestamps >= epochs(1, end);
+    %trials(mask) = n_trials;
+    %spiketimes(mask) = timestamps(mask)-epochs(1, end)-lb;
 
     spikes.waveforms = waveforms;
     spikes.timestamps = timestamps;
     spikes.channels = channels;
     spikes.channel_indices = channel_indices;
     spikes.source_indices = source_indices;
-    spikes.trials = trials;
-    spikes.spiketimes = spiketimes / timestamps_fs;
-    spikes.unwrapped_times = timestamps / timestamps_fs;
+    spikes.trials = [1];
+    spikes.spiketimes = timestamps ./ timestamps_fs;
+    spikes.unwrapped_times = spikes.spiketimes;
+    spikes.trials = ones(1, length(spikes.timestamps), 'single');
 end
 
 function [indices] = get_indices(channels, available_channels)
