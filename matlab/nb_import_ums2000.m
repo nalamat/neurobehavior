@@ -13,7 +13,7 @@ function [spikes] = nb_import_ums2000(filename, sort, varargin)
 %
 %   optional parameters
 %   -------------------
-%   All parameters supported by NB_IMPORT_SPIKES ar
+%   All parameters supported by NB_IMPORT_SPIKES are supported.
 %
 %   Important information
 %   ---------------------
@@ -40,10 +40,18 @@ function [spikes] = nb_import_ums2000(filename, sort, varargin)
     window_size = double(h5readatt(filename, '/event_data', 'window_size'));
     cross_time = double(h5readatt(filename, '/event_data', 'cross_time'));
     shadow = 0;
+
+    % In general I am going to assume that the data falls into ~5 clusters
+    % including a "noise floor", "artifact", and three spike waveforms.  The
+    % clustering algorithm can certainly identify additional clusters as it sees
+    % fit; however, the default clustersize UMS2000 uses is a bit small for the
+    % large datasets we deal with.
+    kmeans_clustersize = round(size(spikes.timestamps, 2)/10);
     
     params = ss_default_params(fs, 'window_size', window_size, ...
                                'cross_time', cross_time, ...
-                               'shadow', shadow);
+                               'shadow', shadow, ...  
+                               'kmeans_clustersize', kmeans_clustersize);
     spikes.params = params.params;
 
     % This is a new feature added to UMS2000 by BNB that allows the user to
@@ -61,7 +69,7 @@ function [spikes] = nb_import_ums2000(filename, sort, varargin)
     % do not seem to deal well with non-double datatypes.
     align_sample = h5readatt(filename, '/event_data', 'samples_before')+1.0;
     spikes.info.detect.align_sample = double(align_sample);
-    spikes.info.detect.dur = [spikes.unwrapped_times(end)];
+    spikes.info.detect.dur = [spikes.spiketimes(end)];
     stds = double(h5readatt(filename, '/event_data', 'noise_std'));
     thresh = double(h5readatt(filename, '/event_data', 'threshold'));
     
