@@ -19,6 +19,21 @@ cluster_type_marker = {
 }
 
 class ExtractedSpikeOverlay(AbstractOverlay):
+    '''
+    Supports overlaying the spike times on a multichannel view.  The component
+    must be a subclass of MultiChannelPlot.
+
+    clusters
+        One entry for each timestamp indicating the cluster that event belongs
+        to
+    
+    cluster_ids
+        List of all cluster IDs
+
+    cluster_types
+        List of the type of each cluster listed in cluster_ids.  Controls how
+        the cluster is plotted on-screen
+    '''
 
     plot = Instance('enable.api.Component')
     
