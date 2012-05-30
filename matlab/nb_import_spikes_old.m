@@ -21,10 +21,14 @@ function [spikes] = nb_import_spikes(filename, varargin)
 %   channels : array (default - all channels)
 %       Specify the default values for waveform_channels and detect_channels.
 %       Mainly a convenience argument that allows you to call the function as:
+%
 %           >>> sp = nb_import_spikes(filename, 'channels', 3);
+%
 %       In lieu of the more verbose syntax:
+%
 %           >>> sp = nb_import_spikes(filename, 'detect_channels', 3, ...
 %                                     'waveform_channels', 3);
+%
 %       If empty, this means to return all channels.
 %
 %   waveform_channels : array (defaults to value passed in 'channels')
@@ -37,6 +41,67 @@ function [spikes] = nb_import_spikes(filename, varargin)
 %       Omit censored spikes from the sorting.  Requires that the
 %       censor_spikes.py script be run on the extracted spiketimes file.  In 99%
 %       of cases, you want to set this option to True.
+%
+%   rms_stdev : float
+%       Number of standard deviations of RMS to use as a threshold for excluding
+%       spikes during that region
+%
+%   rms_channels : {[], 'all', 'detect', 'waveform', array}
+%       'all'
+%           reject event if an artifact is detected on any channel,
+%       'detect'
+%           reject event if an artifact is observed on any of the channels
+%           specified in 'detect_channels'
+%       'waveform'
+%           reject event if an artifact is observed on any of the channels
+%           specified in 'waveform_channels'
+%       array
+%           reject event if an artifact is observed on any of the channels
+%           specified in the vector
+%       [] (default)
+%           do not reject any event
+%
+%   artifact_reject : {[], 'all', 'detect', 'waveform', array}
+%       This argument is deprecated in favor of using the Python-based
+%       censor_spikes.py script (available in Neurobehavior under the scripts
+%       folder).  The censor_spikes.py script is much more powerful and handles
+%       many edge cases (e.g. sudden changes in the noise floor, etc.). 
+%
+%       'all'
+%           reject event if an artifact is detected on any channel,
+%       'detect'
+%           reject event if an artifact is observed on any of the channels
+%           specified in 'detect_channels'
+%       'waveform'
+%           reject event if an artifact is observed on any of the channels
+%           specified in 'waveform_channels'
+%       array
+%           reject event if an artifact is observed on any of the channels
+%           specified in the vector
+%       [] (default)
+%           do not reject any event
+%
+%       Keep in mind that you have access to the waveforms so you can
+%       perform your own reject algorithm
+%
+%   trial_range_mode : {'individual', 'block'}
+%       The 'block' mode of this argument is deprecated in favor of using the
+%       Python-based censor_spikes.py script.
+%
+%       Controls how the trial_range parameter is handled.  The trial_range is
+%       specified as [lower, upper].  
+%
+%       individual
+%           Include only spikes occuring within trial_start+lower to
+%           trial_end+upper for each trial.  Excludes the inter-trial region.
+%       block
+%           Include only spikes occuring within trial_start+lower of the
+%           first trial to trial_end+upper of the last trial.  This includes
+%           the inter-trial region but excludes the region before and after
+%           the subject is performing trials.
+%       exact
+%           Someday it would be nice to be able to specify the exact time
+%           range to include, but this is currently not implemented.
 %
 %   trial_range : Empty or length 2 (lower, upper)
 %       If not empty, return only events that occur during a trial.  The lower
@@ -53,9 +118,6 @@ function [spikes] = nb_import_spikes(filename, varargin)
 %       older datafiles did not save these times, so they will be obtained from
 %       the less accurate trial_log column, 'start'.  Eventually, this code can
 %       be updated to use the physiology_epoch block instead.
-%
-%   DEBUGGING ARGUMENTS (do not use these unless you are attempting to
-%   troubleshoot some issues with the spike sorting)
 %
 %   max_features : integer (default inf)
 %       Maximum number of events to return (useful for debugging since the
@@ -99,10 +161,16 @@ function [spikes] = nb_import_spikes(filename, varargin)
     p.addParamValue('detect_channels', [], @isvector);
     p.addParamValue('max_features', inf, @isscalar);
     p.addParamValue('exclude_censored', false, @islogical);
+    p.addParamValue('artifact_reject', [], ...
+                    @(x) isvector(x) || strcmpi(x, 'all') || ...
+                         strcmpi(x, 'detect') || strcmpi(x, 'waveform') ...
+                   );
     p.addParamValue('omit_prepost', true, @islogical);
     p.addParamValue('trial_range', [], ...
                     @(x) isvector(x) && (length(x) == 2 || isempty(x)) ...
                    );
+    p.addParamValue('trial_range_mode', 'block', ...
+                    @(x) strcmpi(x, 'block') || strcmpi(x, 'trial')),
     p.addParamValue('waveform_gain', 1, @isscalar);
     p.parse(filename, varargin{:});
 
@@ -112,9 +180,10 @@ function [spikes] = nb_import_spikes(filename, varargin)
     waveform_channels = p.Results.waveform_channels;
     detect_channels = p.Results.detect_channels;
     max_features = p.Results.max_features;
+    artifact_reject = p.Results.artifact_reject;
     trial_range = p.Results.trial_range;
     waveform_gain = p.Results.waveform_gain;
-    exclude_censored = p.Results.exclude_censored;
+    trial_range_mode = p.Results.trial_range_mode;
 
     % Empty arrays means that the user wants to default to the value specified
     % via the channels argument.  If channels is also empty, this defaults to
@@ -143,6 +212,13 @@ function [spikes] = nb_import_spikes(filename, varargin)
     timestamps = double(h5read(filename, '/event_data/timestamps_n')');
     timestamps_fs = h5readatt(filename, '/event_data/timestamps_n', 'fs');
     timestamps_fs = double(timestamps_fs);
+
+    % Load the censor data.  We can't apply the censor mask quite yet since we
+    % need to winnow it down first.
+    if exclude_censored
+        censored = h5read(filename, '/event_data/censored');
+    else
+        censored = zeros(size(timestamps));
 
     % Indices of the events in the file (one-based).  Since we may be sorting a
     % subset of our data, we need to be able to pair up the sorted results with
@@ -206,53 +282,74 @@ function [spikes] = nb_import_spikes(filename, varargin)
         source_indices = source_indices(detect_mask);
     else
         detect_channels = extracted_channels;
-        detect_mask = ones(size(timestamps));
     end
  
-    % Load the censor data.  We can't apply the censor mask quite yet since we
-    % need to winnow it down first.
-    if exclude_censored
-        censored = h5read(filename, '/event_data/censored')';
-        censored = censored(detect_mask);
-        waveforms = waveforms(~censored, :, :);
-        max(timestamps)/60/timestamps_fs
-        timestamps = timestamps(~censored);
-        max(timestamps)/60/timestamps_fs
-        channels = channels(~censored);
-        channel_indices = channel_indices(~censored);
-        source_indices = source_indices(~censored);
+    if ~isempty(artifact_reject),
+        if strcmp(artifact_reject, 'detect'),
+            artifact_reject = detect_channels;
+        elseif strcmp(artifact_reject, 'waveform'),
+            artifact_reject = waveform_channels;
+        elseif strcmp(artifact_reject, 'all'),
+            artifact_reject = extracted_channels;
+        end
+        
+        % Artifacts are a 2D array [event, channel] indicating which channels
+        % exceeded the aritfact threshold for any given event.  The transpose
+        % operation is required because they are saved in C order in the HDF5
+        % file.  Matlab views this as [channel, event] so we need to convert it
+        % to the appropriate [event, channel] format.
+        artifacts = h5read(filename, '/event_data/artifacts')';
+        
+        % Now, pull out the values for the correct channels based on the detect
+        % mask and see if any of them are True
+        indices = get_indices(artifact_reject, extracted_channels);
+        artifacts = artifacts(detect_mask, indices);
+        nonartifact_mask = ~any(artifacts, 2)';
+
+        % Winnow down our dataset based on the artifact_mask
+        waveforms = waveforms(nonartifact_mask, :, :);
+        timestamps = timestamps(nonartifact_mask);
+        channels = channels(nonartifact_mask);
+        channel_indices = channel_indices(nonartifact_mask);
+        source_indices = source_indices(nonartifact_mask);
     end
+
+    % Load the start/end times of each trial and convert to the same
+    % unit as the timestamps_n array (e.g. the unit is 1/sampling 
+    % frequency of the physiology data).
+    trial_log = h5read(filename, '/block_data/trial_log');
+    
+    % Apparently Matlab's h5read doesn't like "end" as a fieldname for
+    % the trial_log structure and converts it to xEnd (even though "end" is
+    % a valid fieldname, go figure).
+    epochs = round([trial_log.start, trial_log.xEnd] * timestamps_fs)';
+    spikes.info.detect.trial_epochs = epochs;
     
     if length(trial_range) == 2, 
-        % Load the start/end times of each trial and convert to the same
-        % unit as the timestamps_n array (e.g. the unit is 1/sampling 
-        % frequency of the physiology data).
-        trial_log = h5read(filename, '/block_data/trial_log');
-
-        % Apparently Matlab's h5read doesn't like "end" as a fieldname for the
-        % trial_log structure and converts it to xEnd (even though "end" is a
-        % valid fieldname, go figure).
-        epochs = round([trial_log.start, trial_log.xEnd] * timestamps_fs)';
-        spikes.info.detect.trial_epochs = epochs;
-    
         lb = round(trial_range(1)*timestamps_fs);
         ub = round(trial_range(2)*timestamps_fs);
 
-        % Unlike Python's Numpy, this triggers a *copy* of the entire array,
-        % meaning that expanded_epochs does not point to the same object as
-        % epochs.
-        expanded_epochs = epochs;
-        expanded_epochs(1,:) = expanded_epochs(1,:)+lb;
-        expanded_epochs(2,:) = expanded_epochs(2,:)+ub;
-        spikes.info.detect.expanded_trial_epochs = expanded_epochs;
+        if strcmpi(trial_range_mode, 'individual')
+            % Unlike Python's Numpy, this triggers a *copy* of the entire array,
+            % meaning that expanded_epochs does not point to the same object as
+            % epochs.
+            expanded_epochs = epochs;
+            expanded_epochs(1,:) = expanded_epochs(1,:)+lb;
+            expanded_epochs(2,:) = expanded_epochs(2,:)+ub;
+            spikes.info.detect.expanded_trial_epochs = expanded_epochs;
 
-        % Filter the event data by including only events that fall in the
-        % range [trial_start+trial_range(1), trial_end+trial_range(2))
-        trial_mask = zeros(1, length(timestamps));
-        for i = 1:length(expanded_epochs),
-            submask = (timestamps >= expanded_epochs(1,i)) & ...
-                      (timestamps < expanded_epochs(2,i));
-            trial_mask = trial_mask | submask;
+            % Filter the event data by including only events that fall in the
+            % range [trial_start+trial_range(1), trial_end+trial_range(2))
+            trial_mask = zeros(1, length(timestamps));
+            for i = 1:length(expanded_epochs),
+                submask = (timestamps >= expanded_epochs(1,i)) & ...
+                          (timestamps < expanded_epochs(2,i));
+                trial_mask = trial_mask | submask;
+            end
+        else
+            block_start = epochs(1,1)+lb;
+            block_end = epochs(2,end)+ub;
+            trial_mask = (timestamps >= block_start) & (timestamps < block_end);
         end
 
         % Winnow down our dataset to those that are within the trial range
@@ -261,20 +358,22 @@ function [spikes] = nb_import_spikes(filename, varargin)
         channels = channels(trial_mask);
         channel_indices = channel_indices(trial_mask);
         source_indices = source_indices(trial_mask);
+    else
+        lb = 0;
+        ub = 0;
     end
 
     % Information saved in spikes.info.detect.settings reflects the actual
     % arguments passed to the function, not the values that were actually used
-    % so we should save both p.Results as well as *_channels.
+    % so we should save both p.REsults as well as *_channels.
     spikes.info.detect.settings = p.Results;
     spikes.info.detect.detect_channels = detect_channels;
     spikes.info.detect.waveform_channels = waveform_channels;
     spikes.info.detect.window_samples = size(waveforms, 2);
     spikes.info.detect.source_file = filename;
     
-    % Truncate the list of event times.  First, if we have fewer events than
-    % max_features, then update max_features accordingly.  This is only for
-    % debugging purposes.
+    % Truncate the waveform.  First, if we have fewer events than max_features,
+    % then update max_features accordingly.
     if ~isinf(max_features) & (max_features < length(timestamps)),
         waveforms = waveforms(1:max_features, :, :);
         timestamps = timestamps(1:max_features);
@@ -282,6 +381,46 @@ function [spikes] = nb_import_spikes(filename, varargin)
         channel_indices = channel_indices(1:max_features);
         source_indices = source_indices(1:max_features);
     end
+
+    % Create the array indicating trial time
+    %trials = zeros(1, length(timestamps));
+    %spiketimes = zeros(1, length(timestamps));
+    %n_trials = size(epochs, 2);
+    %for i = 1:(n_trials-1),
+    %    start_1 = epochs(1, i);
+    %    start_2 = epochs(1, i+1);
+    %    mask = (timestamps >= start_1) & (timestamps < start_2);
+    %    trials(mask) = i;
+    %    % Start time of the epoch stored in the epoch array is trial_start+lb.
+    %    % We need to add the lower bound offset back in to find the true
+    %    % post-stimulus time.
+    %    spiketimes(mask) = timestamps(mask)-start_1+lb;
+    %end
+    %mask = timestamps >= epochs(1, end);
+    %trials(mask) = n_trials;
+    %spiketimes(mask) = timestamps(mask)-epochs(1, end)-lb;
+    
+    extract_indices = get_indices(waveform_channels, extracted_channels);
+    % Loop through and pull the data into our preallocated array
+    for i=1:length(extract_indices)
+        waveforms(:,i,:) = h5read(filename, '/event_data/waveforms', ...
+                                  [1 extract_indices(i) 1], [Inf 1 Inf]);
+    end
+
+    if ~isempty(rms_channels)
+        extract_indices = get_indices(rms_channels, extracted_channels);
+        rms = double(h5read(filename, '/rms/rms'))';
+        rms = rms(extract_indices, :);
+        rms_mean = mean(rms, 2);
+        rms_std = std(rms, 0, 2);
+        rms_th = rms_mean + rms_std*rms_stdev;
+
+        % Compute mask indicates the regions excluded because the artifact noise
+        % floor exceeded the specified threshold
+        mask = ones(1, size(raw, 2));
+        for i=1:size(raw, 1)
+            mask = mask | (raw(i,:) >= rms_th(i));
+        end
 
     spikes.waveforms = waveforms;
     spikes.timestamps = timestamps;
