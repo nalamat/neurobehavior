@@ -317,11 +317,17 @@ def running_rms(input_node, output_node, duration, step, processing,
     else:
         raise ValueError, 'Unknown algorithm "{}"'.format(algorithm)
     
+    # Do not modify this code unless you *really* know what you're doing.  We
+    # use some "under-the-hood" tricks in the Numpy library to optimize this
+    # algorithm for speed, specifically the `as_strided` function.  Using the
+    # obvious brute-force approach is significantly slower and more
+    # disk-intensive.
     iterable = chunk_iter(channel, c_samples, step_samples=c_samples-c_loverlap)
 
     aborted = False
     for i_chunk, chunk in enumerate(iterable):
-        # This is a hack to discard the very last chunk if it's the wrong size.
+        # This is a hack to discard the very last chunk if it's the wrong size
+        # because it can't be easily reshaped via the as_strided function.
         # Eventually I need to come up with better logic here ...
         if chunk.shape[-1] != c_samples:
             print 'discarding chunk'
@@ -329,7 +335,7 @@ def running_rms(input_node, output_node, duration, step, processing,
 
         ch_stride, s_stride = chunk.strides
         strides = ch_stride, window_step*s_stride, s_stride
-        chunk = as_strided(chunk, new_shape, strides)
+        chunk = as_strided(chunk, new_shape, strides) # <- the optimization
         rms.append(compute_rms(chunk))
 
         if progress_callback(i_chunk*c_samples, total_samples, ''):
