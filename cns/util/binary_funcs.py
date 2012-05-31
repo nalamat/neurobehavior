@@ -70,6 +70,16 @@ def smooth_epochs(epochs):
         smoothed.append((lb, ub))
     return np.array(smoothed)
 
+def epochs_contain(epochs, ts):
+    '''
+    Returns True if ts falls within one of the epoch boundaries
+
+    Epochs must be sorted.
+    '''
+    i = np.searchsorted(epochs[:,0], ts)
+    j = np.searchsorted(epochs[:,1], ts)
+    return i != j
+
 def int_to_TTL(a, width):
     '''
     Converts a 1D array of integers to a 2D boolean array based on the binary
