@@ -271,6 +271,14 @@ def running_rms(input_node, output_node, duration, step, processing,
     # code works, you need to understand how n-dimensional arrays are
     # represented in computer memory and indexed.  This is an in-depth
     # explanation that is outside the scope of this comment.
+    #
+    # channels
+    #   Number of channels in the dataset
+    # window_n
+    #   Number of windows to evaluate.  This is equivalent to
+    #   np.floor((len(chunk)-window_samples))/window_step+1
+    # window_samples
+    #  Duration of each window
     new_shape = channels, window_n, window_samples
 
     # Create the output data node
@@ -319,22 +327,32 @@ def running_rms(input_node, output_node, duration, step, processing,
     
     # Do not modify this code unless you *really* know what you're doing.  We
     # use some "under-the-hood" tricks in the Numpy library to optimize this
-    # algorithm for speed, specifically the `as_strided` function.  Using the
-    # obvious brute-force approach is significantly slower and more
+    # algorithm for speed and memory, specifically the `as_strided` function.
+    # Using the obvious brute-force approach is significantly slower and more
     # disk-intensive.
     iterable = chunk_iter(channel, c_samples, step_samples=c_samples-c_loverlap)
 
     aborted = False
     for i_chunk, chunk in enumerate(iterable):
-        # This is a hack to discard the very last chunk if it's the wrong size
-        # because it can't be easily reshaped via the as_strided function.
-        # Eventually I need to come up with better logic here ...
-        if chunk.shape[-1] != c_samples:
-            print 'discarding chunk'
-            continue
 
+        if chunk.shape[-1] != c_samples:
+            # We need to update the shape to handle the very last chunk
+            n_samples = chunk.shape[-1]
+            window_n = np.floor((n_samples-window_samples)/window_step)
+            new_shape = channels, window_n, window_samples
+            discarded = n_samples-(window_n*window_step+window_samples)
+            rms._v_attrs['last_chunk_new_shape'] = new_shape
+            rms._v_attrs['samples_discarded'] = discarded
+            print 'Discarding last {} samples from last chunk'.format(discarded)
+
+        # We need to load the stride information from the chunk.  Although we
+        # could guess the information in advance based on our knowledge of the
+        # underlying dtype, I find that there are sometimes edge cases that I am
+        # not aware of.  It's better to just ask the chunk what it's memory
+        # layout is and use that information.
         ch_stride, s_stride = chunk.strides
         strides = ch_stride, window_step*s_stride, s_stride
+
         chunk = as_strided(chunk, new_shape, strides) # <- the optimization
         rms.append(compute_rms(chunk))
 
