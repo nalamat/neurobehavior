@@ -3,7 +3,7 @@ from cns import h5
 from cns.io import update_progress
 from cns.analysis import running_rms
 
-def compute_rms(extracted_filename):
+def compute_rms(ext_filename):
     '''
     Add running measurement of RMS noise floor to the extracted spiketimes file.
     This metric is required for many of the spike processing routines; however,
@@ -11,8 +11,8 @@ def compute_rms(extracted_filename):
     into a separate function.
     '''
     processing = {}
-    with tables.openFile(extracted_filename, 'a') as fh:
-        raw_filename = extracted_filename.replace('extracted', 'raw')
+    with tables.openFile(ext_filename, 'a') as fh:
+        raw_filename = ext_filename.replace('extracted', 'raw')
 
         if 'rms' in fh.root:
             fs = fh.root.rms.rms._v_attrs['fs']
@@ -20,6 +20,8 @@ def compute_rms(extracted_filename):
             dur = fh.root.rms.rms.shape[-1]/fs
             mesg = 'Already has RMS of duration {}.  Last trial ends at {}.'
             print mesg.format(dur, last_trial)
+            if last_trial+5 >= dur:
+                print 'ERROR here!!!!'
             return
 
         processing['filter_freq_lp'] = fh.root.filter._v_attrs.fc_lowpass
@@ -40,8 +42,6 @@ if __name__ == '__main__':
     description = 'Add RMS to extracted spiketimes file'
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('files', nargs='+', help='Files to procss')
-    parser.add_argument('--stdev', type=float, default=2, 
-                        help='Threshold for RMS')
     args = parser.parse_args()
     for filename in args.files:
         print 'Processing file', filename

@@ -1,15 +1,17 @@
 import tables
 import numpy as np
-from cns.util.binary_funcs import epochs, smooth_epochs
+from cns.util.binary_funcs import epochs, smooth_epochs, epochs_contain
 
 def censor_spikes(ext_filename, rms_pad=0.5, block_pad=5, artifact_pad=0.5,
-                  artifact_mode='single', force_overwrite=False):
+                  artifact_mode='single', zero_pad=1.25, force_overwrite=False):
     '''
     Censor extracted spikes based on three criteria::
 
         noise floor
         artifacts
         block
+
+    rms_pad
 
     Once the spikes have been censored, you can use the physiology review GUI
     (using the overla extracted spikes feature) to inspect the censored result.
@@ -46,25 +48,31 @@ def censor_spikes(ext_filename, rms_pad=0.5, block_pad=5, artifact_pad=0.5,
             mask = i == channel_indices
             timestamps = enode.timestamps[mask]
 
+            if len(timestamps) == 0:
+                # This usually means the channel was used solely for artifact
+                # reject (or the user set the spike threshold wrong)
+                continue
+
             if np.diff(timestamps).min() < 0:
                 raise ValueError, 'Timestamps are not ordered!'
 
             # Censor based on RMS artifacts
             rms = fh.root.rms.rms[ch]
             rms_th = np.median(rms)/0.6745
-            #rms_mean = rms.mean()
-            #rms_std = rms.std()
-            #rms_th = rms_mean + rms_stdev*rms_std
-            rms_epochs = epochs(rms >= rms_th, rms_pad)
+            rms_epochs = epochs(rms >= rms_th)
             rms_epochs = rms_epochs / fh.root.rms.rms._v_attrs.fs
+            rms_epochs += [[-rms_pad, rms_pad]]
             rms_epochs = smooth_epochs(rms_epochs)
 
-            j = np.searchsorted(rms_epochs[:,0], timestamps)
-            k = np.searchsorted(rms_epochs[:,1], timestamps)
-            rms_censor = ~(j == k) 
-
             # Censor based on block start/end
-            block_censor = (timestamps < lb) | (timestamps > ub)
+            #block_censor = (timestamps < lb) | (timestamps > ub)
+
+            zero_epochs = epochs(rms == 0)
+            zero_epochs = zero_epochs / fh.root.rms.rms._v_attrs.fs
+            zero_epochs += [[-zero_pad, zero_pad]]
+            zero_epochs = smooth_epochs(zero_epochs)
+            if len(zero_epochs) > 0:
+                print zero_epochs
 
             if artifact_mode == 'single':
                 # Censor based on transients in data.  Need to recompute this
@@ -75,22 +83,27 @@ def censor_spikes(ext_filename, rms_pad=0.5, block_pad=5, artifact_pad=0.5,
                                         artifact_ts+artifact_pad]
                 artifact_epochs = smooth_epochs(artifact_epochs)
 
-            j = np.searchsorted(artifact_epochs[:,0], timestamps)
-            k = np.searchsorted(artifact_epochs[:,1], timestamps)
-            artifact_censor = ~(j == k) 
+            #j = np.searchsorted(artifact_epochs[:,0], timestamps)
+            #k = np.searchsorted(artifact_epochs[:,1], timestamps)
+            #artifact_censor = ~(j == k) 
 
-            # Update the censor mask
-            censored[mask] = rms_censor | block_censor | artifact_censor
-
-            # Save the censor data
             cenode = fh.createGroup(cnode, 'extracted_{}'.format(i))
             cenode._v_attrs['channel'] = ch+1 # 1-based channel number
+
+            # Save the rms censor data
             array = fh.createEArray(cenode, 'rms_epochs', shape=(0, 2),
                                     atom=tables.Float32Atom(),
                                     title='Censored RMS epochs')
             array.append(rms_epochs)
             array._v_attrs['rms_pad'] = rms_pad
             array._v_attrs['rms_threshold'] = rms_th
+
+            # Save the zero censor data
+            array = fh.createEArray(cenode, 'zero_epochs', shape=(0, 2),
+                                    atom=tables.Float32Atom(),
+                                    title='Censored RMS epochs')
+            array.append(zero_epochs)
+            array._v_attrs['zero_pad'] = zero_pad
 
             # Save the artifact reject data
             array = fh.createEArray(cenode, 'artifact_epochs', shape=(0, 2),
@@ -107,11 +120,15 @@ def censor_spikes(ext_filename, rms_pad=0.5, block_pad=5, artifact_pad=0.5,
             all_epochs = np.r_[[(0, lb)], 
                                rms_epochs, 
                                artifact_epochs, 
+                               zero_epochs,
                                [(ub, np.inf)]]
             all_epochs.sort()
             all_epochs = smooth_epochs(all_epochs)
             fh.createArray(cenode, 'censored_epochs', all_epochs,
                            title='All censored epochs')
+
+            # Update the censor mask
+            censored[mask] = epochs_contain(all_epochs, timestamps)
 
         # Save some metadata regarding the censoring process (this is redundant
         # with the data stored in the subnodes, but provided here as well)
@@ -132,7 +149,9 @@ if __name__ == '__main__':
     parser.add_argument('--artifact-pad', type=float, default=0.2, 
                         help='Padding for artifact')
     parser.add_argument('--artifact-mode', choices=('single', 'all'),
-                        default='single', help='Reject mode')
+                        default='all', help='Reject mode')
+    parser.add_argument('--zero-pad', type=float, default=1.25, 
+                        help='Zero padding for artifact')
     parser.add_argument('--force-overwrite', action='store_true',
                         help='Overwrite existing censor data')
 
@@ -145,6 +164,7 @@ if __name__ == '__main__':
                           block_pad=args.block_pad,
                           artifact_pad=args.artifact_pad,
                           artifact_mode=args.artifact_mode,
+                          zero_pad=args.zero_pad,
                           force_overwrite=args.force_overwrite)
         except IOError:
             print 'Censored data already exists, skipping file.'
