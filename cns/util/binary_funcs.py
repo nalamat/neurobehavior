@@ -9,7 +9,7 @@ def edge_rising(TTL):
 def edge_falling(TTL):
     return np.r_[0, np.diff(TTL.astype('i'))] == -1
 
-def epochs(x, pad):
+def epochs(x, pad=0):
     '''
     Given a boolean array, where 1 = epoch, return indices of epochs (first
     column is the index where x goes from 0 to 1 and second column is index
@@ -78,6 +78,16 @@ def epochs_contain(epochs, ts):
     '''
     i = np.searchsorted(epochs[:,0], ts)
     j = np.searchsorted(epochs[:,1], ts)
+    return i != j
+
+def epochs_overlap(a, b):
+    '''
+    Returns True where `b` falls within boundaries of epoch in `a`
+
+    Epochs must be sorted.
+    '''
+    i = np.searchsorted(a[:,0], b[:,0])
+    j = np.searchsorted(a[:,1], b[:,1])
     return i != j
 
 def int_to_TTL(a, width):
