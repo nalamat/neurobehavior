@@ -57,7 +57,7 @@ function spikes = ss_align( spikes )
         shifts = shifts' / spikes.params.Fs;
         spikes.spiketimes = spikes.spiketimes + shifts;
         spikes.unwrapped_times = spikes.unwrapped_times + shifts;
-        spikes.info.align.shifts;
+        spikes.info.align.shifts = shifts;
 
         % update alignment flagged
         spikes.info.align.aligned = 1;

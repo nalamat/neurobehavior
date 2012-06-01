@@ -40,17 +40,24 @@ function nb_autosort_ums2000(filenames, basepath, varargin)
 %
 
 for i = 1:length(filenames),
-    filename = [basepath, '/', filenames(i).name];
+    if ~strcmpi(basepath, '')
+        filename = [basepath, '/', filenames(i).name];
+    else
+        filename = filenames(i).name;
+    end
     base_filename = regexprep(filename, '(.*)\.(h5|hd5|hdf5)', '$1');
 
     for channel = nb_extracted_channels(filename),
         save_filename = [base_filename '__' int2str(channel) '_sorted.mat']
         if exist(save_filename) ~= 2
             fprintf('Sorting %s channel %d', filenames(i).name, channel);
-            sp = nb_import_ums2000(filename, 1, 'detect_channels', channel, ...
-                'waveform_channels', channel, varargin{:});
-            nb_save_ums2000(sp);
-        else,
+            try
+                spikes = nb_import_ums2000(filename, 1, 'channels', channel, varargin{:});
+                nb_save_ums2000(spikes);
+            catch err
+                fprintf('Memory error (I think)');
+            end
+        else
             fprintf('%s channel %d already sorted', filenames(i).name, channel);
         end
     end

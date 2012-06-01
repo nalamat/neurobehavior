@@ -21,9 +21,9 @@ function [filename] = nb_save_ums2000(spikes, file_extra)
     
     for i = 1:length(spikes.info.detect.detect_channels),
         ch = spikes.info.detect.detect_channels(i);
-        file_extension = ['_' int2str(ch)];
+        file_extension = ['_' int2str(ch)];        
     end
     filename = [spikes.base_filename '_' file_extension];
-    filename = [filename '_sorted' file_extra '.mat'];
-    
+    filename = [filename '_sorted' file_extra];
+
     save(filename, '-struct', 'spikes', '-v7.3');
