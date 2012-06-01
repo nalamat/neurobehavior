@@ -330,6 +330,12 @@ def running_rms(input_node, output_node, duration, step, processing,
     # algorithm for speed and memory, specifically the `as_strided` function.
     # Using the obvious brute-force approach is significantly slower and more
     # disk-intensive.
+    # 
+    # Basically, what this is telling the code to do is return a block of length
+    # c_samples.  On each loop, the offset increases by c_samples-c_loverlap.
+    # c_loverlap is the difference between window_samples and window_step.  This
+    # difference reflects the portion of the preceding chunk that we need to
+    # extract so we can proceed with the running algorithm.
     iterable = chunk_iter(channel, c_samples, step_samples=c_samples-c_loverlap)
 
     aborted = False
