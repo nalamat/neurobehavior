@@ -170,10 +170,10 @@ def create_extract_arguments_from_extracted(filename):
 
         processing['bad_channels'] = filter_node.bad_channels[:]-1
         processing['diff_mode'] = filter_node._v_attrs.diff_mode
-        processing['fc_lowpass'] = filter_node._v_attrs.fc_lowpass
-        processing['fc_highpass'] = filter_node._v_attrs.fc_highpass
-        processing['filter_order'] = filter_node._v_attrs.filter_order
+        processing['filter_freq_lp'] = filter_node._v_attrs.fc_lowpass
+        processing['filter_freq_hp'] = filter_node._v_attrs.fc_highpass
         processing['filter_btype'] = filter_node._v_attrs.filter_btype
+        processing['filter_order'] = filter_node._v_attrs.filter_order
 
         kwargs['processing'] = processing
         kwargs['channels'] = event_node._v_attrs.extracted_channels-1
@@ -194,10 +194,10 @@ def create_extract_arguments_from_raw(filename):
         processing = {}
 
         processing['diff_mode'] = md._v_attrs.diff_mode
-        processing['fc_lowpass'] = md._v_attrs.filter_freq_lp
-        processing['fc_highpass'] = md._v_attrs.filter_freq_hp
-        processing['filter_order'] = md._v_attrs.filter_order
+        processing['filter_freq_lp'] = md._v_attrs.filter_freq_lp
+        processing['filter_freq_hp'] = md._v_attrs.filter_freq_hp
         processing['filter_btype'] = md._v_attrs.filter_btype
+        processing['filter_order'] = md._v_attrs.filter_order
 
         md = md.read()
         processing['bad_channels'] = [s['index'] for s in md if s['bad']]
