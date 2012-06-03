@@ -215,9 +215,7 @@ function [spikes] = nb_import_spikes(filename, varargin)
         censored = h5read(filename, '/event_data/censored')';
         censored = censored(detect_mask);
         waveforms = waveforms(~censored, :, :);
-        max(timestamps)/60/timestamps_fs
         timestamps = timestamps(~censored);
-        max(timestamps)/60/timestamps_fs
         channels = channels(~censored);
         channel_indices = channel_indices(~censored);
         source_indices = source_indices(~censored);
