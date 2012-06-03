@@ -48,8 +48,8 @@ for i = 1:length(filenames),
     base_filename = regexprep(filename, '(.*)\.(h5|hd5|hdf5)', '$1');
 
     for channel = nb_extracted_channels(filename),
-        save_filename = [base_filename '__' int2str(channel) '_sorted.mat']
-        if exist(save_filename) ~= 2
+        files = dir([base_filename '__' int2str(channel) '_sorted*.mat']);
+        if length(files) == 0
             fprintf('Sorting %s channel %d', filenames(i).name, channel);
             try
                 spikes = nb_import_ums2000(filename, 1, 'channels', channel, varargin{:});
