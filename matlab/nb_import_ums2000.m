@@ -37,9 +37,6 @@ function [spikes] = nb_import_ums2000(filename, sort, varargin)
     spikes = nb_import_spikes(filename, varargin{:});
     
     fs = double(h5readatt(filename, '/event_data/waveforms', 'fs'));
-    window_size = double(h5readatt(filename, '/event_data', 'window_size'));
-    cross_time = double(h5readatt(filename, '/event_data', 'cross_time'));
-    shadow = 0;
 
     % In general I am going to assume that the data falls into ~5 clusters
     % including a "noise floor", "artifact", and three spike waveforms.  The
@@ -48,9 +45,16 @@ function [spikes] = nb_import_ums2000(filename, sort, varargin)
     % large datasets we deal with.
     kmeans_clustersize = round(size(spikes.timestamps, 2)/10);
     
-    params = ss_default_params(fs, 'window_size', window_size, ...
-                               'cross_time', cross_time, ...
-                               'shadow', shadow, ...  
+    % However, we do need to make sure the kmeans_clustersize isn't *too*
+    % large (otherwise when we compute the energy between two clusters
+    % containing 10k+ spikes Matlab will begin generating gigantic
+    % temporary arrays that significantly slow down the algorithm).
+    kmeans_clustersize = min(2500, kmeans_clustersize);
+    
+    params = ss_default_params(fs, ...
+                               'window_size', spikes.info.detect.window_size, ...
+                               'cross_time', spikes.info.detect.cross_time, ...
+                               'shadow', 0, ...  
                                'kmeans_clustersize', kmeans_clustersize);
     spikes.params = params.params;
 
@@ -67,8 +71,6 @@ function [spikes] = nb_import_ums2000(filename, sort, varargin)
     % compatible with UltraMegaSort2000.  Note that we upcast a lot of the
     % datatypes to double simply because Matlab (and some functions in UMS2000)
     % do not seem to deal well with non-double datatypes.
-    align_sample = h5readatt(filename, '/event_data', 'samples_before')+1.0;
-    spikes.info.detect.align_sample = double(align_sample);
     spikes.info.detect.dur = [spikes.spiketimes(end)];
     stds = double(h5readatt(filename, '/event_data', 'noise_std'));
     thresh = double(h5readatt(filename, '/event_data', 'threshold'));
@@ -83,15 +85,21 @@ function [spikes] = nb_import_ums2000(filename, sort, varargin)
     % detected using a positive threhsold, then we need to flip around the
     % waveform so that it is negative.
     thresh = thresh(extract_indices);
-    spikes.info.detect.thresh = thresh;
+    spikes.info.detect.actual_threshold = thresh;
+
+    % We also need to record the threshold as a negative value, now that we've
+    % flipped the waveforms, so that certain metrics in UMS2000 work properly.
+    spikes.info.detect.thresh = -abs(thresh);
+    %spikes.info.detect.thresh = thresh;
     for i=length(thresh),
         if sign(thresh(i)) == 1,
             spikes.waveforms(:,:,i) = spikes.waveforms(:,:,i) * -1;
         end
     end
     
-    % We need to pull out only the covariance data we need.wave
+    % We need to pull out only the covariance data we need
     cov_samples = length(extract_indices) * window_samples;
+
     % Explicitly requesting a 2D array is better than the implicit creation
     % of one ...
     cov_extracted = zeros(cov_samples, cov_samples);
