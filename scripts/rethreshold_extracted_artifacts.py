@@ -44,4 +44,5 @@ if __name__ == '__main__':
     parser.add_argument('files', nargs='+', help='Files to process')
     args = parser.parse_args()
     for ext_filename in args.files:
+        print 'Processing file', ext_filename
         rethreshold_extracted(ext_filename)
