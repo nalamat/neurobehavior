@@ -50,15 +50,16 @@ for i = 1:length(filenames),
     for channel = nb_extracted_channels(filename),
         files = dir([base_filename '__' int2str(channel) '_sorted*.mat']);
         if length(files) == 0
-            fprintf('Sorting %s channel %d', filenames(i).name, channel);
+            fprintf('Sorting %s channel %d.', filenames(i).name, channel);
             try
                 spikes = nb_import_ums2000(filename, 1, 'channels', channel, varargin{:});
                 nb_save_ums2000(spikes);
-            catch err
-                fprintf('Memory error (I think)');
+                fprintf('  Success!\n');
+            catch
+                fprintf('  Memory error.\n');
             end
         else
-            fprintf('%s channel %d already sorted', filenames(i).name, channel);
+            fprintf('%s channel %d already sorted.\n', filenames(i).name, channel);
         end
     end
 end
