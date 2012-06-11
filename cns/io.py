@@ -168,7 +168,7 @@ def create_extract_arguments_from_extracted(filename):
         filter_node = fh.root.filter
         event_node = fh.root.event_data
 
-        processing['bad_channels'] = filter_node.bad_channels[:]-1
+        processing['bad_channels'] = list(filter_node.bad_channels[:]-1)
         processing['diff_mode'] = filter_node._v_attrs.diff_mode
         processing['filter_freq_lp'] = filter_node._v_attrs.fc_lowpass
         processing['filter_freq_hp'] = filter_node._v_attrs.fc_highpass
@@ -216,3 +216,10 @@ def create_extract_arguments_from_raw(filename):
 
         return kwargs
 
+def create_extract_arguments(filename):
+    if 'raw' in filename:
+        return create_extract_arguments_from_raw(filename)
+    elif 'extracted' in filename:
+        return create_extract_arguments_from_extracted(filename)
+    else:
+        raise IOError, 'Unrecognized file type'
