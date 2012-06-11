@@ -423,6 +423,9 @@ def p_iter_nodes(node, pattern, dereference=True):
             # do something with the trial_log
 
     '''
+    if isinstance(node, tables.File):
+        node = node.root
+
     if type(pattern) != type([]):
         pattern = pattern.strip('/').split('/')
 
