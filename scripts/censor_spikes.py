@@ -2,6 +2,9 @@ import tables
 import numpy as np
 from cns.util.binary_funcs import epochs, smooth_epochs, epochs_contain
 
+import uuid
+import time
+
 def censor_spikes(ext_filename, rms_pad=0.5, block_pad=5, artifact_pad=0.5,
                   artifact_mode='single', zero_pad=1.25, force_overwrite=False):
     '''
@@ -10,8 +13,6 @@ def censor_spikes(ext_filename, rms_pad=0.5, block_pad=5, artifact_pad=0.5,
         noise floor
         artifacts
         block
-
-    rms_pad
 
     Once the spikes have been censored, you can use the physiology review GUI
     (using the overla extracted spikes feature) to inspect the censored result.
@@ -26,6 +27,14 @@ def censor_spikes(ext_filename, rms_pad=0.5, block_pad=5, artifact_pad=0.5,
             else:
                 fh.root.event_data.censored._f_remove()
                 fh.root.censor._f_remove(recursive=True)
+
+        # Create some UUID information that we can reference from other files that
+        # are derived from this one.  If I re-censor spikes, the UUID will
+        # change.  This means we can check to see whether sorted spike data
+        # (obtained from the extracted spiketimes file) is from the current
+        # version of the extracted times file.
+        fh.setNodeAttr(fh.root, 'censor_uuid', str(uuid.uuid1()))
+        fh.setNodeAttr(fh.root, 'last_censored', time.time())
 
         cnode = fh.createGroup('/', 'censor')
         censored = fh.createCArray(enode, 'censored', tables.BoolAtom(),

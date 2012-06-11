@@ -6,6 +6,7 @@ import numpy as np
 from numpy.lib.stride_tricks import as_strided
 from scipy import signal
 from os import path
+import uuid
 
 from .channel import ProcessedFileMultiChannel
 from .arraytools import chunk_samples, chunk_iter
@@ -16,59 +17,6 @@ default_chunk_size = get_config('CHUNK_SIZE')
 
 import logging
 log = logging.getLogger(__name__)
-
-def rates(et, tt, bins):
-    n_tt = len(tt)
-    pst = (et-tt[np.newaxis].T).ravel()
-    rates = []
-    for lb, ub in bins:
-        m = (pst >= lb) & (pst < ub)
-        n_et = len(pst[m])
-        rates.append(n_et/n_tt/(ub-lb))
-    return np.array(rates)
-
-def histogram(et, tt, width, lb, ub):
-    '''
-    Generate a histogram.  Units of each parameter can be in seconds, cycles,
-    milliseconds, etc; however, they must be identical.
-
-    Parameters
-    ----------
-    et : array-like
-        Event times (i.e. spike times)
-    tt : array-like
-        Trigger times to reference event times to
-    lb : float
-        Lower bound of the bin range
-    ub : float
-        Upper bound of the bin range
-    width : float
-        Bin width
-
-    Returns
-    -------
-    bins : array
-        Lower edge of histogram bins
-    rate : array of dtype float
-        Spike rate in each bin
-    '''
-    bins = histogram_bins(width, lb, ub)
-    pst = et-tt[np.newaxis].T
-    n = np.histogram(pst, bins=bins)[0].astype('f')
-    n = n/width/len(tt)
-    return bins[:-1], n
-
-def histogram_bins(bin_width, lb, ub):
-    '''
-    Compute the bins.  
-    
-    Numpy, Scipy and Matplotlib (Pylab) all come with histogram functions, but
-    the autogeneration of the bins rarely are what we want them to be.  This
-    makes sure that we get the bins we want.
-    '''
-    bins =  np.arange(lb, ub, bin_width)
-    bins -= bins[np.argmin(np.abs(bins))]
-    return bins
 
 def zero_waveform(input_node, duration):
     '''
@@ -610,6 +558,14 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
     filename = str(path.basename(input_node._v_file.filename))
     fh_out.setNodeAttr(output_node, 'source_file', filename)
     fh_out.setNodeAttr(output_node, 'source_pathname', input_node._v_pathname)
+
+    # Create some UUID information that we can reference from other files that
+    # are derived from this one.  If I re-extract spikes, but do not change the
+    # filename, the UUID will change.  This means we can check to see whether
+    # sorted spike data (obtained from the extracted spiketimes file) is from
+    # the current version of the extracted times file. 
+    fh_out.setNodeAttr(output_node, 'extract_uuid', str(uuid.uuid1()))
+    fh_out.setNodeAttr(output_node, 'last_extracted', time.time())
 
     ########################################################################
     # BEGIN EVENT NODE
