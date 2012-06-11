@@ -14,26 +14,42 @@ def extract_spikes(raw_filename, template=None, force_overwrite=False):
     settings for spike extraction.
     '''
     ext_filename = raw_filename.replace('raw', 'extracted')
-    if path.exists(ext_filename) and not force_overwrite:
-        raise IOError, 'Extracted file already exists'
 
     if template is None:
-        kwargs = io.create_extract_arguments_from_raw(raw_filename)
-    elif 'extracted' in template:
-        kwargs = io.create_extract_arguments_from_extracted(template)
-    elif 'raw' in template:
-        kwargs = io.create_extract_arguments_from_raw(template)
+        template = raw_filename
+    kwargs = io.create_extract_arguments(template)
+
+    if path.exists(ext_filename):
+        if not force_overwrite:
+            raise IOError, 'Extracted file already exists'
+        else:
+            ext_kwargs = io.create_extract_arguments(ext_filename)
+
+            # Remove the extracted data information in preparation for the
+            # reprocessing of the file.
+            fh_out = tables.openFile(ext_filename, 'a')
+            fh_out.root.event_data._f_remove(recursive=True)
+            fh_out.root.filter._f_remove(recursive=True)
+            fh_out.root.block_data._f_remove(recursive=True)
+            fh_out.root.censor._f_remove(recursive=True)
+
+            # Check to see if the filtering or referencing data has changed.  If
+            # not, we can keep the RMS data stored in the extracted file
+            # otherwise we need to discard that data and start fresh.
+            if ext_kwargs['processing'] != kwargs['processing']:
+                fh_out.root.rms._f_remove(recursive=True)
     else:
-        raise ValueError, 'Unsupported template'
+        print 'Discarding RMS data'
+        fh_out = tables.openFile(ext_filename, 'w')
 
     fh_in = tables.openFile(raw_filename, 'r')
     kwargs['input_node'] = h5.p_get_node(fh_in, '*') 
-    fh_out = tables.openFile(ext_filename, 'w')
     kwargs['output_node'] = fh_out.root
     kwargs['progress_callback'] = io.update_progress
     analysis.extract_spikes(**kwargs)
     fh_in.close()
     fh_out.close()
+
     return ext_filename
 
 if __name__ == '__main__':
