@@ -76,13 +76,16 @@ class AxesIterator(object):
         Maximum number of axes per figure. A new figure will be generated each
         time the axes reaches the maximum.  If set to infinity, all axes will be
         squeezed onto a single figure (even if there's a million of them).
+    save_pattern
+        TODO
 
     sharex and sharey are attributes that can be modified at any time during
     iteration to change the sharing behavior.
     '''
 
     def __init__(self, groups, extra=0, sharex=True, sharey=True,
-                 max_groups=np.inf, adjust_spines=False, save_pattern=None):
+                 max_groups=np.inf, adjust_spines=False, save_pattern=None,
+                 auto_close=False):
 
         self.sharex = sharex
         self.sharey = sharey
@@ -98,6 +101,7 @@ class AxesIterator(object):
         self.current_figure = None
         self.figure_count = 0
         self.save_pattern = save_pattern
+        self.auto_close = auto_close
 
     def __iter__(self):
         return self
@@ -123,6 +127,8 @@ class AxesIterator(object):
             if self.current_figure and self.save_pattern:
                 filename = self.save_pattern.format(self.figure_count)
                 self.current_figure.savefig(filename)
+                if self.auto_close:
+                    pylab.close(self.current_figure)
             self.current_figure = pylab.figure()
             self.figure_count += 1
             self.figures.append(self.current_figure)
