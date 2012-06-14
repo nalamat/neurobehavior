@@ -409,6 +409,11 @@ class PhysiologyReviewController(Controller):
         # transient set to True, so I do not define them here.
         for k, v in info.object.trait_get(setting=True).items():
             table._v_attrs[k] = v
+
+        # Be sure to call the flush() method so changes are immediately written
+        # to disk.
+        info.object.data_file.flush()
+
         information(info.ui.control, "Saved settings to file")
 
     def _load_settings(self, info, table_node):
