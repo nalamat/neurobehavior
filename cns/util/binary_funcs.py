@@ -53,6 +53,8 @@ def smooth_epochs(epochs):
 
         [ epoch     ]      [ epoch ]
 
+    Epochs do not need to be ordered when provided; however, they will be
+    returned ordered.
     '''
     if len(epochs) == 0:
         return epochs
