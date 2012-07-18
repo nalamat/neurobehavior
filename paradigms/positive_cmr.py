@@ -224,14 +224,6 @@ class Controller(
         # in between trials).
         self.invalidate_context()
 
-        # This must be called before the start of every trial to load (or
-        # evaluate if the parameter is an expression) the values of each
-        # parameter.  Note this method will also check to see if the value of a
-        # parameter has changed since the last trial.  If so, the corresponding
-        # set_parametername method will be called with the new value as an
-        # argument.
-        self.evaluate_pending_expressions()
-
         # For all variables declared as context=True, you can get the current
         # value via self.get_current_value().  This gives the
         # abstract_experiment_controller a chance to compute the values of any
@@ -343,6 +335,14 @@ class Controller(
         #self.set_current_value('masker_envelope',E)
         #self.set_current_value('masker_flanker',F)
         self.set_current_value('center_frequency',FC)
+
+        # This must be called before the start of every trial to load (or
+        # evaluate if the parameter is an expression) the values of each
+        # parameter.  Note this method will also check to see if the value of a
+        # parameter has changed since the last trial.  If so, the corresponding
+        # set_parametername method will be called with the new value as an
+        # argument.
+        self.evaluate_pending_expressions()
 
         # This is a "handshake" that lets the RPvds circuit know that we are
         # done with preparations for the next trial (e.g. uploading the stimulus
