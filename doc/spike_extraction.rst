@@ -35,7 +35,7 @@ that is compatible with UltraMegaSort2000, a Matlab program for clustering.  See
 the documentation in the import_ums2000.m and import_spikes.m file for more
 detail.
 
-This program can handle several use-cases::
+This program can handle several use-cases:
 
     1.  A single neuron is detected by more than one channel (i.e. you can see
         the waveform on both channels).  You can choose to extract both
@@ -53,7 +53,43 @@ This program can handle several use-cases::
         extracted as well.  This channel could conceivably be used as additional
         input for UMS to help separate artifacts from noise or the data from
         this channel can be discarded before running the spike sorting routine.  
-
 The simplest way to think about how UMS works is to assume that, for each event,
 the waveforms from each channel are "chained" together into a single long
 waveform.
+
+The multi-step process is as follows:
+
+    * Define the extraction settings using the review_physiology.py GUI.  Be
+      sure to save the settings to the raw file (using the "Save Settings"
+      option).
+    * At the command-line type run the extract_spikes.py script using the raw
+      file as the argument, e.g.::
+
+        >>> python extract_spikes.py --add-rms filename_raw.hd5
+      
+      The `--add-rms` argument is critical for the spike censoring algorithm.
+    * Once the spike extraction is complete, run the censor_spikes.py script on
+      the extracted file::
+
+        >>> python censor_spikes.py filename_extracted.hd5
+
+      A note of caution.  The censoring algorithm can be very aggressive.  If an
+      artifact is detected on *any* extracted channel (even one that has the
+      spike threshold set to infinity), then it is treated as if it appears on
+      all the channels.  Be sure your artifact thresholds are set properly.
+    * Finally, open up Matlab and run the spike sorting.  You can see the help
+      file for `nb_import_ums2000` and `nb_import_spikes` for extra detail on
+      how these functions work.  As an example::
+
+        >>> spikes = nb_import_ums2000('filename_extracted.hd5', 1, ...
+                'channels', 1, 'spike_window', [-0.3, 1.2], ...
+                'exclude_censored', true)
+
+      I recommend excluding censored spikes.  These typically result from
+      artifacts (e.g. muscle movement, sharp transients, RF dropout) and will
+      tend to blur the distinction between individual clusters.  Likewise, you
+      want to use a relatively narrow spike window for the waveform,
+      particularly for channels that have a high rate of multiunit activity.  If
+      part of an adjacent spike often appears at the beginning or end of the
+      waveform, then this will generate a large number of clusters.
+
