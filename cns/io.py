@@ -10,16 +10,15 @@ def update_progress(i, n, mesg):
     '''
     Progress bar for use with the command line
     '''
-    max_chars = 60
+    max_chars = 40
     progress = i/n
     num_chars = int(progress*max_chars)
     num_left = max_chars-num_chars
     # The \r tells the cursor to return to the beginning of the line rather than
     # starting a new line.  This allows us to have a progressbar-style display
     # in the console window.
-    sys.stdout.write('\r[{}{}] {:.2f}%'.format('#'*num_chars, 
-                                               ' '*num_left,
-                                               progress*100))
+    sys.stdout.write('\r[{}{}] {:.0f}% {}'.format('#'*num_chars, ' '*num_left,
+                                                  progress*100, mesg))
     return False
 
 def get_experiment_node(filename=None):
@@ -121,7 +120,9 @@ def import_spikes(filename, channel, cluster_id=None):
         mask = fh.root.event_data.channels[:] == channel
         if cluster_id is not None:
             mask = mask & (fh.root.event_data.assigns[:].ravel() == cluster_id)
-        return fh.root.event_data.timestamps[mask].astype('d')
+        et = fh.root.event_data.timestamps[mask].astype('d')
+        et.sort()
+        return et
 
 def copy_block_data(input_node, output_node):
     '''
@@ -158,3 +159,67 @@ def copy_block_data(input_node, output_node):
             node._f_copy(output_node, newname=node_title)
         except AttributeError:
             print 'Unable to find {}'.format(node_path)
+
+def create_extract_arguments_from_extracted(filename):
+
+    with tables.openFile(filename, 'r') as fh:
+        kwargs = {}
+        processing = {}
+        filter_node = fh.root.filter
+        event_node = fh.root.event_data
+
+        processing['bad_channels'] = list(filter_node.bad_channels[:]-1)
+        processing['diff_mode'] = filter_node._v_attrs.diff_mode
+        processing['filter_freq_lp'] = filter_node._v_attrs.fc_lowpass
+        processing['filter_freq_hp'] = filter_node._v_attrs.fc_highpass
+        processing['filter_btype'] = filter_node._v_attrs.filter_btype
+        processing['filter_order'] = filter_node._v_attrs.filter_order
+
+        kwargs['processing'] = processing
+        kwargs['channels'] = event_node._v_attrs.extracted_channels-1
+        kwargs['noise_std'] = event_node._v_attrs.noise_std
+        kwargs['threshold_stds'] = event_node._v_attrs.threshold_std
+        kwargs['rej_threshold_stds'] = event_node._v_attrs.reject_threshold_std
+        kwargs['window_size'] = event_node._v_attrs.window_size
+        kwargs['cross_time'] = event_node._v_attrs.cross_time
+
+        return kwargs
+
+def create_extract_arguments_from_raw(filename):
+
+    with tables.openFile(filename, 'r') as fh:
+        kwargs = {}
+        md = h5.p_get_node(fh, '*/data/physiology/channel_metadata')
+
+        processing = {}
+
+        processing['diff_mode'] = md._v_attrs.diff_mode
+        processing['filter_freq_lp'] = md._v_attrs.filter_freq_lp
+        processing['filter_freq_hp'] = md._v_attrs.filter_freq_hp
+        processing['filter_btype'] = md._v_attrs.filter_btype
+        processing['filter_order'] = md._v_attrs.filter_order
+
+        md = md.read()
+        processing['bad_channels'] = [s['index'] for s in md if s['bad']]
+
+        md = [s for s in md if s['extract']]
+
+        # Gather the arguments required by the spike extraction routine
+        kwargs['processing'] = processing
+        kwargs['noise_std'] = [s['std'] for s in md]
+        kwargs['channels'] = [s['index'] for s in md]
+        kwargs['threshold_stds'] = [s['th_std'] for s in md]
+        kwargs['rej_threshold_stds'] = [s['artifact_std'] for s in md]
+        kwargs['window_size'] = 2.1
+        kwargs['cross_time'] = 0.5  
+        kwargs['cov_samples'] = 5e3 
+
+        return kwargs
+
+def create_extract_arguments(filename):
+    if 'raw' in filename:
+        return create_extract_arguments_from_raw(filename)
+    elif 'extracted' in filename:
+        return create_extract_arguments_from_extracted(filename)
+    else:
+        raise IOError, 'Unrecognized file type'

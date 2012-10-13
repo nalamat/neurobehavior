@@ -20,8 +20,8 @@ rise_fall_time : seconds
 
 '''
 
-from enthought.traits.api import Instance
-from enthought.traits.ui.api import View, Include, VGroup
+from traits.api import Instance
+from traitsui.api import View, Include, VGroup
 
 from ._positive_dt_controller_mixin import DTControllerMixin
 from ._positive_dt_paradigm_mixin import DTParadigmMixin

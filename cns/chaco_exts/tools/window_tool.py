@@ -1,11 +1,11 @@
 # Enthought library imports
-from enthought.enable.api import cursor_style_trait, Line
-from enthought.traits.api import Any, Bool, Enum, Instance, Int, List, Trait, \
+from enable.api import cursor_style_trait, Line
+from traits.api import Any, Bool, Enum, Instance, Int, List, Trait, \
         Tuple, HasTraits, Float, Property, Dict, Event
-from enthought.enable.component import Component
+from enable.component import Component
 
 # Chaco imports
-from enthought.chaco.api import AbstractOverlay
+from chaco.api import AbstractOverlay
 
 XY = Tuple(Float, Float)
 

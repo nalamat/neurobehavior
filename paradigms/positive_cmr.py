@@ -37,8 +37,8 @@ from __future__ import division
 
 from os import path
 
-from enthought.traits.api import Instance, File, Any, Int, Bool
-from enthought.traits.ui.api import View, Include, VGroup
+from traits.api import Instance, File, Any, Int, Bool
+from traitsui.api import View, Include, VGroup
 
 from experiments.evaluate import Expression
 

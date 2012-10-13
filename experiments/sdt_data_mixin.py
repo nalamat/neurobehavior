@@ -1,6 +1,6 @@
 from numpy import clip, isnan
 from scipy.stats import norm
-from enthought.traits.api import HasTraits, Float, Property, List, \
+from traits.api import HasTraits, Float, Property, List, \
     cached_property
 
 class SDTDataMixin(HasTraits):

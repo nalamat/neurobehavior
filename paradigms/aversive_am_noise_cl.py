@@ -42,8 +42,8 @@ seed : integer
     `int(time()*1e3)` would give you random seeds based on the system clock.
 '''
 
-from enthought.traits.api import Instance, Any, Int
-from enthought.traits.ui.api import View, VGroup, Item, Include
+from traits.api import Instance, Any, Int
+from traitsui.api import View, VGroup, Item, Include
 from experiments.evaluate import Expression
 
 import time 

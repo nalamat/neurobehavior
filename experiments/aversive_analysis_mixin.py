@@ -3,7 +3,7 @@ from __future__ import division
 import numpy as np
 from matplotlib import mlab
 
-from enthought.traits.api import (Int, HasTraits, Range, Float, Enum,
+from traits.api import (Int, HasTraits, Range, Float, Enum,
         cached_property, Property)
 
 from sdt_data_mixin import SDTDataMixin

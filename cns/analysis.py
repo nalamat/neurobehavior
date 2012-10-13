@@ -6,6 +6,7 @@ import numpy as np
 from numpy.lib.stride_tricks import as_strided
 from scipy import signal
 from os import path
+import uuid
 
 from .channel import ProcessedFileMultiChannel
 from .arraytools import chunk_samples, chunk_iter
@@ -16,59 +17,6 @@ default_chunk_size = get_config('CHUNK_SIZE')
 
 import logging
 log = logging.getLogger(__name__)
-
-def rates(et, tt, bins):
-    n_tt = len(tt)
-    pst = (et-tt[np.newaxis].T).ravel()
-    rates = []
-    for lb, ub in bins:
-        m = (pst >= lb) & (pst < ub)
-        n_et = len(pst[m])
-        rates.append(n_et/n_tt/(ub-lb))
-    return np.array(rates)
-
-def histogram(et, tt, width, lb, ub):
-    '''
-    Generate a histogram.  Units of each parameter can be in seconds, cycles,
-    milliseconds, etc; however, they must be identical.
-
-    Parameters
-    ----------
-    et : array-like
-        Event times (i.e. spike times)
-    tt : array-like
-        Trigger times to reference event times to
-    lb : float
-        Lower bound of the bin range
-    ub : float
-        Upper bound of the bin range
-    width : float
-        Bin width
-
-    Returns
-    -------
-    bins : array
-        Lower edge of histogram bins
-    rate : array of dtype float
-        Spike rate in each bin
-    '''
-    bins = histogram_bins(width, lb, ub)
-    pst = et-tt[np.newaxis].T
-    n = np.histogram(pst, bins=bins)[0].astype('f')
-    n = n/width/len(tt)
-    return bins[:-1], n
-
-def histogram_bins(bin_width, lb, ub):
-    '''
-    Compute the bins.  
-    
-    Numpy, Scipy and Matplotlib (Pylab) all come with histogram functions, but
-    the autogeneration of the bins rarely are what we want them to be.  This
-    makes sure that we get the bins we want.
-    '''
-    bins =  np.arange(lb, ub, bin_width)
-    bins -= bins[np.argmin(np.abs(bins))]
-    return bins
 
 def zero_waveform(input_node, duration):
     '''
@@ -171,7 +119,7 @@ def median_std(x, axis=-1):
     return np.median(np.abs(x)/0.6745, axis=axis)
 
 def running_rms(input_node, output_node, duration, step, processing,
-                algorithm='mean', progress_callback=None,
+                algorithm='mean', channels=None, progress_callback=None,
                 chunk_size=default_chunk_size):
     '''
     Compute the running RMS value of the noise floor using a sliding window
@@ -212,6 +160,8 @@ def running_rms(input_node, output_node, duration, step, processing,
         Algorithm for computing the 'M' in RMS.  Using the median rather than
         the mean has been recommended by some scientists (e.g. Quiroga et al.,
         2004).
+    channels : array-like (int)
+        Channel indices (zero-based) to process
     progress_callback : callable
         Function to be notified each time a chunk is processed.  The function
         must take three arguments, (chunk number, total chunks, message).  As
@@ -222,10 +172,15 @@ def running_rms(input_node, output_node, duration, step, processing,
     # Make a dummy progress callback if none is requested
     if progress_callback is None:
         progress_callback = lambda x, y, z: False
-
     raw_node = input_node.data.physiology.raw
+
     channel = ProcessedFileMultiChannel.from_node(raw_node, **processing)
-    channels, total_samples = raw_node.shape
+
+    if channels is None:
+        n_channels = raw_node.shape[0]
+    else:
+        n_channels = len(channels)
+    total_samples = raw_node.shape[1]
 
     # Number of samples to use in estimating RMS in the sliding window
     window_samples = int(duration*channel.fs)
@@ -271,17 +226,30 @@ def running_rms(input_node, output_node, duration, step, processing,
     # code works, you need to understand how n-dimensional arrays are
     # represented in computer memory and indexed.  This is an in-depth
     # explanation that is outside the scope of this comment.
-    new_shape = channels, window_n, window_samples
+    #
+    # n_channels
+    #   Number of channels in the dataset
+    # window_n
+    #   Number of windows to evaluate.  This is equivalent to
+    #   np.floor((len(chunk)-window_samples))/window_step+1
+    # window_samples
+    #  Duration of each window
+    new_shape = n_channels, window_n, window_samples
 
     # Create the output data node
     fh_out = output_node._v_file
     filters = tables.Filters(complevel=1, complib='zlib', fletcher32=True)
     rms = fh_out.createEArray(output_node, 'rms', raw_node.atom,
-                              (channels, 0), filters=filters,
+                              (n_channels, 0), filters=filters,
                               title='Running RMS of signal')
 
     # Save some data about how the RMS was computed
+    if channels is None:
+        processed_channels = np.arange(n_channels)
+    else:
+        processed_channels = channels
 
+    rms._v_attrs['processed_channels'] = processed_channels
     rms._v_attrs['window_duration'] = duration
     rms._v_attrs['window_duration_samples'] = window_samples
     rms._v_attrs['window_step'] = step
@@ -307,7 +275,7 @@ def running_rms(input_node, output_node, duration, step, processing,
     # These must be here for compatibility with the Channel/MultiChannel classes
     # defined in cns.channel (especially if you use the from_node classmethod).
     rms._v_attrs['fs'] = (window_step/channel.fs)**-1
-    rms._v_attrs['channels'] = 16
+    rms._v_attrs['channels'] = n_channels
     rms._v_attrs['t0'] = 0
 
     if algorithm == 'mean':
@@ -317,134 +285,58 @@ def running_rms(input_node, output_node, duration, step, processing,
     else:
         raise ValueError, 'Unknown algorithm "{}"'.format(algorithm)
     
-    iterable = chunk_iter(channel, c_samples, step_samples=c_samples-c_loverlap)
-
+    # Do not modify this code unless you *really* know what you're doing.  We
+    # use some "under-the-hood" tricks in the Numpy library to optimize this
+    # algorithm for speed and memory, specifically the `as_strided` function.
+    # Using the obvious brute-force approach is significantly slower and more
+    # disk-intensive.
+    # 
+    # Basically, what this is telling the code to do is return a block of length
+    # c_samples.  On each loop, the offset increases by c_samples-c_loverlap.
+    # c_loverlap is the difference between window_samples and window_step.  This
+    # difference reflects the portion of the preceding chunk that we need to
+    # extract so we can proceed with the running algorithm.
+    if channels is not None:
+        # This is a hack -- we should be able to pass a "null" slice without
+        # adding an extra dimension to the data.
+        iterable = chunk_iter(channel, c_samples,
+                              step_samples=c_samples-c_loverlap,
+                              ndslice=np.s_[channels, :])
+    else:
+        iterable = chunk_iter(channel, c_samples,
+                              step_samples=c_samples-c_loverlap)
+    aborted = False
     for i_chunk, chunk in enumerate(iterable):
-        # This is a hack to discard the very last chunk if it's the wrong size.
-        # Eventually I need to come up with better logic here ...
         if chunk.shape[-1] != c_samples:
-            print 'discarding chunk'
-            continue
+            # We need to update the shape to handle the very last chunk
+            n_samples = chunk.shape[-1]
+            window_n = np.floor((n_samples-window_samples)/window_step)
+            new_shape = n_channels, window_n, window_samples
+            discarded = n_samples-(window_n*window_step+window_samples)
+            rms._v_attrs['last_chunk_new_shape'] = new_shape
+            rms._v_attrs['samples_discarded'] = discarded
+            print 'Discarding last {} samples from last chunk'.format(discarded)
 
+        # We need to load the stride information from the chunk.  Although we
+        # could guess the information in advance based on our knowledge of the
+        # underlying dtype, I find that there are sometimes edge cases that I am
+        # not aware of.  It's better to just ask the chunk what it's memory
+        # layout is and use that information.
         ch_stride, s_stride = chunk.strides
         strides = ch_stride, window_step*s_stride, s_stride
-        chunk = as_strided(chunk, new_shape, strides)
+
+        chunk = as_strided(chunk, new_shape, strides) # <- the optimization
         rms.append(compute_rms(chunk))
 
-        print i_chunk*c_samples
         if progress_callback(i_chunk*c_samples, total_samples, ''):
             aborted = True
             break
 
-def running_rms_old(input_node, output_node, duration, step, processing,
-                algorithm='median', progress_callback=None):
-    '''
-    Compute the running RMS value of the noise floor
+    rms._v_attrs['aborted'] = aborted
 
-    Parameters
-    ----------
-    input_node : instance of tables.Group
-        The PyTables group pointing to the root of the experiment node.  The
-        physiology data will be found under input_node/data/physiology/raw.
-    output_node : instance of tables.Group
-        The target node to save the data to.  Note that this must be an instance
-        of tables.Group since several arrays will be saved under the target
-        node.
-    duration : float (seconds)
-        Duration to use for computing each chunk.
-    step : float (seconds)
-        Step size.  Degree of overlap between chunks.  Smaller step sizes lead
-        to a smoother estimate of the RMS; however, this comes at the expense of
-        processing time.
-    processing : dict
-        Dictionary containing settings that will be passed along to
-        ProcessedMultiChannel.  These serve as instructions for referencing and
-        filtering of the data.  The dictionary must include the following
-        elements:
-            freq_lp : float (Hz)
-                The lowpass frequency
-            freq_hp : float (Hz)
-                The highpass frequency
-            filter_btype : {'bandpass', 'lowpass', 'highpass'}
-                Band type.  If lowpass or highpass, the appropriate cutoff
-                frequency will be ignored.
-            filter_order : int
-                The filter order
-            bad_channels : array-like
-                List of bad channels using 0-based indexing
-            diff_mode : ['all good']
-                Type of referencing to use.  Currently only one mode
-                (referencing against all the good channels) is supported.
-    algorithm : {'median', 'mean'}
-        Algorithm for computing the 'M' in RMS.  Using the median rather than
-        the mean has been recommended by some scientists (e.g. Quiroga et al.,
-        2004).
-    progress_callback : callable
-        Function to be notified each time a chunk is processed.  The function
-        must take three arguments, (chunk number, total chunks, message).  As
-        each chunk is processed, the function will be called with updates to the
-        progress.  If the function returns a nonzero (True) value, the
-        processing will terminate.
-    '''
-    # Make a dummy progress callback if none is requested
-    if progress_callback is None:
-        progress_callback = lambda x, y, z: False
-
-    raw_node = input_node.data.physiology.raw
-    channel = ProcessedFileMultiChannel.from_node(raw_node, **processing)
-
-    c_samples = int(duration*channel.fs)
-    c_step = int(step*channel.fs)
-
-    channels, total_samples = raw_node.shape
-
-    # Create the output data node
-    fh_out = output_node._v_file
-    filters = tables.Filters(complevel=1, complib='zlib', fletcher32=True)
-    rms = fh_out.createEArray(output_node, 'rms', raw_node.atom,
-                              (channels, 0), filters=filters,
-                              title='Running RMS of signal')
-
-    # Save some data about how the RMS was computed
-
-    rms._v_attrs['chunk_duration'] = duration
-    rms._v_attrs['chunk_spacing'] = step
-    rms._v_attrs['chunk_samples'] = c_samples
-    rms._v_attrs['chunk_step'] = c_step
-    rms._v_attrs['algorithm'] = algorithm
-
-    rms._v_attrs['fc_lowpass'] = channel.filter_freq_lp
-    rms._v_attrs['fc_highpass'] = channel.filter_freq_hp
-    rms._v_attrs['filter_order'] = channel.filter_order
-    rms._v_attrs['filter_btype'] = channel.filter_btype
-    rms._v_attrs['filter_padding'] = channel._padding
-
-    rms._v_attrs['diff_mode'] = channel.diff_mode
-    rms._v_attrs['differential'] = channel.diff_matrix
-
-    b, a = channel.filter_coefficients
-    rms._v_attrs['b_coefficients'] = b
-    rms._v_attrs['a_coefficients'] = a
-
-    rms._v_attrs['fs'] = 1/(c_step*channel.fs)
-
-    if algorithm == 'mean':
-        compute_rms = lambda x: np.mean(x**2, axis=1)**0.5
-    elif algorithm == 'median':
-        compute_rms = median_std
-    else:
-        raise ValueError, 'Unknown algorithm "{}"'.format(algorithm)
-
-    for i_chunk, chunk in enumerate(chunk_iter(channel, step_samples=c_samples,
-                                               l_overlap=c_step)):
-        rms.append(compute_rms(chunk)[np.newaxis].T)
-
-        if progress_callback(i_chunk*c_step, total_samples, ''):
-            aborted = True
-            break
-
-def decimate_waveform(input_node, output_node, q=None, N=4, progress_callback=None,
-                      chunk_size=default_chunk_size, include_block_data=True):
+def decimate_waveform(input_node, output_node, q=None, dec_fs=600.0, N=4,
+                      progress_callback=None, chunk_size=default_chunk_size,
+                      include_block_data=True):
     '''
     Decimates the waveform data to a lower sampling frequency using a lowpass
     filter cutoff.  
@@ -469,8 +361,11 @@ def decimate_waveform(input_node, output_node, q=None, N=4, progress_callback=No
     output_node : instance of tables.Group
     q : { None, int }
         The downsampling (i.e. decimation) factor.  If None, q will be set to
-        floor(source_fs/600) (i.e. the output sampling frequency will be as
-        close to 600 Hz as without being less than 600 Hz). 
+        floor(source_fs/dec_fs) (i.e. the output sampling frequency will be as
+        close to dec_fs as without being less than dec_fs). 
+    dec_fs : { 600.0, float }
+        Used to compute the downsampling factor, q, if one is not provided (see
+        documentation for q above).
     N : int
         The filter order to use
     progress_callback : callable
@@ -497,7 +392,7 @@ def decimate_waveform(input_node, output_node, q=None, N=4, progress_callback=No
     raw = input_node.data.physiology.raw
     source_fs = raw._v_attrs['fs']
     if q is None:
-        q = np.floor(source_fs/600.0)
+        q = np.floor(source_fs/dec_fs)
     target_fs = source_fs/q
 
     n_channels, n_samples = raw.shape
@@ -557,6 +452,10 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
                    chunk_size=default_chunk_size, include_block_data=True):
     '''
     Extracts spikes.  Lots of options.
+
+    All channel arguments to this function must be 0-based; however, when the
+    metadata is written to the output_node, the `bad_channels` and
+    `extracted_channels` are stored as 1-based.
 
     Parameters
     ----------
@@ -659,6 +558,14 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
     filename = str(path.basename(input_node._v_file.filename))
     fh_out.setNodeAttr(output_node, 'source_file', filename)
     fh_out.setNodeAttr(output_node, 'source_pathname', input_node._v_pathname)
+
+    # Create some UUID information that we can reference from other files that
+    # are derived from this one.  If I re-extract spikes, but do not change the
+    # filename, the UUID will change.  This means we can check to see whether
+    # sorted spike data (obtained from the extracted spiketimes file) is from
+    # the current version of the extracted times file. 
+    fh_out.setNodeAttr(output_node, 'extract_uuid', str(uuid.uuid1()))
+    fh_out.setNodeAttr(output_node, 'last_extracted', time.time())
 
     ########################################################################
     # BEGIN EVENT NODE

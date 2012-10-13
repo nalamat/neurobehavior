@@ -1,8 +1,8 @@
 import numpy as np
 
 from .channel_plot import ChannelPlot
-from enthought.enable.api import black_color_trait, LineStyle, MarkerTrait
-from enthought.traits.api import Instance, Float
+from enable.api import black_color_trait, LineStyle, MarkerTrait
+from traits.api import Instance, Float
 
 class EpochPlot(ChannelPlot):
     '''

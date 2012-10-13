@@ -2,8 +2,8 @@ from __future__ import division
 
 import numpy as np
 from channel_plot import ChannelPlot
-from enthought.traits.api import Any, Property, cached_property, Int
-from enthought.traits.ui.api import View, Item
+from traits.api import Any, Property, cached_property, Int
+from traitsui.api import View, Item
 
 import logging
 log = logging.getLogger(__name__)

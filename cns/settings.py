@@ -39,7 +39,7 @@ except KeyError:
     the value.'''
     mesg = textwrap.dedent(mesg.format(BASE_DIRECTORY))
     mesg = mesg.replace('\n', ' ')
-    warnings.warn(mesg)
+    #warnings.warn(mesg)
     neurobehavior_base_defined = False
     
 

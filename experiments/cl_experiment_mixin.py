@@ -1,17 +1,17 @@
 import numpy as np
-from enthought.enable.api import Component, ComponentEditor
-from enthought.traits.api import Instance, Int, on_trait_change, \
+from enable.api import Component, ComponentEditor
+from traits.api import Instance, Int, on_trait_change, \
         Dict, HasTraits, Any, List, Str, Enum, Property
-from enthought.traits.ui.api import VGroup, Item, EnumEditor, SetEditor, HGroup
+from traitsui.api import VGroup, Item, EnumEditor, SetEditor, HGroup
 
 from cns.chaco_exts.helpers import add_default_grids
 
-from enthought.chaco.api import DataRange1D, LinearMapper, \
+from chaco.api import DataRange1D, LinearMapper, \
         PlotAxis, LogMapper, ArrayDataSource, \
         OverlayPlotContainer, LinePlot, ScatterPlot
 
-from enthought.traits.ui.api import TabularEditor
-from enthought.traits.ui.tabular_adapter import TabularAdapter
+from traitsui.api import TabularEditor
+from traitsui.tabular_adapter import TabularAdapter
 
 from cns import get_config
 

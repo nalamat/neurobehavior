@@ -1,7 +1,7 @@
-from enthought.chaco.abstract_overlay import AbstractOverlay
-from enthought.traits.api import Any, Property, cached_property
-from enthought.enable.api import ColorTrait
-from enthought.kiva import fonttools
+from chaco.abstract_overlay import AbstractOverlay
+from traits.api import Any, Property, cached_property
+from enable.api import ColorTrait
+from kiva import fonttools
 
 class ChannelNumberOverlay(AbstractOverlay):
 

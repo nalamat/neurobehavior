@@ -1,4 +1,4 @@
-from enthought.traits.api import Int, Any, Float
+from traits.api import Int, Any, Float
 from cns.pipeline import deinterleave_bits
 from abstract_experiment_controller import AbstractExperimentController
 from cns import get_config

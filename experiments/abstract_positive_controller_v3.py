@@ -9,8 +9,8 @@
 A version of the appetitive paradigm that does not include a reaction window.
 '''
 
-from enthought.traits.api import Instance, Int, Float, Any, Bool
-from enthought.traits.ui.api import View, Item, HGroup, spring
+from traits.api import Instance, Int, Float, Any, Bool
+from traitsui.api import View, Item, HGroup, spring
 from abstract_experiment_controller import AbstractExperimentController
 from abstract_experiment_controller import ExperimentToolBar
 from cns.pipeline import deinterleave_bits

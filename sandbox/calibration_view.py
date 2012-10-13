@@ -1,7 +1,7 @@
-from enthought.chaco.api import *
-from enthought.traits.api import *
-from enthought.traits.ui.api import *
-from enthought.enable.component_editor import ComponentEditor
+from chaco.api import *
+from traits.api import *
+from traitsui.api import *
+from enable.component_editor import ComponentEditor
 
 class CalibrationView(HasTraits):
 

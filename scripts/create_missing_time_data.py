@@ -1,29 +1,7 @@
 import numpy as np
 import tables
 from cns import h5
-
-ts = lambda TTL: np.flatnonzero(TTL)
-edge_rising = lambda TTL: np.r_[0, np.diff(TTL.astype('i'))] == 1
-edge_falling = lambda TTL: np.r_[0, np.diff(TTL.astype('i'))] == -1
-
-def get_epochs(TTL):
-    rising = ts(edge_rising(TTL))
-    falling = ts(edge_falling(TTL))
-
-    # This means that the TTL was high at the end of the experiment, resulting
-    # in no falling edge.  Remove the very last rising edge.
-    if (len(rising) > len(falling)) and TTL[-1] == 1:
-        rising = rising[:-1]
-
-    # This means that the TTL was high at the beginning of the experiment,
-    # resulting in no rising edge.  Insert a rising edge at T=0.
-    if (len(rising) < len(falling)) and TTL[0] == 1:
-        rising = np.r_[0, rising]
-
-    if np.any(falling < rising):
-        raise ValueError, "Unable to compute epoch"
-
-    return np.c_[rising, falling]
+from cns.util.binary_funcs import ts, edge_rising, epochs
 
 def main(filename):
     '''
@@ -47,7 +25,7 @@ def main(filename):
 
 
         if 'all_poke_epoch' not in data.contact:
-            all_poke_epoch = get_epochs(data.contact.poke_TTL[:])
+            all_poke_epoch = epochs(data.contact.poke_TTL[:])
             node = fh.createArray(data.contact, 'all_poke_epoch',
                                   all_poke_epoch)
             node._v_attrs['fs'] = TTL_fs
@@ -97,7 +75,7 @@ def main(filename):
             print 'poke_epoch already exists'
 
         if 'response_ts' not in data.contact:
-            response_ts = get_epochs(data.contact.response_TTL[:])[:,1]
+            response_ts = epochs(data.contact.response_TTL[:])[:,1]
             if len(response_ts) != trials:
                 ts_end = data.trial_log.cols.ts_end[:]
                 incomplete_response_ts = response_ts
@@ -144,7 +122,7 @@ def main(filename):
         #    node._v_attrs['t0'] = 0
 
         if 'all_spout_epoch' not in data.contact:
-            all_spout_epoch = get_epochs(data.contact.spout_TTL[:])
+            all_spout_epoch = epochs(data.contact.spout_TTL[:])
             node = fh.createArray(data.contact, 'all_spout_epoch',
                                   all_spout_epoch)
             node._v_attrs['fs'] = TTL_fs
@@ -170,7 +148,7 @@ def main(filename):
             return
 
         if 'epoch' not in data.physiology:
-            epoch = get_epochs(data.physiology.sweep[:])
+            epoch = epochs(data.physiology.sweep[:])
             node = fh.createArray(data.physiology, 'epoch', epoch)
             node._v_attrs['fs'] = TTL_fs
             node._v_attrs['t0'] = 0

@@ -1,10 +1,10 @@
 from __future__ import division
 
-from enthought.traits.api import Instance, on_trait_change
+from traits.api import Instance, on_trait_change
 
 import numpy as np
 from .channel_plot import ChannelPlot
-from enthought.traits.api import List, Float, Property, cached_property
+from traits.api import List, Float, Property, cached_property
 
 class MultiChannelPlot(ChannelPlot):
 

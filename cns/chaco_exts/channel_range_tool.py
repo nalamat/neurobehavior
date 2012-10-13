@@ -1,5 +1,5 @@
 from traits.api import Float, on_trait_change, Bool, Instance, Enum
-from enthought.enable.api import BaseTool, KeySpec
+from enable.api import BaseTool, KeySpec
 
 class ChannelRangeTool(BaseTool):
 

@@ -336,7 +336,7 @@ class Channel(HasTraits):
                 raise ValueError, "end must be <= signal length"
 
         if np.iterable(lb):
-            return [self[lb:ub] for lb, ub in zip(lb, ub)]
+            return [self[..., lb:ub] for lb, ub in zip(lb, ub)]
         else:
             return self[..., lb:ub]
 
@@ -419,17 +419,18 @@ class Channel(HasTraits):
         # contact during the interval [n+lb_index, n+ub_index).
         lb_index = self.to_samples(offset)
         ub_index = self.to_samples(offset+duration)
+        timestamps = self.to_samples(timestamps)
 
         # Variable ts is the sample number at which the trial began and is a
         # multiple of the contact sampling frequency.
-        # Channel.get_range_index(lb_sample, ub_sample, reference_sample)
-        # will return the specified range relative to the reference sample.
-        # Since we are interested in extracting the range [contact_offset,
+        # Channel.get_range_index(lb_sample, ub_sample, reference_sample) will
+        # return the specified range relative to the reference sample.  Since we
+        # are interested in extracting the range [contact_offset,
         # contact_offset+contact_dur) relative to the timestamp, we need to
-        # first convert the range to the number of samples (which we did
-        # above where we have it as [lb_index, ub_index)).  Since our
-        # reference index (the timestamp) is already in the correct units,
-        # we don't need to convert it.
+        # first convert the range to the number of samples (which we did above
+        # where we have it as [lb_index, ub_index)).  Since our reference index
+        # (the timestamp) is already in the correct units, we don't need to
+        # convert it.
         if np.iterable(timestamps):
             range = self.get_range_index(lb_index, ub_index, timestamps)
             return np.array([fun(r) for r in range])
@@ -553,7 +554,9 @@ class RAMChannel(Channel):
 
 class MultiChannel(Channel):
 
-    channels = Int(8, attr=True)
+    # Default to 0 to make it clear that the class has not been properly
+    # initialized
+    channels = Int(0, attr=True)
 
     def get_channel_range(self, channel, lb, ub):
         return self.get_range(lb, ub)[channel]
@@ -564,7 +567,78 @@ class MultiChannel(Channel):
 
     def get_range(self, start, end, reference=None, channels=None):
         lb, ub = self._to_bounds(start, end, reference)
+        if channels is None:
+            channels = Ellipsis
         return self[..., lb:ub][channels]
+
+    def get_range_index(self, start, end, reference=0, check_bounds=False,
+                        channels=None):
+        '''
+        Returns a subset of the range specified in samples
+
+        The samples must be speficied relative to start of data acquisition.
+
+        Parameters
+        ----------
+        start : num samples (int)
+            Start index in samples
+        end : num samples (int)
+            End index in samples
+        reference : num samples (int), optional
+            Time of trigger to reference start and end to
+        check_bounds : bool
+            Check that start and end fall within the valid data range
+        '''
+        t0_index = int(self.t0*self.fs)
+        lb = start-t0_index+reference
+        ub = end-t0_index+reference
+
+        if check_bounds:
+            if lb < 0:
+                raise ValueError, "start must be >= 0"
+            if ub >= len(self._buffer):
+                raise ValueError, "end must be <= signal length"
+
+        if channels is None:
+            channels = Ellipsis
+
+        if np.iterable(lb):
+            return [self[channels, lb:ub] for lb, ub in zip(lb, ub)]
+        else:
+            return self[channels, lb:ub]
+
+
+    def summarize(self, timestamps, offset, duration, fun, channels=None):
+        if len(timestamps) == 0:
+            return np.array([])
+
+        # Channel.to_samples(time) converts time (in seconds) to the
+        # corresponding number of samples given the sampling frequency of the
+        # channel.  If the trial begins at sample n, then we want to analyze
+        # contact during the interval [n+lb_index, n+ub_index).
+        lb_index = self.to_samples(offset)
+        ub_index = self.to_samples(offset+duration)
+        timestamps = self.to_samples(timestamps)
+
+        # Variable ts is the sample number at which the trial began and is a
+        # multiple of the contact sampling frequency.
+        # Channel.get_range_index(lb_sample, ub_sample, reference_sample) will
+        # return the specified range relative to the reference sample.  Since we
+        # are interested in extracting the range [contact_offset,
+        # contact_offset+contact_dur) relative to the timestamp, we need to
+        # first convert the range to the number of samples (which we did above
+        # where we have it as [lb_index, ub_index)).  Since our reference index
+        # (the timestamp) is already in the correct units, we don't need to
+        # convert it.
+        if np.iterable(timestamps):
+            range = self.get_range_index(lb_index, ub_index, timestamps,
+                                         channels=channels)
+            return np.array([fun(r) for r in range])
+        else:
+            range = self.get_range_index(lb_index, ub_index, timestamps,
+                                         channels=channels)
+            return fun(range)
+
 
 class ProcessedMultiChannel(MultiChannel):
     '''
@@ -611,7 +685,13 @@ class ProcessedMultiChannel(MultiChannel):
             return np.identity(self.channels)
         else:
             matrix = np.identity(self.channels)
+
+            # If all but one channel is bad, this will raise a
+            # ZeroDivisionError.  I'm going to let this error "bubble up" since
+            # the user should realize that they are no longer referencing their
+            # data in that situation.
             weight = 1.0/(self.channels-1-len(self.bad_channels))
+
             for r in range(self.channels):
                 if r in self.bad_channels:
                     matrix[r, r] = 0

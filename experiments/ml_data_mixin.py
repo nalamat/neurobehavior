@@ -1,5 +1,5 @@
 import numpy as np
-from enthought.traits.api import HasTraits, Float, Instance, Property, Array,\
+from traits.api import HasTraits, Float, Instance, Property, Array,\
      on_trait_change, cached_property, Tuple, List, Bool
 
 import logging
