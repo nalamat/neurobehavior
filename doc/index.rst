@@ -25,6 +25,7 @@ Contents
    paradigms.rst
    h5_api.rst
    calibration_api.rst
+   spike_extraction.rst
 
 Indices and tables
 ------------------
