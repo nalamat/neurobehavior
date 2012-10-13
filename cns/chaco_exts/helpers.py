@@ -1,4 +1,4 @@
-from enthought.chaco.api import PlotGrid, PlotAxis
+from chaco.api import PlotGrid, PlotAxis
 
 def add_default_grids(plot, 
         major_index=None,

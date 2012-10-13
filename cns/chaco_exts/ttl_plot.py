@@ -1,6 +1,6 @@
 import numpy as np
 from channel_plot import ChannelPlot
-from enthought.traits.api import Float
+from traits.api import Float
 
 class TTLPlot(ChannelPlot):
 

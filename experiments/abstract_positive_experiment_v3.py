@@ -1,14 +1,14 @@
 from __future__ import division
 
-from enthought.traits.api import Any, Instance, \
+from traits.api import Any, Instance, \
         Int, Float, Property, on_trait_change, cached_property
-from enthought.traits.ui.api import Item, VGroup, InstanceEditor,\
+from traitsui.api import Item, VGroup, InstanceEditor,\
     HSplit, TabularEditor, Include, Tabbed, ShellEditor
 
-from enthought.enable.api import Component, ComponentEditor
+from enable.api import Component, ComponentEditor
 from abstract_experiment import AbstractExperiment
 
-from enthought.chaco.api import DataRange1D, LinearMapper, \
+from chaco.api import DataRange1D, LinearMapper, \
         OverlayPlotContainer
 
 from cns.chaco_exts.channel_range_tool import ChannelRangeTool
@@ -22,7 +22,7 @@ from cns.chaco_exts.helpers import add_default_grids, add_time_axis
 from cns import get_config
 COLORS = get_config('EXPERIMENT_COLORS')
 
-from enthought.traits.ui.tabular_adapter import TabularAdapter
+from traitsui.tabular_adapter import TabularAdapter
 
 class TrialLogAdapter(TabularAdapter):
 

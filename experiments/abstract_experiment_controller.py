@@ -9,15 +9,15 @@ from .evaluate import evaluate_value, evaluate_expressions
 
 from cns import get_config
 
-from enthought.pyface.api import error, confirm, YES
-from enthought.pyface.timer.api import Timer
-from enthought.traits.api import (Any, Instance, Enum, Dict, List, Bool, Tuple,
+from pyface.api import error, confirm, YES
+from pyface.timer.api import Timer
+from traits.api import (Any, Instance, Enum, Dict, List, Bool, Tuple,
                                   Callable, Int, Property, Event, Str, Float,
                                   Trait, on_trait_change)
-from enthought.traits.ui.api import Controller, View, HGroup, Item, spring
+from traitsui.api import Controller, View, HGroup, Item, spring
 
 from cns.widgets.toolbar import ToolBar
-from enthought.savage.traits.ui.svg_button import SVGButton
+from enable.savage.trait_defs.ui.svg_button import SVGButton
 from cns.widgets.icons import icons
 
 import logging
@@ -263,7 +263,7 @@ class AbstractExperimentController(Controller):
             # essentially a rewrite of PyQt4.  These backends are not compatible
             # with each other, so we need to be sure to import the backend that
             # Enthought has decided to use.
-            from enthought.qt import QtGui
+            from pyface.qt import QtGui
 
             #self.system_tray = QtGui.QSystemTrayIcon(icon, info.ui.control)
             icon_path = path.join(path.dirname(__file__), 'psi_uppercase.svg')

@@ -1,3 +1,10 @@
+'''
+Despite the fact that multiple experiments can be stored in a single HDF5 file,
+many of Brad Buran's analysis routines assume that there is only a single
+experiment per file (with the exception of cohort files which were intentionally
+designed to be a container for multiple experiments).  
+'''
+
 import re
 import tables 
 

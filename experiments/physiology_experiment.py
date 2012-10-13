@@ -1,10 +1,10 @@
 import numpy as np
-from enthought.enable.api import Component, ComponentEditor 
-from enthought.chaco.api import (LinearMapper, DataRange1D,
+from enable.api import Component, ComponentEditor 
+from chaco.api import (LinearMapper, DataRange1D,
         OverlayPlotContainer)
-from enthought.traits.ui.api import VGroup, HGroup, Item, Include, View, \
+from traitsui.api import VGroup, HGroup, Item, Include, View, \
         InstanceEditor, RangeEditor, HSplit, Tabbed, ShellEditor
-from enthought.traits.api import Instance, HasTraits, Float, \
+from traits.api import Instance, HasTraits, Float, \
      Bool, on_trait_change, Any, Range, Property,\
      Tuple, List, cached_property, Button, Enum, Undefined
 
@@ -12,8 +12,8 @@ from physiology_paradigm import PhysiologyParadigm
 from physiology_data import PhysiologyData
 from physiology_controller import PhysiologyController
 
-from enthought.chaco.api import PlotAxis
-from enthought.chaco.tools.api import ZoomTool
+from chaco.api import PlotAxis
+from chaco.tools.api import ZoomTool
 from cns.chaco_exts.tools.window_tool import WindowTool
 from cns.chaco_exts.helpers import add_default_grids, add_time_axis
 from cns.chaco_exts.channel_data_range import ChannelDataRange
@@ -32,7 +32,7 @@ CHANNELS = get_config('PHYSIOLOGY_CHANNELS')
 VOLTAGE_SCALE = 1e3
 scale_formatter = lambda x: "{:.2f}".format(x*VOLTAGE_SCALE)
 
-from enthought.traits.ui.menu import MenuBar, Menu, ActionGroup, Action
+from traitsui.menu import MenuBar, Menu, ActionGroup, Action
 
 def create_menubar():
     actions = ActionGroup(

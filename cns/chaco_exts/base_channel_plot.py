@@ -1,6 +1,6 @@
-from enthought.chaco.api import BaseXYPlot
-from enthought.enable.api import black_color_trait, LineStyle
-from enthought.traits.api import Event, Float, Instance
+from chaco.api import BaseXYPlot
+from enable.api import black_color_trait, LineStyle
+from traits.api import Event, Float, Instance
 
 class BaseChannelPlot(BaseXYPlot):
     '''

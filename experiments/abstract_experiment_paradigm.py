@@ -1,4 +1,4 @@
-from enthought.traits.api import HasTraits
+from traits.api import HasTraits
 
 PARAMETER_FILTER = {
         'editable': lambda x: x is not False,

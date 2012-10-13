@@ -1,5 +1,5 @@
-from enthought.enable.api import ColorTrait, black_color_trait, color_table
-from enthought.traits.api import (Property, Int, cached_property,
+from enable.api import ColorTrait, black_color_trait, color_table
+from traits.api import (Property, Int, cached_property,
         on_trait_change, List)
 import numpy as np
 from base_channel_plot import BaseChannelPlot

@@ -7,7 +7,7 @@ import os
 os.environ['ETS_TOOLKIT'] = 'qt4' 
 
 # This is very important since there's a memory leak when using PySide.  This
-# has been fixed in the latest revision of enthought.enable; however, it
+# has been fixed in the latest revision of enable; however, it
 # probably will not appear until a version of ETS > 7.2-2.
 os.environ['QT_API'] = 'pyqt'
 
@@ -54,7 +54,7 @@ def configure_logging(filename):
                 # plotting.  However, we initialize the plots with zero-length data
                 # in the beginning of the experiment since we don't have any trials
                 # yet.  Let's silence this module.
-                'enthought.chaco.barplot': { 'level': 'CRITICAL', },
+                'chaco.barplot': { 'level': 'CRITICAL', },
                 'experiments': { 'level': 'DEBUG' },
                 'paradigms': { 'level': 'DEBUG' },
                 'cns': { 'level': 'DEBUG' },
@@ -173,7 +173,7 @@ if __name__ == '__main__':
         # the callback functions) are silenced.  When debugging, it's often
         # helpful for these exceptions to propagate into the main thread so we
         # can identify the source of the issue.
-        from enthought.traits.api import push_exception_handler
+        from traits.api import push_exception_handler
         push_exception_handler(reraise_exceptions=True)
 
     from experiments import loader

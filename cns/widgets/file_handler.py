@@ -1,6 +1,6 @@
-from enthought.traits.api import Str, File, Trait
-from enthought.traits.ui.api import Controller
-from enthought.pyface.api import FileDialog, confirm, NO, error, OK
+from traits.api import Str, File, Trait
+from traitsui.api import Controller
+from pyface.api import FileDialog, confirm, NO, error, OK
 import logging
 import os
 log = logging.getLogger(__name__)

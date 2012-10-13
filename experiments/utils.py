@@ -1,4 +1,4 @@
-from enthought.pyface.api import FileDialog, OK
+from pyface.api import FileDialog, OK
 import pickle
 import tables
 from os import path

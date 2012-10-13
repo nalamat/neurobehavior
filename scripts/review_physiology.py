@@ -1,6 +1,4 @@
-# Ok, so technically this isn't a script ...
-
-from enthought.traits.api import push_exception_handler
+from traits.api import push_exception_handler
 push_exception_handler(reraise_exceptions=True)
 
 import tables
@@ -10,16 +8,14 @@ import re
 from os import path
 from numpy.lib import recfunctions
 
-from pyface.api import FileDialog, OK, error, ProgressDialog, \
-        information, confirm, YES
+from pyface.api import FileDialog, OK, error, ProgressDialog, information, \
+        confirm, YES
 from enable.api import Component, ComponentEditor
-from chaco.api import (LinearMapper, DataRange1D, OverlayPlotContainer)
+from chaco.api import LinearMapper, DataRange1D, OverlayPlotContainer
                        
-from traitsui.api import VGroup, Item, View, \
-        HSplit, Tabbed, Controller
-from traits.api import Instance, HasTraits, Float, DelegatesTo, \
-     CBool, Int, Any, Event, Property,\
-     List, cached_property, Str, Enum, File, Range
+from traitsui.api import VGroup, Item, View, HSplit, Tabbed, Controller
+from traits.api import Instance, HasTraits, Float, DelegatesTo, CBool, Int, \
+        Any, Event, Property, List, cached_property, Str, Enum, File, Range
 
 # Used for displaying the checkboxes for channel/plot visibility config
 from traitsui.api import TableEditor, ObjectColumn, EnumEditor
@@ -413,6 +409,11 @@ class PhysiologyReviewController(Controller):
         # transient set to True, so I do not define them here.
         for k, v in info.object.trait_get(setting=True).items():
             table._v_attrs[k] = v
+
+        # Be sure to call the flush() method so changes are immediately written
+        # to disk.
+        info.object.data_file.flush()
+
         information(info.ui.control, "Saved settings to file")
 
     def _load_settings(self, info, table_node):
@@ -443,8 +444,9 @@ class PhysiologyReviewController(Controller):
             settings.append(setting)
         info.object.channel_settings = settings
 
-        # Now, load!
-        info.object.trait_set(table_node._v_attrs)
+        # Now, load the remaining settings!
+        for k in info.object.trait_get(setting=True):
+            setattr(info.object, k, table_node._v_attrs[k])
 
     def load_settings(self, info):
         try:
@@ -658,9 +660,17 @@ class PhysiologyReviewController(Controller):
         with tables.openFile(dialog.path, 'r') as fh:
             ts = fh.root.event_data.timestamps[:]
             channels = fh.root.event_data.channels[:]-1
-            clusters = np.ones(len(channels))
-            cluster_ids = [1]
-            cluster_types = [1]
+
+            # If the user has already censored the spiketimes in the file, then
+            # we can indicate which events have been "censored" here
+            if 'censored' in fh.root.event_data:
+                clusters = fh.root.event_data.censored[:]
+                cluster_ids = [0, 1]
+                cluster_types = [1, 4] # in process, garbage
+            else:
+                clusters = np.ones(len(channels))
+                cluster_ids = [1]
+                cluster_types = [1]
             overlay = ExtractedSpikeOverlay(timestamps=ts,
                                             channels=channels,
                                             clusters=clusters,
@@ -849,8 +859,8 @@ class PhysiologyReviewController(Controller):
         # Create a little prompt to allow the user to specify the time they
         # want.
         class TimeDialog(HasTraits):
-            minute = Int
-            second = Int
+            minute = Float(0)
+            second = Float(0)
         td = TimeDialog()
 
         # Setting kind to 'livemodal' ensures that the next line of code is not
@@ -888,7 +898,6 @@ class PhysiologyReview(HasTraits):
     plot_settings       = List(Instance(PlotSetting), transient=True)
     trial_data          = Any(transient=True)
     trial_selected      = Any(transient=True)
-    #trial_dclicked      = Any(transient=True)
     index_range         = Instance(ChannelDataRange, transient=True)
 
     bad_channels        = Property(depends_on='channel_settings.bad')
@@ -1062,7 +1071,7 @@ class PhysiologyReview(HasTraits):
         # bunch of "boilerplate" code, so this is a helper function that takes
         # care of it for us.
         add_default_grids(plot, major_index=1, minor_index=0.25)
-        add_time_axis(plot, orientation='bottom')
+        add_time_axis(plot, orientation='bottom', fraction=True)
 
         overlay = ThresholdOverlay(plot=plot, sort_signs=[True]*16,
                                    line_color='green')
@@ -1319,7 +1328,6 @@ def get_save_filename(raw_filename, suggested_ending):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    #parser.add_argument('-f', '--filename', type=str, required=False)
     parser.add_argument('-p', '--parameters', nargs='+', type=str,
                         required=False)
 

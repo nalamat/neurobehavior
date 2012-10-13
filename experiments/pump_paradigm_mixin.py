@@ -1,5 +1,5 @@
-from enthought.traits.api import HasTraits, Float, Enum, Property, cached_property
-from enthought.traits.ui.api import View, Item, VGroup, HGroup
+from traits.api import HasTraits, Float, Enum, Property, cached_property
+from traitsui.api import View, Item, VGroup, HGroup
 from cns import get_config
 from evaluate import Expression
 

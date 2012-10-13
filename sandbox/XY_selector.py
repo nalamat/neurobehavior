@@ -1,23 +1,23 @@
-from enthought.traits.api import HasTraits, Instance, Str, Array, \
+from traits.api import HasTraits, Instance, Str, Array, \
         CFloat, Property, cached_property, DelegatesTo,  \
         on_trait_change, Any, Trait, Enum
 import numpy as np
 
-from enthought.traits.ui.api import View, Item, VGroup, \
+from traitsui.api import View, Item, VGroup, \
         Label, HGroup, InstanceEditor
 
-from enthought.traits.ui.instance_choice import InstanceChoice
+from traitsui.instance_choice import InstanceChoice
 
-from enthought.enable.component_editor import ComponentEditor
-from enthought.enable.component import Component
-from enthought.enable.base_tool import KeySpec
+from enable.component_editor import ComponentEditor
+from enable.component import Component
+from enable.base_tool import KeySpec
 
-from enthought.chaco.api import ArrayDataSource, BarPlot, create_bar_plot, \
+from chaco.api import ArrayDataSource, BarPlot, create_bar_plot, \
         DataRange1D, LinearMapper, Plot, ArrayPlotData, LabelAxis, PlotAxis, \
         ScatterInspectorOverlay, LinePlot, create_line_plot, \
         OverlayPlotContainer, PlotLabel, BasePlotContainer, VPlotContainer
 
-from enthought.chaco.tools.api import ScatterInspector, PanTool, \
+from chaco.tools.api import ScatterInspector, PanTool, \
         LassoSelection, RangeSelection, RangeSelectionOverlay, LineInspector, \
         ZoomTool
 
