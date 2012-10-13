@@ -111,7 +111,10 @@ The multi-step process is as follows:
 
       This will save the spiketimes file using a standard "template" that
       consists of the name of the extracted spiketimes file, the channel sorted,
-      and append it with '_curated'.
+      and append it with '_curated'.  In addition, it will ensure that the
+      spiketimes file is saved in a format that can be read by the
+      review_physiology GUI (there is an option to overlay the sorted
+      spiketimes onto the raw trace).
 
       Finally, add some statistics about the spikes (e.g. refractory period
       violations, degree of overlap between clusters, etc.)::
