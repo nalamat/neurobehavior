@@ -6,7 +6,7 @@ from pandas import DataFrame
 
 import h5
 
-def update_progress(i, n, mesg):
+def update_progress(i, n, mesg, progress_character='.'):
     '''
     Progress bar for use with the command line
     '''
@@ -17,8 +17,11 @@ def update_progress(i, n, mesg):
     # The \r tells the cursor to return to the beginning of the line rather than
     # starting a new line.  This allows us to have a progressbar-style display
     # in the console window.
-    sys.stdout.write('\r[{}{}] {:.0f}% {}'.format('#'*num_chars, ' '*num_left,
-                                                  progress*100, mesg))
+    template = '\r[{}{}] {:.0f}% {}   '
+    sys.stdout.write(template.format(progress_character*num_chars, 
+                                     ' '*num_left,
+                                     progress*100, 
+                                     mesg))
     return False
 
 def get_experiment_node(filename=None):
