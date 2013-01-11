@@ -10,12 +10,32 @@ def add_panel_id(ax, id):
     ax.text(-0.1, 1.05, str(id), transform=ax.transAxes,
             fontweight='bold', fontsize='xx-large')
 
-def color_iterator(grouping, cmap='jet'):
+def color_iterator(grouping, cmap='jet', n=None):
     '''
     Given a Matplotlib colormap, iterate through the color range in equal-sized
-    increments.
+    increments based on the size of the group.
+    
+    Parameters
+    ----------
+    grouping : iterable
+        Values to return on each iteration
+    cmap : string
+        Matplotlib colormap to use
+    n : int
+        Size of the group.  If not provided, will attempt to estimate the size
+        from the iterable.
     '''
-    n = len(grouping)
+
+    # Attempt to get the length of the iterator first.  If we can't get the
+    # length, then  we need to convert the iterator into a list so we can get
+    # the number of elements.
+    if n is None:
+        try:
+            n = len(grouping)
+        except:
+            grouping = list(grouping)
+            n = len(grouping)
+
     if isinstance(cmap, basestring):
         cmap = pylab.get_cmap(cmap)
     for i, g in enumerate(grouping):
@@ -64,7 +84,7 @@ class AxesIterator(object):
     Parameters
     ----------
     extra
-        Number of extra plots, in addition to len(groups), to reserve axes for
+        Number of extra plots, in addition to len(groups), to reserve space for
         when computing the optimal row/column layout
     sharex
         If True, share the x-axis between axes
@@ -81,6 +101,21 @@ class AxesIterator(object):
 
     sharex and sharey are attributes that can be modified at any time during
     iteration to change the sharing behavior.
+
+    Attributes
+    ----------
+    On each cycle several attributes are set that may prove useful for plotting
+    (e.g. you may only want to display the Y-axis label if the axes are in the
+    first column of the grid).
+
+    first_row : bool
+        True if the current axes is on the first row of the grid
+    first_col : bool
+        True if the current axes is on the first column of the grid
+    last_row : bool
+        True if the current axes is on the last row of the grid
+    last_col : bool
+        True if the current axes is on the last column of the grid
     '''
 
     def __init__(self, groups, extra=0, sharex=True, sharey=True,
@@ -102,6 +137,12 @@ class AxesIterator(object):
         self.figure_count = 0
         self.save_pattern = save_pattern
         self.auto_close = auto_close
+
+        # None means they are uninitialized
+        self.first_row = None
+        self.first_col = None
+        self.last_row = None
+        self.last_col = None
 
     def __iter__(self):
         return self
@@ -147,17 +188,23 @@ class AxesIterator(object):
                                              **kw)
         self.current_axes = ax
 
+        # Update the class attributes indicating the position of the subplot in
+        # the grid
+        self.first_col = (self.i % self.n_cols) == 1 
+        self.last_col = (self.i % self.n_cols) == 0
+        self.first_row = self.i <= self.n_cols
+        self.last_row = self.i > (self.n_cols*(self.n_rows-1))
+
+        # Adjust the spines if requested
         if self.adjust_spines:
-            firstcol = (self.i % self.n_cols) == 1
-            lastrow = self.i > (self.n_cols*(self.n_rows-1))
-            if firstcol and lastrow:
-                adjust_spines(self.current_axes, ('bottom', 'left'))
-            elif firstcol:
-                adjust_spines(self.current_axes, ('left'))
-            elif lastrow:
-                adjust_spines(self.current_axes, ('bottom'))
+            if self.first_col and self.last_row:
+                adjust_spines(self.current_axes, ('bottom', 'left'), 0)
+            elif self.first_col:
+                adjust_spines(self.current_axes, ('left'), 0)
+            elif self.last_row:
+                adjust_spines(self.current_axes, ('bottom'), 0)
             else:
-                adjust_spines(self.current_axes, ())
+                adjust_spines(self.current_axes, (), 0)
         return self.current_axes
 
     def __del__(self):
