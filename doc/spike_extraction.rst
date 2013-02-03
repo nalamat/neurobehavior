@@ -79,7 +79,9 @@ The multi-step process is as follows:
       all the channels.  Be sure your artifact thresholds are set properly.
     * Finally, open up Matlab and run the spike sorting.  You can see the help
       file for `nb_import_ums2000` and `nb_import_spikes` for extra detail on
-      how these functions work.  As an example::
+      how these functions work.  Note that `nb_import_ums2000` is simply a
+      wrapper around the more generic `nb_import_spikes` function and will pass
+      along any unused arguments to `nb_import_spikes`.  As an example::
 
         >>> spikes = nb_import_ums2000('filename_extracted.hd5', 1, ...
                 'channels', 1, 'spike_window', [-0.3, 1.2], ...
@@ -93,3 +95,30 @@ The multi-step process is as follows:
       part of an adjacent spike often appears at the beginning or end of the
       waveform, then this will generate a large number of clusters.
 
+      The function can take a while to return since it will sort the spike
+      waveforms after loading it from the file.  Once it returns, you can view
+      and manipulate the clustered data using `splitmerge_tool`::
+
+        >>> splitmerge_tool(spikes)
+
+      Finally, once you are happy with the clusters you've identified, be sure
+      to save the hand-curated spikes back to the Matlab workspace using the
+      splitmerge GUI (there's a save icon in the upper left hand corner of the
+      screen).  You can also save it to a Matlab file using this GUI; however, I
+      recommend a few more steps before doing so::
+
+        >>> nb_save_ums2000(spikes, 'curated')
+
+      This will save the spiketimes file using a standard "template" that
+      consists of the name of the extracted spiketimes file, the channel sorted,
+      and append it with '_curated'.  In addition, it will ensure that the
+      spiketimes file is saved in a format that can be read by the
+      review_physiology GUI (there is an option to overlay the sorted
+      spiketimes onto the raw trace).
+
+      Finally, add some statistics about the spikes (e.g. refractory period
+      violations, degree of overlap between clusters, etc.)::
+
+        >>> nb_annotate_curated(name_of_curated_file)
+
+      Be sure to read the docstrings for all the functions mentioned.
