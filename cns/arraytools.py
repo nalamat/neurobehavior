@@ -1,8 +1,25 @@
 #!python
 
 '''
-Functions for slicing an array into a series of overlapping chunks
+Functions for slicing an array into a series of overlapping chunks.
+
+The core function of this module is `chunk_iter` which provides an extremely
+powerful and flexible approach for looping through a large array along a certain
+axis while properly handling edge boundaries.  If you deal with continuous
+time-series using a fixed sampling rate (e.g.  digital IO data, single and
+multi-channel neurophysiology), then you can use this to handle various steps
+that are commonly required including:
+
+    * Ensuring the first sample is initialized to a fixed value (e.g. 0 for a
+      digital input line).
+    * Extracting extra samples on the right and left edges of a given chunk to
+      properly stabilize a digital filter algorithm.
+
+This module makes heavy use of doctest to ensure the core functions work
+properly.  You can run these doctests by typing 'python -m cns.arraytools' at
+the command prompt.
 '''
+
 import numpy as np
 
 __author__ = "Brad N. Buran"
@@ -78,15 +95,18 @@ def chunk_samples(x, max_bytes=10e6, block_size=None, axis=-1):
         raise ValueError, "cannot achieve requested chunk size"
     return int(samples)
     
-def chunk_iter(x, chunk_samples, step_samples=None, loverlap=0, roverlap=0,
-               padtype='const', axis=-1, ndslice=None):
+def chunk_iter(x, chunk_samples=None, step_samples=None, loverlap=0, roverlap=0,
+               padding='const', axis=-1, ndslice=None, initial_padding=0,
+               final_padding=0):
     '''
     Return an iterable that yields the data in chunks along the specified axis.  
 
     x : ndarray
         The array that will be chunked
-    chunk_samples : int
-        Number of samples per chunk along the specified axis
+    chunk_samples : { None, int }
+        Number of samples per chunk along the specified axis.  If None, will
+        automatically choose the number of samples based on a fixed memory size
+        per chunk (~10 MB).
     step_samples : int or None
         Number of samples between the first sample of each chunk
     loverlap : int
@@ -97,11 +117,22 @@ def chunk_iter(x, chunk_samples, step_samples=None, loverlap=0, roverlap=0,
         Number of samples on the right to overlap with the next chunk (used
         to handle extraction of features that cross chunk boundaries).  These
         samples are in addition to the number of chunk samples requested.
-    padtype : {'const', }
-        Only one padtype is supported for now.  Eventually could support odd and
-        even padding as well.
+    padding : {'const', number }
+        Only constant extension (of the edge value) or a number (e.g. 0 or
+        np.nan) are supported for now.  Eventually we could support odd and even
+        padding as well.
     ndslice : None or slice
         How to slice the other dimensions
+    initial_padding : int
+        Number of samples to pad the very first chunk by.  Padding will be
+        peformed as requested by `padding`.  This is in addition to
+        `left_overlap` (e.g. the total number of samples added will be
+        `initial_padding`+`left_overlap`).
+    final_padding : int
+        Number of samples to pad the final chunk by.  Padding will be peformed
+        as requested by `padding`.  This is in addition to `right_overlap` (e.g.
+        the total number of samples added will be
+        `initial_padding`+`right_overlap`).
 
     >>> x = np.arange(1000).reshape((4, 250))
     >>> iterable = chunk_iter(x, 5)
@@ -142,13 +173,22 @@ def chunk_iter(x, chunk_samples, step_samples=None, loverlap=0, roverlap=0,
      [754 755 756 757 758 759 760 761]]
 
     Let's take a look at the very last chunk returned.  The right overlapping
-    columns are padded with nan values:
+    columns are padded by repeating the final value:
 
     >>> print list(iterable)[-1]
     [[244 245 246 247 248 249 249 249]
      [494 495 496 497 498 499 499 499]
      [744 745 746 747 748 749 749 749]
      [994 995 996 997 998 999 999 999]]
+
+    We can also specify a different type of padding (e.g. -1).
+
+    >>> iterable = chunk_iter(x, 5, loverlap=1, roverlap=2, padding=-1)
+    >>> print list(iterable)[-1]
+    [[244 245 246 247 248 249  -1  -1]
+     [494 495 496 497 498 499  -1  -1]
+     [744 745 746 747 748 749  -1  -1]
+     [994 995 996 997 998 999  -1  -1]]
 
     We can specify the slices along the other dimensions as well.  This is
     particularly useful when working with instances of tables.Array which are
@@ -221,6 +261,30 @@ def chunk_iter(x, chunk_samples, step_samples=None, loverlap=0, roverlap=0,
      [510 511 512 513 514 515 516 517 518 519]
      [760 761 762 763 764 765 766 767 768 769]]
 
+    Sometimes you wish to pad the final chunk by an array of zeros (e.g. when
+    you are processing a digital IO stream, you may wish to ensure that the
+    stream has a final value of zero.  This allows you to properly record the
+    final falling edge of the trigger even if acquisition stopped before the IO
+    reached a low state.
+
+    >>> x = np.ones(1000, dtype='i').reshape((4, 250))
+    >>> iterable = chunk_iter(x, 5, final_padding=1, padding=0)
+    >>> print list(iterable)[-1]
+    [[1 1 1 1 1 0]
+     [1 1 1 1 1 0]
+     [1 1 1 1 1 0]
+     [1 1 1 1 1 0]]
+
+    This is in addition to the `roverlap` argument (so, be careful if you use
+    both).
+
+    >>> iterable = chunk_iter(x, 5, roverlap=1, final_padding=1, padding=0)
+    >>> print list(iterable)[-1]
+    [[1 1 1 1 1 0 0]
+     [1 1 1 1 1 0 0]
+     [1 1 1 1 1 0 0]
+     [1 1 1 1 1 0 0]]
+
     One can achieve similar chunking using the set the step_samples instead of
     the roverlap and loverlap arguments.  However, the appropriate way to
     achieve the desired chunking behavior may be more intuitive using one
@@ -249,7 +313,9 @@ def chunk_iter(x, chunk_samples, step_samples=None, loverlap=0, roverlap=0,
     while i < samples:
         s = slice(i, i+chunk_samples)
         yield slice_overlap(x, s, start_overlap=loverlap, stop_overlap=roverlap,
-                            axis=axis, ndslice=ndslice)
+                            axis=axis, ndslice=ndslice, padding=padding,
+                            initial_padding=initial_padding,
+                            final_padding=final_padding)
         i += step_samples
 
 def axis_slice(a, start=None, stop=None, step=None, axis=-1, ndslice=None):
@@ -305,57 +371,66 @@ def axis_slice(a, start=None, stop=None, step=None, axis=-1, ndslice=None):
     ndslice[axis] = slice(start, stop, step)
     return a[tuple(ndslice)]
 
-def slice_overlap(a, s, start_overlap=0, stop_overlap=0,
-                  axis=-1, ndslice=None):
+def slice_overlap(a, s, start_overlap=0, stop_overlap=0, axis=-1, ndslice=None,
+                  padding='const', initial_padding=0, final_padding=0):
 
     # First obtain the start, stop and step values of the slice provided.
     samples = a.shape[axis]
     start, stop, step = s.indices(samples)
 
-    # Now, expand the start and stop edges to include the overlapping regions.
+    padded_start = start
+    padded_stop = stop
+
+    # Only apply initial/final padding if this chunk is the first or last
+    if padded_start == 0 and initial_padding:
+        padded_start = start-initial_padding
+    if padded_stop == samples and final_padding:
+        padded_stop = stop+final_padding
+
+    # Now, expand the start and stop edges to include the overlapping regions
+    # (accounting for the step size as needed)
     if step is None:
-        padded_start = start-start_overlap
-        padded_stop = stop+stop_overlap
+        padded_start -= start_overlap
+        padded_stop += stop_overlap
     else:
-        padded_start = start-start_overlap*step
-        padded_stop = stop+stop_overlap*step
+        padded_start -= start_overlap*step
+        padded_stop += stop_overlap*step
 
     # If we are on the first chunk or last chunk, we have some special-case
     # handling to take care of (i.e. padding the extra samples).
-    start_padding, stop_padding = 0, 0
+    n_start_padding, n_stop_padding = 0, 0
     if padded_start < 0:
-        start_padding = np.abs(padded_start)
+        n_start_padding = np.abs(padded_start)
         padded_start = 0
     if padded_stop > samples:
-        stop_padding = padded_stop-samples
-        padded_stop = samples
+        n_stop_padding = padded_stop-samples
+        padded_stop = int(samples)
 
     b = axis_slice(a, padded_start, padded_stop, step, axis, ndslice=ndslice)
 
-    if start_padding or stop_padding:
-        start_ext = _get_padding(b, start_padding, 'start', 'const', axis)
-        stop_ext = _get_padding(b, stop_padding, 'stop', 'const', axis)
+    if n_start_padding or n_stop_padding:
+        start_ext = _get_padding(b, n_start_padding, 'start', padding, axis)
+        stop_ext = _get_padding(b, n_stop_padding, 'stop', padding, axis)
         b = np.c_[start_ext, b, stop_ext]
     return b
 
-def _get_padding(x, n, where='start', padtype='const', axis=-1):
+def _get_padding(x, n, where='start', padding='const', axis=-1):
     '''
     Return the padding required for the array
     '''
-    if where not in ('start', 'stop'):
-        raise ValueError, 'Unsupported option for where: ' + str(where)
-
-    if padtype == 'const':
+    if padding == 'const':
         if where == 'start':
             pad_value = axis_slice(x, start=0, stop=1, axis=axis)
-        else:
+        elif where == 'stop':
             pad_value = axis_slice(x, start=-1, axis=axis)
-        ones_shape = [1] * len(x.shape)
-        ones_shape[axis] = n
-        ones = np.ones(ones_shape, dtype=x.dtype)
-        return ones * pad_value
+        else:
+            raise ValueError, 'Unsupported option for where: ' + str(where)
     else:
-        raise ValueError, 'Unsupported option for padding type'
+        pad_value = padding
+
+    shape = list(x.shape)
+    shape[axis] = n
+    return np.ones(shape, dtype=x.dtype) * pad_value
 
 if __name__ == '__main__':
     import doctest
