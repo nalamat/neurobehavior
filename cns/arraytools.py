@@ -1,7 +1,7 @@
 #!python
-
 '''
-Functions for slicing an array into a series of overlapping chunks.
+Functions for array manipulations such as slicing an array into a series of
+overlapping chunks.
 
 The core function of this module is `chunk_iter` which provides an extremely
 powerful and flexible approach for looping through a large array along a certain
@@ -20,6 +20,7 @@ properly.  You can run these doctests by typing 'python -m cns.arraytools' at
 the command prompt.
 '''
 
+from __future__ import division
 import numpy as np
 
 __author__ = "Brad N. Buran"
@@ -27,6 +28,54 @@ __contact__ = "bburan@alum.mit.edu"
 __license__ = "GPL"
 
 __all__ = ['chunk_samples', 'chunk_iter', 'slice_overlap']
+
+import logging
+log = logging.getLogger(__name__)
+
+def downsampled_mean(x, n, axis=-1):
+    '''
+    Resizes a N-dimensional array by averaging n elements along the last axis
+
+    Parameters
+    ----------
+    x : array-like
+        Input array
+    n : int
+        Samples to average
+    axis : int, optional
+        Axis along which the means are computed.  The default is the last axis.
+
+    >>> a = np.arange(15).reshape((3,5))
+    >>> b = downsampled_mean(a, 2)
+    >>> print(b)
+    [[  0.5   2.5]
+     [  5.5   7.5]
+     [ 10.5  12.5]]
+
+    >>> a = np.arange(20).reshape((4,5))
+    >>> print(a)
+    [[ 0  1  2  3  4]
+     [ 5  6  7  8  9]
+     [10 11 12 13 14]
+     [15 16 17 18 19]]
+
+    >>> b = downsampled_mean(a, 2, axis=0)
+    >>> print(b)
+    [[  2.5   3.5   4.5   5.5   6.5]
+     [ 12.5  13.5  14.5  15.5  16.5]]
+
+    '''
+    offset = x.shape[axis] % n
+    # If offset is zero, don't slice array
+    if offset:
+        x = axis_slice(x, stop=-offset, axis=axis)
+    shape = list(x.shape)
+    # Convert negative axes
+    if axis < 0:
+        axis += x.ndim
+    shape[axis] = -1
+    shape.insert(axis+1, n)
+    return x.reshape(shape).mean(axis=axis+1)
 
 def chunk_samples(x, max_bytes=10e6, block_size=None, axis=-1):
     '''
@@ -97,7 +146,7 @@ def chunk_samples(x, max_bytes=10e6, block_size=None, axis=-1):
     
 def chunk_iter(x, chunk_samples=None, step_samples=None, loverlap=0, roverlap=0,
                padding='const', axis=-1, ndslice=None, initial_padding=0,
-               final_padding=0):
+               final_padding=0, discard_uneven=False):
     '''
     Return an iterable that yields the data in chunks along the specified axis.  
 
@@ -133,6 +182,14 @@ def chunk_iter(x, chunk_samples=None, step_samples=None, loverlap=0, roverlap=0,
         as requested by `padding`.  This is in addition to `right_overlap` (e.g.
         the total number of samples added will be
         `initial_padding`+`right_overlap`).
+    discard_uneven : bool
+        If the axis does not have an appropriate number of samples that can be
+        segmented evenly, given `chunk_samples` and `chunk_step`, discard the
+        final (i.e. "uneven") chunk?  Useful if the processing algorithm
+        requires chunks of an expected size.
+
+    TODO - add provision for preloading data in larger chunks and iterating
+    through them in smaller ones (e.g. chain the chunk_load).
 
     >>> x = np.arange(1000).reshape((4, 250))
     >>> iterable = chunk_iter(x, 5)
@@ -303,26 +360,75 @@ def chunk_iter(x, chunk_samples=None, step_samples=None, loverlap=0, roverlap=0,
     Now, if you are performing filtering *and* computing a running metric, you
     would likely use all three keywords to achieve the optimal chunking
     behavior.
+
+    All the examples above used values for `chunk_size` and `chunk_step` that
+    segmented the array into chunks of equal samples.  However, it's possible to
+    specify certain sizes/steps that result in the final chunk having a
+    different number of samples.  Depending on how you are using the algorithm,
+    this may or may not be the desired behavior.  To illustrate what we mean:
+
+    >>> x = np.arange(55).reshape((5, 11))
+    >>> iterable = chunk_iter(x, 4, 3)
+    >>> chunks = list(iterable)
+    >>> print len(chunks)
+    4
+
+    >>> print chunks[0]
+    [[ 0  1  2  3]
+     [11 12 13 14]
+     [22 23 24 25]
+     [33 34 35 36]
+     [44 45 46 47]]
+
+    >>> print chunks[-1]
+    [[ 9 10]
+     [20 21]
+     [31 32]
+     [42 43]
+     [53 54]]
+
+    The final chunk only returned 2 samples instead of 4!  This is because the
+    array was segmented into 4 chunks since 3 is not enough to cover the full
+    span of the array.  To avoid this issue, indicate that the last chunk should
+    be discarded if it is uneven:
+
+    >>> iterable = chunk_iter(x, 4, 3, discard_uneven=True)
+    >>> chunks = list(iterable)
+    >>> print len(chunks)
+    3
+
+    >>> print chunks[-1]
+    [[ 6  7  8  9]
+     [17 18 19 20]
+     [28 29 30 31]
+     [39 40 41 42]
+     [50 51 52 53]]
     '''
     samples = x.shape[axis]
-    i = 0
-
     if step_samples is None:
         step_samples = chunk_samples
+
+    if discard_uneven:
+        n_chunks = np.floor((samples-chunk_samples)/step_samples) + 1
+    else:
+        n_chunks = np.ceil((samples-chunk_samples)/step_samples) + 1
+    log.debug('Segmenting array into %d chunks', n_chunks)
     
-    while i < samples:
-        s = slice(i, i+chunk_samples)
+    lb_indices = np.arange(n_chunks, dtype='i')*step_samples
+    ub_indices = lb_indices + chunk_samples
+
+    for lb, ub in zip(lb_indices, ub_indices):
+        s = slice(lb, ub)
         yield slice_overlap(x, s, start_overlap=loverlap, stop_overlap=roverlap,
                             axis=axis, ndslice=ndslice, padding=padding,
                             initial_padding=initial_padding,
                             final_padding=final_padding)
-        i += step_samples
 
 def axis_slice(a, start=None, stop=None, step=None, axis=-1, ndslice=None):
     """
     Take a slice along axis 'axis' from 'a'.
 
-    This code is adapted from scipy.signal._arraytools.  key modification is to
+    This code is adapted from scipy.signal._arraytools.  Key modification is to
     add a ndslice parameter.
 
     Parameters
@@ -433,5 +539,7 @@ def _get_padding(x, n, where='start', padding='const', axis=-1):
     return np.ones(shape, dtype=x.dtype) * pad_value
 
 if __name__ == '__main__':
+    #log.setLevel(logging.DEBUG)
+    #log.addHandler(logging.StreamHandler())
     import doctest
     doctest.testmod()
