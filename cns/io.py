@@ -18,10 +18,12 @@ def update_progress(i, n, mesg, progress_character='.'):
     # starting a new line.  This allows us to have a progressbar-style display
     # in the console window.
     template = '\r[{}{}] {:.0f}% {}   '
-    sys.stdout.write(template.format(progress_character*num_chars, 
-                                     ' '*num_left,
-                                     progress*100, 
-                                     mesg))
+    sys.stdout.write(template.format(progress_character*num_chars, ' '*num_left,
+                                     progress*100, mesg))
+
+    # Force a flush because sometimes when using bash scripts and pipes, the
+    # output is not printed until after the program exits.
+    sys.stdout.flush()
     return False
 
 def get_experiment_node(filename=None):
