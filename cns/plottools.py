@@ -3,8 +3,23 @@ Collection of utilities to aid in generating (beautiful) plots
 '''
 from __future__ import division
 
+import itertools
 import pylab
 import numpy as np
+import matplotlib as mp
+
+def best_crange(img, lb=5, ub=95, mirror=False, **kwargs):
+    '''
+    Given a list of 2D arrays to be plotted via imshow, determine bounds
+    '''
+    find_lb = lambda x: np.percentile(x, lb)
+    find_ub = lambda x: np.percentile(x, ub)
+    vmin = min(find_lb(i) for i in itertools.chain(*img))
+    vmax = min(find_ub(i) for i in itertools.chain(*img))
+    if mirror:
+        bound = max(abs(vmin), abs(vmax))
+        vmin, vmax = -bound, bound
+    return mp.colors.Normalize(vmin=vmin, vmax=vmax, **kwargs)
 
 def add_panel_id(ax, id):
     ax.text(-0.1, 1.05, str(id), transform=ax.transAxes,
