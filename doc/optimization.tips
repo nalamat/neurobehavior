@@ -1,0 +1,95 @@
+Optimizing FileChannel settings
+===============================
+
+Did a quick test using data downloaded from the Medusa when no animal was
+plugged in.  Ran for two minutes while simulating nose-pokes and
+hits/misses/false alarms and correct rejects.  
+
+
+Result of two-minute tests
+--------------------------
+
+Simulated nose-pokes during this
+
+    ncalls tottime   percall cumtime percall filname:lineno(function)
+
+ZLIB level 1 SHUFFLE
+    294,780,570 bytes
+    5937191 function calls (5845728 primitive calls) in 127.893 seconds
+    7292   13.531    0.002   13.531    0.002 {method '_append' of 'tables.hdf5Extension.Array' objects}
+
+ZLIB level 9 SHUFFLE
+    289,177,724 bytes
+    2204369 function calls (2138419 primitive calls) in 133.895 seconds
+    1738   61.699    0.036   61.699    0.036 {method '_append' of 'tables.hdf5Extension.Array' objects}
+
+ZLIB level 1 NOSHUFFLE
+    186,571,559 bytes
+    6339501 function calls (6243133 primitive calls) in 140.315 seconds
+    7619    9.547    0.001    9.547    0.001 {method '_append' of 'tables.hdf5Extension.Array' objects}
+
+ZLIB level 9 NOSHUFFLE
+    180,100,635 bytes
+    5229207 function calls (5112235 primitive calls) in 131.175 seconds
+    5550   24.616    0.004   24.616    0.004 {method '_append' of 'tables.hdf5Extension.Array' objects}
+
+NONE level 0 NOSHUFFLE
+    376,783,003 bytes
+    6929564 function calls (6819793 primitive calls) in 135.737 seconds
+    (negligble)
+
+BLOSC level 1 NOSHUFFLE
+    378,879,859 bytes
+    (did not record but was negligble)
+
+BLOSC level 9 NOSHUFFLE
+    276,105,323 bytes
+
+BLOSC level 9 SHUFFLE
+    335,698,954 bytes
+    6682512 function calls (6575732 primitive calls) in 129.885 seconds
+    8191    2.949    0.000    2.949    0.000 {method '_append' of 'tables.hdf5E
+
+Result of 15 minute tests
+-------------------------
+
+Did not stimulate trials during this nor did plot any data on screen
+
+BLOSC level 9 SHUFFLE
+    2,510,475,146 bytes
+    42136910 function calls (41897381 primitive calls) in 917.768 seconds
+    71949   26.462    0.000   26.462    0.000 {method '_append' of 'tables.hdf5E
+
+NONE
+    2,818,312,096 bytes
+    42129731 function calls (41892188 primitive calls) in 914.442 seconds
+    72640    8.069    0.000    8.069    0.000 {method '_append' of 'tables.hdf5E
+
+Did not simulate trials during this test, but did plot data on screen using
+"auto"
+
+NONE
+    2,817,263,520 bytes
+    34455211 function calls (34151678 primitive calls) in 913.362 seconds 
+    33060   27.093    0.001   27.093    0.001 {method '_g_readSlice' of 'tables.    
+     3306   30.122    0.009   30.122    0.009 {method 'max' of 'numpy.ndarray' o
+     6631   30.142    0.005   30.142    0.005 {_plat_support.PixelMap_convert_to
+     3306   30.334    0.009   30.334    0.009 {method 'min' of 'numpy.ndarray' o
+    45639  125.546    0.003  125.546    0.003 {method 'InvokeTypes' of 'PyIDispa
+    42985  144.887    0.003  144.887    0.003 {_agg.GraphicsContextArray_stroke_
+     3309   83.358    0.025  158.236    0.048 extremes_channel_plot.py:72(_get_s
+    36364    5.039    0.000    5.039    0.000 {method '_append' of 'tables.hdf5E
+
+BLOSC level 9 SHUFFLE
+    2,062,323,798 bytes
+    29529368 function calls (29260351 primitive calls) in 909.897 seconds
+
+    17210   66.353    0.004  192.557    0.011 dsp_buffer.py:304(_read)
+     2810   70.477    0.025  133.635    0.048 extremes_channel_plot.py:72(_get_s
+    39043  125.036    0.003  125.036    0.003 {method 'InvokeTypes' of 'PyIDispa
+    36504  122.283    0.003  122.283    0.003 {_agg.GraphicsContextArray_stroke_
+    28050  112.611    0.004  112.611    0.004 {method '_g_readSlice' of 'tables.
+     5639   25.722    0.005   25.722    0.005 {_plat_support.PixelMap_convert_to
+     2805   25.593    0.009   25.593    0.009 {method 'min' of 'numpy.ndarray' o
+     2805   25.423    0.009   25.423    0.009 {method 'max' of 'numpy.ndarray' o
+    30855   10.819    0.000   10.819    0.000 {method '_append' of 'tables.hdf5E
