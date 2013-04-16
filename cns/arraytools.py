@@ -14,6 +14,9 @@ that are commonly required including:
       digital input line).
     * Extracting extra samples on the right and left edges of a given chunk to
       properly stabilize a digital filter algorithm.
+    * Discarding the final chunk if it will not be of the desired chunk size.
+
+Other functions are also provided that may be useful.
 
 This module makes heavy use of doctest to ensure the core functions work
 properly.  You can run these doctests by typing 'python -m cns.arraytools' at
@@ -157,7 +160,7 @@ def downsampled_mean(x, n, axis=-1):
 
     '''
     offset = x.shape[axis] % n
-    # If offset is zero, don't slice array
+    # If offset is zero, don't slice array at all
     if offset:
         x = axis_slice(x, stop=-offset, axis=axis)
     shape = list(x.shape)
