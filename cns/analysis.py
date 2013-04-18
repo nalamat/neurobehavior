@@ -9,10 +9,9 @@ from os import path
 import uuid
 
 from .channel import ProcessedFileMultiChannel
-from .arraytools import chunk_samples, chunk_iter
+from .arraytools import chunk_samples, chunk_iter, downsampled_mean
 from . import get_config
 from .io import copy_block_data
-from mne.time_frequency import tfr
 
 default_chunk_size = get_config('CHUNK_SIZE')
 
@@ -335,9 +334,9 @@ def running_rms(input_node, output_node, duration, step, processing,
 
     rms._v_attrs['aborted'] = aborted
 
-def decimate_waveform(input_node, output_node, q=None, dec_fs=600.0, N=4,
-                      progress_callback=None, chunk_size=default_chunk_size,
-                      include_block_data=True):
+def decimate_waveform(source, output_node, q=None, output_dtype=None,
+                      source_fs=None, dec_fs=600.0, N=4, progress_callback=None,
+                      chunk_size=default_chunk_size):
     '''
     Decimates the waveform data to a lower sampling frequency using a lowpass
     filter cutoff.  
@@ -352,9 +351,9 @@ def decimate_waveform(input_node, output_node, q=None, dec_fs=600.0, N=4,
 
     Parameters
     ----------
-    input_node : instance of tables.Group
-        The PyTables group pointing to the root of the experiment node.  The
-        physiology data will be found under input_node/physiology/raw.
+    waveform : instance of cns.channel.Channel
+        TODO: explain this in detail since it can be duck-typed to support other
+        file formats.
     output_node : instance of tables.Group
         The target node to save the data to.  Note that this must be an instance
         of tables.Group since several arrays will be saved under the target
@@ -377,59 +376,71 @@ def decimate_waveform(input_node, output_node, q=None, dec_fs=600.0, N=4,
         processing will terminate.
     chunk_size : float
         Maximum memory size (in bytes) each chunk should occupy
-    include_block_data : boolean
-        Copy the information regarding blocks occuring in the experiment (e.g.
-        trial timestamps, poke timestamps, trial log, etc.) decimated node file
-        as well.  This is useful for creating a smaller, more compact datafile
-        that you can carry around with you rather than the raw multi-gigabyte
-        physiology data.
     '''
+
     # Make a dummy progress callback if none is requested
     if progress_callback is None:
-        progress_callback = lambda x, y, z: False
+        progress_callback = lambda *args, **kw: None
 
-    # Load information about the data we are processing and compute the sampling
-    # frequency for the decimated dataset
-    raw = input_node.data.physiology.raw
-    source_fs = raw._v_attrs['fs']
+    # Load information about the data we are processing
+    if source_fs is None:
+        source_fs = source.fs
+
+    # In general, this should always be provided by the source because this is
+    # an intrinsic property and the attributes are supported by tables.Array and
+    # numpy.ndarray.  If you roll your own custom object/type you should expose
+    # the dtype and shape attributes and support slicing.
+    source_dtype = source.dtype
+    n_channels, n_samples = source.shape
+
+    # Compute sampling frequency for the decimated dataset
     if q is None:
         q = np.floor(source_fs/dec_fs)
     target_fs = source_fs/q
 
-    n_channels, n_samples = raw.shape
+    log.info('Final sampling frequency is {}'.format(target_fs))
+
+    if output_dtype is None:
+        output_dtype = source_dtype
 
     fh_out = output_node._v_file
     filters = tables.Filters(complevel=1, complib='zlib', fletcher32=True)
-    lfp = fh_out.createEArray(output_node, 'lfp', raw.atom,
-                              (n_channels, 0), filters=filters,
-                              title="Lowpass filtered signal for LFP analysis")
+    lfp = fh_out.createEArray(output_node, 
+                              'lfp',
+                              tables.Atom.from_dtype(np.dtype(output_dtype)),
+                              (n_channels, 0), 
+                              filters=filters,
+                              title="Lowpass filtered signal")
 
     # Critical frequency of the lowpass filter (ensure that the filter cutoff is
     # half the target sampling frequency to avoid aliasing).
     Wn = (0.5*target_fs)/(0.5*source_fs)
     b, a = signal.iirfilter(N, Wn, btype='lowpass')
 
-    # Need to consider this in more detail
-    b = b.astype(raw.dtype)
-    a = a.astype(raw.dtype)
+    # TODO Need to consider this in more detail
+    b = b.astype(output_dtype)
+    a = a.astype(output_dtype)
     
     # The number of samples in each chunk *must* be a multiple of the decimation
     # factor so that we can extract the *correct* samples from each chunk.
-    c_samples = chunk_samples(raw, chunk_size, q)
+    c_samples = chunk_samples(source, chunk_size, q)
     overlap = 3*len(b)
-    iterable = chunk_iter(raw, chunk_samples=c_samples, loverlap=overlap,
+    iterable = chunk_iter(source, 
+                          chunk_samples=c_samples, 
+                          loverlap=overlap,
                           roverlap=overlap)
 
     for i, chunk in enumerate(iterable):
-        chunk = signal.filtfilt(b, a, chunk, padlen=0).astype(raw.dtype)
+        chunk = signal.filtfilt(b, a, chunk.astype(output_dtype), padlen=0)
         chunk = chunk[:, overlap:-overlap:q]
+        if np.any(np.isnan(chunk)):
+            raise ValueError, 'NaN values detected'
         lfp.append(chunk)
         if progress_callback(i*c_samples, n_samples, ''):
             break
 
     # Save some data about how the lfp data was generated
     lfp._v_attrs['q'] = q
-    lfp._v_attrs['fs'] = target_fs
     lfp._v_attrs['b'] = b
     lfp._v_attrs['a'] = a
     lfp._v_attrs['chunk_overlap'] = overlap
@@ -437,15 +448,16 @@ def decimate_waveform(input_node, output_node, q=None, dec_fs=600.0, N=4,
     lfp._v_attrs['btype'] = 'lowpass'
     lfp._v_attrs['order'] = N
     lfp._v_attrs['freq_lowpass'] = target_fs*0.5
+    lfp._v_attrs['source_dtype'] = source_dtype
+    lfp._v_attrs['source_fs'] = source_fs
 
-    # Save some information about where we obtained the raw data from
-    filename = path.basename(input_node._v_file.filename)
-    output_node._v_attrs['source_file'] = filename
-    output_node._v_attrs['source_pathname'] = input_node._v_pathname
+    # Attributes required to support the cns.channel.FileChannel.from_node
+    # method.
+    lfp._v_attrs['fs'] = target_fs
+    lfp._v_attrs['channels'] = n_channels
+    lfp._v_attrs['t0'] = 0
 
-    if include_block_data:
-        block_node = output_node._v_file.createGroup(output_node, 'block_data')
-        copy_block_data(input_node, block_node)
+    lfp._v_attrs['complete'] = True
 
 def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
                    rej_threshold_stds, processing, window_size=2.1,
@@ -833,88 +845,59 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
     # Notify the progress dialog that we're done
     progress_callback(total_samples, total_samples, 'Complete')
 
-def compute_spectrogram(lfp, output_node, frequencies, cycles=3,
-                        progress_callback=None,
-                        chunk_size=default_chunk_size,
-                        include_block_data=True):
+def running_fft(x, fs, fft_window=0.25, fft_step=0.125, max_frequency=300,
+                detrend=None, window='hanning'):
     '''
-    Computes the running spectrogram using Morlet wavelets
-
-    Much of the work here was derived from code made available by the Martinos
-    Center for Neuroimaging.
-
-    This code is carefully designed to handle boundary issues when processing
-    large datasets in chunks (e.g. stabilizing the edges of each chunk when
-    when performing the Morlet convolution).
-
-    Parameters
-    ----------
-    lfp : instance of tables.Array
-        The PyTables array containing the LFP data (computed using the
-        decimate_waveform script).
-    output_node : instance of tables.Group
-        The target node to save the data to.  Note that this must be an instance
-        of tables.Group.
-    frequencies : list/array
-        Frequencies to use in computing spectrogram
-    cycles : integer
-        Number of cycles in Morlet wavelet
-
-    Notes
-    -----
-    Chunk size has to be much smaller to handle arrays of this size.
+    Given the 2D array containing multiple signals (channel x time), compute the
+    FFT.  This is useful as a precursor for various functions such as pwelch,
+    etc.
     '''
-    # Make a dummy progress callback if none is requested
-    if progress_callback is None:
-        progress_callback = lambda x, y, z: False
+    # Generate the appropriate function for detrending
+    if detrend is None:
+        detrend = lambda x: x
+    elif type == 'mean':
+        detrend = lambda x: x-x.mean(0)
 
-    # Load information about the data we are processing and compute the sampling
-    # frequency for the decimated dataset
-    #raw = input_node.data.physiology.raw
-    fs = lfp._v_attrs.fs
-    n_channels, n_samples = lfp.shape
-    n_frequencies = len(frequencies)
+    NFFT = int(fft_window*fs)
+    nstep = int(fft_step*fs)
 
-    fh_out = output_node._v_file
-    filters = tables.Filters(complevel=1, complib='zlib', fletcher32=True)
+    # Total number of segments that will be computed
+    n_windows = np.floor((x.shape[-1]-NFFT)/nstep) + 1
 
-    spectrogram = fh_out.createCArray(output_node, 'spectrogram',
-                                      tables.atom.ComplexAtom(itemsize=8),
-                                      (n_channels, n_frequencies, n_samples),
-                                      filters=filters,
-                                      title="Spectrogram of LFP signal")
+    # Compute the upper bound of the returned frequency array to keep.  If
+    # we only want up to 300 Hz and our FFT resolution is 1 Hz, then we want
+    # to keep the first 301 values in Pxx (add one since the first frequency
+    # is 0).
+    fft_resolution = fs/NFFT
+    fft_ub = np.round(max_frequency/fft_resolution) + 1
 
-    # Get the Morlet wavelets used for the transform
-    wavelets = tfr.morlet(fs, frequencies, n_cycles=cycles)
+    if window == 'hanning':
+        window_vals = signal.hanning(NFFT)
 
-    # Overlap by number of samples in the largest wavelet
-    overlap = max(map(len, wavelets))
-    c_samples = chunk_samples(lfp, chunk_size)
-    iterable = chunk_iter(lfp, chunk_samples=c_samples, loverlap=overlap,
-                          roverlap=overlap)
+    log.debug('FFT resolution of %0.2f with %d frequencies up to %0.2f',
+              fft_resolution, fft_ub, max_frequency)
 
-    for i, chunk in enumerate(iterable):
-        for j, Wn in enumerate(wavelets):
-            for k in range(n_channels):
-                lb = i*c_samples
-                ub = lb+c_samples
-                c_spect = np.convolve(chunk[k], Wn, 'same')
-                spectrogram[k,j,lb:ub] = c_spect[overlap:-overlap] 
-        if progress_callback(i*c_samples, n_samples, ''):
-            break
+    # Create destination array for spectra data.  Array has format channel,
+    # frequency, time.
+    shape = len(x), fft_ub, n_windows
+    cache = np.empty(shape, dtype=np.complex64)
 
-    # Save some data about how the lfp data was generated
-    spectrogram._v_attrs['chunk_overlap'] = overlap
-    spectrogram._v_attrs['frequencies'] = frequencies
-    spectrogram._v_attrs['wavelets'] = wavelets
-    spectrogram._v_attrs['wavelet_cycles'] = cycles
+    # Process the data!
+    citer = chunk_iter(x, NFFT, nstep, discard_uneven=True)
+    for i, chunk in enumerate(citer):
+        chunk = window_vals * detrend(chunk)
+        cache[..., i] = np.fft.fft(chunk)[..., :fft_ub]
 
-    # Save some information about where we obtained the raw data from
-    filename = path.basename(input_node._v_file.filename)
-    output_node._v_attrs['source_file'] = filename
-    output_node._v_attrs['source_pathname'] = input_node._v_pathname
+    # Actual frequencies computed
+    freqs = np.arange(fft_ub)*fft_resolution
+    time = np.arange(n_windows)*fft_step
 
-    if include_block_data:
-        block_node = output_node._v_file.createGroup(output_node, 'block_data')
-        copy_block_data(input_node, block_node)
+    return cache, freqs, time
 
+
+def running_msc(x, y, downsample):
+    Pxx = downsampled_mean(np.abs(x)**2, downsample)
+    Pyy = downsampled_mean(np.abs(y)**2, downsample)
+    Pxy = downsampled_mean(x * np.conjugate(y), downsample)
+    Pxy = np.abs(Pxy)**2
+    return Pxy / (Pxx * Pyy)

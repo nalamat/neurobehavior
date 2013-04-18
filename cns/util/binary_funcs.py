@@ -1,6 +1,9 @@
 import numpy as np
 
 def ts(TTL):
+    '''
+    Return nonzero indices (e.g. rising or falling) edges of the TTL
+    '''
     return np.flatnonzero(TTL)
 
 def edge_rising(TTL):
@@ -9,24 +12,48 @@ def edge_rising(TTL):
 def edge_falling(TTL):
     return np.r_[0, np.diff(TTL.astype('i'))] == -1
 
-def epochs(x, pad=0):
+def epochs(x, pad=0, smooth=True):
     '''
-    Given a boolean array, where 1 = epoch, return indices of epochs (first
-    column is the index where x goes from 0 to 1 and second column is index
-    where x goes from 1 to 0.
+    Identify start and end indices where the TTL goes high
+
+    Parameters
+    ----------
+    x : 1D array
+        Array to be evaluated as a logical.  A logical True is treated as a
+        "high" in TTL parlance.
+    pad : int
+        Expand epoch boundaries by the requested number of indices.  Will not
+        expand epoch boundaries beyond the edges of the input.
+
+    Returns
+    -------
+    2D array
+
+    Examples
+    --------
+    >>> x = np.zeros(10)
+
+    Boundary conditions 
+    -------------------
+    >>> x = np.zeros(10)
+    >>> epochs(x)
+    array([], shape=(0, 2), dtype=float64)
+
+    >>> x[-1] = 1
+    >>> epochs(x)
+    array([[ 9, 10]])
+
+    >>> x[0] = 1
+    >>> epochs(x)
+    array([[ 0,  1],
+           [ 9, 10]])
+
     '''
-    start = ts(edge_rising(x))
-    end = ts(edge_falling(x))
-    for s in start:
-        x[s-pad:s] = 1
-    for e in end:
-        x[e:e+pad] = 1
     start = ts(edge_rising(x))
     end = ts(edge_falling(x))
 
     # Handle various boundary conditions where some sort of task-related
     # activity is registered at very beginning or end of experiment.
-
     if len(end) == 0 and len(start) == 0:
         return np.array([]).reshape((0, 2))
     elif len(end) == 0 and len(start) == 1:
@@ -39,7 +66,16 @@ def epochs(x, pad=0):
     if end[-1] < start[-1]:
         end = np.r_[end, len(x)]
 
-    return np.c_[start, end]
+    start = start-pad
+    end = end+pad
+
+    epochs = np.c_[start, end]
+    epochs = np.clip(epochs, 0, len(x))
+    
+    if smooth:
+        epochs = smooth_epochs(epochs)
+
+    return epochs
 
 def smooth_epochs(epochs):
     '''
@@ -164,6 +200,6 @@ arr = randint(0, 8, 10e3)
     print timeit.timeit("int_to_TTL(arr, 8)", setup, number=20)
 
 if __name__ == "__main__":
-    #import doctest
-    #doctest.testmod()
-    test_speed()
+    import doctest
+    doctest.testmod()
+    #test_speed()

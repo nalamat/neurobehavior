@@ -7,9 +7,8 @@ import numpy as np
 
 import h5
 
-from .util.binary_funcs import smooth_epochs
+def update_progress(i, n, mesg, progress_character='.'):
 
-def update_progress(i, n, mesg):
     '''
     Progress bar for use with the command line
     '''
@@ -20,8 +19,13 @@ def update_progress(i, n, mesg):
     # The \r tells the cursor to return to the beginning of the line rather than
     # starting a new line.  This allows us to have a progressbar-style display
     # in the console window.
-    sys.stdout.write('\r[{}{}] {:.0f}% {}'.format('#'*num_chars, ' '*num_left,
-                                                  progress*100, mesg))
+    template = '\r[{}{}] {:.0f}% {}   '
+    sys.stdout.write(template.format(progress_character*num_chars, ' '*num_left,
+                                     progress*100, mesg))
+
+    # Force a flush because sometimes when using bash scripts and pipes, the
+    # output is not printed until after the program exits.
+    sys.stdout.flush()
     return False
 
 def get_experiment_node(filename=None):
