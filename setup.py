@@ -20,7 +20,6 @@ setup(
              'scripts/process_batchfile.py',
              'scripts/strip_extra_physiology.py',
              'scripts/split_physiology_file.py',
-             'scripts/migrate_extracted_data.py',
              'scripts/plot_lfp.py',
             ]
 )

@@ -13,10 +13,21 @@ def main(infile, dec_fs=600, outfile_suffix='dec', force_overwrite=False):
         if path.exists(outfile) and not force_overwrite:
             raise IOError, '{} already exists'.format(outfile)
         fh_out = tables.openFile(outfile, 'w')
+
         output_node = fh_out.root
         input_node = fh_in.root._f_listNodes()[0]
-        decimate_waveform(input_node, output_node, dec_fs=dec_fs,
+
+        decimate_waveform(input_node, 
+                          output_node,
+                          source_fs=input_node._v_attrs['fs'],
+                          dec_fs=dec_fs,
                           progress_callback=update_progress)
+
+        # Add some extra metadata to the output node to help us in tracking
+        # where the data came from
+        output_node._v_attrs['source_file'] = infile
+        output_node._v_attrs['source_pathname'] = input_node._v_pathname
+
         fh_out.close()
         fh_in.close()
     else:
