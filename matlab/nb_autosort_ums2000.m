@@ -51,13 +51,14 @@ for i = 1:length(filenames),
         files = dir([base_filename '__' int2str(channel) '_sorted*.mat']);
         if length(files) == 0
             fprintf('Sorting %s channel %d.', filenames(i).name, channel);
-            try
-                spikes = nb_import_ums2000(filename, 1, 'channels', channel, varargin{:});
-                nb_save_ums2000(spikes);
-                fprintf('  Success!\n');
-            catch
-                fprintf('  Memory error.\n');
-            end
+            spikes = nb_import_ums2000(filename, 0, ...
+                'channels', channel, varargin{:});
+            spikes = ss_align(spikes);
+            spikes = ss_kmeans(spikes);
+            spikes = ss_energy(spikes);
+            spikes = ss_aggregate(spikes);
+            nb_save_ums2000(spikes);
+            fprintf('  Success!\n');
         else
             fprintf('%s channel %d already sorted.\n', filenames(i).name, channel);
         end
