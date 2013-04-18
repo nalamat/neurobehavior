@@ -8,14 +8,51 @@ import pylab
 import numpy as np
 import matplotlib as mp
 
-def best_crange(img, lb=5, ub=95, mirror=False, **kwargs):
+def plot_mean_sem(x, y, color='k', axis=-1, ax=None):
+    if ax is None:
+        ax = pylab.gca()
+    m = y.mean(axis=axis)
+    sem = y.std(axis=axis)/np.sqrt(y.shape[-1])
+    ax.plot(x, m, '-', color='k')
+    ax.fill_between(x, m-sem, m+sem, edgecolor=color, facecolor=color,
+                    alpha=0.5)
+
+    
+def best_crange(img, lb=5, ub=95, mirror=False, finite_only=False, **kwargs):
     '''
-    Given a list of 2D arrays to be plotted via imshow, determine bounds
+    Given a list of 2D arrays to be plotted via imshow, determine optimal bounds
+    for color range
+
+    Parameters
+    ----------
+    img : list
+        List of 2D arrays
+    lb : float [0, 100]
+        Set lower bound to specified percentile of value range
+    ub : float [0, 100]
+        Set upper bound to specified percentile of value range
+    finite_only : bool
+        Consider only finite values?
     '''
-    find_lb = lambda x: np.percentile(x, lb)
-    find_ub = lambda x: np.percentile(x, ub)
-    vmin = min(find_lb(i) for i in itertools.chain(*img))
-    vmax = min(find_ub(i) for i in itertools.chain(*img))
+    # Should we only consider finite values when plotting data?
+    if finite_only:
+        find_lb = lambda x: np.percentile(x[np.isfinite(x)], lb)
+        find_ub = lambda x: np.percentile(x[np.isfinite(x)], ub)
+    else:
+        find_lb = lambda x: np.percentile(x, lb)
+        find_ub = lambda x: np.percentile(x, ub)
+
+    # Discared masked elements if the array is a MaskedArray
+    img_data = []
+    for i in itertools.chain(*img):
+        if hasattr(i, 'compressed'):
+            img_data.append(i.compressed())
+        else:
+            img_data.append(i)
+
+    vmin = min(find_lb(i) for i in img_data)
+    vmax = max(find_ub(i) for i in img_data)
+
     if mirror:
         bound = max(abs(vmin), abs(vmax))
         vmin, vmax = -bound, bound
@@ -135,7 +172,7 @@ class AxesIterator(object):
 
     def __init__(self, groups, extra=0, sharex=True, sharey=True,
                  max_groups=np.inf, adjust_spines=False, save_pattern=None,
-                 auto_close=False):
+                 auto_close=False, figure_args=None):
 
         self.sharex = sharex
         self.sharey = sharey
@@ -159,6 +196,8 @@ class AxesIterator(object):
         self.last_row = None
         self.last_col = None
 
+        self.figure_args = {} if figure_args is None else figure_args
+
     def __iter__(self):
         return self
 
@@ -178,14 +217,13 @@ class AxesIterator(object):
         if sharey is None:
             sharey = self.sharey
 
-        #if not np.isinf(self.max_groups):
         if self.i == 0:
             if self.current_figure and self.save_pattern:
                 filename = self.save_pattern.format(self.figure_count)
                 self.current_figure.savefig(filename)
                 if self.auto_close:
                     pylab.close(self.current_figure)
-            self.current_figure = pylab.figure()
+            self.current_figure = pylab.figure(**self.figure_args)
             self.figure_count += 1
             self.figures.append(self.current_figure)
 
