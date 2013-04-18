@@ -14,6 +14,9 @@ that are commonly required including:
       digital input line).
     * Extracting extra samples on the right and left edges of a given chunk to
       properly stabilize a digital filter algorithm.
+    * Discarding the final chunk if it will not be of the desired chunk size.
+
+Other functions are also provided that may be useful.
 
 This module makes heavy use of doctest to ensure the core functions work
 properly.  You can run these doctests by typing 'python -m cns.arraytools' at
@@ -31,6 +34,97 @@ __all__ = ['chunk_samples', 'chunk_iter', 'slice_overlap']
 
 import logging
 log = logging.getLogger(__name__)
+
+def mask_any(mask, reduction_axes):
+    '''
+    Reduce a mask along the specified axes using `numpy.any`, then upsize the
+    mask to the original shape.
+
+    This is useful for computing "artifact reject" masks.  For example, if you
+    have a 3D array containing data from multiple channels, epochs and
+    timepoints (with the dimensions in that order), and you wish to reject all
+    epochs where the signal exceeded a given value on any timepoint or channel,
+    then you could do:
+
+        mask = mask_any(waveforms >= 1e-6, [0, 2])
+
+    Examples
+    --------
+    >>> x = np.array([[0, 1, 1, 0], [0, 0, 0, 0]], dtype='bool')
+    >>> print x
+    [[False  True  True False]
+     [False False False False]]
+
+    >>> print mask_any(x, [-1])
+    [[ True  True  True  True]
+     [False False False False]]
+
+    >>> y = np.array([[0, 0, 0, 0], [1, 0, 0, 0]], dtype='bool')
+    >>> y = np.dstack([x, y])
+    >>> print y
+    [[[False False]
+      [ True False]
+      [ True False]
+      [False False]]
+    <BLANKLINE>
+     [[False  True]
+      [False False]
+      [False False]
+      [False False]]]
+
+    >>> print mask_any(y, [0, -1])
+    [[[ True  True]
+      [ True  True]
+      [ True  True]
+      [False False]]
+    <BLANKLINE>
+     [[ True  True]
+      [ True  True]
+      [ True  True]
+      [False False]]]
+
+    >>> print mask_any(y, [1, 2])
+    [[[ True  True]
+      [ True  True]
+      [ True  True]
+      [ True  True]]
+    <BLANKLINE>
+     [[ True  True]
+      [ True  True]
+      [ True  True]
+      [ True  True]]]
+
+    >>> y[1,0,1] = False
+    >>> print y
+    [[[False False]
+      [ True False]
+      [ True False]
+      [False False]]
+    <BLANKLINE>
+     [[False False]
+      [False False]
+      [False False]
+      [False False]]]
+
+    >>> print mask_any(y, [1, 2])
+    [[[ True  True]
+      [ True  True]
+      [ True  True]
+      [ True  True]]
+    <BLANKLINE>
+     [[False False]
+      [False False]
+      [False False]
+      [False False]]]
+
+    '''
+    original_shape = mask.shape
+    for axis in reduction_axes:
+        mask = np.any(mask, axis=axis, keepdims=True)
+    for axis in reduction_axes:
+        mask = np.repeat(mask, original_shape[axis], axis)
+    return mask
+
 
 def downsampled_mean(x, n, axis=-1):
     '''
@@ -66,7 +160,7 @@ def downsampled_mean(x, n, axis=-1):
 
     '''
     offset = x.shape[axis] % n
-    # If offset is zero, don't slice array
+    # If offset is zero, don't slice array at all
     if offset:
         x = axis_slice(x, stop=-offset, axis=axis)
     shape = list(x.shape)

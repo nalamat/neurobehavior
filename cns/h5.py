@@ -54,6 +54,7 @@ import logging
 from datetime import datetime
 from pandas import DataFrame
 from os import path
+import fnmatch
 
 log = logging.getLogger(__name__)
 
@@ -422,6 +423,12 @@ def p_iter_nodes(node, pattern, dereference=True):
         for trial_log in p_iter_nodes(fh.root, pattern):
             # do something with the trial_log
 
+    Partial wildcards (ala Unix-style filename matching) are supported as well::
+
+        fh = tables.openFile('G1_dt_behavior.cohort.hd5', 'r')
+        pattern = '/Cohort_0/animals/*/exp*/*/data/trial_log'
+        for trial_log in p_iter_nodes(fh.root, pattern):
+            # do something with the trial_log
     '''
     if isinstance(node, tables.File):
         node = node.root
@@ -438,11 +445,18 @@ def p_iter_nodes(node, pattern, dereference=True):
     # We're at the end of the list.  This is the node we want.
     if len(pattern) == 0:
         yield node
-    elif '*' == pattern[0]:
+
+    #elif '*' == pattern[0]:
+    #    for n in node._f_iterNodes():
+    #        for n in p_iter_nodes(n, pattern[1:]):
+    #            if n is not None:
+    #                yield n
+    elif '*' in pattern[0]:
         for n in node._f_iterNodes():
-            for n in p_iter_nodes(n, pattern[1:]):
-                if n is not None:
-                    yield n
+            if fnmatch.fnmatch(n._v_name, pattern[0]):
+                for n in p_iter_nodes(n, pattern[1:]):
+                    if n is not None:
+                        yield n
     else:
         try:
             n = node._f_getChild(pattern[0])
@@ -461,10 +475,10 @@ def p_list_nodes(file_name, pattern, dereference=True):
     stored in the node.
     '''
     with tables.openFile(file_name, 'r') as fh:
-        pattern = pattern.split('/')
-        if pattern[0] != '':
-            raise ValueError, 'Pattern must begin with /'
-        for node in p_iter_nodes(fh.root, pattern[1:]):
+        #pattern = pattern.split('/')
+        #if pattern[0] != '':
+            #raise ValueError, 'Pattern must begin with /'
+        for node in p_iter_nodes(fh.root, pattern):
             yield node
 
 def extract_node_data(node, fields, summary):

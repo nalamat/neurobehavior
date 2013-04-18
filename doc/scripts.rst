@@ -63,6 +63,9 @@ Which will give you the following message::
                             current directory. This option is not throughly
                             tested. Use at your own risk.
 
+Analyzing data
+--------------
+
 .. note::
 
     Some of the analysis operations designed to work with the raw physiology
@@ -81,9 +84,6 @@ Which will give you the following message::
     station.  Since this usually occurs only at the beginning or end of an
     experiment, use the truncate waveform and zero waveform options in the
     review physiology program.
-
-Analyzing data
---------------
 
 Create missing timeseries data (create_missing_time_data.py)
 ............................................................
@@ -107,14 +107,6 @@ Decimate physiology (decimate.py)
 .................................
 
 TODO.  Saves to <source_filename>_dec.hd5 by default.
-
-Process batchfile (process_batchfile.py)
-........................................
-
-Extract spikes (no command-line program -- must be launched via the
-review_physiology.py GUI or queued and run using process_batchfile.py).
-
-TODO.  Saves to <source_filename>_extracted.hd5 by default.
 
 Review Physiology (review_physiology.py)
 ........................................
