@@ -1,6 +1,6 @@
 from __future__ import division
 
-from enthought.traits.api import HasTraits, Property, cached_property
+from traits.api import HasTraits, Property, cached_property
 import numpy as np
 
 class AversiveCLDataMixin(HasTraits):

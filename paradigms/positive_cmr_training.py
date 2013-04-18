@@ -6,8 +6,8 @@ import numpy as np
 
 from cns.pipeline import deinterleave_bits
 
-from enthought.traits.api import Instance, File, List, Any, Int, Bool, Enum, Button
-from enthought.traits.ui.api import (View, Include, VSplit, VGroup, Item,
+from traits.api import Instance, File, List, Any, Int, Bool, Enum, Button
+from traitsui.api import (View, Include, VSplit, VGroup, Item,
         HSplit, HGroup, Tabbed, ShellEditor)
 
 # These mixins are shared with the positive_cmr paradigm.  I use the underscore

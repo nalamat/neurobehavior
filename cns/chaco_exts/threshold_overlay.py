@@ -1,12 +1,12 @@
-from enthought.enable.api import ColorTrait
-from enthought.chaco.api import AbstractOverlay
-from enthought.traits.api import (Instance, Property, cached_property, Int,
+from enable.api import ColorTrait
+from chaco.api import AbstractOverlay
+from traits.api import (Instance, Property, cached_property, Int,
         Float, List, Bool, on_trait_change)
-from enthought.traits.ui.api import View, VGroup, Item
+from traitsui.api import View, VGroup, Item
 
 class ThresholdOverlay(AbstractOverlay):
 
-    plot = Instance('enthought.enable.api.Component')
+    plot = Instance('enable.api.Component')
 
     line_width = Int(1)
     line_color = ColorTrait('red')

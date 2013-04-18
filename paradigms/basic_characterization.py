@@ -1,7 +1,7 @@
 from traits.api import Instance, on_trait_change, Range, Button, Any, HasTraits
 from traitsui.api import View, VGroup, Item, HGroup, spring
 from cns.channel import FileChannel
-from enthought.chaco.api import DataRange1D, LinearMapper
+from chaco.api import DataRange1D, LinearMapper
 from cns.chaco_exts.rms_channel_plot import RMSChannelPlot
 
 from os.path import join

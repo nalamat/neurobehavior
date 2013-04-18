@@ -1,12 +1,12 @@
 import numpy as np
-from enthought.enable.api import MarkerTrait, ColorTrait
-from enthought.chaco.api import AbstractOverlay
-from enthought.traits.api import Instance, Any, Int
-from enthought.traits.ui.api import View, Item, VGroup
+from enable.api import MarkerTrait, ColorTrait
+from chaco.api import AbstractOverlay
+from traits.api import Instance, Any, Int
+from traitsui.api import View, Item, VGroup
 
 class SpikeOverlay(AbstractOverlay):
 
-    plot = Instance('enthought.enable.api.Component')
+    plot = Instance('enable.api.Component')
     spikes = Any
 
     marker = MarkerTrait('inverted_triangle')

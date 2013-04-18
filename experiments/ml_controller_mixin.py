@@ -1,6 +1,6 @@
 from functools import partial
 import numpy as np
-from enthought.traits.api import HasTraits, Bool
+from traits.api import HasTraits, Bool
 from .maximum_likelihood import MaximumLikelihood
 from .trial_setting import TrialSetting
 

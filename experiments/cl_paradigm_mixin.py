@@ -1,6 +1,6 @@
-from enthought.traits.api import (HasTraits, Instance, Button, List, Trait,
+from traits.api import (HasTraits, Instance, Button, List, Trait,
         Bool, Property)
-from enthought.traits.ui.api import View, VGroup, HGroup, Item, Include
+from traitsui.api import View, VGroup, HGroup, Item, Include
 
 from cns import choice
 
