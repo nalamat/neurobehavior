@@ -2,16 +2,16 @@ from os import path
 import operator as op
 import tables
 from cns import h5
-from enthought.traits.api import HasTraits, Date, Enum, Instance, \
+from traits.api import HasTraits, Date, Enum, Instance, \
     Property, Int, Str, List, Bool, Any
 import datetime
 
-from enthought.traits.ui.menu import MenuBar, Menu, ActionGroup, Action
+from traitsui.menu import MenuBar, Menu, ActionGroup, Action
 
 from cns.widgets.file_handler import FileHandler
-from enthought.pyface.api import YES, confirm
-from enthought.traits.api import Button, Event, on_trait_change, File
-from enthought.traits.ui.api import View, HGroup, Item, VGroup, spring, \
+from pyface.api import YES, confirm
+from traits.api import Button, Event, on_trait_change, File
+from traitsui.api import View, HGroup, Item, VGroup, spring, \
     Group, TableEditor, ObjectColumn
 
 from cns import get_config

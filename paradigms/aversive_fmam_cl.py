@@ -5,8 +5,8 @@ Aversive FM/AM tone paradigm
 
 TODO: Desription
 '''
-from enthought.traits.api import Instance
-from enthought.traits.ui.api import View, VGroup, Item, Include
+from traits.api import Instance
+from traitsui.api import View, VGroup, Item, Include
 from experiments.evaluate import Expression
 from os.path import join
 from cns import get_config

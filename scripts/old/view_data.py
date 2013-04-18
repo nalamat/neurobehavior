@@ -1,18 +1,18 @@
-from enthought.etsconfig.api import ETSConfig
+from traits.etsconfig.api import ETSConfig
 ETSConfig.toolkit = 'qt4'
 import  tables
 from cns.data.h5_utils import iter_nodes, walk_nodes
 from cns.data import persistence
 
-from enthought.traits.api import *
-from enthought.traits.ui.api import *
+from traits.api import *
+from traitsui.api import *
 
 import logging
 log = logging.getLogger()
 log.setLevel(logging.ERROR)
 log.addHandler(logging.StreamHandler())
 
-from enthought.traits.ui.extras.checkbox_column import CheckboxColumn
+from traitsui.extras.checkbox_column import CheckboxColumn
 from cns.data.ui.cohort import SimpleAnimalAdapter
 
 class ListColumn(ObjectColumn):

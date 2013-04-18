@@ -5,10 +5,10 @@ Created on Jul 12, 2010
 '''
 
 from cns.equipment.calibration import MicrophoneCalibration, SpeakerCalibration
-from enthought.pyface.api import GUI, OK
-from enthought.pyface.wizard.api import SimpleWizard, WizardPage, WizardController
-from enthought.traits.ui.api import View
-from enthought.traits.api import Instance, Str, HasTraits, on_trait_change
+from pyface.api import GUI, OK
+from pyface.wizard.api import SimpleWizard, WizardPage, WizardController
+from traitsui.api import View
+from traits.api import Instance, Str, HasTraits, on_trait_change
 
 miccalsetup_mesg = \
 '''The first step is to determine the actual sensitivity of the microphone using

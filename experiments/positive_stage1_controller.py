@@ -3,9 +3,9 @@ from cns import get_config
 from cns.pipeline import deinterleave_bits
 from abstract_experiment_controller import AbstractExperimentController
 from abstract_experiment_controller import ExperimentToolBar
-from enthought.traits.api import Any, Instance
+from traits.api import Any, Instance
 
-from enthought.savage.traits.ui.svg_button import SVGButton
+from enable.savage.trait_defs.ui.svg_button import SVGButton
 
 from traitsui.api import Item, View, HGroup, spring
 from cns.widgets.icons import icons

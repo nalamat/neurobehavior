@@ -1,7 +1,7 @@
 from __future__ import division
 
-from enthought.chaco.api import DataRange1D
-from enthought.traits.api import Float, List, Instance, Enum, on_trait_change
+from chaco.api import DataRange1D
+from traits.api import Float, List, Instance, Enum, on_trait_change
 
 import logging
 log = logging.getLogger(__name__)

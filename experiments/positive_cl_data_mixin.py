@@ -2,7 +2,7 @@ from __future__ import division
 
 import numpy as np
 from scipy import stats
-from enthought.traits.api import (HasTraits, Property, cached_property,
+from traits.api import (HasTraits, Property, cached_property,
         on_trait_change)
 
 class PositiveCLDataMixin(HasTraits):

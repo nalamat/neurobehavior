@@ -1,4 +1,4 @@
-function [filename] = nb_save_ums2000(spikes, file_extension)
+function [filename] = nb_save_ums2000(spikes, file_extra)
 %   Neurobehavior by Buran BN and Sanes DH
 %
 %   This is a simple wrapper around Matlab's save function that ensures that the
@@ -14,14 +14,16 @@ function [filename] = nb_save_ums2000(spikes, file_extension)
     % spikes structure since import_ums2000 saves the filename to a field in the
     % structure.
     if nargin == 1,
-        file_extension = '';
+        file_extra = '';
+    else
+        file_extra = ['_' file_extra];
     end
     
     for i = 1:length(spikes.info.detect.detect_channels),
         ch = spikes.info.detect.detect_channels(i);
-        file_extension = [file_extension '_' int2str(ch)];
+        file_extension = ['_' int2str(ch)];        
     end
     filename = [spikes.base_filename '_' file_extension];
-    filename = [filename '_sorted.mat'];
-    
+    filename = [filename '_sorted' file_extra];
+
     save(filename, '-struct', 'spikes', '-v7.3');

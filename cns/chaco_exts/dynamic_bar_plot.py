@@ -1,8 +1,8 @@
 import numpy as np
-from enthought.chaco.api import (ArrayDataSource, LabelAxis, BarPlot,
+from chaco.api import (ArrayDataSource, LabelAxis, BarPlot,
                                  LinearMapper, DataRange1D)
 
-from enthought.traits.api import (Instance, Any, Str, Int, Trait, DelegatesTo,
+from traits.api import (Instance, Any, Str, Int, Trait, DelegatesTo,
                                   Callable, Float)
 
 class DynamicBarplotAxis(LabelAxis):

@@ -1,5 +1,5 @@
-from enthought.traits.api import Instance
-from enthought.traits.ui.api import View, Include, VGroup
+from traits.api import Instance
+from traitsui.api import View, Include, VGroup
 
 from experiments.positive_stage1_data import PositiveStage1Data
 from experiments.positive_stage1_controller import PositiveStage1Controller

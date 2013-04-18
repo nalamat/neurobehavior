@@ -3,8 +3,8 @@ Created on May 26, 2010
 
 @author: Brad
 '''
-from enthought.traits.api import HasTraits, Instance
-from enthought.traits.ui.api import Handler, UIInfo
+from traits.api import HasTraits, Instance
+from traitsui.api import Handler, UIInfo
 
 class ToolBar(HasTraits):
 

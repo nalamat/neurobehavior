@@ -1,6 +1,9 @@
 import numpy as np
 
 def ts(TTL):
+    '''
+    Return nonzero indices (e.g. rising or falling) edges of the TTL
+    '''
     return np.flatnonzero(TTL)
 
 def edge_rising(TTL):
@@ -8,6 +11,122 @@ def edge_rising(TTL):
 
 def edge_falling(TTL):
     return np.r_[0, np.diff(TTL.astype('i'))] == -1
+
+def epochs(x, pad=0, smooth=True):
+    '''
+    Identify start and end indices where the TTL goes high
+
+    Parameters
+    ----------
+    x : 1D array
+        Array to be evaluated as a logical.  A logical True is treated as a
+        "high" in TTL parlance.
+    pad : int
+        Expand epoch boundaries by the requested number of indices.  Will not
+        expand epoch boundaries beyond the edges of the input.
+
+    Returns
+    -------
+    2D array
+
+    Examples
+    --------
+    >>> x = np.zeros(10)
+
+    Boundary conditions 
+    -------------------
+    >>> x = np.zeros(10)
+    >>> epochs(x)
+    array([], shape=(0, 2), dtype=float64)
+
+    >>> x[-1] = 1
+    >>> epochs(x)
+    array([[ 9, 10]])
+
+    >>> x[0] = 1
+    >>> epochs(x)
+    array([[ 0,  1],
+           [ 9, 10]])
+
+    '''
+    start = ts(edge_rising(x))
+    end = ts(edge_falling(x))
+
+    # Handle various boundary conditions where some sort of task-related
+    # activity is registered at very beginning or end of experiment.
+    if len(end) == 0 and len(start) == 0:
+        return np.array([]).reshape((0, 2))
+    elif len(end) == 0 and len(start) == 1:
+        end = np.r_[end, len(x)]
+    elif len(end) == 1 and len(start) == 0:
+        start = np.r_[0, start]
+
+    if end[0] < start[0]:
+        start = np.r_[0, start]
+    if end[-1] < start[-1]:
+        end = np.r_[end, len(x)]
+
+    start = start-pad
+    end = end+pad
+
+    epochs = np.c_[start, end]
+    epochs = np.clip(epochs, 0, len(x))
+    
+    if smooth:
+        epochs = smooth_epochs(epochs)
+
+    return epochs
+
+def smooth_epochs(epochs):
+    '''
+    Given a 2D array of epochs in the format [[start time, end time], ...],
+    identify and remove all overlapping epochs such that::
+
+        [ epoch   ]        [ epoch ] 
+            [ epoch ]
+
+    Will become::
+
+        [ epoch     ]      [ epoch ]
+
+    Epochs do not need to be ordered when provided; however, they will be
+    returned ordered.
+    '''
+    if len(epochs) == 0:
+        return epochs
+    epochs = np.asarray(epochs)
+    epochs.sort(axis=0)
+    i = 0
+    n = len(epochs)
+    smoothed = []
+    while i < n:
+        lb, ub = epochs[i]
+        i += 1
+        while (i < n) and (ub >= epochs[i,0]):
+            ub = epochs[i,1]
+            i += 1
+        smoothed.append((lb, ub))
+    return np.array(smoothed)
+
+def epochs_contain(epochs, ts):
+    '''
+    Returns True if ts falls within one of the epoch boundaries
+
+    Epochs must be sorted.
+    '''
+    i = np.searchsorted(epochs[:,0], ts)
+    j = np.searchsorted(epochs[:,1], ts)
+    return i != j
+
+def epochs_overlap(a, b):
+    '''
+    Returns True where `b` falls within boundaries of epoch in `a`
+
+    Epochs must be sorted.
+    '''
+    i = np.searchsorted(a[:,0], b[:,0])
+    j = np.searchsorted(a[:,1], b[:,1])
+    return i != j
 
 def int_to_TTL(a, width):
     '''
@@ -56,7 +175,6 @@ def int_to_TTL(a, width):
     '''
     a = np.array(a)
     bitarray = [(a>>bit) & 1 for bit in range(width)]
-    #bitarray = map(lambda x: bin_array(x, width), a)
     return np.array(bitarray, dtype=np.bool)
 
 def bin_array(number, bits):
@@ -82,6 +200,6 @@ arr = randint(0, 8, 10e3)
     print timeit.timeit("int_to_TTL(arr, 8)", setup, number=20)
 
 if __name__ == "__main__":
-    #import doctest
-    #doctest.testmod()
-    test_speed()
+    import doctest
+    doctest.testmod()
+    #test_speed()

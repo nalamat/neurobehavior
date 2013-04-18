@@ -1,5 +1,5 @@
-from enthought.traits.api import HasTraits, Enum, TraitError, Float, Int
-from enthought.traits.ui.api import View, VGroup
+from traits.api import HasTraits, Enum, TraitError, Float, Int
+from traitsui.api import View, VGroup
 
 class TrialSetting(HasTraits):
     
@@ -78,8 +78,8 @@ class TrialSetting(HasTraits):
     def __iter__(self):
         return iter(self._parameters)
 
-from enthought.traits.ui.api import TabularEditor
-from enthought.traits.ui.tabular_adapter import TabularAdapter
+from traitsui.api import TabularEditor
+from traitsui.tabular_adapter import TabularAdapter
 
 from cns import get_config
 color_names = get_config('COLOR_NAMES')

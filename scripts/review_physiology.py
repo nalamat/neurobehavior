@@ -1,6 +1,4 @@
-# Ok, so technically this isn't a script ...
-
-from enthought.traits.api import push_exception_handler
+from traits.api import push_exception_handler
 push_exception_handler(reraise_exceptions=True)
 
 import tables
@@ -10,16 +8,14 @@ import re
 from os import path
 from numpy.lib import recfunctions
 
-from pyface.api import FileDialog, OK, error, ProgressDialog, \
-        information, confirm, YES
+from pyface.api import FileDialog, OK, error, ProgressDialog, information, \
+        confirm, YES
 from enable.api import Component, ComponentEditor
-from chaco.api import (LinearMapper, DataRange1D, OverlayPlotContainer)
+from chaco.api import LinearMapper, DataRange1D, OverlayPlotContainer
                        
-from traitsui.api import VGroup, Item, View, \
-        HSplit, Tabbed, Controller
-from traits.api import Instance, HasTraits, Float, DelegatesTo, \
-     CBool, Int, Any, Event, Property,\
-     List, cached_property, Str, Enum, File, Range
+from traitsui.api import VGroup, Item, View, HSplit, Tabbed, Controller
+from traits.api import Instance, HasTraits, Float, DelegatesTo, CBool, Int, \
+        Any, Event, Property, List, cached_property, Str, Enum, File, Range
 
 # Used for displaying the checkboxes for channel/plot visibility config
 from traitsui.api import TableEditor, ObjectColumn, EnumEditor
@@ -47,7 +43,7 @@ from cns.chaco_exts.threshold_overlay import ThresholdOverlay
 from cns.chaco_exts.extracted_spike_overlay import ExtractedSpikeOverlay
 
 from cns.analysis import (extract_spikes, median_std, decimate_waveform,
-    truncate_waveform, zero_waveform)
+    truncate_waveform, zero_waveform, running_rms)
 
 COLORS = get_config('EXPERIMENT_COLORS')
 RAW_WILDCARD = get_config('PHYSIOLOGY_RAW_WILDCARD')
@@ -413,6 +409,11 @@ class PhysiologyReviewController(Controller):
         # transient set to True, so I do not define them here.
         for k, v in info.object.trait_get(setting=True).items():
             table._v_attrs[k] = v
+
+        # Be sure to call the flush() method so changes are immediately written
+        # to disk.
+        info.object.data_file.flush()
+
         information(info.ui.control, "Saved settings to file")
 
     def _load_settings(self, info, table_node):
@@ -443,8 +444,9 @@ class PhysiologyReviewController(Controller):
             settings.append(setting)
         info.object.channel_settings = settings
 
-        # Now, load!
-        info.object.trait_set(table_node._v_attrs)
+        # Now, load the remaining settings!
+        for k in info.object.trait_get(setting=True):
+            setattr(info.object, k, table_node._v_attrs[k])
 
     def load_settings(self, info):
         try:
@@ -531,6 +533,16 @@ class PhysiologyReviewController(Controller):
         information(info.ui.control, "Zeroed waveform.  Be sure to run "
                     "ptrepack or h5repack to recompress the file.")
 
+    def _prepare_processing_settings(self, info):
+        # Compile our referencing and filtering instructions
+        processing = {}
+        processing['filter_freq_lp'] = info.object.filter_freq_lp
+        processing['filter_freq_hp'] = info.object.filter_freq_hp
+        processing['filter_order'] = info.object.filter_order
+        processing['filter_btype'] = info.object.filter_btype
+        processing['bad_channels'] = info.object.bad_channels
+        processing['diff_mode'] = info.object.diff_mode
+        return processing
 
     def _prepare_extract_settings(self, info):
         settings = [s for s in info.object.channel_settings if s.extract]
@@ -547,14 +559,7 @@ class PhysiologyReviewController(Controller):
 
         kwargs = {}
 
-        # Compile our referencing and filtering instructions
-        processing = {}
-        processing['filter_freq_lp'] = info.object.filter_freq_lp
-        processing['filter_freq_hp'] = info.object.filter_freq_hp
-        processing['filter_order'] = info.object.filter_order
-        processing['filter_btype'] = info.object.filter_btype
-        processing['bad_channels'] = info.object.bad_channels
-        processing['diff_mode'] = info.object.diff_mode
+        processing = self._prepare_processing_settings(info)
 
         # Gather the arguments required by the spike extraction routine
         kwargs['processing'] = processing
@@ -568,6 +573,38 @@ class PhysiologyReviewController(Controller):
 
         return kwargs
 
+    def compute_rms(self, info):
+        filename = get_save_filename(info.object.data_filename, 'rms')
+        if filename is None:
+            return
+
+        with tables.openFile(filename, 'w') as fh_out:
+            output_node = fh_out.root
+            input_node = info.object.data_node
+            processing = self._prepare_processing_settings(info)
+
+            # Create a progress dialog that keeps the user up-to-date on what's
+            # going on since this is a fairly lengthy process.
+            dialog = ProgressDialog(title='Exporting data', 
+                                    min=0,
+                                    can_cancel=True,
+                                    max=int(info.object.channel.shape[-1]),
+                                    message='Initializing ...')
+
+            # Define a function that, when called, updates the dialog ... 
+            dialog.open()
+
+            def callback(samples, max_samples, mesg):
+                if samples == max_samples:
+                    dialog.close()
+                dialog.change_message(mesg)
+                cont, skip = dialog.update(samples)
+                return not cont
+
+            running_rms(input_node, output_node, 1, 1, processing=processing,
+                        progress_callback=callback, algorithm='median')
+
+
     def extract_spikes(self, info):
         # Compile the necessary arguments to pass along to extract_spikes.  If
         # the helper method returns None, this means that there was a problem
@@ -577,20 +614,11 @@ class PhysiologyReviewController(Controller):
         if kwargs is None:
             return
 
-        # Suggest a filename based on the filename of the original file (to make
-        # it easier for the user to just click "OK").
-        filename = re.sub(r'(.*?)(_raw)?\.(h5|hd5|hdf5)', r'\1_extracted.\3',
-                          info.object.data_filename)
-
-        # Get the output filename from the user
-        dialog = FileDialog(action="save as", 
-                            wildcard='HDF5 file (*.hd5)|*.hd5|',
-                            default_path=filename)
-        dialog.open()
-        if dialog.return_code != OK:
+        filename = get_save_filename(info.object.data_filename, 'extracted')
+        if filename is None:
             return
 
-        with tables.openFile(dialog.path, 'w') as fh_out:
+        with tables.openFile(filename, 'w') as fh_out:
             kwargs['input_node'] = info.object.data_node
             kwargs['output_node'] = fh_out.root
 
@@ -632,9 +660,17 @@ class PhysiologyReviewController(Controller):
         with tables.openFile(dialog.path, 'r') as fh:
             ts = fh.root.event_data.timestamps[:]
             channels = fh.root.event_data.channels[:]-1
-            clusters = np.ones(len(channels))
-            cluster_ids = [1]
-            cluster_types = [1]
+
+            # If the user has already censored the spiketimes in the file, then
+            # we can indicate which events have been "censored" here
+            if 'censored' in fh.root.event_data:
+                clusters = fh.root.event_data.censored[:]
+                cluster_ids = [0, 1]
+                cluster_types = [1, 4] # in process, garbage
+            else:
+                clusters = np.ones(len(channels))
+                cluster_ids = [1]
+                cluster_types = [1]
             overlay = ExtractedSpikeOverlay(timestamps=ts,
                                             channels=channels,
                                             clusters=clusters,
@@ -823,8 +859,8 @@ class PhysiologyReviewController(Controller):
         # Create a little prompt to allow the user to specify the time they
         # want.
         class TimeDialog(HasTraits):
-            minute = Int
-            second = Int
+            minute = Float(0)
+            second = Float(0)
         td = TimeDialog()
 
         # Setting kind to 'livemodal' ensures that the next line of code is not
@@ -862,7 +898,6 @@ class PhysiologyReview(HasTraits):
     plot_settings       = List(Instance(PlotSetting), transient=True)
     trial_data          = Any(transient=True)
     trial_selected      = Any(transient=True)
-    #trial_dclicked      = Any(transient=True)
     index_range         = Instance(ChannelDataRange, transient=True)
 
     bad_channels        = Property(depends_on='channel_settings.bad')
@@ -1036,7 +1071,7 @@ class PhysiologyReview(HasTraits):
         # bunch of "boilerplate" code, so this is a helper function that takes
         # care of it for us.
         add_default_grids(plot, major_index=1, minor_index=0.25)
-        add_time_axis(plot, orientation='bottom')
+        add_time_axis(plot, orientation='bottom', fraction=True)
 
         overlay = ThresholdOverlay(plot=plot, sort_signs=[True]*16,
                                    line_color='green')
@@ -1188,6 +1223,10 @@ class PhysiologyReview(HasTraits):
                            accelerator='Ctrl+C',
                            enabled_when='object.data_node is not None'
                           ),
+                    Action(name='Compute running RMS', 
+                           action='compute_rms',
+                           enabled_when='object.data_node is not None'
+                          ),
                 ),
                 ActionGroup(
                     Action(name='Extract spikes',
@@ -1270,10 +1309,25 @@ def get_experiment_node_dialog(filename):
         i = options.index(dialog.experiment)
         return nodes[i]._v_pathname
 
+def get_save_filename(raw_filename, suggested_ending):
+    # Suggest a filename based on the filename of the original file (to make
+    # it easier for the user to just click "OK").
+    search_pattern = r'(.*?)(_raw)?\.(h5|hd5|hdf5)'
+    sub_pattern = r'\1_{}.\3'.format(suggested_ending)
+    filename = re.sub(search_pattern, sub_pattern, raw_filename) 
+
+    # Get the output filename from the user
+    dialog = FileDialog(action="save as", 
+                        wildcard='HDF5 file (*.hd5)|*.hd5|',
+                        default_path=filename)
+    dialog.open()
+    if dialog.return_code != OK:
+        return
+    return dialog.path
+
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('-f', '--filename', type=str, required=False)
     parser.add_argument('-p', '--parameters', nargs='+', type=str,
                         required=False)
 

@@ -2,7 +2,7 @@ from cns import equipment
 from cns.pipeline import acquire
 from cns.signal.type import Tone
 from cns.util.signal import rfft, dbtopa, patodb
-from enthought.traits.api import HasTraits, String, CFloat
+from traits.api import HasTraits, String, CFloat
 from scipy.signal import butter, filtfilt, hann
 import logging
 import numpy as np
