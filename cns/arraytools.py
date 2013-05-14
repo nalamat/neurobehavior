@@ -35,10 +35,11 @@ __all__ = ['chunk_samples', 'chunk_iter', 'slice_overlap']
 import logging
 log = logging.getLogger(__name__)
 
-def mask_any(mask, reduction_axes):
+def reduce_mask(mask, reduction_axes, reduction_mode='any',
+                original_shape=None):
     '''
-    Reduce a mask along the specified axes using `numpy.any`, then upsize the
-    mask to the original shape.
+    Reduce a mask along the specified axes using the mode specified by
+    `reduction_mode` then upsize the mask to the original shape.
 
     This is useful for computing "artifact reject" masks.  For example, if you
     have a 3D array containing data from multiple channels, epochs and
@@ -46,7 +47,20 @@ def mask_any(mask, reduction_axes):
     epochs where the signal exceeded a given value on any timepoint or channel,
     then you could do:
 
-        mask = mask_any(waveforms >= 1e-6, [0, 2])
+        mask = reduce_mask(waveforms >= 1e-6, [0, 2])
+
+    Parameters
+    ----------
+    mask : ndarray of dtype bool
+        The mask that needs to be reduced
+    reduction_axes : { int, list }
+        Axis or axes to reduce across
+    reduction_mode : { str, list } of { 'all', 'any' }
+        How to reduce each axes.  If a single string is provided, use the same
+        reduction method for each axes.  Otherwise, map the list to the
+        appropriate axes.
+    original_shape : { None, tuple }
+        Shape to upcast the mask to after reduction.
 
     Examples
     --------
@@ -55,7 +69,7 @@ def mask_any(mask, reduction_axes):
     [[False  True  True False]
      [False False False False]]
 
-    >>> print mask_any(x, [-1])
+    >>> print reduce_mask(x, [-1])
     [[ True  True  True  True]
      [False False False False]]
 
@@ -72,7 +86,7 @@ def mask_any(mask, reduction_axes):
       [False False]
       [False False]]]
 
-    >>> print mask_any(y, [0, -1])
+    >>> print reduce_mask(y, [0, -1])
     [[[ True  True]
       [ True  True]
       [ True  True]
@@ -83,7 +97,7 @@ def mask_any(mask, reduction_axes):
       [ True  True]
       [False False]]]
 
-    >>> print mask_any(y, [1, 2])
+    >>> print reduce_mask(y, [1, 2])
     [[[ True  True]
       [ True  True]
       [ True  True]
@@ -106,7 +120,7 @@ def mask_any(mask, reduction_axes):
       [False False]
       [False False]]]
 
-    >>> print mask_any(y, [1, 2])
+    >>> print reduce_mask(y, [1, 2])
     [[[ True  True]
       [ True  True]
       [ True  True]
@@ -118,13 +132,35 @@ def mask_any(mask, reduction_axes):
       [False False]]]
 
     '''
-    original_shape = mask.shape
-    for axis in reduction_axes:
-        mask = np.any(mask, axis=axis, keepdims=True)
+    if original_shape is None:
+        original_shape = mask.shape
+
+    if isinstance(reduction_mode, basestring):
+        reduction_mode = [reduction_mode] * len(reduction_axes)
+    elif len(reduction_mode) != len(reduction_axes):
+        mesg = 'Length of reduction_mode must match number of reduction_axes'
+        raise ValueError, mesg
+
+    for mode, axis in zip(reduction_mode, reduction_axes):
+        if mode == 'any':
+            reduce = np.any
+        elif mode == 'all':
+            reduce = np.all
+        else:
+            raise ValueError, 'Unsupported mode for reduction'
+        mask = reduce(mask, axis=axis, keepdims=True)
     for axis in reduction_axes:
         mask = np.repeat(mask, original_shape[axis], axis)
     return mask
 
+
+def threshold_mask(mask, axes, thresholds):
+    for axis, threshold in zip(axes, thresholds):
+        m = np.mean(mask, axis=axis, keepdims=True) >= threshold
+        mask[m] = True
+    #for axis in axes:
+    #    mask = np.repeat(mask, original_shape[axis], axis)
+    return mask
 
 def downsampled_mean(x, n, axis=-1):
     '''
