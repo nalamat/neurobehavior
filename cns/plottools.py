@@ -8,12 +8,24 @@ import pylab
 import numpy as np
 import matplotlib as mp
 
+
+def subplot(*args, **kwargs):
+    spines = kwargs.pop('spines', ['left', 'bottom'])
+    id = kwargs.pop('id', None)
+    ax = pylab.subplot(*args, **kwargs)
+    if spines is not None:
+        adjust_spines(ax, spines)
+    if id is not None:
+        add_panel_id(ax, id)
+    return ax
+
+
 def plot_mean_sem(x, y, color='k', axis=-1, ax=None):
     if ax is None:
         ax = pylab.gca()
     m = y.mean(axis=axis)
-    sem = y.std(axis=axis)/np.sqrt(y.shape[-1])
-    ax.plot(x, m, '-', color='k')
+    sem = y.std(axis=axis)/np.sqrt(y.shape[axis])
+    ax.plot(x, m, '-', color=color)
     ax.fill_between(x, m-sem, m+sem, edgecolor=color, facecolor=color,
                     alpha=0.5)
 
@@ -46,7 +58,9 @@ def best_crange(img, lb=5, ub=95, mirror=False, finite_only=False, **kwargs):
     img_data = []
     for i in itertools.chain(*img):
         if hasattr(i, 'compressed'):
-            img_data.append(i.compressed())
+            data = i.compressed()
+            if data.size > 0:
+                img_data.append(i.compressed())
         else:
             img_data.append(i)
 
