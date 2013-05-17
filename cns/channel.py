@@ -120,8 +120,6 @@ class FileMixin(HasTraits):
         '''
         Create an instance of the class from an existing node
         '''
-        print node
-
         # If the attribute (e.g. fs or t0) are not provided, load the value of
         # the attribute from the node attributes
         for name in cls.class_trait_names(attr=True):
@@ -166,7 +164,6 @@ class FileMixin(HasTraits):
     # information stored away.
     @on_trait_change('+attr', post_init=True)
     def update_attrs(self, name, new):
-        print 'updating the traits'
         log.debug('%s: updating %s to %r', self, name, new)
         self._buffer.setAttr(name, new)
 
@@ -177,7 +174,7 @@ class FileMixin(HasTraits):
         self._buffer.append(data)
 
     def __repr__(self):
-        return '<HDF5Store {}>'.format(self.name)
+        return '<HDF5 node {}>'.format(self.name)
 
 class MCStreamMixin(HasTraits):
     '''
@@ -568,6 +565,20 @@ class Channel(HasTraits):
         return self._buffer.shape[-1]
 
     def get_segments(self, start, duration):
+        '''
+        Load snippets of the continuous waveform
+
+        Parameters
+        ----------
+        start : iterable of float
+            Start time of each segment (in seconds)
+        duration : float
+            Duration of each segment (in seconds)
+
+        Returns
+        -------
+        Array of segment x channel x time
+        '''
         segments = []
         for ts in start:
             s = self.get_range(ts, ts+duration)
@@ -920,6 +931,10 @@ class FileMultiChannel(FileMixin, MultiChannel):
             return self._buffer.shape
         else:
             return (self.channels, 0)
+
+    def __repr__(self):
+        t = '<HDF5 node {}, {} channels, {} Hz>'
+        return t.format(self.name, self.channels, self.fs)
 
 class FileSnippetChannel(FileChannel):
 
