@@ -1,5 +1,12 @@
 import numpy as np
 
+def mask_signal(signal, epochs):
+    mask = np.zeros_like(signal)
+    for lb, ub in epochs:
+        mask[..., lb:ub] = True
+    return np.ma.masked_array(signal, mask=mask)
+
+
 def ts(TTL):
     '''
     Return nonzero indices (e.g. rising or falling) edges of the TTL
@@ -21,9 +28,10 @@ def epochs(x, pad=0, smooth=True):
     x : 1D array
         Array to be evaluated as a logical.  A logical True is treated as a
         "high" in TTL parlance.
-    pad : int
+    pad : {two-tupel, int}
         Expand epoch boundaries by the requested number of indices.  Will not
-        expand epoch boundaries beyond the edges of the input.
+        expand epoch boundaries beyond the edges of the input.  If padding is a
+        two-tuple, indicates how much to pad lower and upper edge by.
 
     Returns
     -------
@@ -66,8 +74,13 @@ def epochs(x, pad=0, smooth=True):
     if end[-1] < start[-1]:
         end = np.r_[end, len(x)]
 
-    start = start-pad
-    end = end+pad
+    try:
+        start_pad, end_pad = pad
+        start = start-start_pad
+        end = end+end_pad
+    except:
+        start = start-pad
+        end = end+pad
 
     epochs = np.c_[start, end]
     epochs = np.clip(epochs, 0, len(x))
