@@ -149,21 +149,23 @@ class AxesIterator(object):
     '''
     Parameters
     ----------
-    extra
+    extra: int
         Number of extra plots, in addition to len(groups), to reserve space for
         when computing the optimal row/column layout
-    sharex
+    sharex: bool
         If True, share the x-axis between axes
-    sharey
+    sharey: bool
         If True, share the y-axis between axes
     adjust_spines
         If True, adjust spines using Brad's preferred axes style
-    max_groups
+    max_groups: int
         Maximum number of axes per figure. A new figure will be generated each
         time the axes reaches the maximum.  If set to infinity, all axes will be
         squeezed onto a single figure (even if there's a million of them).
     save_pattern
         TODO
+    figure_kw: dict
+        Dictionary of keyword arguments to pass to pylab's `figure` function.
 
     sharex and sharey are attributes that can be modified at any time during
     iteration to change the sharing behavior.
@@ -186,7 +188,7 @@ class AxesIterator(object):
 
     def __init__(self, groups, extra=0, sharex=True, sharey=True,
                  max_groups=np.inf, adjust_spines=False, save_pattern=None,
-                 auto_close=False, figure_args=None):
+                 auto_close=False, figure_kw=None):
 
         self.sharex = sharex
         self.sharey = sharey
@@ -210,7 +212,7 @@ class AxesIterator(object):
         self.last_row = None
         self.last_col = None
 
-        self.figure_args = {} if figure_args is None else figure_args
+        self.figure_kw = {} if figure_kw is None else figure_kw
 
     def __iter__(self):
         return self
@@ -237,7 +239,7 @@ class AxesIterator(object):
                 self.current_figure.savefig(filename)
                 if self.auto_close:
                     pylab.close(self.current_figure)
-            self.current_figure = pylab.figure(**self.figure_args)
+            self.current_figure = pylab.figure(**self.figure_kw)
             self.figure_count += 1
             self.figures.append(self.current_figure)
 
