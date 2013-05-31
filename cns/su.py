@@ -4,11 +4,31 @@ Collection of functions for computing statistics on a spike train
 Most of these functions are optimized for memory-usage and speed; however these
 optimizations assume certain constraints on the data (e.g.  the spike times
 often must be sorted).  Be sure to see the docstring for each function.
+
+Most functions don't require a particular unit (i.e. msec or seconds).  The
+assumption is that all arguments provided will be of the same unit.  That is, if
+you specify `durations` in seconds, then the `et` (event times) and `tt`
+(trigger times) should be specified in seconds as well.  This approach gives you
+flexibility in handling data in the units (and datatype) that make the most
+sense for your analysis.
+
+The following variable naming conventions are found throughout the functions in
+this module:
+
+tt : trigger times
+    Times to compute the metric against (e.g. peri-stimulus times, etc.).  This
+    is typically the trigger time of the event in question (e.g. poke onset,
+    trial start, etc.).
+et : event times
+    Time of the events (typically the spikes)
+    
 '''
+from __future__ import division
+
 import numpy as np
 import numexpr as ne
 import scipy as sp
-from .util.binary_funcs import epochs_contain
+from .util.binary_funcs import epochs_contain, smooth_epochs
 
 def rates(et, tt, offsets, durations, censored=None, squeeze=False):
     '''
@@ -50,8 +70,10 @@ def rates(et, tt, offsets, durations, censored=None, squeeze=False):
         invalid = epochs_contain(censored, lb) | epochs_contain(censored, ub)
         result[invalid] = np.nan
 
+    # Remove singleton dimensions if requested
     if squeeze:
-        return result.squeeze()
+        result = result.squeeze()
+
     return result
 
 def rossum_distance(smoothed):
@@ -106,6 +128,8 @@ def histogram(et, tt, bin_width, lb, ub, censored=None):
     if censored is not None:
         mask = epochs_contain(censored, tt+lb) | epochs_contain(censored, tt+ub)
         tt = tt[~mask]
+    if len(tt) == 0:
+        raise ValueError, 'No trials to compute histogram on'
     pst_times = np.concatenate(pst(et, tt, lb, ub))
     bins = histogram_bins(bin_width, lb, ub)
     n = np.histogram(pst_times, bins=bins)[0]
@@ -129,4 +153,36 @@ def histogram_bins(bin_width, lb, ub):
     bins =  np.arange(lb, ub, bin_width)
     bins -= bins[np.argmin(np.abs(bins))]
     return bins
+
+def interepoch_times(epochs, n=1000, padding=1, duration=0.1, seed=1321132):
+    '''
+    Returns a list of inter-epoch times of `duration` that do not occur within
+    `padding` of the requested epochs.
+
+    Example
+    -------
+    >>> censored = load_censored_epochs(ext_filename, channels)
+    >>> task = load_task_epochs(raw_filename, padding=0)
+    >>> epochs = np.r_[censored, task]
+    >>> timestamps = interepoch_times(epochs)
+
+    Does not make an effort to ensure that the random windows are uniformly
+    distributed and non-overlapping with themselves.
+    '''
+    random = np.random.RandomState(seed=seed)
+    epochs = smooth_epochs(epochs)
+    mask = np.all(np.isfinite(epochs), 1)
+    lb, ub = epochs[mask,0][0], epochs[mask,1][-1]
+
+    random_ts = []
+    while len(random_ts) < n:
+        # We actually attempt to compute all the random times in one fell swoop
+        # by generating 2x the random numbers, then checking to see how many of
+        # these random numbers impinge on the epochs.  If we don't have enough
+        # left after filtering out the impinging timestamps, then we keep
+        # trying.
+        x = random.uniform(low=lb, high=ub, size=n*2)
+        mask = epochs_contain(epochs, x) | epochs_contain(epochs, x+duration)
+        random_ts.extend(x[~mask])
+    return np.array(random_ts)[:n]
 
