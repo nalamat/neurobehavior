@@ -7,7 +7,7 @@ import numpy as np
 
 import h5
 
-from .util.binary_funcs import smooth_epochs
+from .util.binary_funcs import epochs, smooth_epochs
 
 def update_progress(i, n, mesg):
     '''
@@ -74,35 +74,28 @@ def load_trial_log(filename, path='*/data'):
     Path can have wildcards in it, but must point to the data node (not the
     trial_log node).
     '''
-    epochs = (
-        'trial_epoch',
-        'physiology_epoch',
-        'poke_epoch',
-        'signal_epoch',
-        )
+    epochs = [
+        ('poke', '*/data/contact/poke_epoch'),
+        ('trial', '*/data/contact/trial_epoch'),
+        ('response', '*/data/contact/response_ts'),
+        ]
 
     with tables.openFile(filename) as fh:
         base_node = h5.p_get_node(fh.root, path)
         tl = pandas.DataFrame(base_node.trial_log[:])
 
-        for epoch in epochs:
-            basename = epoch.split('_')[0]
-            node = base_node._f_getChild(epoch)
+        for basename, searchpath in epochs:
+            node = h5.rgetattr(fh.root, searchpath)
             data = node[:]
-
-            # Save as a timestamp (i.e. the raw integer value)
-            tl[basename + '_ts/']  = data[:,0]
-            tl[basename + '_ts\\']  = data[:,1]
-
-            # Save as seconds
-            data = data.astype('f')/node._v_attrs['fs']
-            tl[basename + '/']  = data[:,0]
-            tl[basename + '\\']  = data[:,1]
-
-        # Pull in response timestamps as well
-        node = base_node._f_getChild('response_ts')
-        tl['response_ts|'] = node[:]
-        tl['response|'] =  node[:]/node._v_attrs['fs']
+            if data.ndim == 2:
+                # This is an epoch
+                data = data.astype('d')/node._v_attrs['fs']
+                tl[basename + '_start']  = data[:,0]
+                tl[basename + '_end']  = data[:,1]
+            else:
+                # This is a timestamp
+                data = data.astype('d')/node._v_attrs['fs']
+                tl[basename + '_ts']  = data    
 
         return tl
 
@@ -295,7 +288,14 @@ def load_curated_metadata(curated_file, single_unit=False):
     # Eventually this should include the false positive and false negative
     # spike information.
     if single_unit:
-        mask = (clusters.c_type == 'good unit') & \
+        # I include multi-unit here because I marked some data as multi-unit
+        # early during the sorting process, but in later experiments I did not
+        # bother to make the distinction as I prefer to use the isi_fraction as
+        # a metric for determining if the data is single or multi unit.
+        mask = (clusters.c_type == 'good unit') | \
+               (clusters.c_type == 'multi-unit')
+
+        mask = mask & \
                (clusters.fraction_missing <= 0.2) & \
                (clusters.isi_fraction < 0.5)
         clusters = clusters[mask]
@@ -305,6 +305,15 @@ def load_curated_metadata(curated_file, single_unit=False):
     clusters = clusters[clusters.c_type != 'garbage']
 
     return clusters
+
+def load_extracted(extracted_file):
+    '''
+    Load extracted spike data
+    '''
+    with tables.openFile(extracted_file) as fh:
+        timestamps = fh.root.event_data.timestamps[:]
+        channels = fh.root.event_data.channels[:]-1
+        return pandas.DataFrame({'channel': channels, 'ts': timestamps})
 
 def load_curated(curated_file, single_unit=False):
     '''
@@ -317,7 +326,7 @@ def load_curated(curated_file, single_unit=False):
     curated_file : str
         file to load
     single_unit : bool
-        Return only clusters that are identified as good single units
+        Return only clusters that are tagged as "good units" or "multi
 
     Returns
     -------
@@ -345,6 +354,7 @@ def load_curated(curated_file, single_unit=False):
         spikes = pandas.DataFrame({'cluster': [], 'ts': []})
 
     return spikes, clusters
+
 def load_censored_epochs(ext_filename, channels=None):
     '''
     Given the extracted trial times file (containing the RMS noise floor data),
@@ -357,7 +367,8 @@ def load_censored_epochs(ext_filename, channels=None):
     '''
 
     with tables.openFile(ext_filename) as fh:
-        ext_channels = fh.root.event_data._v_attrs.extracted_channels.tolist()
+        ext_channels = [c-1 for c in \
+                        fh.root.event_data._v_attrs.extracted_channels[:]]
         if channels is None:
             channels = ext_channels
         elif not np.iterable(channels):
@@ -369,3 +380,26 @@ def load_censored_epochs(ext_filename, channels=None):
             cepochs.extend(cnode.censored_epochs[:])
         return smooth_epochs(cepochs)
 
+def load_task_epochs(raw_filename, pad=1.0):
+    '''
+    Given the file containing raw experiment data, return a list of epochs
+    (expanded on either end by `pad` seconds that reflect task-related activity
+    (e.g. going to the nose-poke or spout).
+    '''
+    with tables.openFile(raw_filename) as fh:
+        contact = h5.p_get_node(fh, '*/data/contact')
+        uservars = {
+            'spout':        contact.spout_TTL,
+            'poke':         contact.poke_TTL,
+            'reaction':     contact.reaction_TTL,
+            'response':     contact.response_TTL,
+        }
+
+        # OR together the arrays using an in-kernel approach (faster and uses
+        # less memory)
+        expr = tables.Expr('spout | poke | reaction | response', uservars)
+        fs = contact.poke_TTL._v_attrs.fs
+
+        # Evaluate the expression, convert it to epochs, pad the epochs and
+        # convert to time in seconds.
+        return epochs(expr.eval(), pad*fs)/fs
