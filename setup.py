@@ -17,9 +17,5 @@ setup(
              'scripts/edit_cohort.py',
              'scripts/review_physiology.py',
              'scripts/decimate.py',
-             'scripts/process_batchfile.py',
-             'scripts/strip_extra_physiology.py',
-             'scripts/split_physiology_file.py',
-             'scripts/plot_lfp.py',
-            ]
+             'scripts/process_batchfile.py', ]
 )

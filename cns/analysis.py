@@ -12,6 +12,7 @@ from .channel import ProcessedFileMultiChannel
 from .arraytools import chunk_samples, chunk_iter
 from . import get_config
 from .io import copy_block_data
+from mne.time_frequency import tfr
 
 default_chunk_size = get_config('CHUNK_SIZE')
 
@@ -831,3 +832,89 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
 
     # Notify the progress dialog that we're done
     progress_callback(total_samples, total_samples, 'Complete')
+
+def compute_spectrogram(lfp, output_node, frequencies, cycles=3,
+                        progress_callback=None,
+                        chunk_size=default_chunk_size,
+                        include_block_data=True):
+    '''
+    Computes the running spectrogram using Morlet wavelets
+
+    Much of the work here was derived from code made available by the Martinos
+    Center for Neuroimaging.
+
+    This code is carefully designed to handle boundary issues when processing
+    large datasets in chunks (e.g. stabilizing the edges of each chunk when
+    when performing the Morlet convolution).
+
+    Parameters
+    ----------
+    lfp : instance of tables.Array
+        The PyTables array containing the LFP data (computed using the
+        decimate_waveform script).
+    output_node : instance of tables.Group
+        The target node to save the data to.  Note that this must be an instance
+        of tables.Group.
+    frequencies : list/array
+        Frequencies to use in computing spectrogram
+    cycles : integer
+        Number of cycles in Morlet wavelet
+
+    Notes
+    -----
+    Chunk size has to be much smaller to handle arrays of this size.
+    '''
+    # Make a dummy progress callback if none is requested
+    if progress_callback is None:
+        progress_callback = lambda x, y, z: False
+
+    # Load information about the data we are processing and compute the sampling
+    # frequency for the decimated dataset
+    #raw = input_node.data.physiology.raw
+    fs = lfp._v_attrs.fs
+    n_channels, n_samples = lfp.shape
+    n_frequencies = len(frequencies)
+
+    fh_out = output_node._v_file
+    filters = tables.Filters(complevel=1, complib='zlib', fletcher32=True)
+
+    spectrogram = fh_out.createCArray(output_node, 'spectrogram',
+                                      tables.atom.ComplexAtom(itemsize=8),
+                                      (n_channels, n_frequencies, n_samples),
+                                      filters=filters,
+                                      title="Spectrogram of LFP signal")
+
+    # Get the Morlet wavelets used for the transform
+    wavelets = tfr.morlet(fs, frequencies, n_cycles=cycles)
+
+    # Overlap by number of samples in the largest wavelet
+    overlap = max(map(len, wavelets))
+    c_samples = chunk_samples(lfp, chunk_size)
+    iterable = chunk_iter(lfp, chunk_samples=c_samples, loverlap=overlap,
+                          roverlap=overlap)
+
+    for i, chunk in enumerate(iterable):
+        for j, Wn in enumerate(wavelets):
+            for k in range(n_channels):
+                lb = i*c_samples
+                ub = lb+c_samples
+                c_spect = np.convolve(chunk[k], Wn, 'same')
+                spectrogram[k,j,lb:ub] = c_spect[overlap:-overlap] 
+        if progress_callback(i*c_samples, n_samples, ''):
+            break
+
+    # Save some data about how the lfp data was generated
+    spectrogram._v_attrs['chunk_overlap'] = overlap
+    spectrogram._v_attrs['frequencies'] = frequencies
+    spectrogram._v_attrs['wavelets'] = wavelets
+    spectrogram._v_attrs['wavelet_cycles'] = cycles
+
+    # Save some information about where we obtained the raw data from
+    filename = path.basename(input_node._v_file.filename)
+    output_node._v_attrs['source_file'] = filename
+    output_node._v_attrs['source_pathname'] = input_node._v_pathname
+
+    if include_block_data:
+        block_node = output_node._v_file.createGroup(output_node, 'block_data')
+        copy_block_data(input_node, block_node)
+

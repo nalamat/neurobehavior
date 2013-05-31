@@ -62,8 +62,8 @@ function [stats, fp, fn] = nb_cluster_metrics(spikes)
             % cluster.  sum(fp(i,:)) will give you total false positives for the
             % specified cluster.
             fp(i,j) = C(1,1); % false positive in i (assigned from j)
-            fp(j,i) = C(2,2); % false positive in j (assigned from i)
             fn(i,j) = C(1,2); % false negative in i (assigned to j)
             fn(j,i) = C(2,1); % false negative in j (assigned to i)
+            fp(j,i) = C(2,2); % false positive in j (assigned from i)
         end
     end
