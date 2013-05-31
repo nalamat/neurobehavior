@@ -5,10 +5,20 @@ from __future__ import division
 
 import pylab
 import numpy as np
+import matplotlib as mp
 
-def add_panel_id(ax, id):
-    ax.text(-0.1, 1.05, str(id), transform=ax.transAxes,
-            fontweight='bold', fontsize='xx-large')
+def log_axis(ax, which='both'):
+    if which in ['x', 'both']:
+        ax.set_xscale('log')
+        ax.xaxis.set_major_formatter(mp.ticker.FormatStrFormatter('%g'))
+    if which in ['y', 'both']:
+        ax.set_yscale('log')
+        ax.yaxis.set_major_formatter(mp.ticker.FormatStrFormatter('%g'))
+
+
+def add_panel_id(ax, id, fontweight='bold', fontsize='xx-large'):
+    ax.text(-0.1, 1.05, str(id), transform=ax.transAxes, fontweight=fontweight,
+            fontsize=fontsize)
 
 def color_iterator(grouping, cmap='jet', n=None):
     '''
