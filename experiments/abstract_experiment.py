@@ -1,6 +1,4 @@
-from datetime import datetime, timedelta
-
-from traits.api import HasTraits, Any, Instance, Property, Bool
+from traits.api import HasTraits, Any, Instance, Bool
 from traitsui.api import View, Include, VGroup, Item, Tabbed, TabularEditor
 from traitsui.menu import MenuBar, Menu, ActionGroup, Action
 from traitsui.tabular_adapter import TabularAdapter
