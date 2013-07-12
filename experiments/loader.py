@@ -295,7 +295,11 @@ def launch_experiment(args, filename, overwrite=False):
         log.debug('Opening file %s for appending', filename)
     handle = tables.openFile(filename, mode)
     model, controller = prepare_experiment(args, handle.root)
+
+    # Experiment enters the main loop and does not exit until the GUI is closed
     model.configure_traits(handler=controller)
+
+    # GUI has finally been closed.  Clean up.
     handle.close()
     log.debug('Closing file %s', filename)
 
