@@ -11,9 +11,8 @@ from cns import get_config
 
 from pyface.api import error, confirm, YES
 from pyface.timer.api import Timer
-from traits.api import (Any, Instance, Enum, Dict, List, Bool, Tuple,
-                                  Callable, Int, Property, Event, Str, Float,
-                                  Trait, on_trait_change)
+from traits.api import (Any, Instance, Enum, Dict, List, Bool, Tuple, Callable,
+                        Int, Property, Str, Trait, on_trait_change, HasTraits)
 from traitsui.api import Controller, View, HGroup, Item, spring
 
 from cns.widgets.toolbar import ToolBar
@@ -32,9 +31,350 @@ from physiology_controller import PhysiologyController
 DATETIME_FMT = get_config('DATETIME_FMT')
 DATE_FMT = get_config('DATE_FMT')
 
+
+class ApplyRevertControllerMixin(HasTraits):
+    '''
+    Logic for run-time configuration of parameters
+
+    If an experiment is running, we need to queue changes to most of the
+    settings in the GUI to ensure that the user has a chance to finish making
+    all the changes they desire before the new settings take effect.
+    
+    Supported metadata
+    ------------------
+    context
+        Include in the context namespace.  Note that for a Trait to be logged,
+        it must also be
+    immediate
+        Apply the changes immediately (i.e. do not queue the changes)
+        
+    Handling changes to a parameter
+    -------------------------------
+    When a parameter is modified via the GUI, the controller needs to know how
+    to handle this change.  For example, changing the pump rate or reward volume
+    requires sending a command to the pump via the serial port.
+    
+    When a change to a parameter is applied, the class instance the parameter
+    belongs to is checked to see if it has a method, "set_parameter_name",
+    defined. If not, the controller checks to see if it has the method defined
+    on itself.
+    
+    The function must have the following signature `set_parameter_name(self,
+    value)`.
+    '''
+
+    def close(self, info, is_ok):
+        '''
+        Prevent user from closing window while an experiment is running since
+        data is not saved to file until the stop button is pressed.
+        '''
+        # We can abort a close event by returning False.  Confirm that the user
+        # really did want to close the window.  
+        mesg = 'Are you sure you want to exit?'
+
+        # The function confirm returns an integer that represents the response
+        # that the user requested.  YES is a constant (also imported from the
+        # same module as confirm) corresponding to the return value of confirm
+        # when the user presses the "yes" button on the dialog.  If any other
+        # button (e.g. "no", "abort", etc.) is pressed, the return value will be
+        # something other than YES and we will assume that the user has
+        # requested not to quit the experiment.
+        if confirm(info.ui.control, mesg) != YES:
+            return False
+        else:
+            # Call the shutdown routines to ensure that data is saved.
+            self.stop(info)
+            return True
+
+    def start(self, info=None):
+        self.initialize_context()
+        self.setup_experiment(info)
+        self.start_experiment(info)
+
+    def stop(self, info=None):
+        self.stop_experiment(info)
+
+    # Boolean flag indicating whether there are any changes to paradigm
+    # variables that have not been applied.  Currently the apply/revert logic is
+    # not smart enough to handle cases where the user makes a sequence of
+    # changes that results in the final value being equivalent to the original
+    # value.
+    pending_changes = Bool(False)
+
+    # A shadow copy of the paradigm where the current values used for the
+    # experiment are stored.  The copy of the paradigm at info.object.paradigm
+    # is a separate copy that is currently being edited via the GUI.
+    shadow_paradigm = Any
+
+    # List of expressions that have not yet been evaluated.
+    pending_expressions = Dict
+
+    # The current value of all context variables
+    current_context = Dict
+
+    # Label of the corresponding variable to use in the GUI
+    context_labels = Dict
+
+    # Should the context variable be logged?
+    context_log = Dict
+
+    # Copy of the old context (used for comparing with the current context to
+    # determine if a value has changed)
+    old_context = Dict
+
+    # List of name, value, label tuples (used for displaying in the GUI)
+    current_context_list = List
+
+    @on_trait_change('model.paradigm.+container*.+context, +context')
+    def handle_change(self, instance, name, old, new):
+        # When a paradigm value has changed while the experiment is running,
+        # indicate that changes are pending
+        if self.state in ['uninitialized', 'initialized']:
+            return
+
+        log.debug('Detected change to %s', name)
+        trait = instance.trait(name)
+        if trait.immediate:
+            self.set_current_value(name, new)
+        else:
+            self.pending_changes = True
+
+    def invalidate_context(self):
+        '''
+        Invalidate the current context.  This forces the program to reevaluate
+        any values that may have changed.
+        '''
+        import warnings
+        warnings.warn('Method has been replaced by refresh_context')
+        self.refresh_context()
+
+    def refresh_context(self):
+        '''
+        Stores a copy of self.current_context in self.old_context, wipes
+        self.current_context, and reloads the expressions from the paradigm.
+
+        This will force the program to re-evaluate any values that may have
+        changed.  Be sure to call `evaluate_pending_expressions` to finish.
+        '''
+        log.debug('Refreshing context')
+        self.old_context = self.current_context.copy()
+        self.current_context = self.trait_get(context=True)
+        self.current_context.update(self.model.data.trait_get(context=True))
+        self.pending_expressions = self.shadow_paradigm.trait_get(context=True)
+
+    def apply(self, info=None):
+        '''
+        This method is called when the apply button is pressed
+        '''
+        log.debug('Applying requested changes')
+        try:
+            # First, we do a quick check to ensure the validity of the
+            # expressions the user entered by evaluating them.  If the
+            # evaluation passes, we will make the assumption that the
+            # expressiosn are valid as entered.  However, this will *not* catch
+            # all edge cases or situations where actually applying the change
+            # causes an error.
+            pending_expressions = self.model.paradigm.trait_get(context=True)
+            current_context = self.model.data.trait_get(context=True)
+            evaluate_expressions(pending_expressions, current_context)
+
+            # If we've made it this far, then let's go ahead and copy the
+            # changes over to our shadow_paradigm.  We'll apply the requested
+            # changes immediately if a trial is not currently running.
+            self.shadow_paradigm.copy_traits(self.model.paradigm)
+            self.pending_changes = False
+
+            # Subclasses need to define this function (e.g.
+            # abstract_positive_controller and abstract_aversive_controller)
+            # because only those subclases know when it's safe to apply the
+            # changes (e.g. the positive paradigms will check to make sure that
+            # a trial is not running before applying the changes).
+            self.context_updated()
+        except Exception, e:
+            # A problem occured when attempting to apply the context. 
+            # the changes and notify the user.  Hopefully we never reach this
+            # point.
+            log.exception(e)
+            mesg = '''
+            Unable to apply your requested changes due to an error.  No changes
+            have been made. Please review the changes you have requested to
+            ensure that they are indeed valid.'''
+            import textwrap
+            mesg = textwrap.dedent(mesg).strip().replace('\n', ' ')
+            mesg += '\n\nError message: ' + str(e)
+            error(info.ui.control, message=mesg, title='Error applying changes')
+
+    def context_updated(self):
+        '''
+        This can be overriden in subclasses to implement logic for updating the
+        experiment when the apply button is pressed
+        '''
+        pass
+
+    def revert(self, info=None):
+        '''
+        Revert GUI fields to original values
+        '''
+        log.debug('Reverting requested changes')
+        self.model.paradigm.copy_traits(self.shadow_paradigm)
+        self.pending_changes = False
+
+    def value_changed(self, name): 
+        new_value = self.get_current_value(name)
+        old_value = self.old_context.get(name, None)
+        return new_value != old_value
+
+    def get_current_value(self, name):
+        '''
+        Get the current value of a context variable.  If the context variable
+        has not been evaluated yet, compute its value from the
+        pending_expressions stack.  Additional context variables may be
+        evaluated as needed.
+        '''
+        try:
+            return self.current_context[name]
+        except:
+            evaluate_value(name, self.pending_expressions, self.current_context)
+            return self.current_context[name]
+
+    def set_current_value(self, name, value):
+        self.current_context[name] = value
+
+    def evaluate_pending_expressions(self, extra_context=None):
+        '''
+        Evaluate all pending expressions and store results in current_context.
+
+        If extra_content is provided, it will be included in the local
+        namespace. If extra_content defines the value of a parameter also
+        present in pending_expressions, the value stored in extra_context takes
+        precedence.
+        '''
+        log.debug('Evaluating pending expressions')
+        if extra_context is not None:
+            self.current_context.update(extra_context)
+        self.current_context.update(self.model.data.trait_get(context=True))
+        evaluate_expressions(self.pending_expressions, self.current_context)
+
+    @on_trait_change('current_context_items')
+    def _apply_context_changes(self, event):
+        '''
+        Automatically apply changes as expressions are evaluated and their
+        result added to the context
+        '''
+        names = event.added.keys()
+        names.extend(event.changed.keys())
+        for name in names:
+            old_value = self.old_context.get(name, None)
+            new_value = self.current_context.get(name)
+            if old_value != new_value:
+                mesg = 'changed {} from {} to {}'
+                log.debug(mesg.format(name, old_value, new_value))
+
+                # I used to have this in a try/except block (i.e. using the
+                # Python idiom of "it's better to ask for forgiveness than 
+                # permission).  However, it quickly became apparent that this
+                # was masking Exceptions that may be raised in the body of the
+                # setter functions.  We should let these exceptions bubble to
+                # the surface so the user has more information about what
+                # happened.
+                setter = 'set_{}'.format(name)
+                if hasattr(self, setter):
+                    getattr(self, setter)(new_value)
+                    log.debug('setting %s', name)
+                else:
+                    log.debug('no setter for %s', name)
+
+    @on_trait_change('current_context_items')
+    def _update_current_context_list(self):
+        context = []
+        for name, value in self.current_context.items():
+            label = self.context_labels.get(name, '')
+            changed = not self.old_context.get(name, None) == value
+            log = self.context_log[name]
+            if type(value) in ((type([]), type(()))):
+                str_value = ', '.join('{}'.format(v) for v in value)
+                str_value = '[{}]'.format(str_value)
+            else:
+                str_value = '{}'.format(value)
+            context.append((name, str_value, label, log, changed))
+        self.current_context_list = sorted(context)
+        
+    def initialize_context(self):
+        log.debug('Initializing context')
+        for instance in (self.model.data, self.model.paradigm, self):
+            for name, trait in instance.traits(context=True).items():
+                log.debug('Found context variable {}'.format(name))
+                self.context_labels[name] = trait.label
+                self.context_log[name] = trait.log
+
+        # TODO: this is sort of a "hack" to ensure that the appropriate data for
+        # the trial type is included
+        #self.context_labels['ttype'] = 'Trial type'
+        #self.context_log['ttype'] = True
+        self.shadow_paradigm = self.model.paradigm.clone_traits()
+        self.refresh_context()
+
+    def log_trial(self, **kwargs):
+        '''
+        Add entry to trial log table
+
+        In addition to the data provided via kwargs, the current value of all
+        parameters for that given trial will be included.  The keys of the
+        kwargs dictionary will be used as the column names.
+
+        The first call to log_trial establishes the columns that will be present
+        on every call.  Subsequent calls to log_trial must use the exact same
+        set of keys (e.g. you cannot remove or add new parameters on each call).
+
+        This is a valid sequence of calls:
+
+            self.log_trial(hw_atten=120, noise_seed=4)
+            ...
+            self.log_trial(hw_atten=20, noise_seed=5)
+            ...
+            self.log_trial(hw_atten=30, noise_seed=6)
+            ...
+
+        This is an invalid sequence of calls:
+
+            self.log_trial(hw_atten=120, noise_seed=4)
+            ...
+
+            # Invalid because a keyword argument provided in the first call is
+            # missing
+            self.log_trial(noise_seed=5)
+            ...
+
+            # Invalid because a keyword argument not provided in the first call
+            # has been added
+            self.log_trial(hw_atten=30, noise_seed=6, noise_bandwidth=1000)
+            ...
+
+        '''
+        log.debug('Logging trial')
+        for key, value in self.context_log.items():
+            if value:
+                kwargs[key] = self.current_context[key]
+        for key, value in self.shadow_paradigm.trait_get(context=True).items():
+            kwargs['expression_{}'.format(key)] = '{}'.format(value)
+        self.model.data.log_trial(**kwargs)
+
+    def log_event(self, event, ts=None):
+        if ts is None:
+            ts = self.get_ts()
+        self.model.data.log_event(ts, event)
+        log.debug("EVENT: %.2f, %s", ts, event)
+
+    # Simplest way to load/save paradigms is via Python's pickle module which
+    # persists the object data to a binary file on disk.  Note that this file
+    # format is specific to Python's pickle module and will not be
+    # human-readable (or Matlab readable unless you want to write the
+    # appropriate converter).
+
+
 class ExperimentToolBar(ToolBar):
 
-    size    = 24, 24
+    size    = 16, 16
     kw      = dict(height=size[0], width=size[1], action=True)
     apply   = SVGButton('Apply', filename=icons['apply'],
                         tooltip='Apply settings', **kw)
@@ -462,62 +802,6 @@ class AbstractExperimentController(Controller):
         '''
         raise NotImplementedError
 
-    def log_trial(self, **kwargs):
-        '''
-        Add entry to trial log table
-
-        In addition to the data provided via kwargs, the current value of all
-        parameters for that given trial will be included.  The keys of the
-        kwargs dictionary will be used as the column names.
-
-        The first call to log_trial establishes the columns that will be present
-        on every call.  Subsequent calls to log_trial must use the exact same
-        set of keys (e.g. you cannot remove or add new parameters on each call).
-
-        This is a valid sequence of calls:
-
-            self.log_trial(hw_atten=120, noise_seed=4)
-            ...
-            self.log_trial(hw_atten=20, noise_seed=5)
-            ...
-            self.log_trial(hw_atten=30, noise_seed=6)
-            ...
-
-        This is an invalid sequence of calls:
-
-            self.log_trial(hw_atten=120, noise_seed=4)
-            ...
-
-            # Invalid because a keyword argument provided in the first call is
-            # missing
-            self.log_trial(noise_seed=5)
-            ...
-
-            # Invalid because a keyword argument not provided in the first call
-            # has been added
-            self.log_trial(hw_atten=30, noise_seed=6, noise_bandwidth=1000)
-            ...
-
-        '''
-        for key, value in self.context_log.items():
-            if value:
-                kwargs[key] = self.current_context[key]
-        for key, value in self.shadow_paradigm.trait_get(context=True).items():
-            kwargs['expression_{}'.format(key)] = '{}'.format(value)
-        self.model.data.log_trial(**kwargs)
-
-    def log_event(self, name, message, ts=None):
-        if ts is None:
-            ts = self.get_ts()
-        self.model.data.log_event(ts, name, message)
-        log.debug("EVENT: %d, %s, %r", ts, name, message)
-
-    # Simplest way to load/save paradigms is via Python's pickle module which
-    # persists the object data to a binary file on disk.  Note that this file
-    # format is specific to Python's pickle module and will not be
-    # human-readable (or Matlab readable unless you want to write the
-    # appropriate converter).
-
     def load_paradigm(self, info):
         try:
             PARADIGM_ROOT = get_config('PARADIGM_ROOT')
@@ -552,250 +836,4 @@ class AbstractExperimentController(Controller):
             self.calibration_window = CalibrationPlot(calibrations=calibrations)
         self.calibration_window.edit_traits()
 
-    '''
-    APPLY/REVERT ATTRIBUTES AND LOGIC
 
-    If an experiment is running, we need to queue changes to most of the
-    settings in the GUI to ensure that the user has a chance to finish making
-    all the changes they desire before the new settings take effect.
-    
-    Supported metadata
-    ------------------
-    context
-        Include in the context namespace.  Note that for a Trait to be logged,
-        it must also be
-    immediate
-        Apply the changes immediately (i.e. do not queue the changes)
-        
-    Handling changes to a parameter
-    -------------------------------
-    When a parameter is modified via the GUI, the controller needs to know how
-    to handle this change.  For example, changing the pump rate or reward volume
-    requires sending a command to the pump via the serial port.
-    
-    When a change to a parameter is applied, the class instance the parameter
-    belongs to is checked to see if it has a method, "set_parameter_name",
-    defined. If not, the controller checks to see if it has the method defined
-    on itself.
-    
-    The function must have the following signature set_parameter_name(self,
-    value)
-
-    '''
-
-    # Boolean flag indicating whether there are any changes to paradigm
-    # variables that have not been applied.  Currently the apply/revert logic is
-    # not smart enough to handle cases where the user makes a sequence of
-    # changes that results in the final value being equivalent to the original
-    # value.
-    pending_changes = Bool(False)
-
-    # A shadow copy of the paradigm where the current values used for the
-    # experiment are stored.  The copy of the paradigm at info.object.paradigm
-    # is a separate copy that is currently being edited via the GUI.
-    shadow_paradigm = Any
-
-    # List of expressions that have not yet been evaluated.
-    pending_expressions = Dict
-
-    # The current value of all context variables
-    current_context = Dict
-
-    # Label of the corresponding variable to use in the GUI
-    context_labels = Dict
-
-    # Should the context variable be logged?
-    context_log = Dict
-
-    # Copy of the old context (used for comparing with the current context to
-    # determine if a value has changed)
-    old_context = Dict
-
-    # List of name, value, label tuples (used for displaying in the GUI)
-    current_context_list = List
-
-    @on_trait_change('model.paradigm.+container*.+context, +context')
-    def handle_change(self, instance, name, old, new):
-        # When a paradigm value has changed while the experiment is running,
-        # indicate that changes are pending
-        if self.state == 'halted':
-            return
-
-        log.debug('Detected change to %s', name)
-        trait = instance.trait(name)
-        if trait.immediate:
-            self.set_current_value(name, new)
-        else:
-            self.pending_changes = True
-
-    def invalidate_context(self):
-        '''
-        Invalidate the current context.  This forces the program to reevaluate
-        any values that may have changed.
-        '''
-        import warnings
-        warnings.warn('Method has been replaced by refresh_context')
-        self.refresh_context()
-
-    def refresh_context(self):
-        '''
-        Stores a copy of self.current_context in self.old_context, wipes
-        self.current_context, and reloads the expressions from the paradigm.
-        '''
-        log.debug('Refreshing context')
-        self.old_context = self.current_context.copy()
-        self.current_context = self.trait_get(context=True)
-        self.current_context.update(self.model.data.trait_get(context=True))
-        self.pending_expressions = self.shadow_paradigm.trait_get(context=True)
-
-    def apply(self, info=None):
-        '''
-        This method is called when the apply button is pressed
-        '''
-        log.debug('Applying requested changes')
-        try:
-            # First, we do a quick check to ensure the validity of the
-            # expressions the user entered by evaluating them.  If the
-            # evaluation passes, we will make the assumption that the
-            # expressiosn are valid as entered.  However, this will *not* catch
-            # all edge cases or situations where actually applying the change
-            # causes an error.
-            pending_expressions = self.model.paradigm.trait_get(context=True)
-            current_context = self.model.data.trait_get(context=True)
-            evaluate_expressions(pending_expressions, current_context)
-
-            # If we've made it this far, then let's go ahead and copy the
-            # changes over to our shadow_paradigm.  We'll apply the requested
-            # changes immediately if a trial is not currently running.
-            self.shadow_paradigm.copy_traits(self.model.paradigm)
-            self.pending_changes = False
-
-            # Subclasses need to define this function (e.g.
-            # abstract_positive_controller and abstract_aversive_controller)
-            # because only those subclases know when it's safe to apply the
-            # changes (e.g. the positive paradigms will check to make sure that
-            # a trial is not running before applying the changes).
-            self.context_updated()
-        except Exception, e:
-            # A problem occured when attempting to apply the context. 
-            # the changes and notify the user.  Hopefully we never reach this
-            # point.
-            log.exception(e)
-            mesg = '''
-            Unable to apply your requested changes due to an error.  No changes
-            have been made. Please review the changes you have requested to
-            ensure that they are indeed valid.'''
-            import textwrap
-            mesg = textwrap.dedent(mesg).strip().replace('\n', ' ')
-            mesg += '\n\nError message: ' + str(e)
-            error(info.ui.control, message=mesg, title='Error applying changes')
-
-    def context_updated(self):
-        '''
-        This can be overriden in subclasses to implement logic for updating the
-        experiment when the apply button is pressed
-        '''
-        pass
-
-    def revert(self, info=None):
-        '''
-        Revert GUI fields to original values
-        '''
-        log.debug('Reverting requested changes')
-        self.model.paradigm.copy_traits(self.shadow_paradigm)
-        self.pending_changes = False
-
-    def value_changed(self, name): 
-        new_value = self.get_current_value(name)
-        old_value = self.old_context.get(name, None)
-        return new_value != old_value
-
-    def get_current_value(self, name):
-        '''
-        Get the current value of a context variable.  If the context variable
-        has not been evaluated yet, compute its value from the
-        pending_expressions stack.  Additional context variables may be
-        evaluated as needed.
-        '''
-        try:
-            return self.current_context[name]
-        except:
-            evaluate_value(name, self.pending_expressions, self.current_context)
-            return self.current_context[name]
-
-    def set_current_value(self, name, value):
-        self.current_context[name] = value
-
-    def evaluate_pending_expressions(self, extra_context=None):
-        '''
-        Evaluate all pending expressions and store results in current_context.
-
-        If extra_content is provided, it will be included in the local
-        namespace. If extra_content defines the value of a parameter also
-        present in pending_expressions, the value stored in extra_context takes
-        precedence.
-        '''
-        log.debug('Evaluating pending expressions')
-        if extra_context is not None:
-            self.current_context.update(extra_context)
-        self.current_context.update(self.model.data.trait_get(context=True))
-        evaluate_expressions(self.pending_expressions, self.current_context)
-
-    @on_trait_change('current_context_items')
-    def _apply_context_changes(self, event):
-        '''
-        Automatically apply changes as expressions are evaluated and their
-        result added to the context
-        '''
-        names = event.added.keys()
-        names.extend(event.changed.keys())
-        for name in names:
-            old_value = self.old_context.get(name, None)
-            new_value = self.current_context.get(name)
-            if old_value != new_value:
-                mesg = 'changed {} from {} to {}'
-                log.debug(mesg.format(name, old_value, new_value))
-
-                # I used to have this in a try/except block (i.e. using the
-                # Python idiom of "it's better to ask for forgiveness than 
-                # permission).  However, it quickly became apparent that this
-                # was masking Exceptions that may be raised in the body of the
-                # setter functions.  We should let these exceptions bubble to
-                # the surface so the user has more information about what
-                # happened.
-                setter = 'set_{}'.format(name)
-                if hasattr(self, setter):
-                    getattr(self, setter)(new_value)
-                    log.debug('setting %s', name)
-                else:
-                    log.debug('no setter for %s', name)
-
-    @on_trait_change('current_context_items')
-    def _update_current_context_list(self):
-        context = []
-        for name, value in self.current_context.items():
-            label = self.context_labels.get(name, '')
-            changed = not self.old_context.get(name, None) == value
-            log = self.context_log[name]
-            if type(value) in ((type([]), type(()))):
-                str_value = ', '.join('{}'.format(v) for v in value)
-                str_value = '[{}]'.format(str_value)
-            else:
-                str_value = '{}'.format(value)
-            context.append((name, str_value, label, log, changed))
-        self.current_context_list = sorted(context)
-        
-    def initialize_context(self):
-        log.debug('Initializing context')
-        for instance in (self.model.data, self.model.paradigm, self):
-            for name, trait in instance.traits(context=True).items():
-                log.debug('Found context variable {}'.format(name))
-                self.context_labels[name] = trait.label
-                self.context_log[name] = trait.log
-
-        # TODO: this is sort of a "hack" to ensure that the appropriate data for
-        # the trial type is included
-        self.context_labels['ttype'] = 'Trial type'
-        self.context_log['ttype'] = True
-        self.shadow_paradigm = self.model.paradigm.clone_traits()
-        self.refresh_context()
