@@ -13,13 +13,44 @@ def ts(TTL):
     '''
     return np.flatnonzero(TTL)
 
-def edge_rising(TTL):
-    return np.r_[0, np.diff(TTL.astype('i'))] == 1
+def edge_rising(TTL, assume_zero=False):
+    '''
+    Return indices of rising edges
 
-def edge_falling(TTL):
-    return np.r_[0, np.diff(TTL.astype('i'))] == -1
+    Parameters
+    ----------
+    TTL : 1D array
+        Array to be evaluated as a logical.  A logical True is treated as a
+        "high" in TTL parlance.
+    assume_zero : bool
+        For edge-cases where the first value is high, should we assume that this
+        represents a rising edge (i.e. the sample immediately prior was low)?
+    '''
+    if assume_zero:
+        return np.diff(np.r_[0, TTL.astype('i')]) == 1
+    else:
+        return np.r_[0, np.diff(TTL.astype('i'))] == 1
 
-def epochs(x, pad=0, smooth=True):
+def edge_falling(TTL, assume_zero=False):
+    '''
+    Return indices of falling edges
+
+    Parameters
+    ----------
+    TTL : 1D array
+        Array to be evaluated as a logical.  A logical True is treated as a
+        "high" in TTL parlance.
+    assume_zero : bool
+        For edge-cases where the final value is high, should we assume that this
+        represents a falling edge (i.e. the sample immediately following would
+        be low)
+    '''
+    if assume_zero:
+        return np.diff(np.r_[TTL.astype('i'), 0]) == -1
+    else:
+        return np.r_[0, np.diff(TTL.astype('i'))] == -1
+
+def epochs(x, pad=0, smooth=True, assume_zero=False):
     '''
     Identify start and end indices where the TTL goes high
 
@@ -28,10 +59,13 @@ def epochs(x, pad=0, smooth=True):
     x : 1D array
         Array to be evaluated as a logical.  A logical True is treated as a
         "high" in TTL parlance.
-    pad : {two-tupel, int}
+    pad : {two-tuple, int}
         Expand epoch boundaries by the requested number of indices.  Will not
         expand epoch boundaries beyond the edges of the input.  If padding is a
         two-tuple, indicates how much to pad lower and upper edge by.
+    assume_zero : bool
+        For edge-cases where the inital or final value is high, should we assume
+        that these reflect an epoch boundary?
 
     Returns
     -------
@@ -48,17 +82,24 @@ def epochs(x, pad=0, smooth=True):
     array([], shape=(0, 2), dtype=float64)
 
     >>> x[-1] = 1
-    >>> epochs(x)
-    array([[ 9, 10]])
+    >>> print epochs(x)
+    [[ 9 10]]
 
     >>> x[0] = 1
-    >>> epochs(x)
-    array([[ 0,  1],
-           [ 9, 10]])
+    >>> print epochs(x)
+    [[ 0  1]
+     [ 9 10]]
 
+    >>> x = np.ones(10)
+    >>> print epochs(x)
+    []
+
+    >>> x = np.ones(10)
+    >>> print epochs(x, assume_zero=True)
+    [[ 0 10]]
     '''
-    start = ts(edge_rising(x))
-    end = ts(edge_falling(x))
+    start = ts(edge_rising(x, assume_zero=assume_zero))
+    end = ts(edge_falling(x, assume_zero=assume_zero))
 
     # Handle various boundary conditions where some sort of task-related
     # activity is registered at very beginning or end of experiment.
@@ -89,6 +130,62 @@ def epochs(x, pad=0, smooth=True):
         epochs = smooth_epochs(epochs)
 
     return epochs
+
+
+def pad_epochs(epochs, pad):
+    '''
+    Identify start and end indices where the TTL goes high
+
+    Parameters
+    ----------
+    epochs : 2D array
+        List of epochs
+    pad : {two-tuple, int}
+        Expand epoch boundaries by the requested number of indices.  Will not
+        expand epoch boundaries beyond the edges of the input.  If padding is a
+        two-tuple, indicates how much to pad lower and upper edge by.
+
+    Returns
+    -------
+    2D array
+    '''
+
+    epochs = epochs.copy()
+    try:
+        start_pad, end_pad = pad
+    except:
+        start_pad, end_pad = pad, pad
+    epochs[:,0] -= start_pad
+    epochs[:,1] += end_pad
+    return epochs
+
+
+def debounce_epochs(epochs, pad):
+    '''
+    Detect spurious fluctuations in the TTL and remove these
+
+    Parameters
+    ----------
+    epochs : 2D array
+        List of epochs
+    pad : {two-tuple, int}
+
+    Returns
+    -------
+    2D array
+    '''
+    
+    # Remove spurious fluctuations that go high->low->high
+    epochs = pad_epochs(epochs, pad)
+    epochs = smooth_epochs(epochs)
+    epochs = pad_epochs(epochs, -pad)
+
+    # Remove spurious fluctuations that go low->high->low
+    d_epochs = np.diff(epochs, axis=1).ravel()
+    epochs = epochs[d_epochs >= pad*2]
+
+    return epochs
+
 
 def smooth_epochs(epochs):
     '''
