@@ -184,6 +184,10 @@ class AxesIterator(object):
         True if the current axes is on the last row of the grid
     last_col : bool
         True if the current axes is on the last column of the grid
+    current_figure : { None, Matplotlib figure instance }
+        If the generator has not been started, the value of this attribute will
+        be None.  Once the generator has started, this attribute will point to
+        the instance of the current figure.
     '''
 
     def __init__(self, groups, extra=0, sharex=True, sharey=True,
