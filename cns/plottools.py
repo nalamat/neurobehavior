@@ -192,7 +192,7 @@ class AxesIterator(object):
 
     def __init__(self, groups, extra=0, sharex=True, sharey=True,
                  max_groups=np.inf, adjust_spines=False, save_pattern=None,
-                 auto_close=False, figure_kw=None):
+                 auto_close=False, figure_kw=None, n_rows=None, n_cols=None):
 
         self.sharex = sharex
         self.sharey = sharey
@@ -200,7 +200,20 @@ class AxesIterator(object):
         self.group_iter = iter(groups)
         self.max_groups = max_groups
         self.n_groups = min(len(self.groups)+extra, self.max_groups)
-        self.n_rows, self.n_cols = best_rowscols(self.n_groups)
+
+        if n_rows is None and n_cols is None:
+            self.n_rows, self.n_cols = best_rowscols(self.n_groups)
+        elif n_rows is not None and n_cols is not None:
+            self.n_rows = n_rows
+            self.n_cols = n_cols
+            self.max_groups = n_rows*n_cols
+        elif n_rows is not None:
+            self.n_rows = n_rows
+            self.n_cols = np.ceil(self.n_groups/n_rows)
+        elif n_cols is not None:
+            self.n_cols = n_cols
+            self.n_rows = np.ceil(self.n_groups/n_cols)
+
         self.i = 0
         self.current_axes = None
         self.figures = []
