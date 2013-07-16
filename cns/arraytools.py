@@ -195,6 +195,9 @@ def downsampled_mean(x, n, axis=-1):
      [ 12.5  13.5  14.5  15.5  16.5]]
 
     '''
+    if n is None or n == 1:
+        return x
+
     offset = x.shape[axis] % n
     # If offset is zero, don't slice array at all
     if offset:
