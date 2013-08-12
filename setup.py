@@ -12,7 +12,11 @@ setup(
     license='LICENSE.txt',
     description=description,
     package_data={'experiments': ['components/*.rcx']},
-    requires=['tdtpy', 'new_era'],
+    requires=[
+        'tdtpy', 
+        'new_era',
+        'tables>=3.0',
+    ],
     scripts=[#'scripts/load_experiment.py', 
              #'scripts/edit_cohort.py',
              #'scripts/review_physiology.py',
