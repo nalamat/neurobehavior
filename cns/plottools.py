@@ -191,15 +191,20 @@ class AxesIterator(object):
     '''
 
     def __init__(self, groups, extra=0, sharex=True, sharey=True,
-                 max_groups=np.inf, adjust_spines=False, save_pattern=None,
-                 auto_close=False, figure_kw=None, n_rows=None, n_cols=None):
+                 n=None, max_groups=np.inf, adjust_spines=False,
+                 save_pattern=None, auto_close=False, figure_kw=None,
+                 n_rows=None, n_cols=None):
 
         self.sharex = sharex
         self.sharey = sharey
         self.groups = groups
         self.group_iter = iter(groups)
         self.max_groups = max_groups
-        self.n_groups = min(len(self.groups)+extra, self.max_groups)
+        if n is not None:
+            self.n = n+extra
+        else:
+            self.n = len(self.groups)+extra
+        self.n_groups = min(self.n, self.max_groups)
 
         if n_rows is None and n_cols is None:
             self.n_rows, self.n_cols = best_rowscols(self.n_groups)
