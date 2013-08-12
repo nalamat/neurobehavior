@@ -17,7 +17,7 @@ about how the HDF5 data structure is represented in Python.  PyTables has a
 really nice API (application programming interface) that we can use to access
 the nodes stored in the file.  First, open a handle to the file::
 
-    fh = tables.openFile('filename', 'r')
+    fh = tables.open_file('filename', 'r')
 
 The top-level node can be accessed via an attribute called root::
 
@@ -29,7 +29,7 @@ A child node can be accessed via it's name::
 
 Alternatively, you can request the pathname::
 
-    animal = fh.getNode('/Cohort_0/animals/Animal_0')
+    animal = fh.get_node('/Cohort_0/animals/Animal_0')
 
 The attributes of the animal are stored in a special node called _v_attrs.  This
 is a PyTables-specific feature, other HDF5 libraries may have different ways of
@@ -41,10 +41,10 @@ tab.  There are several ways to access the attributes::
 
     nyu_id = fh.root.Cohort_0.animals.Animal_0._v_attrs['nyu_id']
 
-    animal = fh.getNode('/Cohort_0/animals/Animal_0')
-    nyu_id = animal.getAttr('nyu_id')
+    animal = fh.get_node('/Cohort_0/animals/Animal_0')
+    nyu_id = animal.get_attr('nyu_id')
 
-    animal = fh.getNode('/Cohort_0/animals/Animal_0')
+    animal = fh.get_node('/Cohort_0/animals/Animal_0')
     nyu_id = animal._v_attrs.nyu_id
 '''
 
@@ -105,7 +105,7 @@ def _getattr(node, xattr):
     if xattr.startswith('<'):
         return _find_ancestor(node, xattr[1:])
     elif xattr == '*':
-        return node._f_listNodes()[0]
+        return node._f_list_nodes()[0]
     elif xattr == '_v_parent':
         return node._v_parent
     else:
@@ -114,12 +114,12 @@ def _getattr(node, xattr):
         # _v_pathname and _v_name can only be accessed via getattr).
         try:
             # If the node is an instance of tables.Leaf, then it will not have
-            # the _f_getChild method and raises an AttributeError.  If the node
-            # is an instance of tables.Group, then it will have the _f_getChild
+            # the _f_get_child method and raises an AttributeError.  If the node
+            # is an instance of tables.Group, then it will have the _f_get_child
             # method and raise a tables.NoSuchNodeError (a subclass of
             # AttributeError) if the node does not exist.  We can capture both
             # and fall back to the getattr approach.
-            return node._f_getChild(xattr)
+            return node._f_get_child(xattr)
         except AttributeError:
             return getattr(node, xattr)
 
@@ -128,7 +128,7 @@ def _rgetattr(node, xattr):
         base, xattr = xattr.split('/', 1)
         # Handle the special cases first
         if base == '_v_attrs':
-            return node._f_getAttr(xattr)
+            return node._f_getattr(xattr)
         else:
             node = _getattr(node, base)
             return _rgetattr(node, xattr)
@@ -256,7 +256,7 @@ def iter_nodes(where, filter, classname=None):
 
         list(iter_nodes(fh.root, ('_v_name', 'trial_log)))
     '''
-    for node in where._f_iterNodes(classname=classname):
+    for node in where._f_iter_nodes(classname=classname):
         if node_match(node, filter):
             yield node
 
@@ -331,7 +331,7 @@ def walk_nodes(where, filter, classname=None):
     To return all nodes that store animal data (note that the iterator approach
     is standard Python-fu)::
 
-        fh = tables.openFile('example_data.h5', 'r')
+        fh = tables.open_file('example_data.h5', 'r')
         filter = ('+animal_id', lambda x: True)
         iterator = walk_nodes(fh.root, filter)
         animal_nodes = list(iterator)
@@ -339,7 +339,7 @@ def walk_nodes(where, filter, classname=None):
     If you want to walk over the results one at a time, the above can be
     rewritten::
 
-        fh = tables.openFile('example_data.h5', 'r')
+        fh = tables.open_file('example_data.h5', 'r')
         filter = ('+animal_id', lambda x: True)
         for animal_node in walk_nodes(fh.root, filter):
             # Do something with the node, e.g.:
@@ -348,25 +348,25 @@ def walk_nodes(where, filter, classname=None):
     To return all nodes who have a subnode, data, that has a name beginning with
     'RawAversiveData'::
 
-        fh = tables.openFile('example_data.h5', 'r')
+        fh = tables.open_file('example_data.h5', 'r')
         base_node = fh.root.Cohort_0.animals.Animal_0.experiments
         filter = ('data._v_name', re.compile('RawAversiveData.*').match)
         experiment_nodes = list(walk_nodes(base_node, filter))
 
     To return all nodes whose name matches a given pattern::
 
-        fh = tables.openFile('example_data.h5', 'r')
+        fh = tables.open_file('example_data.h5', 'r')
         filter = ('_v_name', re.compile('^Animal_\d+').match)
         animal_nodes = list(walk_nodes(fh.root, filter))
     '''
-    for node in where._f_walkNodes(classname=classname):
+    for node in where._f_walknodes(classname=classname):
         if node_match(node, filter):
             yield node
 
 LINK_CLASSES = tables.link.SoftLink, tables.link.ExternalLink
 
 def get(filename, xattr):
-    with tables.openFile(filename, 'r') as fh:
+    with tables.open_file(filename, 'r') as fh:
         attr = rgetattr(fh.root, xattr)
         if isinstance(attr, tables.Leaf):
             return attr.read()
@@ -387,13 +387,13 @@ def p_get_node(node, pattern, dereference=True):
     However, the parent node is PositiveDTCL_2011_09_09_11_59_58.  You would not
     know what the exact name of this node is without checking it first::
 
-        fh = tables.openFile('110909_G1_tail_behavior_raw.hd5', 'r')
+        fh = tables.open_file('110909_G1_tail_behavior_raw.hd5', 'r')
         trial_log = p_get_node(fh.root, '*/data/trial_log')
 
     If the tables.File instance is passed in, the search begins at fh.root,
     e.g., the above code is equivalent to::
 
-        fh = tables.openFile('110909_G1_tail_behavior_raw.hd5', 'r')
+        fh = tables.open_file('110909_G1_tail_behavior_raw.hd5', 'r')
         trial_log = p_get_node(fh, '*/data/trial_log')
 
     '''
@@ -402,7 +402,7 @@ def p_get_node(node, pattern, dereference=True):
     return list(p_iter_nodes(node, pattern, dereference))[0]
 
 def p_read(filename, pattern, dereference=True):
-    with tables.openFile(filename, 'r') as fh:
+    with tables.open_file(filename, 'r') as fh:
         return p_get_node(fh.root, pattern, dereference).read()
 
 def p_iter_nodes(node, pattern, dereference=True):
@@ -418,14 +418,14 @@ def p_iter_nodes(node, pattern, dereference=True):
     wildcard in the search pattern where the animal name (e.g. LeftF) or the
     experiment name (e.g. PositiveDTCL_2011_11_11_11_11_11) would be::
 
-        fh = tables.openFile('G1_dt_behavior.cohort.hd5', 'r')
+        fh = tables.open_file('G1_dt_behavior.cohort.hd5', 'r')
         pattern = '/Cohort_0/animals/*/experiments/*/data/trial_log'
         for trial_log in p_iter_nodes(fh.root, pattern):
             # do something with the trial_log
 
     Partial wildcards (ala Unix-style filename matching) are supported as well::
 
-        fh = tables.openFile('G1_dt_behavior.cohort.hd5', 'r')
+        fh = tables.open_file('G1_dt_behavior.cohort.hd5', 'r')
         pattern = '/Cohort_0/animals/*/exp*/*/data/trial_log'
         for trial_log in p_iter_nodes(fh.root, pattern):
             # do something with the trial_log
@@ -447,19 +447,19 @@ def p_iter_nodes(node, pattern, dereference=True):
         yield node
 
     #elif '*' == pattern[0]:
-    #    for n in node._f_iterNodes():
+    #    for n in node._f_iter_nodes():
     #        for n in p_iter_nodes(n, pattern[1:]):
     #            if n is not None:
     #                yield n
     elif '*' in pattern[0]:
-        for n in node._f_iterNodes():
+        for n in node._f_iter_nodes():
             if fnmatch.fnmatch(n._v_name, pattern[0]):
                 for n in p_iter_nodes(n, pattern[1:]):
                     if n is not None:
                         yield n
     else:
         try:
-            n = node._f_getChild(pattern[0])
+            n = node._f_get_child(pattern[0])
             for n in p_iter_nodes(n, pattern[1:]):
                 yield n
         except tables.NoSuchNodeError:
@@ -474,7 +474,7 @@ def p_list_nodes(file_name, pattern, dereference=True):
     exhausted, the file will be closed and you will be unable to access the data
     stored in the node.
     '''
-    with tables.openFile(file_name, 'r') as fh:
+    with tables.open_file(file_name, 'r') as fh:
         #pattern = pattern.split('/')
         #if pattern[0] != '':
             #raise ValueError, 'Pattern must begin with /'
@@ -514,7 +514,7 @@ def _extract_data(file_name, filters, fields=None, summary=None,
     file to a different folder, this does not clear the cache.
     '''
     log.info('... No cached copy of data found, reloading data')
-    with tables.openFile(file_name, 'r') as h:
+    with tables.open_file(file_name, 'r') as h:
         data = DataFrame()
         if mode == 'walk':
             iterator = walk_nodes(h.root, filters, classname)
