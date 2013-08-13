@@ -111,7 +111,7 @@ class FileMixin(HasTraits):
     
     @classmethod
     def from_file(cls, filename, node_path, **kwargs):
-        fh = tables.openFile(filename)
+        fh = tables.open_file(filename)
         node = h5.rgetattr(fh.root, node_path)
         return cls.from_node(node, **kwargs)
 
@@ -153,7 +153,7 @@ class FileMixin(HasTraits):
         filters = tables.Filters(complevel=self.compression_level,
                 complib=self.compression_type, fletcher32=self.use_checksum,
                 shuffle=self.use_shuffle)
-        earray = self.node._v_file.createEArray(self.node._v_pathname,
+        earray = self.node._v_file.create_earray(self.node._v_pathname,
                 self.name, atom, self._get_shape(), filters=filters,
                 expectedrows=int(self.fs*self.expected_duration))
         for k, v in self.trait_get(attr=True).items():
@@ -165,7 +165,7 @@ class FileMixin(HasTraits):
     @on_trait_change('+attr', post_init=True)
     def update_attrs(self, name, new):
         log.debug('%s: updating %s to %r', self, name, new)
-        self._buffer.setAttr(name, new)
+        self._buffer.set_attr(name, new)
 
     def _write(self, data):
         self._buffer.append(data)
@@ -948,14 +948,14 @@ class FileSnippetChannel(FileChannel):
 
     def _classifiers_default(self):
         atom = tables.Atom.from_dtype(np.dtype('int32'))
-        earray = self.node._v_file.createEArray(self.node._v_pathname,
+        earray = self.node._v_file.create_earray(self.node._v_pathname,
                 self.name + '_classifier', atom, (0,),
                 expectedrows=int(self.fs*self.expected_duration))
         return earray
 
     def _timestamps_default(self):
         atom = tables.Atom.from_dtype(np.dtype('int32'))
-        earray = self.node._v_file.createEArray(self.node._v_pathname,
+        earray = self.node._v_file.create_earray(self.node._v_pathname,
                 self.name + '_ts', atom, (0,),
                 expectedrows=int(self.fs*self.expected_duration))
         return earray
