@@ -61,11 +61,17 @@ if __name__ == '__main__':
                         help='Overwrite existing file')
     parser.add_argument('--add-rms', action='store_true', help='Add RMS to file')
     parser.add_argument('--template', help='Use settings defined in this file')
+    parser.add_argument('--skip-missing', action='store_true',
+                        help='Skip file if channel metadata missing')
 
     args = parser.parse_args()
     for raw_filename in args.files:
-        ext_filename = extract_spikes(raw_filename, 
-                                      template=args.template,
-                                      force_overwrite=args.force_overwrite)
-        if args.add_rms:
-            compute_rms(ext_filename)
+        try:
+            ext_filename = extract_spikes(raw_filename, 
+                                          template=args.template,
+                                          force_overwrite=args.force_overwrite)
+            if args.add_rms:
+                compute_rms(ext_filename)
+        except:
+            if not args.skip_missing:
+                raise
