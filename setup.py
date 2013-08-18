@@ -1,6 +1,11 @@
 from distutils.core import setup
+import os.path 
+import glob
 
 description = '''Module for running behavior experiments'''
+
+base_directory = os.path.dirname(__file__)
+scripts = glob.glob(os.path.join(base_directory, 'scripts', '*.py'))
 
 setup(
     name='Neurobehavior',
@@ -13,9 +18,5 @@ setup(
     description=description,
     package_data={'experiments': ['components/*.rcx']},
     requires=['tdtpy', 'new_era'],
-    scripts=['scripts/load_experiment.py', 
-             'scripts/edit_cohort.py',
-             'scripts/review_physiology.py',
-             'scripts/decimate.py',
-             'scripts/process_batchfile.py', ]
+    scripts=scripts,
 )
