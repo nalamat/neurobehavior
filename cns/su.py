@@ -161,8 +161,9 @@ def interepoch_times(epochs, n=1000, padding=1, duration=0.1, seed=1321132):
 
     Example
     -------
-    >>> censored = load_censored_epochs(ext_filename, channels)
-    >>> task = load_task_epochs(raw_filename, padding=0)
+    >>> from cns import io
+    >>> censored = io.load_censored_epochs(ext_filename, channels)
+    >>> task = io.load_task_epochs(raw_filename)
     >>> epochs = np.r_[censored, task]
     >>> timestamps = interepoch_times(epochs)
 
