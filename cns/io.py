@@ -87,12 +87,11 @@ def load_trial_log(filename, path='*/data'):
     with tables.openFile(filename) as fh:
         base_node = h5.p_get_node(fh.root, path)
         tl = pandas.DataFrame(base_node.trial_log[:])
-
-        for basename, searchpath in epochs:
-            node = h5.rgetattr(fh.root, searchpath)
         for epoch in epochs:
+            if epoch not in base_node.contact:
+                continue
             basename = epoch.split('_')[0]
-            node = base_node._f_getChild(epoch)
+            node = base_node.contact._f_getChild(epoch)
             data = node[:]
             if data.ndim == 2:
                 # This is an epoch
@@ -105,7 +104,7 @@ def load_trial_log(filename, path='*/data'):
                 tl[basename + '_ts']  = data    
 
         # Pull in response timestamps as well
-        node = base_node._f_getChild('response_ts')
+        node = base_node.contact._f_getChild('response_ts')
         tl['response_ts|'] = node[:]
         tl['response|'] =  node[:]/node._v_attrs['fs']
 
@@ -318,14 +317,23 @@ def load_curated_metadata(curated_file, single_unit=False):
 
     return clusters
 
-def load_extracted(extracted_file):
+def load_extracted(extracted_file, channels=None):
     '''
     Load extracted spike data
     '''
     with tables.openFile(extracted_file) as fh:
         timestamps = fh.root.event_data.timestamps[:]
-        channels = fh.root.event_data.channels[:]-1
-        return pandas.DataFrame({'channel': channels, 'ts': timestamps})
+        event_channels = fh.root.event_data.channels[:]-1
+        if channels is not None:
+            try:
+                mask = np.zeros(len(event_channels), dtype='bool')
+                for channel in channels:
+                    mask = mask | (event_channels == channel)
+            except TypeError:
+                mask = event_channels == channels
+            event_channels = event_channels[mask]
+            timestamps = timestamps[mask]
+        return pandas.DataFrame({'channel': event_channels, 'ts': timestamps})
 
 def load_curated(curated_file, single_unit=False):
     '''
