@@ -6,8 +6,8 @@ line switch via load_experiment.py) that do not have a trial log attached to
 them.  These nodes are typically experiments that were created then aborted
 before a trial was initiated. 
 
-Supports processing a list of filenames (hint, use a shell that supports
-wildcard expansion).
+Supports processing a list of filenames (hint, use a shell such as bash that
+supports wildcard expansion).
 '''
 
 def main(filename):
