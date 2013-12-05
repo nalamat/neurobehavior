@@ -166,6 +166,10 @@ class AxesIterator(object):
         TODO
     figure_kw: dict
         Dictionary of keyword arguments to pass to pylab's `figure` function.
+    ylabel : str
+        Label to attach to the Y-axis of subplots in the first column
+    xlabel : str
+        Label to attach ot the X-axis of the final subplot in each column
 
     sharex and sharey are attributes that can be modified at any time during
     iteration to change the sharing behavior.
@@ -193,7 +197,7 @@ class AxesIterator(object):
     def __init__(self, groups, extra=0, sharex=True, sharey=True,
                  n=None, max_groups=np.inf, adjust_spines=False,
                  save_pattern=None, auto_close=False, figure_kw=None,
-                 n_rows=None, n_cols=None):
+                 n_rows=None, n_cols=None, xlabel=None, ylabel=None):
 
         self.sharex = sharex
         self.sharey = sharey
@@ -234,6 +238,9 @@ class AxesIterator(object):
         self.last_row = None
         self.last_col = None
 
+        self.ylabel = ylabel
+        self.xlabel = xlabel
+
         self.figure_kw = {} if figure_kw is None else figure_kw
 
     def __iter__(self):
@@ -242,7 +249,7 @@ class AxesIterator(object):
     def next(self):
         g = self.group_iter.next()
         ax = self.next_axes()
-        return  ax, g
+        return ax, g
 
     def next_axes(self, sharex=None, sharey=None):
         # When the call to group_iter.next() raises a StopIteration exception,
@@ -265,6 +272,13 @@ class AxesIterator(object):
             self.figure_count += 1
             self.figures.append(self.current_figure)
 
+        # Update the class attributes indicating the position of the subplot in
+        # the grid
+        self.first_col = (self.i % self.n_cols) == 0
+        self.last_col = (self.i % self.n_cols) == self.n_cols-1
+        self.first_row = self.i < self.n_cols
+        self.last_row = self.i >= (self.n_cols*(self.n_rows-1))
+
         if not np.isinf(self.max_groups):
             self.i = (self.i + 1) % self.max_groups
         else:
@@ -279,13 +293,6 @@ class AxesIterator(object):
                                              **kw)
         self.current_axes = ax
 
-        # Update the class attributes indicating the position of the subplot in
-        # the grid
-        self.first_col = (self.i % self.n_cols) == 1 
-        self.last_col = (self.i % self.n_cols) == 0
-        self.first_row = self.i <= self.n_cols
-        self.last_row = self.i > (self.n_cols*(self.n_rows-1))
-
         # Adjust the spines if requested
         if self.adjust_spines:
             if self.first_col and self.last_row:
@@ -296,6 +303,12 @@ class AxesIterator(object):
                 adjust_spines(self.current_axes, ('bottom'), 0)
             else:
                 adjust_spines(self.current_axes, (), 0)
+
+        if self.ylabel is not None and self.first_col:
+            self.current_axes.set_ylabel(self.ylabel)
+        if self.xlabel is not None and self.last_row:
+            self.current_axes.set_xlabel(self.xlabel)
+
         return self.current_axes
 
     def __del__(self):
