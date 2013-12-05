@@ -573,7 +573,8 @@ class Channel(HasTraits):
         start : iterable of float
             Start time of each segment (in seconds)
         duration : float
-            Duration of each segment (in seconds)
+            Duration of segments (in seconds).  All segments must be of the same
+            duration.
 
         Returns
         -------
@@ -584,6 +585,26 @@ class Channel(HasTraits):
             s = self.get_range(ts, ts+duration)
             segments.append(s[np.newaxis])
         return np.concatenate(segments)
+
+    def segments_valid(self, start, duration):
+        '''
+        Return boolean mask indicating valid segments
+
+        Parameters
+        ----------
+        start : iterable of float
+            Start time of each segment (in seconds)
+        duration : float
+            Duration of segments (in seconds).  All segments must be of the same
+            duration.
+        '''
+        max_samples = self.get_size()
+        valid = []
+        for ts in start:
+            lb, ub = self._to_bounds(ts, ts+duration)
+            valid.append((lb >= 0) and (ub <= max_samples))
+        return np.array(valid)
+
 
 class FileChannel(FileMixin, Channel):
     '''
