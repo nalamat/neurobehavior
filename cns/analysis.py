@@ -2,7 +2,7 @@ from __future__ import division
 
 import time
 import tables
-import numpy as np 
+import numpy as np
 from numpy.lib.stride_tricks import as_strided
 from scipy import signal
 from os import path
@@ -284,13 +284,13 @@ def running_rms(input_node, output_node, duration, step, processing,
         compute_rms = median_std
     else:
         raise ValueError, 'Unknown algorithm "{}"'.format(algorithm)
-    
+
     # Do not modify this code unless you *really* know what you're doing.  We
     # use some "under-the-hood" tricks in the Numpy library to optimize this
     # algorithm for speed and memory, specifically the `as_strided` function.
     # Using the obvious brute-force approach is significantly slower and more
     # disk-intensive.
-    # 
+    #
     # Basically, what this is telling the code to do is return a block of length
     # c_samples.  On each loop, the offset increases by c_samples-c_loverlap.
     # c_loverlap is the difference between window_samples and window_step.  This
@@ -339,7 +339,7 @@ def decimate_waveform(source, output_node, q=None, output_dtype=None,
                       chunk_size=default_chunk_size):
     '''
     Decimates the waveform data to a lower sampling frequency using a lowpass
-    filter cutoff.  
+    filter cutoff.
 
     A 4th order lowpass butterworth filter is used in conjunction with filtfilt
     to apply a zero phase-delay to the waveform.
@@ -362,7 +362,7 @@ def decimate_waveform(source, output_node, q=None, output_dtype=None,
     q : { None, int }
         The downsampling (i.e. decimation) factor.  If None, q will be set to
         floor(source_fs/dec_fs) (i.e. the output sampling frequency will be as
-        close to dec_fs as without being less than dec_fs). 
+        close to dec_fs as without being less than dec_fs).
     dec_fs : { 600.0, float }
         Used to compute the downsampling factor, q, if one is not provided (see
         documentation for q above).
@@ -405,10 +405,10 @@ def decimate_waveform(source, output_node, q=None, output_dtype=None,
 
     fh_out = output_node._v_file
     filters = tables.Filters(complevel=1, complib='zlib', fletcher32=True)
-    lfp = fh_out.createEArray(output_node, 
+    lfp = fh_out.createEArray(output_node,
                               'lfp',
                               tables.Atom.from_dtype(np.dtype(output_dtype)),
-                              (n_channels, 0), 
+                              (n_channels, 0),
                               filters=filters,
                               title="Lowpass filtered signal")
 
@@ -420,13 +420,13 @@ def decimate_waveform(source, output_node, q=None, output_dtype=None,
     # TODO Need to consider this in more detail
     b = b.astype(output_dtype)
     a = a.astype(output_dtype)
-    
+
     # The number of samples in each chunk *must* be a multiple of the decimation
     # factor so that we can extract the *correct* samples from each chunk.
     c_samples = chunk_samples(source, chunk_size, q)
     overlap = 3*len(b)
-    iterable = chunk_iter(source, 
-                          chunk_samples=c_samples, 
+    iterable = chunk_iter(source,
+                          chunk_samples=c_samples,
                           loverlap=overlap,
                           roverlap=overlap)
 
@@ -576,7 +576,7 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
     # are derived from this one.  If I re-extract spikes, but do not change the
     # filename, the UUID will change.  This means we can check to see whether
     # sorted spike data (obtained from the extracted spiketimes file) is from
-    # the current version of the extracted times file. 
+    # the current version of the extracted times file.
     fh_out.setNodeAttr(output_node, 'extract_uuid', str(uuid.uuid1()))
     fh_out.setNodeAttr(output_node, 'last_extracted', time.time())
 
@@ -605,7 +605,7 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
                                      tables.Int32Atom(), (0,),
                                      title='Event time (cycles)')
     fh_indices._v_attrs['fs'] = fs
-    
+
     # The actual channel the event was detected on.  We can represent up
     # to 32,767 channels with a 16 bit integer.  This should be
     # sufficient for at least the next year.
@@ -619,9 +619,9 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
     # 4 in /channels and 0 in /channels index.  Likewise, events detected on
     # channel 9 would be marked as 3 in /channels_index.  This allows us to
     # "slice" the /waveforms array if needed to get the waveforms that triggered
-    # the detection events.  
+    # the detection events.
     #
-    # >>> detected_waveforms = waveforms[:, channels_index, :] 
+    # >>> detected_waveforms = waveforms[:, channels_index, :]
     #
     # This is also useful for UMS2000 becaues UMS2000 only sees the extracted
     # waveforms and assumes they are numbered consecutively starting at 1.  By
@@ -747,7 +747,7 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
         crossings = (c[..., :-1] <= thresholds) & (c[..., 1:] > thresholds)
 
         # Get the channel number and index for each crossing.
-        channel_index, sample_index = np.where(crossings) 
+        channel_index, sample_index = np.where(crossings)
 
         n_features = len(sample_index)
         tot_features += n_features
@@ -799,7 +799,7 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
     # Save some informationa bout whet
     output_node._v_attrs['aborted'] = aborted
     output_node._v_attrs['last_processed_sample'] = samples_processed
-        
+
     t_chunk_end = time.time()
     t_chunk = t_chunk_end-t_chunk_start
     log.debug('Extracting spikes took {} seconds'.format(t_chunk))
@@ -808,9 +808,9 @@ def extract_spikes(input_node, output_node, channels, noise_std, threshold_stds,
     # the signal exceeds the artifact threshold defined on any given sample.
     # Note that the specified reject threshold for each channel will be honored
     # via broadcasting of the array.  This uses tables.Expr to avoid creating
-    # large Numpy temporary arrays in memory (and should be much faster). 
+    # large Numpy temporary arrays in memory (and should be much faster).
     rej_thresholds = rej_thresholds[np.newaxis].T
-    exp = tables.Expr("(fh_waveforms >= rej_thresholds) |" 
+    exp = tables.Expr("(fh_waveforms >= rej_thresholds) |"
                       "(fh_waveforms < -rej_thresholds)")
 
     # Now, evaluate and reduce the expression so that we end up with a 2d array
@@ -901,3 +901,5 @@ def running_msc(x, y, downsample):
     Pxy = downsampled_mean(x * np.conjugate(y), downsample)
     Pxy = np.abs(Pxy)**2
     return Pxy / (Pxx * Pyy)
+
+
