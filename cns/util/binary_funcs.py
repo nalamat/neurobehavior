@@ -75,7 +75,7 @@ def epochs(x, pad=0, smooth=True, assume_zero=False):
     --------
     >>> x = np.zeros(10)
 
-    Boundary conditions 
+    Boundary conditions
     -------------------
     >>> x = np.zeros(10)
     >>> epochs(x)
@@ -125,7 +125,7 @@ def epochs(x, pad=0, smooth=True, assume_zero=False):
 
     epochs = np.c_[start, end]
     epochs = np.clip(epochs, 0, len(x))
-    
+
     if smooth:
         epochs = smooth_epochs(epochs)
 
@@ -174,7 +174,10 @@ def debounce_epochs(epochs, pad):
     -------
     2D array
     '''
-    
+    # Short-circuit logic for empty arrays
+    if len(epochs) == 0:
+        return epochs
+
     # Remove spurious fluctuations that go high->low->high
     epochs = pad_epochs(epochs, pad)
     epochs = smooth_epochs(epochs)
@@ -192,7 +195,7 @@ def smooth_epochs(epochs):
     Given a 2D array of epochs in the format [[start time, end time], ...],
     identify and remove all overlapping epochs such that::
 
-        [ epoch   ]        [ epoch ] 
+        [ epoch   ]        [ epoch ]
             [ epoch ]
 
     Will become::
@@ -275,7 +278,7 @@ def int_to_TTL(a, width):
     =======
     bitfield : array
         2D boolean array repesenting the bits in little-endian order
-    
+
     Example (note the transpose -- didn't have time to flip around)
     =======
     >>> int_to_TTL([4, 8, 5], width=6).T
@@ -295,7 +298,7 @@ def bin_array(number, bits):
 
     >>> bin_array(3, 4)
     [1, 1, 0, 0]
-    
+
     NOTE: This function has not been profiled for speed.
     '''
     return [(number>>bit)&1 for bit in range(bits)]
