@@ -121,7 +121,7 @@ def pst(et, tt, lb, ub):
     tt_ub = np.searchsorted(et, tt+ub)
     return [et[lb:ub]-tt for tt, lb, ub in zip(tt, tt_lb, tt_ub)]
 
-def histogram(et, tt, bin_width, lb, ub, censored=None):
+def histogram(et, tt, bin_width, lb, ub, censored=None, latency=0):
     '''
     Fast version of the histogram function that assumes et and tt are sorted
     '''
@@ -131,7 +131,7 @@ def histogram(et, tt, bin_width, lb, ub, censored=None):
     if len(tt) == 0:
         raise ValueError, 'No trials to compute histogram on'
     pst_times = np.concatenate(pst(et, tt, lb, ub))
-    bins = histogram_bins(bin_width, lb, ub)
+    bins = histogram_bins(bin_width, lb, ub, latency)
     n = np.histogram(pst_times, bins=bins)[0]
     return bins[:-1], n/bin_width/len(tt)
 
@@ -141,17 +141,19 @@ def fano_factor(et, tt, bin_width, lb, ub):
     histograms = np.c_[histograms]
     return histograms.var(0)/histograms.mean(0)
 
-def histogram_bins(bin_width, lb, ub):
+def histogram_bins(bin_width, lb, ub, latency=0):
     '''
-    Compute bins
+    Compute bins to use for generating histograms
     
     Numpy, Scipy and Matplotlib (Pylab) all come with histogram functions, but
     the autogeneration of the bins rarely are what we want them to be.  This
     makes sure that we get the bins we want given the temporal bounds of the
-    analysis window (lb, ub) and the bin width.
+    analysis window (lb, ub) and the bin width.  Specifically:
+
+    * One bin always begins at 0+latency.
     '''
     bins =  np.arange(lb, ub, bin_width)
-    bins -= bins[np.argmin(np.abs(bins))]
+    bins -= bins[np.argmin(np.abs(bins))]-latency
     return bins
 
 def interepoch_times(epochs, n=1000, padding=1, duration=0.1, seed=1321132):
