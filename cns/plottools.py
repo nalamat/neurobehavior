@@ -24,7 +24,7 @@ def color_iterator(grouping, cmap='jet', n=None):
     '''
     Given a Matplotlib colormap, iterate through the color range in equal-sized
     increments based on the size of the group.
-    
+
     Parameters
     ----------
     grouping : iterable
@@ -64,6 +64,8 @@ def adjust_spines(ax, spines, position=5):
     # turn off ticks where there is no spine
     if 'left' in spines:
         ax.yaxis.set_ticks_position('left')
+    elif 'right' in spines:
+        ax.yaxis.set_ticks_position('right')
     else:
         # No yaxis ticks.  The traditional way of turning off the ticklabels for
         # a given axis is to use setp(ax2, yticklabels=[]); however, this will
@@ -200,7 +202,7 @@ class AxesIterator(object):
 
         # Update the class attributes indicating the position of the subplot in
         # the grid
-        self.first_col = (self.i % self.n_cols) == 1 
+        self.first_col = (self.i % self.n_cols) == 1
         self.last_col = (self.i % self.n_cols) == 0
         self.first_row = self.i <= self.n_cols
         self.last_row = self.i > (self.n_cols*(self.n_rows-1))
