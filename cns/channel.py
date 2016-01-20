@@ -68,8 +68,8 @@ class FileMixin(HasTraits):
         Ensures data integrity, but at cost of degraded read/write performance
 
     Default settings for the compression filter are no compression which
-    provides the best read/write performance. 
-    
+    provides the best read/write performance.
+
     Note that if compression_level is > 0 and compression_type is None,
     tables.Filter will raise an exception.
     '''
@@ -82,7 +82,7 @@ class FileMixin(HasTraits):
                                transient=True)
     use_checksum        = Bool(False, transient=True)
     use_shuffle         = Bool(False, transient=True)
-    
+
     # It is important to implement dtype appropriately, otherwise it defaults to
     # float64 (double-precision float).
     dtype               = Any(transient=True)
@@ -90,9 +90,9 @@ class FileMixin(HasTraits):
     # Duration is in seconds.  The default corresponds to a 30 minute
     # experiment, which we seem to have settled on as the "standard" for running
     # appetitive experiments.
-    expected_duration   = Float(1800, transient=True) 
+    expected_duration   = Float(1800, transient=True)
     signal              = Property
-    
+
     # The actual source where the data is stored.  Node is the HDF5 Group that
     # the EArray is stored under while name is the name of the EArray.
     node                = Instance(tables.group.Group, transient=True)
@@ -232,7 +232,7 @@ class FileEpoch(FileMixin, Epoch):
 
     name  = 'FileEpoch'
     dtype = Any(np.int32)
-    
+
     def _get_shape(self):
         return (0, 2)
 
@@ -251,14 +251,14 @@ class Channel(HasTraits):
         acquisition.  This typically defaults to zero; however, some subclasses
         may discard old data (e.g.  :class:`RAMChannel`), so we need to factor
         in the time offset when attempting to extract a given segment of the
-        waveform for analysis.  
+        waveform for analysis.
 
     Two events are supported.
 
     added
         New data has been added. If listeners have been caching the results of
         prior computations, they can assume that older data in the cache is
-        valid. 
+        valid.
     changed
         The underlying dataset has changed, but the time-range has not.
 
@@ -450,108 +450,6 @@ class FileChannel(FileMixin, Channel):
     name  = 'FileChannel'
     dtype = Any(np.float32)
 
-class RAMChannel(Channel):
-    '''
-    Buffers data in memory without saving it to disk.
-
-    Uses a ringbuffer algorithm designed for efficient reads (writes are not as
-    efficient, but should still be fairly quick).  The assumption is that this
-    is used for plotting data, and reads will be more common than writes (due to
-    panning, zooming and scaling).
-
-    Parameters
-    ==========
-    window
-        Number of seconds to buffer
-    '''
-
-    window  = Float(10)
-    samples = Property(Int, depends_on='window, fs')
-    t0      = Property(depends_on="offset, fs")
-
-    buffer = Array
-    offset = Int(0)
-    dropped = Int(0)
-
-    partial_idx = 0
-    buffer_full = False
-
-    @cached_property
-    def _get_t0(self):
-        return self.offset/self.fs
-
-    @cached_property
-    def _get_samples(self):
-        return int(self.window * self.fs)
-
-    def _buffer_default(self):
-        return np.empty(self.samples)
-
-    def _samples_changed(self):
-        self.buffer = np.empty(self.samples)
-        self.offset = 0
-        self.dropped = 0
-        self.partial_idx = 0
-        self._write = self._partial_write
-
-    def _partial_write(self, data):
-        size = data.shape[-1]
-        if size > self.samples:
-            # If we have too much data to write to the buffer, drop the extra
-            # samples.  Offset should be incremented by the number of samples
-            # dropped.  Furthermore, we now have a "full" buffer so we switch to
-            # the _full_write method from now on.
-            self.buffer = data[..., -self.samples:]
-            self.dropped = size-self.samples
-            self.offset = size-self.samples
-            # Switch to the full write mode
-            del self.partial_idx
-            self.buffer_full = True
-            self._write = self._full_write
-        elif self.partial_idx+size > self.samples:
-            # If the number of samples available is greater than the remaining
-            # slots in the buffer, write what we can to the buffer and then
-            # switch to _full_write for the remaining samples.
-            overflow_size = (self.partial_idx+size)-self.samples
-            initial_size = size-overflow_size
-            self.buffer[..., self.partial_idx:] = data[..., :initial_size]
-            # Switch to the full write mode
-            del self.partial_idx
-            self.buffer_full = True
-            self._write = self._full_write
-            # Write the remaining samples to the buffer
-            self._write(data[..., -overflow_size:])
-        else:
-            self.buffer[..., self.partial_idx:self.partial_idx+size] = data
-            self.partial_idx += size
-
-    def _full_write(self, data):
-        size = data.shape[-1]
-        if size == 0:
-            return
-        elif size > self.samples:
-            self.buffer = data[..., -self.samples:]
-            self.dropped += size-self.samples
-            self.offset += size-self.samples
-        else:
-            # Shift elements at end of buffer to beginning so we can write new
-            # data.  Old data at beginning is discarded.  If old data is
-            # discarded, we update offset.
-            remainder = self.samples-size
-            if remainder:
-                self.buffer[..., :remainder] = self.buffer[..., -remainder:]
-                self.offset += size
-            # Write new data to end of buffer
-            self.buffer[..., -size:] = data
-
-    _write = _partial_write
-
-    def get_size(self):
-        if self.buffer_full:
-            return self.samples
-        else:
-            return self.partial_idx
-
 class MultiChannel(Channel):
 
     # Default to 0 to make it clear that the class has not been properly
@@ -715,7 +613,7 @@ class ProcessedMultiChannel(MultiChannel):
 
         return signal.iirfilter(self.filter_order, Wp, 60, 2,
                                 ftype=self.filter_type,
-                                btype=self.filter_btype, 
+                                btype=self.filter_btype,
                                 output='ba')
 
     @cached_property
@@ -748,18 +646,6 @@ class ProcessedMultiChannel(MultiChannel):
 class ProcessedFileMultiChannel(FileMixin, ProcessedMultiChannel):
     pass
 
-class RAMMultiChannel(RAMChannel, MultiChannel):
-
-    def _buffer_default(self):
-        return np.empty((self.channels, self.samples))
-
-    def _samples_changed(self):
-        self.buffer = np.empty((self.channels, self.samples))
-        self.offset = 0
-        self.dropped = 0
-        self.partial_idx = 0
-        self._write = self._partial_write
-
 class FileMultiChannel(FileMixin, MultiChannel):
 
     name = 'FileMultiChannel'
@@ -790,7 +676,7 @@ class FileSnippetChannel(FileChannel):
                 self.name + '_ts', atom, (0,),
                 expectedrows=int(self.fs*self.expected_duration))
         return earray
-    
+
     def _get_shape(self):
         return (0, self.snippet_size)
 

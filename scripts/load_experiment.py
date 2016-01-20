@@ -4,7 +4,7 @@ import os
 
 # Ensure that ETS toolkit will default to PyQt4 and use the PyQt (instead of
 # the less stable PySide backend) if we load it
-os.environ['ETS_TOOLKIT'] = 'qt4' 
+os.environ['ETS_TOOLKIT'] = 'qt4'
 
 # This is very important since there's a memory leak when using PySide.  This
 # has been fixed in the latest revision of enable; however, it
@@ -32,7 +32,7 @@ def configure_logging(filename):
                 'simple': { 'format': simple_format },
                 },
             'handlers': {
-                # This is what gets printed out to the console 
+                # This is what gets printed out to the console
                 'console': {
                     'class': 'logging.StreamHandler',
                     'formatter': 'simple',
@@ -112,7 +112,7 @@ example, localhost:3333 or regina.cns.nyu.edu:3333.'''
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Launch experiment")
 
-    parser.add_argument('type', type=str, 
+    parser.add_argument('type', type=str,
                         help='The type of experiment to launch')
 
     parser.add_argument('-r', '--rove', help='Parameter(s) to rove',
@@ -120,7 +120,7 @@ if __name__ == '__main__':
                         required=False)
     parser.add_argument('-a', '--analyze', help='Parameter(s) to analyze',
                         nargs='+', action=VerifyUniqueParameters, default=[])
-    parser.add_argument('--repeats', 
+    parser.add_argument('--repeats',
                         help='Specify number of repeats for each trial setting',
                         action='store_true', default=False)
 
@@ -130,13 +130,13 @@ if __name__ == '__main__':
 
     group = parser.add_mutually_exclusive_group()
     group.add_argument('-p', '--profile', dest='mode', action='store_const',
-                       const='profile', default='regular', 
-                       help='Profile experiment') 
+                       const='profile', default='regular',
+                       help='Profile experiment')
     group.add_argument('--memory', dest='mode', action='store_const',
-                       const='memory', default='regular', 
-                       help='Graph memory usage') 
+                       const='memory', default='regular',
+                       help='Graph memory usage')
     group.add_argument('-t', '--test', dest='mode', action='store_const',
-                       const='test', help='Test experiment') 
+                       const='test', help='Test experiment')
     group.add_argument('-i', '--inspect', dest='mode', action='store_const',
                        const='inspect', help='Print available parameters')
     group.add_argument('-f', '--file', type=str, help="File to save data to")
@@ -144,10 +144,6 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--neural', dest='physiology',
                         action='store_true', help='Acquire neurophysiology',
                         default=False)
-    parser.add_argument('--address', help=SERVER_HELP, action=VerifyServer)
-
-    #parser.add_argument('--paradigm', help='Paradigm settings file to load')
-    #parser.add_argument('--physiology', help='Physiology settings file to load')
 
     parser.add_argument('--save-microphone', action='store_true',
             help='Save microphone data?', default=False)
@@ -155,20 +151,14 @@ if __name__ == '__main__':
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--cal', action=VerifyCalibration, nargs=2, default=None,
             help='Calibration files to use for primary and secondary speaker')
-    group.add_argument('--att', action='store_true', 
+    group.add_argument('--att', action='store_true',
             help='Treat signal level as an attenuation value')
     parser.add_argument('--equalized', action='store_true',
             help='Use equalized calibration?', default=False)
 
-    #parser.add_argument('--rebase', type=str, default=None)
-
     args = parser.parse_args()
 
-    #if args.rebase is not None:
-    #    os.environ['NEUROBEHAVIOR_BASE'] = path.abspath(args.rebase)
-
-    #if args.debug:
-    if True:
+    if args.debug:
         # By default, exceptions that occur in the trait change handlers (i.e.
         # the callback functions) are silenced.  When debugging, it's often
         # helpful for these exceptions to propagate into the main thread so we
@@ -180,7 +170,7 @@ if __name__ == '__main__':
     from cns import get_config
 
     # Configure the logging
-    log_root = get_config('LOG_ROOT') 
+    log_root = get_config('LOG_ROOT')
     if path.exists(log_root):
         log_filename = path.join(log_root, strftime('%Y%m%d_%H%M.log'))
     else:
@@ -204,7 +194,6 @@ if __name__ == '__main__':
     ###############################################################################
 
     try:
-
         # Do some additional checking of argument list to make sure it is valid
         if args.mode != 'inspect':
             invalid = loader.get_invalid_parameters(args)

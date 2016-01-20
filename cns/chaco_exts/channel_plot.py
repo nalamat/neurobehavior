@@ -81,7 +81,7 @@ class ChannelPlot(BaseChannelPlot):
         if not self._screen_cache_valid:
             # Obtain cached data and map to screen
             val_pts = self._cached_data
-            s_val_pts = self._map_screen(val_pts) 
+            s_val_pts = self._map_screen(val_pts)
             self._cached_screen_data = s_val_pts
 
             # Obtain cached data bounds and create index points
@@ -92,7 +92,7 @@ class ChannelPlot(BaseChannelPlot):
 
             # Screen cache is valid
             self._screen_cache_valid = True
-            
+
         return self._cached_screen_index, self._cached_screen_data
 
     def _map_screen(self, data):
@@ -110,7 +110,7 @@ class ChannelPlot(BaseChannelPlot):
             gc.set_antialias(True)
             gc.clip_to_rect(self.x, self.y, self.width, self.height)
             gc.set_stroke_color(self.line_color_)
-            gc.set_line_width(self.line_width) 
+            gc.set_line_width(self.line_width)
             gc.begin_path()
             gc.lines(np.c_[points])
             gc.stroke_path()

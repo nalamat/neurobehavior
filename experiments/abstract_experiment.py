@@ -61,14 +61,8 @@ class AbstractExperiment(HasTraits):
             )
 
     traits_view = View(
-            Include('traits_group'), 
-            resizable=True, 
-            # Hmm, the keybindings don't seem to be working that well.
-            key_bindings=KeyBindings(
-                KeyBinding(binding1='Ctrl-r', method_name='remind'),
-                KeyBinding(binding1='Ctrl-a', method_name='apply'),
-                KeyBinding(binding1='Ctrl-u', method_name='undo'),
-                ),
+            Include('traits_group'),
+            resizable=True,
             menubar=MenuBar(
                 Menu(
                     ActionGroup(
@@ -77,5 +71,5 @@ class AbstractExperiment(HasTraits):
                     ),
                     name='&Paradigm'),
             ),
-            height=0.9, 
+            height=0.9,
             width=0.9)

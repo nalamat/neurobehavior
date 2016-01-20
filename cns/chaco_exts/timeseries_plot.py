@@ -40,7 +40,7 @@ class TimeseriesPlot(ChannelPlot):
 
         gc.set_fill_color(self.marker_color_)
         gc.set_stroke_color(self.marker_edge_color_)
-        gc.set_line_width(self.marker_edge_width) 
+        gc.set_line_width(self.marker_edge_width)
         gc.set_line_join(0) # Curved
 
         gc.draw_marker_at_points(points, self.marker_size,

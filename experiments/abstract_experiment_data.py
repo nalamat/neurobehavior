@@ -15,6 +15,7 @@ def string_array_equal(a, string):
     else:
         return np.array(a) == string
 
+
 class AbstractExperimentData(HasTraits):
 
     new_trial = Event
@@ -47,20 +48,22 @@ class AbstractExperimentData(HasTraits):
     parameters = List
 
     event_log = Any
+    event_log_updated = Event
 
     def _event_log_default(self):
         fh = self.store_node._v_file
-        description = np.dtype([('timestamp', 'i'), ('name', 'S64'), 
-                                ('value', 'S128'),])
+        description = np.dtype([('ts', np.float64), ('event', 'S512')])
         node = fh.createTable(self.store_node, 'event_log', description)
         return node
 
-    def log_event(self, timestamp, name, value):
+    def log_event(self, ts, event):
         # The append() method of a tables.Table class requires a list of rows
         # (i.e. records) to append to the table.  Since we only append a single
         # row at a time, we need to nest it as a list that contains a single
         # record.
-        self.event_log.append([(timestamp, name, repr(value))])
+        self.event_log.append([(ts, event)])
+        print 'updating'
+        self.event_log_updated = ts, event
 
     # Trial log structure
     _trial_log = List
@@ -99,7 +102,7 @@ class AbstractExperimentData(HasTraits):
         cmp_array = np.empty(1, dtype=object)
         for par in self.pars:
             cmp_array[0] = par
-            m = self.par_seq == cmp_array 
+            m = self.par_seq == cmp_array
             result.append(m)
         return result
 

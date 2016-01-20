@@ -4,6 +4,7 @@ from .channel_plot import ChannelPlot
 from enable.api import black_color_trait, LineStyle, MarkerTrait
 from traits.api import Instance, Float
 
+
 class EpochPlot(ChannelPlot):
     '''
     Designed for efficiently handling time series data stored in a channel.
@@ -40,7 +41,7 @@ class EpochPlot(ChannelPlot):
 
             gc.set_fill_color(self.marker_color_)
             gc.set_stroke_color(self.marker_edge_color_)
-            gc.set_line_width(self.marker_edge_width) 
+            gc.set_line_width(self.marker_edge_width)
             gc.set_line_join(0) # Curved
 
             starts = points[:,(0,2)]
@@ -61,3 +62,4 @@ class EpochPlot(ChannelPlot):
             self.invalidate_draw()
             self._data_cache_valid = False
             self.request_redraw()
+
