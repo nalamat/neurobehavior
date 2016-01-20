@@ -13,53 +13,6 @@ from .utils import get_temp_mic_node
 import logging
 log = logging.getLogger(__name__)
 
-# Score functions
-ts = lambda TTL: np.flatnonzero(TTL)
-edge_rising = lambda TTL: np.r_[0, np.diff(TTL.astype('i'))] == 1
-edge_falling = lambda TTL: np.r_[0, np.diff(TTL.astype('i'))] == -1
-
-# Version log
-#
-# V2.0 - 110315 - Fixed bug in par_info where fa_frac and hit_frac columns were
-# swapped.  Script migrate_positive_data_v1_v2 will correct this bug.
-# V2.1 - 110330 - Added TO_TTL and TO_safe_TTL
-# V2.2 - 110330 - Renamed reaction_time to response_time and added the *actual*
-# reaction_time.  Response time now reflects the time from trial onset to the
-# the time the subject touches the spout or the nose-poke (note that in V2.1 and
-# earlier, this is reflected by the value in the (mis-named) reaction_time
-# column.  If response time is NaN, that means there was no response. Reaction
-# time is the time from signal onset to nose-poke withdraw.  If reaction time is
-# NaN, that means there was no withdraw from the nose-poke.
-# V2.3 - 110404 - Revamped masked_trial_log to include an arbitrary dataset.  First
-# call to log_trial establishes the columns that will be available.  Subsequent
-# calls to log_trial must contain the *exact* same data.  I no longer guarantee
-# the column order of the masked_trial_log table.  You will have to explicitly
-# query the columns to get the information you need out of the table rather than
-# relying on a pre-specified index.
-# V2.4 - 110415 - Switch to a volume-based reward made detection of gerbil on
-# spout slightly problematic.  Made scoring more robust.  pump_TTL data is now
-# being spooled again; however, this is simply an indicator of whether a trigger
-# was sent to the pump rather than an indicator of how long the pump was running
-# for.
-# V2.5 - 110418 - Revised global FA fraction computation to be more consistent
-# with how we score the actual trials and compute FA for the individual
-# parameters.
-# V2.6 - 110605 - Added commutator inhibit TTL (comm_inhibit_TTL) to indicate
-# when commutator is being suppressed from spinning.
-# V2.7 - 110718 - Added microphone data buffer
-# V3.0 - 110909 - Added poke/signal/trial epoch and response ts sampled at the
-# maximum resolution of the system (i.e. the sampling rate of the DSP).  Also,
-# all logged timestamps now reflect the *maximum* resolution of the system
-# rather than the sampling rate of the TTL.
-# V4.0 - 120306 - Removed comm_inhibit_TTL and TO_safe_TTL since these are no
-# longer needed/used.  Also removed the unused store='channel' and store_path
-# attributes from the FileChannel/FileMultiChannel Trait instance definitions
-# because these are no longer needed.
-# V4.1 - 1203017 - When a student modified the paradigm to remove the reaction
-# window and add a delay to the response window, he used the paradigm variable
-# "reaction_window_delay" to set the response window delay.  The naming of this
-# variable is counter-intuitive.  Renamed reaction_window_delay to
-# response_window_delay.
 
 class PositiveData(AbstractExperimentData, SDTDataMixin):
 
@@ -96,19 +49,8 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
     c_nogo_all = Int(0, context=True, label='Consecutive nogos')
     fa_rate = Float(0, context=True, label='Running FA rate (frac)')
 
-    poke_TTL        = Instance(FileChannel)
-    spout_TTL       = Instance(FileChannel)
-    trial_TTL       = Instance(FileChannel)
-    response_TTL    = Instance(FileChannel)
-    pump_TTL        = Instance(FileChannel)
-    signal_TTL      = Instance(FileChannel)
-    reaction_TTL    = Instance(FileChannel)
-    reward_TTL      = Instance(FileChannel)
-    TO_TTL          = Instance(FileChannel)
-
     microphone      = Instance(FileChannel)
 
-    trial_epoch     = Instance(FileEpoch)
     signal_epoch    = Instance(FileEpoch)
     poke_epoch      = Instance(FileEpoch)
     all_poke_epoch  = Instance(FileEpoch)
@@ -124,33 +66,6 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
         else:
             node = get_temp_mic_node()
         return FileChannel(node=node, name='microphone', dtype=np.float32)
-
-    def _poke_TTL_default(self):
-        return self._create_channel('poke_TTL', np.bool)
-
-    def _spout_TTL_default(self):
-        return self._create_channel('spout_TTL', np.bool)
-
-    def _trial_TTL_default(self):
-        return self._create_channel('trial_TTL', np.bool)
-
-    def _reaction_TTL_default(self):
-        return self._create_channel('reaction_TTL', np.bool)
-
-    def _pump_TTL_default(self):
-        return self._create_channel('pump_TTL', np.bool)
-
-    def _signal_TTL_default(self):
-        return self._create_channel('signal_TTL', np.bool)
-
-    def _response_TTL_default(self):
-        return self._create_channel('response_TTL', np.bool)
-
-    def _reward_TTL_default(self):
-        return self._create_channel('reward_TTL', np.bool)
-
-    def _TO_TTL_default(self):
-        return self._create_channel('TO_TTL', np.bool)
 
     def _trial_epoch_default(self):
         node = get_or_append_node(self.store_node, 'contact')
@@ -172,19 +87,7 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
         node = get_or_append_node(self.store_node, 'contact')
         return FileTimeseries(node=node, name='response_ts')
 
-    def log_trial(self, score=True, **kwargs):
-        # Typically we want score to be True; however, for debugging purposes it
-        # is convenient to set score to False that way we don't need to provide
-        # the "dummy" spout and poke data required for scoring.
-        if score:
-            ts_start = kwargs['ts_start']
-            ts_end = kwargs['ts_end']
-            response = kwargs['response']
-            kwargs.update(self.compute_response(ts_start, ts_end, response))
-            kwargs['start'] = ts_start/self.poke_TTL.fs
-            kwargs['end'] = ts_end/self.poke_TTL.fs
-
-        # Log the trial
+    def log_trial(self, **kwargs):
         AbstractExperimentData.log_trial(self, **kwargs)
 
         # Now, compute the context data
@@ -197,68 +100,6 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
         # We include the FA seq when slicing that way we can reset the count if
         # the gerbil false alarms (which they almost certainly do)
         self.c_hit = self.rcount(self.hit_seq[self.go_seq|self.fa_seq])
-
-    def compute_response(self, ts_start, ts_end, response):
-        '''
-        Available sequences
-        -------------------
-        Response type   {spout, poke, no withdraw, no response}
-        Early response  {True, False}
-        Trial type      {GO, NOGO}
-
-        Default method for computing scores
-        -----------------------------------
-        HIT
-            go & spout & ~early
-        MISS
-            go & (poke | no_response) & ~early
-        FA
-            (nogo & spout) | (early & spout)
-        CR
-            (nogo | early) & ~spout
-        '''
-        poke_data = self.poke_TTL.get_range_index(ts_start, ts_end+5,
-                check_bounds=True)
-        spout_data = self.spout_TTL.get_range_index(ts_start, ts_end+5,
-                check_bounds=True)
-
-        reaction = 'normal'
-        reaction_type = 'none'
-
-        # SCORING OF RESPONSE TIME
-        # lb is poke start, ub is end of response delay, both in sec
-        lb_sec = self.trial_epoch[-1,0]
-        ub_sec = self.poke_epoch[-1,1]
-        TTL = self.poke_TTL.get_range(lb_sec, ub_sec)
-        if len(ts(edge_rising(TTL))):
-            reaction = 'early'
-            reaction_type = 'poke'
-
-        TTL = self.spout_TTL.get_range(lb_sec, ub_sec)
-        if len(ts(edge_rising(TTL))):
-            reaction = 'early'
-            reaction_type = 'spout'
-
-        # How quickly did he react?
-        try:
-            reaction_time = ts(edge_falling(poke_data))[0]/self.poke_TTL.fs
-        except:
-            reaction_time = np.nan
-        # END SCORING OF ACTUAL RESPONSE
-
-        # How quickly did he provide his answer?
-        try:
-            if response == 'spout':
-                response_time = ts(edge_rising(spout_data))[0]/self.spout_TTL.fs
-            elif response == 'poke':
-                response_time = ts(edge_rising(poke_data))[0]/self.poke_TTL.fs
-            else:
-                response_time = np.nan
-        except:
-            response_time = np.nan
-
-        return dict(reaction=reaction, reaction_type=reaction_type,
-                response_time=response_time, reaction_time=reaction_time)
 
     # Splits masked_trial_log into individual sequences as needed
     ts_seq          = Property(Array('i'), depends_on='masked_trial_log')
@@ -320,7 +161,7 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
     late_seq    = Property(Array('b'), depends_on='masked_trial_log')
     early_seq   = Property(Array('b'), depends_on='masked_trial_log')
     normal_seq  = Property(Array('b'), depends_on='masked_trial_log')
-    
+
     @cached_property
     def _get_yes_seq(self):
         return self.spout_seq
@@ -331,11 +172,11 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
 
     @cached_property
     def _get_nogo_normal_seq(self):
-        return self.string_array_equal(self.ttype_seq, 'NOGO') 
+        return self.string_array_equal(self.ttype_seq, 'NOGO')
 
     @cached_property
     def _get_nogo_repeat_seq(self):
-        return self.string_array_equal(self.ttype_seq, 'NOGO_REPEAT') 
+        return self.string_array_equal(self.ttype_seq, 'NOGO_REPEAT')
 
     @cached_property
     def _get_nogo_seq(self):
@@ -414,7 +255,7 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
 
     @cached_property
     def _get_miss_seq(self):
-        return self.go_seq & (self.poke_seq | self.nr_seq) 
+        return self.go_seq & (self.poke_seq | self.nr_seq)
 
     @cached_property
 
@@ -423,7 +264,7 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
 
     @cached_property
     def _get_cr_seq(self):
-        return self.nogo_seq & ~self.spout_seq               
+        return self.nogo_seq & ~self.spout_seq
 
     def save(self):
         # This function will be called when the user hits the stop button.  This

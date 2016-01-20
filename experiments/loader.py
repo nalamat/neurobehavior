@@ -44,7 +44,7 @@ class ExperimentLauncher(CohortViewHandler):
         cohort_folder = filename[:-4]
         if not os.path.exists(cohort_folder):
             os.makedirs(cohort_folder)
-        
+
         with tables.openFile(filename, 'a', rootUEP=pathname) as fh:
             # We need to call prepare_experiment prior to loading a saved
             # paradigm.  prepare_experiment adds the roving parameters as traits
@@ -135,7 +135,7 @@ class ExperimentLauncher(CohortViewHandler):
                         log.debug(mesg)
                 except TraitError:
                     log.debug('Prior paradigm is not compatible with experiment')
-        
+
                 try:
                     model.edit_traits(parent=info.ui.control, kind='livemodal',
                                       handler=controller)
@@ -147,7 +147,7 @@ class ExperimentLauncher(CohortViewHandler):
                     self.last_paradigm = model.paradigm
                     selected.processed = True
                     log.debug('Saved paradigm for animal to the datafile')
-                except AttributeError, e: 
+                except AttributeError, e:
                     log.exception(e)
                 except SystemError, e:
                     from textwrap import dedent
@@ -157,8 +157,8 @@ class ExperimentLauncher(CohortViewHandler):
                     ensure that the RX6, RZ5 and PA5 are turned on.  If you
                     still get this error message, please try power-cycling the
                     rack.  If this still does not fix the error, power-cycle the
-                    computer as well.  
-                    
+                    computer as well.
+
                     Please remember that you need to give the equipment rack a
                     minute to boot up once you turn it back on before attempting
                     to launch an experiment.
@@ -193,7 +193,7 @@ def prepare_experiment(args, store_node, create_child=True):
     # name of the corresponding file in the launchers folder (without the .py
     # extension)
     module = get_experiment(args.type)
-    
+
     # Pull out the classes
     paradigm_class = module.Paradigm
     experiment_class = module.Experiment
@@ -243,13 +243,12 @@ def prepare_experiment(args, store_node, create_child=True):
     controller_args = {
             'cal_primary':      cal1,
             'cal_secondary':    cal2,
-            'address':          args.address,
             }
-    
+
     log.debug('store_node: %s', store_node)
     log.debug('data_node: %s', data_node)
     log.debug('exp_node: %s', exp_node)
-    
+
     # Prepare the classes. This really is a lot of boilerplate to link up
     # parameters with paradigms, etc, to facilitate analysis
     paradigm = paradigm_class()
@@ -257,14 +256,14 @@ def prepare_experiment(args, store_node, create_child=True):
                       save_microphone=args.save_microphone)
     data.parameters = args.analyze
     model = experiment_class(
-            store_node=store_node, 
+            store_node=store_node,
             experiment_node=exp_node,
-            data_node=data_node, 
+            data_node=data_node,
             data=data,
             paradigm=paradigm,
             spool_physiology=args.physiology,
             )
-    
+
     if args.analyze:
         model.plot_index = args.analyze[0]
         model.plot_group = args.analyze[1:]

@@ -1,6 +1,12 @@
 from datetime import datetime
 from cns.data.h5_utils import get_or_append_node
 
+# Enthought supports both the PySide and Qt4 backend.  PySide is
+# essentially a rewrite of PyQt4.  These backends are not compatible
+# with each other, so we need to be sure to import the backend that
+# Enthought has decided to use.
+from pyface.qt import QtGui
+
 import subprocess
 from os import path
 import os
@@ -89,14 +95,6 @@ class ExperimentToolBar(ToolBar):
 
 class AbstractExperimentController(Controller):
     """
-    Primary controller for TDT System 3 hardware.  This class must be configured
-    with a model that contains the appropriate parameters (e.g.  Paradigm) and a
-    view to show these parameters.
-
-    As changes are applied to the view, the necessary changes to the hardware
-    (e.g. RX6 tags and PA5 attenuation) will be made and the model will be
-    updated.
-
     For a primer on model-view-controller architecture and its relation to the
     Enthought libraries (e.g. Traits), refer to the Enthought Tool Suite
     documentation online at:
@@ -106,21 +104,20 @@ class AbstractExperimentController(Controller):
 
     Halted
         The system is waiting for the user to configure parameters.  No data
-        acquisition is in progress nor is a signal being played.  
+        acquisition is in progress nor is a signal being played.
     Paused
         The system is configured, spout contact is being monitored, and the
-        intertrial signal is being played. 
+        intertrial signal is being played.
     Manual
         The user has requested a manual trial.  Once the trial is over, the
         controller will go back to the paused state.
     Running
-        The system is playing the sequence of safe and warn signals. 
+        The system is playing the sequence of safe and warn signals.
     Complete
         The experiment is done.
     Disconnected
         Could not connect to the equipment.
     """
-
     shell_variables = Dict
 
     # These define what variables will be available in the Python shell.  Right
@@ -134,13 +131,9 @@ class AbstractExperimentController(Controller):
     # If you add a toolbar, be sure to set toolbar=True so that the controller
     # knows that the toolbar instance needs to be "installed".
     toolbar = Instance(ExperimentToolBar, (), toolbar=True)
-    
+
     state = Enum('halted', 'paused', 'running', 'manual', 'disconnected',
                  'complete')
-
-    # name_ = Any are Trait wildcards
-    # see http://code.enthought.com/projects/traits/docs
-    # /html/traits_user_manual/advanced.html#trait-attribute-name-wildcard)
 
     # current_* and choice_* are variables tracked by the controller to
     # determine the current "state" of the experiment and what values to use for
@@ -150,58 +143,21 @@ class AbstractExperimentController(Controller):
     # parameter that needs to be presented) and are not needed once the
     # experiment is done.  A good rule of thumb: if the parameter is used as a
     # placeholder for transient data (to compute variables needed for experiment
-    # control), it should be left out of the "model". 
+    # control), it should be left out of the "model".
     current_    = Any
-    #choice_     = Any
 
-    # iface_* and buffer_* are handles to hardware and hardware memory buffers
-    iface_      = Any
-    buffer_     = Any
-
-    # List of tasks to be run during experiment.  Each entry is a tuple
-    # (callable, frequency) where frequency is how often the task should be run.
-    # Tasks that are slow (e.g. communciating with the pump) should not be run
-    # as often.  A frequency of 1 indicates the task should be run on every
-    # "tick" of the timer, a frequency of 5 indicates the task should be run
-    # every 5 "ticks".  If the timer interval is set to 100 ms, then a frequency
-    # of 5 corresponds to 500 ms.  However, be warned that this is not
-    # deterministic.  If tasks take a while to complete, then the timer "slows
-    # down" as a result.
-    timer       = Any
-    tasks       = List(Tuple(Callable, Int))
-    tick_count  = Int(1)
-
-    # The DSP process that will be responsible for handling all communication
-    # with the DSPs.  All circuits must be loaded and buffers initialized before
-    # the process is started (so the process can appropriately allocate the
-    # required shared memory resources).
-    process         = Instance('tdt.DSPProject')
     system_tray     = Any
 
     # Calibration objects
     cal_primary     = Instance('cns.calibration.Calibration')
     cal_secondary   = Instance('cns.calibration.Calibration')
-    
+
     physiology_handler = Instance(PhysiologyController)
 
-    status = Property(Str, depends_on='state, current_setting')
-
-    # Address of the hardware server.  If None, defaults to the non-network
-    # aware version of the TDTPy library.
-    address = Trait(None, None, Tuple(Str, Int))
+    status = Property(Str, depends_on='trial_state, current_setting')
 
     # Start time of the experiment, in seconds
     start_time = Any
-
-    def _process_default(self):
-        # Imports typically should be listed at the top of the module (outside
-        # any class definitions, methods or functions); however, I hde the
-        # import for tdt here so that people can launch the GUI on their home
-        # computers without having to install the tdt module.  Obviously the
-        # experiment code will fail to run if TDTPy has not been installed, but
-        # you should at least be able to get to a GUI.
-        import tdt
-        return tdt.DSPProject(address=self.address)
 
     def _get_status(self):
         if self.state == 'disconnected':
@@ -212,14 +168,12 @@ class AbstractExperimentController(Controller):
             return str(self.current_setting)
         else:
             return ''
-    
+
     def handle_error(self, error):
+        # Since this is a critical error, we should force the window to the top
+        # so the user knows there is a problem. Typically this is considered
+        # rude behavior in programming; however, experiments take priority.
         mesg = '{}\n\nDo you wish to stop the program?'.format(error)
-        
-        # Since this is a critical error, we should force the window to the
-        # top so the user knows there is a problem. Typically this is
-        # considered rude behavior in programming; however, experiments take
-        # priority.
         self.info.ui.control.activateWindow()
         if confirm(self.info.ui.control, mesg, 'Error while running') == YES:
             self.stop(self.info)
@@ -255,17 +209,6 @@ class AbstractExperimentController(Controller):
             # case they block the program from continuing to run) or they
             # dissappear below the main window.  I really don't like this
             # approach, but I can't think of a better way to do it ...
-
-            # HACK ALERT! This is a buried import to ensure that I can still run
-            # my analysis code.
-
-            # Enthought supports both the PySide and Qt4 backend.  PySide is
-            # essentially a rewrite of PyQt4.  These backends are not compatible
-            # with each other, so we need to be sure to import the backend that
-            # Enthought has decided to use.
-            from pyface.qt import QtGui
-
-            #self.system_tray = QtGui.QSystemTrayIcon(icon, info.ui.control)
             icon_path = path.join(path.dirname(__file__), 'psi_uppercase.svg')
             icon = QtGui.QIcon(icon_path)
             self.system_tray = QtGui.QSystemTrayIcon()
@@ -300,7 +243,7 @@ class AbstractExperimentController(Controller):
                 close = False
             else:
                 self.stop(info)
-        
+
         if close:
             pass
             #if self.physiology_handler is not None:
@@ -359,9 +302,6 @@ class AbstractExperimentController(Controller):
             # created.
             self.setup_experiment(info)
 
-            # Start the harware process
-            self.process.start()
-
             # Sorta a hack
             if self.model.spool_physiology:
                 self.physiology_handler.start()
@@ -374,7 +314,6 @@ class AbstractExperimentController(Controller):
 
             # Save the start time in the model
             self.model.start_time = datetime.now()
-            self.timer = Timer(100, self.run_tasks)
         except Exception, e:
             if self.state != 'halted':
                 self.stop_experiment(info)
@@ -391,8 +330,6 @@ class AbstractExperimentController(Controller):
 
     def stop(self, info=None):
         try:
-            self.timer.stop()
-            self.process.stop()
             self.pending_changes = False
         except Exception, e:
             log.exception(e)
@@ -412,22 +349,11 @@ class AbstractExperimentController(Controller):
             node._v_attrs['stop_time'] = time.strftime(DATETIME_FMT)
             node._v_attrs['duration'] = (time-self.start_time).seconds
             info.object.data.save()
-            
-    def run_tasks(self):
-        for task, frequency in self.tasks:
-            if frequency == 1 or not (self.tick_count % frequency):
-                try:
-                    task()
-                except Exception, e:
-                    # Display an error message to the user
-                    log.exception(e)
-                    self.handle_error(e)
-        self.tick_count += 1
 
     ############################################################################
     # Method stubs to be implemented
     ############################################################################
-    
+
     def resume(self, info=None):
         raise NotImplementedError
 
@@ -506,10 +432,8 @@ class AbstractExperimentController(Controller):
             kwargs['expression_{}'.format(key)] = '{}'.format(value)
         self.model.data.log_trial(**kwargs)
 
-    def log_event(self, name, message, ts=None):
-        if ts is None:
-            ts = self.get_ts()
-        self.model.data.log_event(ts, name, message)
+    def log_event(self, ts, event):
+        self.model.data.log_event(ts, event)
         log.debug("EVENT: %d, %s, %r", ts, name, message)
 
     # Simplest way to load/save paradigms is via Python's pickle module which
@@ -558,7 +482,7 @@ class AbstractExperimentController(Controller):
     If an experiment is running, we need to queue changes to most of the
     settings in the GUI to ensure that the user has a chance to finish making
     all the changes they desire before the new settings take effect.
-    
+
     Supported metadata
     ------------------
     context
@@ -566,18 +490,18 @@ class AbstractExperimentController(Controller):
         it must also be
     immediate
         Apply the changes immediately (i.e. do not queue the changes)
-        
+
     Handling changes to a parameter
     -------------------------------
     When a parameter is modified via the GUI, the controller needs to know how
     to handle this change.  For example, changing the pump rate or reward volume
     requires sending a command to the pump via the serial port.
-    
+
     When a change to a parameter is applied, the class instance the parameter
     belongs to is checked to see if it has a method, "set_parameter_name",
     defined. If not, the controller checks to see if it has the method defined
     on itself.
-    
+
     The function must have the following signature set_parameter_name(self,
     value)
 
@@ -677,7 +601,7 @@ class AbstractExperimentController(Controller):
             # a trial is not running before applying the changes).
             self.context_updated()
         except Exception, e:
-            # A problem occured when attempting to apply the context. 
+            # A problem occured when attempting to apply the context.
             # the changes and notify the user.  Hopefully we never reach this
             # point.
             log.exception(e)
@@ -705,7 +629,7 @@ class AbstractExperimentController(Controller):
         self.model.paradigm.copy_traits(self.shadow_paradigm)
         self.pending_changes = False
 
-    def value_changed(self, name): 
+    def value_changed(self, name):
         new_value = self.get_current_value(name)
         old_value = self.old_context.get(name, None)
         return new_value != old_value
@@ -722,6 +646,8 @@ class AbstractExperimentController(Controller):
         except:
             evaluate_value(name, self.pending_expressions, self.current_context)
             return self.current_context[name]
+
+    get_value = get_current_value
 
     def set_current_value(self, name, value):
         self.current_context[name] = value
@@ -757,7 +683,7 @@ class AbstractExperimentController(Controller):
                 log.debug(mesg.format(name, old_value, new_value))
 
                 # I used to have this in a try/except block (i.e. using the
-                # Python idiom of "it's better to ask for forgiveness than 
+                # Python idiom of "it's better to ask for forgiveness than
                 # permission).  However, it quickly became apparent that this
                 # was masking Exceptions that may be raised in the body of the
                 # setter functions.  We should let these exceptions bubble to
@@ -784,7 +710,7 @@ class AbstractExperimentController(Controller):
                 str_value = '{}'.format(value)
             context.append((name, str_value, label, log, changed))
         self.current_context_list = sorted(context)
-        
+
     def initialize_context(self):
         log.debug('Initializing context')
         for instance in (self.model.data, self.model.paradigm, self):
@@ -795,7 +721,7 @@ class AbstractExperimentController(Controller):
 
         # TODO: this is sort of a "hack" to ensure that the appropriate data for
         # the trial type is included
-        self.context_labels['ttype'] = 'Trial type'
-        self.context_log['ttype'] = True
+        #self.context_labels['ttype'] = 'Trial type'
+        #self.context_log['ttype'] = True
         self.shadow_paradigm = self.model.paradigm.clone_traits()
         self.refresh_context()

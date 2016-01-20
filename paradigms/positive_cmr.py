@@ -60,6 +60,7 @@ import numpy as np
 import logging
 log = logging.getLogger(__name__)
 
+from experiments.abstract_experiment_controller import AbstractExperimentController
 from experiments.abstract_positive_experiment_v3 import AbstractPositiveExperiment
 from experiments.abstract_positive_controller_v3 import AbstractPositiveController
 from experiments.abstract_positive_paradigm_v3 import AbstractPositiveParadigm
