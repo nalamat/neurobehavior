@@ -1,54 +1,34 @@
-import numpy as np
+from __future__ import division
+
 import logging
 log = logging.getLogger(__name__)
 
-from traits.api import (List, Property, Tuple, cached_property, Any,
-                                  Int, Event, HasTraits)
+import numpy as np
+import pandas as pd
+from scipy.stats import norm
 
-from cns.data.h5_utils import get_or_append_node
+from traits.api import (Instance, List, Property, Tuple, cached_property, Any,
+                        Int, Event, HasTraits)
+
 from cns.channel import FileChannel
-from cns.util.math import rcount
-
-def string_array_equal(a, string):
-    if len(a) == 0:
-        return np.array([], dtype='bool')
-    else:
-        return np.array(a) == string
 
 
 class AbstractExperimentData(HasTraits):
-
-    new_trial = Event
-
-    def rcount(self, sequence):
-        return rcount(sequence)
-
-    def string_array_equal(self, array, string):
-        return string_array_equal(array, string)
-
-    def apply_mask(self, fun, masks, sequence):
-        return np.array([fun(sequence[m]) for m in masks])
-
-    def apply_par_mask(self, fun, sequence):
-        return self.apply_mask(fun, self.par_mask, sequence)
-
-    def _create_channel(self, name, dtype):
-        contact_node = get_or_append_node(self.store_node, 'contact')
-        return FileChannel(node=contact_node, name=name, dtype=dtype)
-
-    def get_context(self):
-        context_names = self.trait_names(context=True)
-        return dict((t, getattr(self, t)) for t in context_names)
 
     # Node to store the data in
     store_node = Any
 
     # List of parameters to analyze.  If you set this up properly, then you can
     # re-analyze your data on the fly.
-    parameters = List
+    parameters = List(['to_duration'])
+
+    trial_log = Instance('pandas.DataFrame', ())
+    trial_log_updated = Event
 
     event_log = Any
     event_log_updated = Event
+
+    performance = Instance('pandas.DataFrame')
 
     def _event_log_default(self):
         fh = self.store_node._v_file
@@ -62,71 +42,14 @@ class AbstractExperimentData(HasTraits):
         # row at a time, we need to nest it as a list that contains a single
         # record.
         self.event_log.append([(ts, event)])
-        print 'updating'
         self.event_log_updated = ts, event
 
-    # Trial log structure
-    _trial_log = List
-    _trial_log_columns = Tuple
-    trial_log = Property(store='table', depends_on='_trial_log')
-
-    @cached_property
-    def _get_trial_log(self):
-        if len(self._trial_log) > 0:
-            col_names = self._trial_log_columns
-            return np.rec.fromrecords(self._trial_log, names=col_names)
-        else:
-            return []
-
-    par_seq = Property(depends_on='masked_trial_log, parameters')
-
-    @cached_property
-    def _get_par_seq(self):
-        if len(self.masked_trial_log) != 0:
-            arr = np.empty(len(self.masked_trial_log), dtype=object)
-            arr[:] = zip(*[self.masked_trial_log[p] for p in self.parameters])
-            return arr
-        else:
-            return np.array([])
-
-    par_mask = Property(depends_on='masked_trial_log, parameters')
-
-    @cached_property
-    def _get_par_mask(self):
-        result = []
-        # Numpy's equal function casts the argument on either side of the
-        # operator to an array.  Numpy's default handling of tuples is to
-        # convert it to an array where each element of the tuple is an element
-        # in the array.  We need to do the casting ourself (e.g. ensure that we
-        # have a single-element array where the element is a tuple).
-        cmp_array = np.empty(1, dtype=object)
-        for par in self.pars:
-            cmp_array[0] = par
-            m = self.par_seq == cmp_array
-            result.append(m)
-        return result
-
-    pars = Property(List(Int), depends_on='masked_trial_log, parameters')
-
-    @cached_property
-    def _get_pars(self):
-        # We only want to return pars for complete trials (e.g. ones for which a
-        # go was presented).
-        return np.unique(self.par_seq)
-
     def log_trial(self, **kwargs):
-        names, record = zip(*sorted(kwargs.items()))
-        if len(self.trial_log) == 0:
-            self._trial_log_columns = names
-            self._trial_log = [record]
-        elif names == self._trial_log_columns:
-            self._trial_log.append(record)
-        else:
-            log.debug("Expected the following columns %r",
-                      self._trial_log_columns)
-            log.debug("Recieved the following columns %r", names)
-            raise AttributeError, "Invalid log_trial attempt"
-        self.new_trial = kwargs
+        # This is a very inefficient implementation (appends require
+        # reallocating information in memory).
+        self.trial_log = self.trial_log.append(kwargs, ignore_index=True)
+        self.update_performance(self.trial_log)
+        self.trial_log_updated = kwargs
 
     def save(self):
         '''
@@ -139,8 +62,29 @@ class AbstractExperimentData(HasTraits):
             fh.createTable(self.store_node, 'trial_log', self.trial_log)
         else:
             log.debug('No trials in the trial_log file!')
-        if hasattr(self, 'par_info') and len(self.par_info):
-            fh.createTable(self.store_node, 'par_info', self.par_info)
-        else:
-            log.debug('No par_info')
 
+    microphone = Instance(FileChannel)
+
+    def _microphone_default(self):
+        return FileChannel(node=self.store_node, name='microphone',
+                           dtype=np.float32)
+
+    def update_performance(self, trial_log):
+        # Compute hit rate, FA rate, z-score and d'
+        self.parameters = ['to_duration']
+        response_types = ['HIT', 'MISS', 'FA', 'CR']
+        grouping = self.parameters + ['score']
+        counts = trial_log.groupby(grouping).size().unstack('score')
+        counts = counts.reindex_axis(response_types, axis='columns').fillna(0)
+        counts['trials'] = counts.sum(axis=1)
+        counts['hit_rate'] = counts.HIT/(counts.HIT+counts.MISS)
+        counts['fa_rate'] = counts.FA/(counts.FA+counts.CR)
+        clipped_rates = counts[['hit_rate', 'fa_rate']].clip(0.05, 0.95)
+        z_score = clipped_rates.apply(norm.ppf)
+        counts['z_score'] = z_score.hit_rate-z_score.fa_rate
+
+        # Compute median reaction time and response time
+        median = trial_log.groupby(self.parameters) \
+            [['reaction_time', 'response_time']].median().add_prefix('median_')
+
+        self.performance = counts.join(median)

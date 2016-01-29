@@ -8,19 +8,15 @@ log = logging.getLogger(__name__)
 
 class PositiveCMRParadigmMixin(HasTraits):
 
-    go_filename = File(context=True, log=False, label='GO filename')
-    masker_filename = File(context=True, log=False, label='Masker filename')
+    go_filename = File('CMR/T01.wav', context=True, log=False, label='GO filename')
+    masker_filename = File('CMR/supermasker1_1k.wav', context=True, log=False, label='Masker filename')
     target_level = Int(label='Target Level', log=True, context=True)
     masker_level = Int(label='Masker Level', log=True, context=True)
     TMR = Int(label='Target Level', log=True, context=True)
     target_number = Int(label='Target Token Number', log=True, context=True)
     center_frequency = Int(label='Masker with or without Flanker', log=True, context=True)
     hw_att = Enum(0, 20, 40, 60, context=True, log=True, label='HW attenuation (dB)')
- 
-    # Just in case ...
-    #masker_number = Int(label='Masker Token Number', log=True, context=True)
-    #masker_envelope = Int(label='Masker Envelope', log=True, context=True)
-    #masker_flanker = Int(label='Masker with or without Flanker', log=True, context=True)
+
 
 class PositiveCMRControllerMixin(HasTraits):
 
@@ -37,6 +33,7 @@ class PositiveCMRControllerMixin(HasTraits):
                               label='Masker scaling factor')
 
     def set_masker_filename(self, filename):
+        print 'setting', filename
         if not path.exists(filename):
             raise ValueError, 'Masker file {} does not exist'.format(filename)
         log.debug("Configuring masker from {}".format(filename))
@@ -78,7 +75,7 @@ class PositiveCMRControllerMixin(HasTraits):
 
     # set_nogo_filename and set_go_filename are only called when the value of
     # go_filename and nogo_filename change
-    
+
     # Even though the positive CMR training controller doesn't have a nogo
     # filename, it's OK to have it here.
     def set_nogo_filename(self, filename):
@@ -100,11 +97,11 @@ class PositiveCMRControllerMixin(HasTraits):
             raise ValueError, 'GO file {} does not exist'.format(filename)
         log.debug("Loading go settings from {}".format(filename))
         go_parameters = np.loadtxt(filename, delimiter=',')[::-1].tolist()
-        
+
         # The first line of the CSV file (now the last element of the list
         # since we've reversed it) defines the settings for the GO_REMIND.
         self.go_remind = go_parameters.pop()
-        
+
         # pop() removes the element of the list, so we are now left with all
         # but the first line of the CSV file.
         self.go_parameters = go_parameters
