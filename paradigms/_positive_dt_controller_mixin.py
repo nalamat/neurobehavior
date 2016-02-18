@@ -16,7 +16,7 @@ class DTControllerMixin(HasTraits):
     kw = {'context': True, 'log': True, 'immediate': True}
     dt_waveform_sf  = Float(np.nan, label='DT scaling factor', **kw)
     dt_waveform_error = Bool(False, label='DT waveform error?', **kw)
-    
+
     # This paradigm demonstrates how one can cache some of the computations
     # underlying the waveform generation.  Essentially we cache the "pieces" of
     # the waveform (e.g. the token and envelope) and load the cached waveform
@@ -154,7 +154,7 @@ class DTControllerMixin(HasTraits):
         # We could also cache the waveform as well since it will not change if
         # we are only roving level.
         waveform = self._get_token() * self._get_envelope()
-        
+
         # Given the calibration file and hardware attenuation (which we do not
         # wish to change), compute the appropriate scaling factor for the
         # waveform.  Although we configured the hardware attenuators assuming

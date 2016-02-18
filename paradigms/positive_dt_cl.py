@@ -14,8 +14,8 @@ level : db SPL
     Level of tone
 duration : seconds
     Duration of tone (from ramp onset to ramp offset)
-rise_fall_time : seconds 
-    Rise/fall time of cos^2 envelope 
+rise_fall_time : seconds
+    Rise/fall time of cos^2 envelope
 
 '''
 from traits.api import Instance
@@ -26,10 +26,10 @@ from traitsui.api import View, Include, VGroup
 from ._positive_dt_controller_mixin import DTControllerMixin
 from ._positive_dt_paradigm_mixin import DTParadigmMixin
 
-from experiments.abstract_positive_experiment_v2 import AbstractPositiveExperiment
-from experiments.abstract_positive_controller_v2 import AbstractPositiveController
-from experiments.abstract_positive_paradigm_v2 import AbstractPositiveParadigm
-from experiments.positive_data_v2 import PositiveData
+from experiments.abstract_positive_experiment_v3 import AbstractPositiveExperiment
+from experiments.abstract_positive_controller_v3 import AbstractPositiveController
+from experiments.abstract_positive_paradigm_v3 import AbstractPositiveParadigm
+from experiments.positive_data_v3 import PositiveData
 
 from experiments.cl_controller_mixin import CLControllerMixin
 from experiments.cl_paradigm_mixin import CLParadigmMixin
@@ -48,7 +48,7 @@ class Controller(
         # compute_waveform method.  We want to make sure that it finds the one
         # defined in PositiveDTControllerMixin first!
         DTControllerMixin,
-        AbstractPositiveController, 
+        AbstractPositiveController,
         CLControllerMixin,
         PumpControllerMixin,
         ):
@@ -56,7 +56,7 @@ class Controller(
 
 class Paradigm(
         DTParadigmMixin,
-        AbstractPositiveParadigm, 
+        AbstractPositiveParadigm,
         PumpParadigmMixin,
         CLParadigmMixin,
         ):

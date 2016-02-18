@@ -25,8 +25,8 @@ class CLControllerMixin(HasTraits):
                 for i in range(repeats):
                     expanded_settings.append(setting.clone_traits())
             self.current_sequence = selector(expanded_settings)
-    
-    def next_setting(self):        
+
+    def next_setting(self):
         # Must be able to handle both the initial (first trial) and repeat nogo
         # cases as needed.  Check for special cases first.
         if self.remind_requested:
@@ -40,11 +40,10 @@ class CLControllerMixin(HasTraits):
                 self.value_changed('go_setting_order') or \
                 self.value_changed('go_settings'):
             self._create_selector()
-        
+
         # This is a regular case.  Select the appropriate setting.
-        spout = self.model.data.yes_seq[-1]
-        nogo = self.model.data.nogo_seq[-1]
-        if nogo and spout and self.get_current_value('repeat_fa'):
+        prev_trial = self.model.data.trial_log.iloc[-1]
+        if (prev_trial['response'] == 'FA') and self.get_current_value('repeat_fa'):
             return self.nogo_repeat_setting()
         if np.random.uniform() <= self.get_current_value('go_probability'):
             return self.current_sequence.next()
@@ -53,8 +52,8 @@ class CLControllerMixin(HasTraits):
 
     def initial_setting(self):
         return self.remind_setting()
-    
-    def remind_setting(self):    
+
+    def remind_setting(self):
         return self.get_current_value('remind_setting')
 
     def nogo_setting(self):
