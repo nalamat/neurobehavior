@@ -27,17 +27,16 @@ class CLParadigmMixin(HasTraits):
     trial_settings = List(Instance(TrialSetting), store='child')
     remind_setting = Property(Instance(TrialSetting),
             depends_on='trial_settings', **kw)
-    nogo_setting = Property(Instance(TrialSetting), 
+    nogo_setting = Property(Instance(TrialSetting),
             depends_on='trial_settings', **kw)
     go_settings = Property(List(Instance(TrialSetting)),
             depends_on='trial_settings', **kw)
 
     kw = { 'log': True, 'context': True, 'store': 'attribute' }
 
-    go_setting_order = Trait('shuffled set', choice.options, 
+    go_setting_order = Trait('shuffled set', choice.options,
             label='Go setting order', **kw)
-    go_probability = Expression('0.5 if c_nogo < 5 else 1', 
-            label='Go probability', **kw)
+    go_probability = Expression('0.5', label='Go probability', **kw)
     repeat_fa = Bool(True, label='Repeat nogo if FA?', **kw)
 
     # GUI elements to facilitate adding and removing parameters from the go
@@ -109,7 +108,7 @@ class CLParadigmMixin(HasTraits):
 
     def __sort_fired(self):
         self.trial_settings.sort()
-    
+
     def __add_fired(self):
         # If some settings are selected, let's assume that the user wishes to
         # duplicate these
@@ -120,7 +119,7 @@ class CLParadigmMixin(HasTraits):
                 self.trial_settings.append(new)
         else:
             self.trial_settings.append(TrialSetting('GO'))
-        
+
     def __remove_fired(self):
         for setting in self._selected_setting:
             # If the ttype is a NOGO or GO_REMIND, we do not remove these
@@ -149,5 +148,5 @@ class CLParadigmMixin(HasTraits):
         label='Constant limits',
         show_border=True,
         )
-    
+
     traits_view = View(constant_limits_paradigm_mixin_group)

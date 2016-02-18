@@ -24,7 +24,7 @@ class PositiveData(AbstractExperimentData):
 
     def update_performance(self, trial_log):
         # Compute hit rate, FA rate, z-score and d'
-        self.parameters = ['to_duration']
+        #self.parameters = ['to_duration']
         response_types = ['HIT', 'MISS', 'FA', 'CR']
         grouping = self.parameters + ['score']
         counts = trial_log.groupby(grouping).size().unstack('score')

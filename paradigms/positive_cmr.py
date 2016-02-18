@@ -16,9 +16,6 @@ Although this is a constant limits go-nogo paradigm, there are several key
 differences between this paradigm and `positive_dt_cl` and
 `positive_am_noise_cl`::
 
-    * The sequence of go/nogo tokens are read in from a csv (comma separated
-    values) file (specified by `go_filename` and `nogo_filename`).
-
     * The target is added to a continuous masker (masker is specified by
     `masker_filename` which must contain float32 values stored as binary).
 
@@ -69,15 +66,18 @@ log = logging.getLogger(__name__)
 
 from experiments.abstract_experiment_controller import AbstractExperimentController
 from experiments.abstract_positive_experiment_v3 import AbstractPositiveExperiment
-#from experiments.abstract_positive_controller_v3 import AbstractPositiveController
 from experiments.abstract_positive_paradigm_v3 import AbstractPositiveParadigm
 from experiments.positive_data_v3 import PositiveData
-from experiments.positive_cl_data_mixin import PositiveCLDataMixin
-from experiments.cl_experiment_mixin import CLExperimentMixin
 
 from experiments.pump_controller_mixin import PumpControllerMixin
 from experiments.pump_paradigm_mixin import PumpParadigmMixin
 from experiments.pump_data_mixin import PumpDataMixin
+
+from experiments.cl_controller_mixin import CLControllerMixin
+from experiments.cl_paradigm_mixin import CLParadigmMixin
+from experiments.cl_experiment_mixin import CLExperimentMixin
+from experiments.positive_cl_data_mixin import PositiveCLDataMixin
+
 
 class TrialState(enum.Enum):
     '''
@@ -118,6 +118,7 @@ class Event(enum.Enum):
 class Controller(
         PositiveCMRControllerMixin,
         AbstractExperimentController,
+        CLControllerMixin,
         #PumpControllerMixin,
         ):
     '''
@@ -149,26 +150,27 @@ class Controller(
     def start_experiment(self, info):
         self.refresh_context()
 
+        # Load the masker and target. Scale to +/-1 V based on the maximum value
+        # of a signed 16 bit integer. Right now we assume that the nogo is
+        # silent (i.e., a scaling factor of 0). Go trials will have a nonzero
+        # scaling factor. In general, this is a fairly reasonable approximation
+        # of SDT (i.e., the nogo should be some undetectable variant of the go,
+        # right)?
         masker_filename = self.get_current_value('masker_filename')
         if not path.exists(masker_filename):
-            raise ValueError, 'Masker file {} does not exist'.format(masker_filename)
+            m = 'Masker file {} does not exist'
+            raise ValueError(m.format(masker_filename))
         self.masker_offset = 0
         self.fs, masker = wavfile.read(masker_filename, mmap=True)
         self.masker = masker.astype('f')/np.iinfo(np.int16).max
 
-        go_filename = self.get_current_value('go_filename')
-        if not path.exists(go_filename):
-            raise ValueError, 'Go file {} does not exist'.format(go_filename)
-        self.go_offset = 0
-        self.fs, go = wavfile.read(go_filename, mmap=True)
-        self.go = go.astype('f')/np.iinfo(np.int16).max
-
-        nogo_filename = self.get_current_value('nogo_filename')
-        if not path.exists(nogo_filename):
-            raise ValueError, 'Nogo file {} does not exist'.format(nogo_filename)
-        self.nogo_offset = 0
-        self.fs, nogo = wavfile.read(nogo_filename, mmap=True)
-        self.nogo = nogo.astype('f')/np.iinfo(np.int16).max
+        target_filename = self.get_current_value('target_filename')
+        if not path.exists(target_filename):
+            m = 'Go file {} does not exist'
+            raise ValueError(m.format(target_filename))
+        self.target_offset = 0
+        self.fs, target = wavfile.read(target_filename, mmap=True)
+        self.target = target.astype('f')/np.iinfo(np.int16).max
 
         self.trial_state = TrialState.waiting_for_np_start
         self.engine = Engine()
@@ -217,70 +219,15 @@ class Controller(
     def trigger_next(self):
         self.trial_info = {}
         self.invalidate_context()
-        self.evaluate_pending_expressions()
-
-        repeat_fa = self.get_current_value('repeat_fa')
-        go_probability = self.get_current_value('go_probability')
-
-        if len(self.model.data.trial_log) == 0:
-            # This is the very first trial
-            ttype = 'GO_REMIND'
-            settings = self.go_remind
-        elif self.remind_requested:
-            # When the user clicks on the "remind" button, it sets the
-            # remind_requested attribute on the experiment controller to True.
-            ttype = 'GO_REMIND'
-            settings = self.go_remind
-        elif repeat_fa and self.model.data.trial_log.iloc[-1]['response'] == 'FA':
-            # The animal false alarmed and the user wishes to repeat the trial
-            # if the animal false alarms
-            ttype = 'NOGO_REPEAT'
-            settings = self.nogo_parameters.pop()
-        elif self.random_generator.uniform() < go_probability:
-            ttype = 'GO'
-            #settings = self.go_parameters.pop()
-        else:
-            ttype = 'NOGO'
-            #settings = self.nogo_parameters.pop()
-        self.set_current_value('ttype', ttype)
-        return
-
-        #F, E, FC, ML, TL, TokenNo, TargetNo = settings
-
-        #target_file = path.join(get_config('SOUND_PATH'), 'CMR\stimuli\T{}{}.stim')
-        #target_file = target_file.format(int(FC), int(TargetNo))
-        #target = np.fromfile(target_file, dtype=np.float32)
-
-        # This method will return the theoretical SPL of the speaker assuming
-        # you are playing a tone at the specified frequency and voltage (i.e.
-        # Vrms)
-        #dBSPL_RMS1 = cal.get_spl(frequencies=1e3, voltage=1)
-        dBSPL_RMS1 = 1
-
-        # Scale waveforms so that we get desired stimulus level assuming 0 dB of
-        # attenuation
-        #masker = 10**((ML-dBSPL_RMS1)/20)*masker
-        target = 10**((TL-dBSPL_RMS1)/20)*target
-        #stimulus = target + masker
-        stimulus = target
-
-        stimulus = stimulus * 10**(hw_att/20)
-        # writ this tot he file
-
-        self.set_current_value('target_level', TL)
-        ML = self.get_current_value('masker_level')
-        self.set_current_value('TMR',TL-ML)
-        self.set_current_value('target_number',TargetNo)
-        self.set_current_value('center_frequency',FC)
+        self.current_setting = self.next_setting()
+        self.evaluate_pending_expressions(self.current_setting)
 
     def log_trial(self, **kwargs):
         # HDF5 data files do not natively support unicode strings so we need to
         # convert our filename to an ASCII string.  While we're at it, we should
         # probably strip the directory path as well and just save the basename.
-        go_filename = self.get_current_value('go_filename')
-        kwargs['go_filename'] = str(path.basename(go_filename))
-        nogo_filename = self.get_current_value('nogo_filename')
-        kwargs['nogo_filename'] = str(path.basename(nogo_filename))
+        target_filename = self.get_current_value('target_filename')
+        kwargs['target_filename'] = str(path.basename(target_filename))
         masker_filename = self.get_current_value('masker_filename')
         kwargs['masker_filename'] = str(path.basename(masker_filename))
         super(Controller, self).log_trial(**kwargs)
@@ -303,9 +250,13 @@ class Controller(
         duration = self.engine.ao_write_space_available(offset)/10
         log.debug('Overwriting %d samples in buffer', duration)
 
-        # Generating combined signal
-        signal = self.get_masker(offset, duration)
-        target = self.get_target()
+        masker_sf = self.get_current_value('masker_sf')
+        target_sf = self.get_current_value('target_sf')
+
+        # Generate combined signal
+        signal = self.get_masker(offset, duration)*masker_sf
+        target = self.get_target()*target_sf
+
         signal[:target.shape[-1]] += target
         self.engine.write_hw_ao(signal, offset)
         self._masker_offset = offset + signal.shape[-1]
@@ -346,7 +297,8 @@ class Controller(
             self.start_timer('iti_duration', Event.iti_duration_elapsed)
             self.trial_state = TrialState.waiting_for_iti
 
-        self.log_trial(ttype=trial_type, score=score, response=response,
+        print(self.trial_info)
+        self.log_trial(score=score, response=response, ttype=trial_type,
                        **self.trial_info)
         self.trigger_next()
 
@@ -386,17 +338,18 @@ class Controller(
         # current one.
         with self._lock:
             # Only events generated by NI-DAQmx callbacks will have a timestamp.
-            # event won't have a timestamp associated with it. Since we want all
-            # timing information to be in units of the analog output sample
-            # clock, we will capture the value of the sample clock. I don't know
-            # what the accuracy of this is, but it's not super-important since
-            # these events are not reference points around which we would do a
-            # perievent analysis. Important reference points would include
-            # nose-poke initiation and withdraw, spout contact, sound onset,
-            # lights on, lights off. These reference points will be tracked via
-            # NI-DAQmx or can be calculated analytically (i.e., we know exactly
-            # when the target onset occurs because we precisely specify the
-            # location of the target in the analog output buffer).
+            # Since we want all timing information to be in units of the analog
+            # output sample clock, we will capture the value of the sample
+            # clock if a timestamp is not provided. Since there will be some
+            # delay between the time the event occurs and the time we read the
+            # analog clock, the timestamp won't be super-accurate. However, it's
+            # not super-important since these events are not reference points
+            # around which we would do a perievent analysis. Important reference
+            # points would include nose-poke initiation and withdraw, spout
+            # contact, sound onset, lights on, lights off. These reference
+            # points will be tracked via NI-DAQmx or can be calculated (i.e., we
+            # know exactly when the target onset occurs because we precisely
+            # specify the location of the target in the analog output buffer).
             if timestamp is None:
                 timestamp = self.get_ts()
             self._handle_event(event, timestamp)
@@ -452,7 +405,6 @@ class Controller(
                 # Record the time of nose-poke withdrawal if it is the first
                 # time since initiating a trial.
                 log.debug('Animal withdrew during response period')
-                print self.trial_info
                 if 'np_end' not in self.trial_info:
                     self.trial_info['np_end'] = timestamp
             elif event == Event.np_start:
@@ -510,13 +462,8 @@ class Controller(
                 break
         return np.concatenate(result, axis=-1)
 
-    #def get_masker(self, offset, duration):
-    #    t = np.arange(offset, offset+duration, dtype=np.float64)/self.fs
-    #    return np.sin(2*np.pi*t*2)
-    #    #return np.zeros(duration, dtype=np.float32)
-
     def get_target(self):
-        return self.go
+        return self.target
 
     def get_ts(self):
         return self.engine.ao_sample_clock()/self.fs
@@ -525,6 +472,7 @@ class Controller(
 class Paradigm(
         PositiveCMRParadigmMixin,
         AbstractPositiveParadigm,
+        CLParadigmMixin,
         PumpParadigmMixin,
         ):
     '''
@@ -534,16 +482,20 @@ class Paradigm(
 
     # Parameters specific to the actual appetitive paradigm that are not needed
     # by the training program (and therefore not in the "mixin")
-    go_probability = Expression('0.5',
-            label='Go probability', log=False, context=True)
+    #go_probability = Expression('0.5',
+    #        label='Go probability', log=False, context=True)
     repeat_fa = Bool(True, label='Repeat if FA?', log=True, context=True)
 
-    nogo_filename = File('CMR\\T00.wav', context=True, log=False, label='NOGO filename')
-    go_filename = File('CMR\\T01.wav', context=True, log=False, label='GO filename')
+    target_filename = File('CMR\\T01.wav', context=True, log=False,
+                           label='Target filename')
+
+    masker_sf = Expression('1', label='Masker SF', log=True, context=True)
+    target_sf = Expression('1', label='Target SF', log=True, context=True)
 
     traits_view = View(
             VGroup(
-                'go_probability',
+                #'go_probability',
+                Include('constant_limits_paradigm_mixin_group'),
                 Include('abstract_positive_paradigm_group'),
                 Include('pump_paradigm_mixin_syringe_group'),
                 label='Paradigm',
@@ -553,10 +505,10 @@ class Paradigm(
                 # PositiveCMRParadigmMixin all the parameters defined there are
                 # available as if they were defined on this class.
                 Include('speaker_group'),
-                'nogo_filename',
-                'go_filename',
                 'masker_filename',
-                'masker_level',
+                'masker_sf',
+                'target_filename',
+                'target_sf',
                 label='Sound',
                 ),
             )
