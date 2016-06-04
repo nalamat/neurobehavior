@@ -29,3 +29,5 @@ doc/_build/*
 doc/*.idx
 doc/*.aux
 *.orig
+
+.DS_Store
