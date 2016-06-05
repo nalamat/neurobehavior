@@ -515,9 +515,11 @@ class Paradigm(
                 # available as if they were defined on this class.
                 Include('speaker_group'),
                 'masker_filename',
-                'masker_sf',
+                'masker_level',
                 'target_filename',
-                'target_sf',
+                'target_level',
+                'hw_att',
+                'silencer',
                 label='Sound',
                 ),
             )
