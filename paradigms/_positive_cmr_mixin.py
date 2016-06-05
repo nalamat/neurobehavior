@@ -1,4 +1,4 @@
-from traits.api import HasTraits, File, Int, Enum, Any, List, Float
+from traits.api import HasTraits, File, Int, Enum, Any, List, Float, Expression
 import numpy as np
 from os import path
 import time
@@ -8,14 +8,17 @@ log = logging.getLogger(__name__)
 
 class PositiveCMRParadigmMixin(HasTraits):
 
-    go_filename = File('CMR/T01.wav', context=True, log=False, label='GO filename')
-    masker_filename = File('CMR/supermasker1_1k.wav', context=True, log=False, label='Masker filename')
-    target_level = Int(label='Target Level', log=True, context=True)
-    masker_level = Int(label='Masker Level', log=True, context=True)
-    TMR = Int(label='Target Level', log=True, context=True)
-    target_number = Int(label='Target Token Number', log=True, context=True)
-    center_frequency = Int(label='Masker with or without Flanker', log=True, context=True)
-    hw_att = Enum(0, 20, 40, 60, context=True, log=True, label='HW attenuation (dB)')
+    kw = {'context': True, 'log': True}
+    
+    masker_filename  = File('CMR/supermasker4.wav', label='Masker filename'            , **kw)
+    target_filename  = File('CMR/T01.wav'         , label='Target filename'            , **kw)
+    masker_level     = Expression(0               , label='Masker level (dB)'          , **kw)
+    target_level     = Expression(0               , label='Target level (dB)'          , **kw)
+    TMR              = Int(                         label='Target level'               , **kw)
+    target_number    = Int(                         label='Target token number'        , **kw)
+    center_frequency = Int(                         label='Masker with/without flanker', **kw)
+    hw_att           = Enum(0, 20, 40, 60         , label='HW attenuation (dB)'        , **kw)
+    test_attenuation = Expression(40              , label='Test attenuation (dB)'      , **kw)
 
 
 class PositiveCMRControllerMixin(HasTraits):

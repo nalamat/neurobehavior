@@ -156,13 +156,15 @@ class Controller(
         # scaling factor. In general, this is a fairly reasonable approximation
         # of SDT (i.e., the nogo should be some undetectable variant of the go,
         # right)?
+        test_sf = 10.0**(self.get_current_value('test_attenuation')/-20.0)
+        
         masker_filename = self.get_current_value('masker_filename')
         if not path.exists(masker_filename):
             m = 'Masker file {} does not exist'
             raise ValueError(m.format(masker_filename))
         self.masker_offset = 0
         self.fs, masker = wavfile.read(masker_filename, mmap=True)
-        self.masker = masker.astype('f')/np.iinfo(np.int16).max
+        self.masker = masker.astype('float64')/np.iinfo(np.int16).max * test_sf
 
         target_filename = self.get_current_value('target_filename')
         if not path.exists(target_filename):
@@ -170,7 +172,7 @@ class Controller(
             raise ValueError(m.format(target_filename))
         self.target_offset = 0
         self.fs, target = wavfile.read(target_filename, mmap=True)
-        self.target = target.astype('f')/np.iinfo(np.int16).max
+        self.target = target.astype('float64')/np.iinfo(np.int16).max * test_sf
 
         self.trial_state = TrialState.waiting_for_np_start
         self.engine = Engine()
@@ -245,18 +247,29 @@ class Controller(
         # update_delay (to give us time to generate and upload the new signal).
         ts = self.get_ts()
         offset = int(round(ts*self.fs)) + self.update_delay
+        
+        #### Insert target within a specific phase of the periodic masker
+        masker_frequency = self.get_current_value('masker_frequency')
+        period = self.fs/masker_frequency
+        phase_delay = self.get_current_value('phase_delay')/360.0*period
+        phase = (offset % self.masker.shape[-1]) % period
+        delay = phase-phase_delay
+        if delay<0: delay+=period
+        offset += int(delay);
+        ####
+        
         log.debug('Inserting target at %d', offset)
         # TODO - should be able to calculate a precise duration.
         duration = self.engine.ao_write_space_available(offset)/10
         log.debug('Overwriting %d samples in buffer', duration)
 
-        masker_sf = self.get_current_value('masker_sf')
-        target_sf = self.get_current_value('target_sf')
+        masker_sf = 10.0**(-self.get_current_value('masker_level')/20.0)
+        target_sf = 10.0**(-self.get_current_value('target_level')/20.0)
 
         # Generate combined signal
-        signal = self.get_masker(offset, duration)*masker_sf
-        target = self.get_target()*target_sf
-
+        signal = self.get_masker(offset, duration) * masker_sf
+        target = self.get_target() * target_sf
+        
         signal[:target.shape[-1]] += target
         self.engine.write_hw_ao(signal, offset)
         self._masker_offset = offset + signal.shape[-1]
@@ -486,11 +499,7 @@ class Paradigm(
     #        label='Go probability', log=False, context=True)
     repeat_fa = Bool(True, label='Repeat if FA?', log=True, context=True)
 
-    target_filename = File('CMR\\T01.wav', context=True, log=False,
-                           label='Target filename')
 
-    masker_sf = Expression('1', label='Masker SF', log=True, context=True)
-    target_sf = Expression('1', label='Target SF', log=True, context=True)
 
     traits_view = View(
             VGroup(
