@@ -179,7 +179,7 @@ class Controller(
 
         # Speaker in, mic, nose-poke IR, spout contact IR. Not everything will
         # necessarily be connected.
-        self.engine.configure_hw_ai(self.fs, 'Dev2/ai0:3', (-10, 10))
+        self.engine.configure_hw_ai(self.fs/100, 'Dev2/ai0:3', (-10, 10))
 
         # Speaker out
         self.engine.configure_hw_ao(self.fs, 'Dev2/ao0', (-10, 10))
