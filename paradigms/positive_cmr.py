@@ -156,7 +156,7 @@ class Controller(
         # scaling factor. In general, this is a fairly reasonable approximation
         # of SDT (i.e., the nogo should be some undetectable variant of the go,
         # right)?
-        test_sf = 10.0**(self.get_current_value('test_attenuation')/-20.0)
+        test_sf = 10.0**(self.get_current_value('test_att')/-20.0)
         
         masker_filename = self.get_current_value('masker_filename')
         if not path.exists(masker_filename):
@@ -519,7 +519,7 @@ class Paradigm(
                 'target_filename',
                 'target_level',
                 'hw_att',
-                'silencer',
+                'test_att',
                 label='Sound',
                 ),
             )
