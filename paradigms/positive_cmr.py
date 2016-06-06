@@ -165,6 +165,8 @@ class Controller(
         self.masker_offset = 0
         self.fs, masker = wavfile.read(masker_filename, mmap=True)
         self.masker = masker.astype('float64')/np.iinfo(np.int16).max * test_sf
+        
+        self.update_delay = int(self.fs * 150e-3) # 50ms
 
         target_filename = self.get_current_value('target_filename')
         if not path.exists(target_filename):
