@@ -297,7 +297,7 @@ class Controller(
         if trial_type in ('GO', 'GO_REMIND'):
             score = 'HIT' if response == 'spout contact' else 'MISS'
         elif trial_type in ('NOGO', 'NOGO_REPEAT'):
-            score = 'FA' if response == ' spout contact' else 'CR'
+            score = 'FA' if response == 'spout contact' else 'CR'
 
         if score == 'FA':
             # Turn the light off
