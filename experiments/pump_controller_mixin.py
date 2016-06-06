@@ -57,24 +57,28 @@ class PumpControllerMixin(HasTraits):
             self.pump_toggle = False
 
     def set_pump_volume(self, value):
-        self.iface_pump.pause()
+        halted = self.iface_pump.get_status() == 'halted'
+        if not halted: self.iface_pump.pause()
         self.iface_pump.set_volume(value, unit='ul')
-        self.iface_pump.resume()
+        if not halted: self.iface_pump.resume()
 
     def set_pump_rate(self, value):
-        self.iface_pump.pause()
+        halted = self.iface_pump.get_status() == 'halted'
+        if not halted: self.iface_pump.pause()
         self.iface_pump.set_rate(value, unit='ml/min')
-        self.iface_pump.resume()
+        if not halted: self.iface_pump.resume()
 
     def set_pump_syringe_diameter(self, value):
-        self.iface_pump.pause()
+        halted = self.iface_pump.get_status() == 'halted'
+        if not halted: self.iface_pump.pause()
         self.iface_pump.set_diameter(value, unit='mm')
-        self.iface_pump.resume()
+        if not halted: self.iface_pump.resume()
 
     def set_pump_rate_delta(self, value):
-        self.iface_pump.pause()
+        halted = self.iface_pump.get_status() == 'halted'
+        if not halted: self.iface_pump.pause()
         self.current_pump_rate_delta = value
-        self.iface_pump.resume()
+        if not halted: self.iface_pump.resume()
 
 if __name__ == '__main__':
     PumpToolBar().configure_traits()
