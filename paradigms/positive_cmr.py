@@ -119,7 +119,7 @@ class Controller(
         PositiveCMRControllerMixin,
         AbstractExperimentController,
         CLControllerMixin,
-        #PumpControllerMixin,
+        PumpControllerMixin,
         ):
     '''
     Controls experiment logic (i.e. communicates with the TDT hardware,
@@ -192,8 +192,8 @@ class Controller(
                                  names=['spout', 'np'])
 
         # Control for pump and room light
-        #self.engine.configure_sw_do('/Dev2/port1/line1:4',
-        #                            names=['spout', 'np', 'pump', 'light'])
+        self.engine.configure_sw_do('/Dev2/port1/line1',
+                                    names=['light'])
         self.engine.register_ao_callback(self.samples_needed)
         self.engine.register_ai_callback(self.samples_acquired)
         self.engine.register_et_callback(self.et_fired)
@@ -201,8 +201,7 @@ class Controller(
         self.model.data.microphone.fs = self.fs
 
         # Configure the pump
-        #self.iface_pump.set_trigger(start='rising', stop=None)
-        #self.iface_pump.set_direction('infuse')
+        self.iface_pump.set_direction('infuse')
 
         # Generate a random seed based on the computer's clock.
         self.random_seed = int(time())
@@ -273,7 +272,7 @@ class Controller(
         signal[:target.shape[-1]] += target
         self.engine.write_hw_ao(signal, offset)
         self._masker_offset = offset + signal.shape[-1]
-
+            
         # TODO - the hold duration will include the update delay. Do we need
         # super-precise tracking of hold period or can it vary by a couple 10s
         # to 100s of msec?
@@ -300,13 +299,16 @@ class Controller(
 
         if score == 'FA':
             # Turn the light off
-            #self.engine.set_sw_do('light', 0)
+            self.engine.set_sw_do('light', 0)
             self.start_timer('to_duration', Event.to_duration_elapsed)
             self.trial_state = TrialState.waiting_for_to
         else:
             if score == 'HIT':
-                #self.engine.fire_sw_do('pump', 0.2)
-                pass
+                # TODO: Investigate why are changes to reward_volume applied on
+                # the second trial rather than the first one?
+                self.set_pump_volume(self.get_current_value('reward_volume'))
+                self.pump_trigger([])
+                
             self.start_timer('iti_duration', Event.iti_duration_elapsed)
             self.trial_state = TrialState.waiting_for_iti
 
@@ -433,7 +435,7 @@ class Controller(
         elif self.trial_state == TrialState.waiting_for_to:
             if event == Event.to_duration_elapsed:
                 # Turn the light back on
-                #self.engine.set_sw_do('light', 1)
+                self.engine.set_sw_do('light', 1)
                 self.start_timer('iti_duration',
                                  Event.iti_duration_elapsed)
                 self.trial_state = TrialState.waiting_for_iti
