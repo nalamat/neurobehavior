@@ -250,7 +250,7 @@ class Controller(
         ts = self.get_ts()
         offset = int(round(ts*self.fs)) + self.update_delay
         
-        #### Insert target within a specific phase of the periodic masker
+        #### Insert the target at a specific phase of the modulated masker
         masker_frequency = self.get_current_value('masker_frequency')
         period = self.fs/masker_frequency
         phase_delay = self.get_current_value('phase_delay')/360.0*period
@@ -314,6 +314,15 @@ class Controller(
                 
             self.start_timer('iti_duration', Event.iti_duration_elapsed)
             self.trial_state = TrialState.waiting_for_iti
+
+        # Overrwrite output buffer with the masker to stop sound
+        ts = self.get_ts()
+        offset = int(round(ts*self.fs)) + self.update_delay
+        duration = self.get_target().shape[-1]
+        masker_sf = 10.0**(-self.get_current_value('masker_level')/20.0)
+        signal = self.get_masker(offset, duration) * masker_sf
+        self.engine.write_hw_ao(signal, offset)
+        self._masker_offset = offset + duration
 
         print(self.trial_info)
         self.log_trial(score=score, response=response, ttype=trial_type,
