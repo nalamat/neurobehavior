@@ -193,9 +193,10 @@ class Controller(
         self.engine.configure_et('/Dev2/port0/line1:2', 'ao/SampleClock',
                                  names=['spout', 'np'])
 
-        # Control for pump and room light
-        self.engine.configure_sw_do('/Dev2/port1/line1',
-                                    names=['light'])
+        # Control for room light
+        self.engine.configure_sw_do('/Dev2/port1/line1', names=['light'])
+        self.engine.set_sw_do('light', 1)
+        
         self.engine.register_ao_callback(self.samples_needed)
         self.engine.register_ai_callback(self.samples_acquired)
         self.engine.register_et_callback(self.et_fired)
