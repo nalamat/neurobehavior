@@ -166,7 +166,7 @@ class Controller(
         self.fs, masker = wavfile.read(masker_filename, mmap=True)
         self.masker = masker.astype('float64')/np.iinfo(np.int16).max * test_sf
         
-        self.update_delay = int(self.fs * 150e-3) # 50ms
+        self.update_delay = int(self.fs * 150e-3) # 150ms
 
         target_filename = self.get_current_value('target_filename')
         if not path.exists(target_filename):
@@ -250,32 +250,30 @@ class Controller(
         ts = self.get_ts()
         offset = int(round(ts*self.fs)) + self.update_delay
         
-        #### Insert the target at a specific phase of the modulated masker
+        # Insert the target at a specific phase of the modulated masker
         masker_frequency = self.get_current_value('masker_frequency')
         period = self.fs/masker_frequency
         phase_delay = self.get_current_value('phase_delay')/360.0*period
         phase = (offset % self.masker.shape[-1]) % period
-        delay = phase-phase_delay
+        delay = phase_delay-phase
         if delay<0: delay+=period
         offset += int(delay);
-        ####
-        
-        log.debug('Inserting target at %d', offset)
-        # TODO - should be able to calculate a precise duration.
-        duration = self.engine.ao_write_space_available(offset)/10
-        log.debug('Overwriting %d samples in buffer', duration)
 
         masker_sf = 10.0**(-self.get_current_value('masker_level')/20.0)
         target_sf = 10.0**(-self.get_current_value('target_level')/20.0)
-
-        # Generate combined signal
-        signal = self.get_masker(offset, duration) * masker_sf
-        target = self.get_target() * target_sf
         
-        signal[:target.shape[-1]] += target
+        # Generate combined signal
+        target = self.get_target() * target_sf
+        duration = target.shape[-1]
+        signal = self.get_masker(offset, duration) * masker_sf
+        
+        log.debug('Inserting target at %d', offset)
+        log.debug('Overwriting %d samples in buffer', duration)
+        
+        signal += target
         self.engine.write_hw_ao(signal, offset)
-        self._masker_offset = offset + signal.shape[-1]
-            
+        self.masker_offset = offset + duration
+        
         # TODO - the hold duration will include the update delay. Do we need
         # super-precise tracking of hold period or can it vary by a couple 10s
         # to 100s of msec?
@@ -322,7 +320,7 @@ class Controller(
         masker_sf = 10.0**(-self.get_current_value('masker_level')/20.0)
         signal = self.get_masker(offset, duration) * masker_sf
         self.engine.write_hw_ao(signal, offset)
-        self._masker_offset = offset + duration
+        self.masker_offset = offset + duration
 
         print(self.trial_info)
         self.log_trial(score=score, response=response, ttype=trial_type,
