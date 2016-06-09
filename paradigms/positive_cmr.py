@@ -248,7 +248,8 @@ class Controller(
         # Get the current position in the analog output buffer, and add a cetain
         # update_delay (to give us time to generate and upload the new signal).
         ts = self.get_ts()
-        offset = int(round(ts*self.fs)) + self.update_delay
+        ud = self.get_current_value('update_delay')*1e-3 # Convert msec to sec
+        offset = int(round((ts+ud)*self.fs))
         
         # Insert the target at a specific phase of the modulated masker
         masker_frequency = self.get_current_value('masker_frequency')
@@ -271,8 +272,11 @@ class Controller(
         log.debug('Overwriting %d samples in buffer', duration)
         
         signal += target
-        self.engine.write_hw_ao(signal, offset)
-        self.masker_offset = offset + duration
+        try:
+            self.engine.write_hw_ao(signal, offset)
+            self.masker_offset = offset + duration
+        except:
+            log.error('Update delay %f is too small', ud)
         
         # TODO - the hold duration will include the update delay. Do we need
         # super-precise tracking of hold period or can it vary by a couple 10s
@@ -315,12 +319,16 @@ class Controller(
 
         # Overrwrite output buffer with the masker to stop sound
         ts = self.get_ts()
-        offset = int(round(ts*self.fs)) + self.update_delay
+        ud = self.get_current_value('update_delay')*1e-3 # Convert msec to sec
+        offset = int(round((ts+ud)*self.fs))
         duration = self.get_target().shape[-1]
         masker_sf = 10.0**(-self.get_current_value('masker_level')/20.0)
         signal = self.get_masker(offset, duration) * masker_sf
-        self.engine.write_hw_ao(signal, offset)
-        self.masker_offset = offset + duration
+        try:
+            self.engine.write_hw_ao(signal, offset)
+            self.masker_offset = offset + duration
+        except:
+            log.error('Update delay %f is too small', ud)
 
         print(self.trial_info)
         self.log_trial(score=score, response=response, ttype=trial_type,
