@@ -17,6 +17,7 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm):
     phase_delay       = Expression(45 , label='Phase delay (deg)'      , **kw)
     pump_rate         = Expression(1.5, label='Pump rate (ml/min)'     , **kw)
     reward_volume     = Expression(25 , label='Reward volume (ul)'     , **kw)
+    update_delay      = Expression(150, label='Update delay (ms)'      , **kw)
 
     abstract_positive_paradigm_group = VGroup(
             'iti_duration',
@@ -28,6 +29,7 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm):
             'phase_delay',
             'pump_rate',
             'reward_volume',
+            'update_delay',
             label='Paradigm',
             show_border=True,
             )
