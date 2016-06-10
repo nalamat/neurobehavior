@@ -17,11 +17,19 @@ log = logging.getLogger(__name__)
 class PositiveData(AbstractExperimentData):
 
     microphone = Instance(FileChannel)
+    np = Instance(FileChannel)
+    spout = Instance(FileChannel)
 
     def _microphone_default(self):
         return FileChannel(node=self.store_node, name='microphone',
                            dtype=np.float32)
-
+    
+    def _np_default(self):
+        return FileChannel(node=self.store_node, name='np', dtype=np.float32)
+    
+    def _spout_default(self):
+        return FileChannel(node=self.store_node, name='spout', dtype=np.float32)
+        
     def update_performance(self, trial_log):
         # Compute hit rate, FA rate, z-score and d'
         #self.parameters = ['to_duration']

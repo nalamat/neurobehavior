@@ -62,6 +62,33 @@ class AbstractPositiveExperiment(AbstractExperiment):
     experiment_plot = Instance(Component)
 
     def _add_experiment_plots(self, index_mapper, container, alpha=0.25):
+
+        # set up microphone plot
+        value_range = DataRange1D(low_setting=-4.5, high_setting=1.5)
+        value_mapper = LinearMapper(range=value_range)
+        plot = ExtremesChannelPlot(source=self.data.microphone,
+                           index_mapper=index_mapper, value_mapper=value_mapper,
+                           line_color='black')
+        self.microphone_plot = plot
+        container.add(plot)
+
+        # set up nose poke plot
+        value_range = DataRange1D(low_setting=-.5, high_setting=10.5)
+        value_mapper = LinearMapper(range=value_range)
+        plot = ExtremesChannelPlot(source=self.data.np,
+                           index_mapper=index_mapper, value_mapper=value_mapper,
+                           line_color='blue')
+        container.add(plot)
+        
+        # set up lick spout plot
+#        value_range = DataRange1D(low_setting=-.5, high_setting=10.5)
+#        value_mapper = LinearMapper(range=value_range)
+        plot = ExtremesChannelPlot(source=self.data.spout,
+                           index_mapper=index_mapper, value_mapper=value_mapper,
+                           line_color='orange')
+        container.add(plot)
+        
+        # set up epoch plot
         value_range = DataRange1D(low_setting=-0, high_setting=1)
         value_mapper = LinearMapper(range=value_range)
 
@@ -87,18 +114,32 @@ class AbstractPositiveExperiment(AbstractExperiment):
                                     value_mapper=value_mapper)
         container.add(plot)
 
+        plot = TablesTimeseriesPlot(source=self.data,
+                                    trait_name='event_log',
+                                    changed_name='event_log_updated',
+                                    event_name='spout contact',
+                                    marker='diamond',
+                                    marker_color='yellow',
+                                    marker_height=0.45,
+                                    index_mapper=index_mapper,
+                                    value_mapper=value_mapper)
+        container.add(plot)
+
+        plot = TablesTimeseriesPlot(source=self.data,
+                                    trait_name='event_log',
+                                    changed_name='event_log_updated',
+                                    event_name='withdrew from spout',
+                                    marker='diamond',
+                                    marker_color='green',
+                                    marker_height=0.45,
+                                    index_mapper=index_mapper,
+                                    value_mapper=value_mapper)
+        container.add(plot)
+
         tool = ChannelRangeTool(component=plot, allow_drag=False,
                 value_factor=1)
         plot.tools.append(tool)
-
-        # set up microphone plot
-        value_range = DataRange1D(low_setting=-10, high_setting=10)
-        value_mapper = LinearMapper(range=value_range)
-        plot = ExtremesChannelPlot(source=self.data.microphone,
-                           index_mapper=index_mapper, value_mapper=value_mapper,
-                           line_color='black')
-        self.microphone_plot = plot
-        container.add(plot)
+        
 
     @on_trait_change('data')
     def _generate_experiment_plot(self):
