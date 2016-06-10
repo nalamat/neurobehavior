@@ -181,8 +181,8 @@ class Controller(
 
         # Speaker in, mic, nose-poke IR, spout contact IR. Not everything will
         # necessarily be connected.
-        self.ai_fs = 50e3
-        self.engine.configure_hw_ai(self.ai_fs, 'Dev2/ai0:3', (-10, 10),
+        self.fs_ai = 50e3
+        self.engine.configure_hw_ai(self.fs_ai, 'Dev2/ai0:3', (-10, 10),
                                     names=['speaker', 'mic', 'np', 'spout'])
 
         # Speaker out
@@ -192,7 +192,7 @@ class Controller(
         # events occuring in the behavior booth (e.g., room light on/off), we
         # can connect the output controlling the light/pump to an input and
         # monitor state changes on that input.
-        self.engine.configure_et('/Dev2/port0/line1:2', 'ao/SampleClock',
+        self.engine.configure_et('/Dev2/port0/line6:7', 'ao/SampleClock',
                                  names=['spout', 'np'])
 
         # Control for room light
@@ -203,7 +203,9 @@ class Controller(
         self.engine.register_ai_callback(self.samples_acquired)
         self.engine.register_et_callback(self.et_fired)
 
-        self.model.data.microphone.fs = self.ai_fs
+        self.model.data.microphone.fs = self.fs_ai
+        self.model.data.np.fs = self.fs_ai
+        self.model.data.spout.fs = self.fs_ai
 
         # Configure the pump
         self.iface_pump.set_direction('infuse')
@@ -342,6 +344,8 @@ class Controller(
         # Speaker in, mic, nose-poke IR, spout contact IR
         speaker, mic, np, spout = samples
         self.model.data.microphone.send(speaker)
+        self.model.data.np.send(np)
+        self.model.data.spout.send(spout)
 
     def samples_needed(self, names, offset, samples):
         masker = self.get_masker(self.masker_offset, samples)
