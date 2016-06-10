@@ -122,7 +122,7 @@ class Controller(
         PumpControllerMixin,
         ):
     '''
-    Controls experiment logic (i.e. communicates with the TDT hardware,
+    Controls experiment logic (i.e. communicates with the NI hardware,
     responds to input by the user, etc.).
     '''
     random_generator = Any
@@ -137,7 +137,7 @@ class Controller(
         return self.trial_state.value
 
     preload_samples = 200000*5
-    update_delay = 100000
+    #update_delay = 100000
 
     _lock = threading.Lock()
     engine = Instance('daqengine.ni.Engine')
@@ -166,7 +166,7 @@ class Controller(
         self.fs, masker = wavfile.read(masker_filename, mmap=True)
         self.masker = masker.astype('float64')/np.iinfo(np.int16).max * test_sf
         
-        self.update_delay = int(self.fs * 150e-3) # 150ms
+        #self.update_delay = int(self.fs * 100e-3) # 100ms
 
         target_filename = self.get_current_value('target_filename')
         if not path.exists(target_filename):
@@ -181,10 +181,12 @@ class Controller(
 
         # Speaker in, mic, nose-poke IR, spout contact IR. Not everything will
         # necessarily be connected.
-        self.engine.configure_hw_ai(self.fs/100, 'Dev2/ai0:3', (-10, 10))
+        self.ai_fs = 50e3
+        self.engine.configure_hw_ai(self.ai_fs, 'Dev2/ai0:3', (-10, 10),
+                                    names=['speaker', 'mic', 'np', 'spout'])
 
         # Speaker out
-        self.engine.configure_hw_ao(self.fs, 'Dev2/ao0', (-10, 10))
+        self.engine.configure_hw_ao(self.fs, 'Dev2/ao0', (-10, 10), names=['speaker'])
 
         # Nose poke and spout contact TTL. If we want to monitor additional
         # events occuring in the behavior booth (e.g., room light on/off), we
@@ -201,7 +203,7 @@ class Controller(
         self.engine.register_ai_callback(self.samples_acquired)
         self.engine.register_et_callback(self.et_fired)
 
-        self.model.data.microphone.fs = self.fs
+        self.model.data.microphone.fs = self.ai_fs
 
         # Configure the pump
         self.iface_pump.set_direction('infuse')
@@ -213,8 +215,6 @@ class Controller(
 
         node = info.object.experiment_node
         node._v_attrs['trial_sequence_random_seed'] = self.random_seed
-
-        self.samples_needed(self.preload_samples)
 
         self.state = 'running'
         self.engine.start()
@@ -338,12 +338,12 @@ class Controller(
     ############################################################################
     # Callbacks for NI Engine
     ############################################################################
-    def samples_acquired(self, samples):
+    def samples_acquired(self, names, samples):
         # Speaker in, mic, nose-poke IR, spout contact IR
         speaker, mic, np, spout = samples
         self.model.data.microphone.send(speaker)
 
-    def samples_needed(self, samples):
+    def samples_needed(self, names, offset, samples):
         masker = self.get_masker(self.masker_offset, samples)
         self.engine.write_hw_ao(masker)
         self.masker_offset += samples
