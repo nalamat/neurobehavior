@@ -79,7 +79,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
                            index_mapper=index_mapper, value_mapper=value_mapper,
                            line_color='blue')
         container.add(plot)
-        
+
         # set up lick spout plot
 #        value_range = DataRange1D(low_setting=-.5, high_setting=10.5)
 #        value_mapper = LinearMapper(range=value_range)
@@ -87,7 +87,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
                            index_mapper=index_mapper, value_mapper=value_mapper,
                            line_color='orange')
         container.add(plot)
-        
+
         # set up epoch plot
         value_range = DataRange1D(low_setting=-0, high_setting=1)
         value_mapper = LinearMapper(range=value_range)
@@ -139,7 +139,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
         tool = ChannelRangeTool(component=plot, allow_drag=False,
                 value_factor=1)
         plot.tools.append(tool)
-        
+
 
     @on_trait_change('data')
     def _generate_experiment_plot(self):
