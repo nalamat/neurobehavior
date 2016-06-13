@@ -9,7 +9,7 @@ log = logging.getLogger(__name__)
 class PositiveCMRParadigmMixin(HasTraits):
 
     kw = {'context': True, 'log': True}
-    
+
     masker_filename  = File('CMR/supermasker4.wav', label='Masker filename'            , **kw)
     target_filename  = File('CMR/T01.wav'         , label='Target filename'            , **kw)
     masker_level     = Expression(0               , label='Masker level (dB)'          , **kw)
@@ -18,7 +18,7 @@ class PositiveCMRParadigmMixin(HasTraits):
     target_number    = Int(                         label='Target token number'        , **kw)
     center_frequency = Int(                         label='Masker with/without flanker', **kw)
     hw_att           = Enum(0, 20, 40, 60         , label='HW attenuation (dB)'        , **kw)
-    test_att         = Float(40                   , label='Test attenuation (dB)'      , **kw)
+    test_att         = Float(0                    , label='Test attenuation (dB)'      , **kw)
 
 
 class PositiveCMRControllerMixin(HasTraits):

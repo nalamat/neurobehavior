@@ -181,19 +181,21 @@ class Controller(
 
         # Speaker in, mic, nose-poke IR, spout contact IR. Not everything will
         # necessarily be connected.
-        self.fs_ai = 50e3
-        self.engine.configure_hw_ai(self.fs_ai, 'Dev2/ai0:3', (-10, 10),
+        self.fs_ai = 250e3/4
+        self.engine.configure_hw_ai(self.fs_ai, '/Dev2/ai0:3', (-10, 10),
                                     names=['speaker', 'mic', 'np', 'spout'])
 
         # Speaker out
-        self.engine.configure_hw_ao(self.fs, 'Dev2/ao0', (-10, 10), names=['speaker'])
+        self.engine.configure_hw_ao(self.fs, '/Dev2/ao0', (-10, 10), names=['speaker'])
 
         # Nose poke and spout contact TTL. If we want to monitor additional
         # events occuring in the behavior booth (e.g., room light on/off), we
         # can connect the output controlling the light/pump to an input and
         # monitor state changes on that input.
-        self.engine.configure_et('/Dev2/port0/line6:7', 'ao/SampleClock',
-                                 names=['spout', 'np'])
+#        self.engine.configure_et('/Dev2/port0/line1:2', 'ao/SampleClock',
+#                                 names=['spout', 'np'])
+        self.engine.configure_hw_di(self.fs, '/Dev2/port0/line1:2', clock='/Dev2/Ctr0',
+                                    names=['spout', 'np'])
 
         # Control for room light
         self.engine.configure_sw_do('/Dev2/port1/line1', names=['light'])
@@ -201,7 +203,8 @@ class Controller(
 
         self.engine.register_ao_callback(self.samples_needed)
         self.engine.register_ai_callback(self.samples_acquired)
-        self.engine.register_et_callback(self.et_fired)
+#        self.engine.register_et_callback(self.et_fired)
+        self.engine.register_di_change_callback(self.di_changed, debounce=self.fs*50e-3)
 
         self.model.data.microphone.fs = self.fs_ai
         self.model.data.np.fs = self.fs_ai
@@ -278,7 +281,7 @@ class Controller(
             self.engine.write_hw_ao(signal, offset)
             self.masker_offset = offset + duration
         except:
-            log.error('Update delay %f is too small', ud)
+            log.error('[start_trial] Update delay %f is too small', ud)
 
         # TODO - the hold duration will include the update delay. Do we need
         # super-precise tracking of hold period or can it vary by a couple 10s
@@ -330,7 +333,7 @@ class Controller(
             self.engine.write_hw_ao(signal, offset)
             self.masker_offset = offset + duration
         except:
-            log.error('Update delay %f is too small', ud)
+            log.error('[stop_trial] Update delay %f is too small', ud)
 
         print(self.trial_info)
         self.log_trial(score=score, response=response, ttype=trial_type,
@@ -359,13 +362,13 @@ class Controller(
         ('falling', 'spout'): Event.spout_end,
     }
 
-    def et_fired(self, edge, line, timestamp):
+    def di_changed(self, name, change, timestamp):
         # The timestamp is the number of analog output samples that have been
         # generated at the time the event occured. Convert to time in seconds
         # since experiment start.
         timestamp /= self.fs
-        log.debug('detected {} edge on {} at {}'.format(edge, line, timestamp))
-        event = self.event_map[edge, line]
+        log.debug('detected {} edge on {} at {}'.format(change, name, timestamp))
+        event = self.event_map[change, name]
         self.handle_event(event, timestamp)
 
     def handle_event(self, event, timestamp=None):
