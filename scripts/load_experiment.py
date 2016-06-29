@@ -20,6 +20,8 @@ import logging
 import logging.config
 from time import strftime
 from os import path
+import threading
+import tables as tb
 
 def configure_logging(filename):
     time_format = '[%(asctime)s] :: %(name)s - %(levelname)s - %(message)s'
@@ -92,6 +94,29 @@ class VerifyServer(argparse.Action):
     def __call__(self, parser, args, value, option_string=None):
         host, port = value.split(':')
         setattr(args, self.dest, (host, int(port)))
+
+def do_monkeypatch():
+    # List of class methods that need to be monkey-patched. This is not an
+    # exhaustive list. We can add to this as we find more methods that we want
+    # to use.
+    monkeypatch = [
+        tb.Table.append,
+        tb.Table.read,
+        tb.EArray.append,
+        tb.Array.__getitem__,
+    ]
+
+    def secure_lock(f, lock):
+        def wrapper(*args, **kwargs):
+            with lock:
+                return f(*args, **kwargs)
+        return wrapper
+
+    lock = threading.Lock()
+    for im in monkeypatch:
+        wrapped_im = secure_lock(im, lock)
+        setattr(im.im_class, im.im_func.func_name, wrapped_im)
+
 
 CALIBRATION_HELP = '''Path to file containing calibration data for {} speaker.
 If this option is not specified, the most recent calibration file available
@@ -203,6 +228,8 @@ if __name__ == '__main__':
                 else:
                     mesg = ' are invalid parameters'
                 sys.exit(', '.join(invalid) + mesg)
+
+        do_monkeypatch()
 
         # Finally, do the requested action
         if args.file is not None:
