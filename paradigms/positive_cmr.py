@@ -192,8 +192,6 @@ class Controller(
         # events occuring in the behavior booth (e.g., room light on/off), we
         # can connect the output controlling the light/pump to an input and
         # monitor state changes on that input.
-#        self.engine.configure_et('/Dev2/port0/line1:2', 'ao/SampleClock',
-#                                 names=['spout', 'np'])
         self.engine.configure_hw_di(self.fs, '/Dev2/port0/line1:2', clock='/Dev2/Ctr0',
                                     names=['spout', 'np'])
 
@@ -203,7 +201,6 @@ class Controller(
 
         self.engine.register_ao_callback(self.samples_needed)
         self.engine.register_ai_callback(self.samples_acquired)
-#        self.engine.register_et_callback(self.et_fired)
         self.engine.register_di_change_callback(self.di_changed, debounce=self.fs*50e-3)
 
         self.model.data.microphone.fs = self.fs_ai
@@ -243,6 +240,7 @@ class Controller(
 
     def stop_experiment(self, info):
         self.engine.stop()
+        self.iface_pump.disconnect()
 
     def request_remind(self, info=None):
         # If trial is already running, the remind will be presented on the next
@@ -339,6 +337,10 @@ class Controller(
         self.log_trial(score=score, response=response, ttype=trial_type,
                        **self.trial_info)
         self.trigger_next()
+
+    def context_updated(self):
+        if self.trial_state == TrialState.waiting_for_np_start:
+            self.trigger_next()
 
     ############################################################################
     # Callbacks for NI Engine
