@@ -80,9 +80,9 @@ class PhysiologyController(Controller):
                 block_size=1048)
         self.buffer_ts = self.iface_physiology.get_buffer('trig/',
                 'r', src_type='int32', dest_type='int32', block_size=1)
-        self.buffer_ts_start = self.iface_physiology.get_buffer('trig/', 
+        self.buffer_ts_start = self.iface_physiology.get_buffer('trig/',
                 'r', src_type='int32', dest_type='int32', block_size=1)
-        self.buffer_ts_end = self.iface_physiology.get_buffer('trig\\', 
+        self.buffer_ts_end = self.iface_physiology.get_buffer('trig\\',
                 'r', src_type='int32', dest_type='int32', block_size=1)
         self.buffer_ttl = self.iface_physiology.get_buffer('TTL',
                 'r', src_type='int8', dest_type='int8', block_size=1)
@@ -167,7 +167,7 @@ class PhysiologyController(Controller):
         for ch, threshold in enumerate(value):
             name = 'a_spike{}'.format(ch+1)
             self.iface_physiology.set_tag(name, threshold)
-            
+
     @on_trait_change('model.settings.monitor_fc_highpass')
     def set_monitor_fc_highpass(self, value):
         self.iface_physiology.set_tag('FiltHP', value)

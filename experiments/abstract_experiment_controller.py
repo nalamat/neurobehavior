@@ -213,7 +213,7 @@ class AbstractExperimentController(Controller):
             icon = QtGui.QIcon(icon_path)
             self.system_tray = QtGui.QSystemTrayIcon()
             self.system_tray.setIcon(icon)
-            self.system_tray.setVisible(True)
+            #self.system_tray.setVisible(True)
         except Exception, e:
             log.exception(e)
             self.state = 'disconnected'
