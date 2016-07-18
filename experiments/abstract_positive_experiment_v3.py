@@ -72,8 +72,16 @@ class AbstractPositiveExperiment(AbstractExperiment):
         self.microphone_plot = plot
         container.add(plot)
 
+        # set up channel 1 plot
+        value_range = DataRange1D(low_setting=-4, high_setting=7)
+        value_mapper = LinearMapper(range=value_range)
+        plot = ExtremesChannelPlot(source=self.data.ch1,
+                        index_mapper=index_mapper, value_mapper=value_mapper,
+                        line_color='blue')
+        container.add(plot)
+
         # set up nose poke plot
-        value_range = DataRange1D(low_setting=-.5, high_setting=10.5)
+        value_range = DataRange1D(low_setting=1, high_setting=16)
         value_mapper = LinearMapper(range=value_range)
         plot = ExtremesChannelPlot(source=self.data.np,
                            index_mapper=index_mapper, value_mapper=value_mapper,
@@ -89,7 +97,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
         container.add(plot)
 
         # set up epoch plot
-        value_range = DataRange1D(low_setting=-0, high_setting=1)
+        value_range = DataRange1D(low_setting=-0+.3, high_setting=1+.3)
         value_mapper = LinearMapper(range=value_range)
 
         plot = TablesTimeseriesPlot(source=self.data,
