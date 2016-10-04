@@ -3,6 +3,8 @@ from traitsui.api import View, HGroup, Item
 from traits.api import Instance, Bool, HasTraits, Tuple, Float
 from enable.savage.trait_defs.ui.svg_button import SVGButton
 from cns.widgets.icons import icons
+import logging
+log = logging.getLogger(__name__)
 
 class PumpToolBar(ToolBar):
     '''
@@ -39,10 +41,16 @@ class PumpControllerMixin(HasTraits):
         ts = self.get_ts()
         self.model.data.log_water(ts, infused)
 
-    def pump_trigger(self, info):
+    def pump_trigger(self, info=None):
         self.iface_pump.run()
 
-    def pump_override(self, info):
+    def pump_override(self, info=None):
+        if not self.pump_toggle:
+            self.pump_override_on()
+        else:
+            self.pump_override_off()
+
+    def pump_override_on(self, info=None):
         if not self.pump_toggle:
             self.pump_trigger_cache = self.iface_pump.get_trigger()
             self.pump_volume_cache = self.iface_pump.get_volume()
@@ -50,7 +58,9 @@ class PumpControllerMixin(HasTraits):
             self.iface_pump.set_trigger('rising', None)
             self.iface_pump.run()
             self.pump_toggle = True
-        else:
+
+    def pump_override_off(self, info=None):
+        if self.pump_toggle:
             self.iface_pump.stop()
             self.iface_pump.set_trigger(*self.pump_trigger_cache)
             self.iface_pump.set_volume(self.pump_volume_cache)

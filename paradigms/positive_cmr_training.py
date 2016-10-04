@@ -35,36 +35,36 @@ class Controller(
         PositiveStage1Controller,
         PumpControllerMixin,
         ):
-    
+
     cycle = Button
 
     def setup_experiment(self, info):
         filename = 'positive-behavior-training-contmask-v4'
         circuit = path.join(get_config('RCX_ROOT'), filename)
-        self.iface_behavior = self.process.load_circuit(circuit, 'RZ6')
-        self.buffer_masker = self.iface_behavior.get_buffer('masker', 'w')
-        self.buffer_target = self.iface_behavior.get_buffer('target', 'w')
+        # self.iface_behavior = self.process.load_circuit(circuit, 'RZ6')
+        # self.buffer_masker = self.iface_behavior.get_buffer('masker', 'w')
+        # self.buffer_target = self.iface_behavior.get_buffer('target', 'w')
+        #
+        # self.buffer_TTL = self.iface_behavior.get_buffer('TTL', 'r',
+        #         block_size=24, src_type='int8', dest_type='int8')
+        # self.buffer_mic = self.iface_behavior.get_buffer('mic', 'r')
+        # self.model.data.spout_TTL.fs = self.buffer_TTL.fs
+        # self.model.data.override_TTL.fs = self.buffer_TTL.fs
+        # self.model.data.pump_TTL.fs = self.buffer_TTL.fs
+        # self.model.data.signal_TTL.fs = self.buffer_TTL.fs
+        # self.model.data.free_run_TTL.fs = self.buffer_TTL.fs
+        # self.model.data.microphone.fs = self.buffer_mic.fs
 
-        self.buffer_TTL = self.iface_behavior.get_buffer('TTL', 'r',
-                block_size=24, src_type='int8', dest_type='int8')
-        self.buffer_mic = self.iface_behavior.get_buffer('mic', 'r')
-        self.model.data.spout_TTL.fs = self.buffer_TTL.fs
-        self.model.data.override_TTL.fs = self.buffer_TTL.fs
-        self.model.data.pump_TTL.fs = self.buffer_TTL.fs
-        self.model.data.signal_TTL.fs = self.buffer_TTL.fs
-        self.model.data.free_run_TTL.fs = self.buffer_TTL.fs
-        self.model.data.microphone.fs = self.buffer_mic.fs
-
-        targets = [self.model.data.spout_TTL,
-                   self.model.data.override_TTL,
-                   self.model.data.pump_TTL, 
-                   self.model.data.signal_TTL,
-                   self.model.data.free_run_TTL ]
-        self.pipeline_TTL = deinterleave_bits(targets)
-
-        self.iface_pump.set_trigger(start='rising', stop='falling')
-        self.iface_pump.set_direction('infuse')
-        self.iface_pump.set_volume(0)
+        # targets = [self.model.data.spout_TTL,
+        #            self.model.data.override_TTL,
+        #            self.model.data.pump_TTL,
+        #            self.model.data.signal_TTL,
+        #            self.model.data.free_run_TTL ]
+        # self.pipeline_TTL = deinterleave_bits(targets)
+        #
+        # self.iface_pump.set_trigger(start='rising', stop='falling')
+        # self.iface_pump.set_direction('infuse')
+        # self.iface_pump.set_volume(0)
 
     def start_experiment(self, info):
         # AbstractExperimentController defines a method, start(), that is called
@@ -79,7 +79,7 @@ class Controller(
         self.invalidate_context()
         self.get_current_value('masker_filename')
         super(Controller, self).start_experiment(info)
-    
+
     # This gets called when someone presses the "cycle" button (or,
     # alternatively, does self.button = somevalue).  This is a feature of
     # Enthought's Traits package (e.g. when you define a button on a class that
@@ -95,18 +95,20 @@ class Controller(
         # the primary output by default.
         speaker = self.get_current_value('speaker')
         if speaker == 'primary':
-            self.iface_behavior.set_tag('att_A', hw_atten)
-            self.iface_behavior.set_tag('att_B', 120)
+            # self.iface_behavior.set_tag('att_A', hw_atten)
+            # self.iface_behavior.set_tag('att_B', 120)
+            pass
         else:
-            self.iface_behavior.set_tag('att_A', 120)
-            self.iface_behavior.set_tag('att_B', hw_atten)
+            # self.iface_behavior.set_tag('att_A', 120)
+            # self.iface_behavior.set_tag('att_B', hw_atten)
+            pass
 
         log.debug('Updated hardware attenuators')
 
         # The masker scaling factor depends on the hardware attenuation value,
         # so we need to be sure to configure that as well.
         self._update_masker_sf()
-        
+
     def update_waveform(self):
         # Force a recomputation of all variables by clearing the cached values
         self.invalidate_context()
@@ -140,8 +142,8 @@ class Controller(
         # attenuation
         target = 10**((TL-dBSPL_RMS1)/20)*target
         target = target * 10**(hw_att/20)
-        self.buffer_target.set(target)
-    
+        # self.buffer_target.set(target)
+
         self.set_current_value('target_level', TL)
         #self.set_current_value('masker_level',ML)
         ML = self.get_current_value('masker_level')
@@ -151,7 +153,7 @@ class Controller(
 
 class Paradigm(
         PositiveCMRParadigmMixin,
-        PositiveStage1Paradigm, 
+        PositiveStage1Paradigm,
         PumpParadigmMixin,
         ):
 

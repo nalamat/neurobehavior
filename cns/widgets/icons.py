@@ -18,6 +18,14 @@ icons = {'start':        'actions/1rightarrow.svgz',
          'down':         'actions/go-down.svgz',
          'right2':       'actions/2rightarrow.svgz',
          'left2':        'actions/2leftarrow.svgz',
+         'speaker':      'actions/speaker.svgz',
+         'light-on':     'actions/light-on.svg',
+         'light-off':    'actions/light-off.svg',
+         'water':        'actions/water.svg',
+         'water-white':  'actions/water-white.svg',
+         'water-black':  'actions/water-black.svg',
+         'water-blue':   'actions/water-blue.svg',
+         'water-blue2':  'actions/water-blue2.svg',
          }
 
 # Update the icon list with the full path to the resource

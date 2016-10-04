@@ -1,4 +1,4 @@
-from traits.api import Float
+from traits.api import Float, Bool
 from traitsui.api import View, VGroup, Include
 
 from .abstract_experiment_paradigm import AbstractExperimentParadigm
@@ -7,6 +7,7 @@ from .evaluate import Expression
 class AbstractPositiveParadigm(AbstractExperimentParadigm):
 
     kw = {'context': True, 'log': True}
+    kw2 = {'context': False, 'log': False}
 
     iti_duration      = Expression(0.1, label='Intertrial duration (s)', **kw)
     to_duration       = Expression(1  , label='TO duration (s)'        , **kw)
