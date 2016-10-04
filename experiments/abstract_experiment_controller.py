@@ -199,8 +199,9 @@ class AbstractExperimentController(Controller):
                 node = get_or_append_node(data_node, 'physiology')
                 data = PhysiologyData(store_node=node)
                 experiment = PhysiologyExperiment(data=data, parent=info.object)
-                handler = PhysiologyController(process=self.process,
-                                               parent=self, state='client')
+                # handler = PhysiologyController(process=self.process,
+                #                                parent=self, state='client')
+                handler = PhysiologyController(parent=self, state='client')
                 experiment.edit_traits(handler=handler, parent=None)
                 self.physiology_handler = handler
 
@@ -213,7 +214,7 @@ class AbstractExperimentController(Controller):
             icon = QtGui.QIcon(icon_path)
             self.system_tray = QtGui.QSystemTrayIcon()
             self.system_tray.setIcon(icon)
-            self.system_tray.setVisible(True)
+            #self.system_tray.setVisible(True)
         except Exception, e:
             log.exception(e)
             self.state = 'disconnected'
