@@ -64,7 +64,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
     def _add_experiment_plots(self, index_mapper, container, alpha=0.25):
 
         # set up microphone plot
-        value_range = DataRange1D(low_setting=-4.5, high_setting=1.5)
+        value_range = DataRange1D(low_setting=-4, high_setting=1.5)
         value_mapper = LinearMapper(range=value_range)
         plot = ExtremesChannelPlot(source=self.data.microphone,
                            index_mapper=index_mapper, value_mapper=value_mapper,
@@ -72,8 +72,16 @@ class AbstractPositiveExperiment(AbstractExperiment):
         self.microphone_plot = plot
         container.add(plot)
 
+        # set up channel 1 plot
+        # value_range = DataRange1D(low_setting=-4, high_setting=7)
+        # value_mapper = LinearMapper(range=value_range)
+        # plot = ExtremesChannelPlot(source=self.data.ch1,
+        #                 index_mapper=index_mapper, value_mapper=value_mapper,
+        #                 line_color='blue')
+        # container.add(plot)
+
         # set up nose poke plot
-        value_range = DataRange1D(low_setting=-.5, high_setting=10.5)
+        value_range = DataRange1D(low_setting=-1, high_setting=16)
         value_mapper = LinearMapper(range=value_range)
         plot = ExtremesChannelPlot(source=self.data.np,
                            index_mapper=index_mapper, value_mapper=value_mapper,
@@ -81,15 +89,15 @@ class AbstractPositiveExperiment(AbstractExperiment):
         container.add(plot)
 
         # set up lick spout plot
-#        value_range = DataRange1D(low_setting=-.5, high_setting=10.5)
-#        value_mapper = LinearMapper(range=value_range)
+        # value_range = DataRange1D(low_setting=-.5, high_setting=10.5)
+        # value_mapper = LinearMapper(range=value_range)
         plot = ExtremesChannelPlot(source=self.data.spout,
                            index_mapper=index_mapper, value_mapper=value_mapper,
                            line_color='orange')
         container.add(plot)
 
         # set up epoch plot
-        value_range = DataRange1D(low_setting=-0, high_setting=1)
+        value_range = DataRange1D(low_setting=0+.2, high_setting=1+.2)
         value_mapper = LinearMapper(range=value_range)
 
         plot = TablesTimeseriesPlot(source=self.data,

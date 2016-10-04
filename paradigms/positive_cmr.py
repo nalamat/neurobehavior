@@ -64,19 +64,19 @@ from scipy.io import wavfile
 import logging
 log = logging.getLogger(__name__)
 
-from experiments.abstract_experiment_controller import AbstractExperimentController
+from experiments.abstract_experiment_controller  import AbstractExperimentController
 from experiments.abstract_positive_experiment_v3 import AbstractPositiveExperiment
-from experiments.abstract_positive_paradigm_v3 import AbstractPositiveParadigm
-from experiments.positive_data_v3 import PositiveData
+from experiments.abstract_positive_paradigm_v3   import AbstractPositiveParadigm
+from experiments.positive_data_v3                import PositiveData
 
-from experiments.pump_controller_mixin import PumpControllerMixin
-from experiments.pump_paradigm_mixin import PumpParadigmMixin
-from experiments.pump_data_mixin import PumpDataMixin
+from experiments.pump_controller_mixin           import PumpControllerMixin
+from experiments.pump_paradigm_mixin             import PumpParadigmMixin
+from experiments.pump_data_mixin                 import PumpDataMixin
 
-from experiments.cl_controller_mixin import CLControllerMixin
-from experiments.cl_paradigm_mixin import CLParadigmMixin
-from experiments.cl_experiment_mixin import CLExperimentMixin
-from experiments.positive_cl_data_mixin import PositiveCLDataMixin
+from experiments.cl_controller_mixin             import CLControllerMixin
+from experiments.cl_paradigm_mixin               import CLParadigmMixin
+from experiments.cl_experiment_mixin             import CLExperimentMixin
+from experiments.positive_cl_data_mixin          import PositiveCLDataMixin
 
 
 class TrialState(enum.Enum):
@@ -88,12 +88,12 @@ class TrialState(enum.Enum):
 
     This is specific to appetitive reinforcement paradigms.
     '''
-    waiting_for_np_start = 'waiting for nose-poke start'
+    waiting_for_np_start    = 'waiting for nose-poke start'
     waiting_for_np_duration = 'waiting for nose-poke duration'
     waiting_for_hold_period = 'waiting for hold period'
-    waiting_for_response = 'waiting for response'
-    waiting_for_to = 'waiting for timeout'
-    waiting_for_iti = 'waiting for intertrial interval'
+    waiting_for_response    = 'waiting for response'
+    waiting_for_to          = 'waiting for timeout'
+    waiting_for_iti         = 'waiting for intertrial interval'
 
 
 class Event(enum.Enum):
@@ -103,16 +103,16 @@ class Event(enum.Enum):
 
     This is specific to appetitive reinforcement paradigms.
     '''
-    np_start = 'initiated nose poke'
-    np_end = 'withdrew from nose poke'
-    np_duration_elapsed = 'nose poke duration met'
-    hold_duration_elapsed = 'hold period over'
+    np_start                  = 'initiated nose poke'
+    np_end                    = 'withdrew from nose poke'
+    np_duration_elapsed       = 'nose poke duration met'
+    hold_duration_elapsed     = 'hold period over'
     response_duration_elapsed = 'response timed out'
-    spout_start = 'spout contact'
-    spout_end = 'withdrew from spout'
-    to_duration_elapsed = 'timeout over'
-    iti_duration_elapsed = 'ITI over'
-    trial_start = 'trial start'
+    spout_start               = 'spout contact'
+    spout_end                 = 'withdrew from spout'
+    to_duration_elapsed       = 'timeout over'
+    iti_duration_elapsed      = 'ITI over'
+    trial_start               = 'trial start'
 
 
 class Controller(
@@ -140,7 +140,7 @@ class Controller(
     #update_delay = 100000
 
     _lock = threading.Lock()
-    engine = Instance('daqengine.ni.Engine')
+    # engine = Instance('daqengine.ni.Engine')
 
     fs = 100e3
 
@@ -181,31 +181,41 @@ class Controller(
 
         # Speaker in, mic, nose-poke IR, spout contact IR. Not everything will
         # necessarily be connected.
-        self.fs_ai = 250e3/4
+        self.fs_ai = 250e3/8
         self.engine.configure_hw_ai(self.fs_ai, '/Dev2/ai0:3', (-10, 10),
                                     names=['speaker', 'mic', 'np', 'spout'])
+        # self.fs_ai2 = 500e3/16
+        # channels = []
+        # for i in range(0, self.data.model.channels): channels.append('ch' + str(i))
+        # self.engine.configure_hw_ai2(self.fs_ai2, '/Dev1/ai0:15', (-10, 10))
+        #                             # names=channels)
 
         # Speaker out
-        self.engine.configure_hw_ao(self.fs, '/Dev2/ao0', (-10, 10), names=['speaker'])
+        self.engine.configure_hw_ao(self.fs, '/Dev2/ao0', (-10, 10),
+                                    names=['speaker'])
 
         # Nose poke and spout contact TTL. If we want to monitor additional
         # events occuring in the behavior booth (e.g., room light on/off), we
         # can connect the output controlling the light/pump to an input and
         # monitor state changes on that input.
-        self.engine.configure_hw_di(self.fs, '/Dev2/port0/line1:2', clock='/Dev2/Ctr0',
-                                    names=['spout', 'np'])
+        self.engine.configure_hw_di(self.fs, '/Dev2/port0/line1:2',
+                                    clock='/Dev2/Ctr0', names=['spout', 'np'])
 
         # Control for room light
         self.engine.configure_sw_do('/Dev2/port1/line1', names=['light'])
-        self.engine.set_sw_do('light', 1)
+        self.engine.set_sw_do('light' , 1)
 
         self.engine.register_ao_callback(self.samples_needed)
         self.engine.register_ai_callback(self.samples_acquired)
-        self.engine.register_di_change_callback(self.di_changed, debounce=self.fs*50e-3)
+        # self.engine.register_ai2_callback(self.samples_acquired2)
+        self.engine.register_di_change_callback(self.di_changed,
+                                                debounce=self.fs*50e-3)
 
         self.model.data.microphone.fs = self.fs_ai
-        self.model.data.np.fs = self.fs_ai
-        self.model.data.spout.fs = self.fs_ai
+        self.model.data.np.fs         = self.fs_ai
+        self.model.data.spout.fs      = self.fs_ai
+        # self.model.data.ch1.fs        = self.fs_ai2
+        # self.model.data.raw.fs        = self.fs_ai2
 
         # Configure the pump
         self.iface_pump.set_direction('infuse')
@@ -219,6 +229,10 @@ class Controller(
         node._v_attrs['trial_sequence_random_seed'] = self.random_seed
 
         self.state = 'running'
+
+        if self.model.spool_physiology:
+            self.physiology_handler.start_physiology()
+
         self.engine.start()
         self.trigger_next()
 
@@ -352,6 +366,10 @@ class Controller(
         self.model.data.np.send(np)
         self.model.data.spout.send(spout)
 
+    # def samples_acquired2(self, names, samples):
+    #     self.model.data.ch1.send(samples[0])
+    #     self.model.data.raw.send(samples)
+
     def samples_needed(self, names, offset, samples):
         masker = self.get_masker(self.masker_offset, samples)
         self.engine.write_hw_ao(masker)
@@ -369,7 +387,7 @@ class Controller(
         # generated at the time the event occured. Convert to time in seconds
         # since experiment start.
         timestamp /= self.fs
-        log.debug('detected {} edge on {} at {}'.format(change, name, timestamp))
+        log.debug('detected {} edge on {} at {}'.format(change, name,timestamp))
         event = self.event_map[change, name]
         self.handle_event(event, timestamp)
 

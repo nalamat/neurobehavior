@@ -10,11 +10,11 @@ class PumpToolBar(ToolBar):
     '''
     Toolbar containing command buttons that allow us to control the pump via a
     GUI.  Three basic commands are provided: increase rate, decrease rate, and
-    override the TTL input (so pump continuously infuses). 
+    override the TTL input (so pump continuously infuses).
     '''
 
     kw               = dict(height=20, width=20, action=True)
-    pump_override    = SVGButton('Run', filename=icons['right2'], 
+    pump_override    = SVGButton('Run', filename=icons['right2'],
                                  tooltip='Override', toggle=True, **kw)
     pump_trigger     = SVGButton('Trigger', filename=icons['start'],
                                  tooltip='Trigger', **kw)
