@@ -1,0 +1,18 @@
+<?xml version="1.0"?><svg width="394.4135099999999" height="554.93317" xmlns="http://www.w3.org/2000/svg">
+ <title>water</title>
+ <defs>
+  <pattern id="gridpattern" patternUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
+   <image id="svg_1" x="0" y="0" width="100" height="100"/>
+  </pattern>
+ </defs>
+ <metadata id="metadata7">image/svg+xml</metadata>
+ <g>
+  <title>Layer 1</title>
+  <g id="layer1">
+   <g id="g2462">
+    <path fill="#000000" fill-rule="evenodd" stroke-width="7" marker-start="none" marker-mid="none" marker-end="none" stroke-miterlimit="4" stroke-dashoffset="0" d="m396.416138,363.094574c0,105.894867 -88.341187,191.838531 -197.190308,191.838531c-108.849121,0 -199.2041,-85.962799 -197.19019,-191.838531c2.67579,-142.019196 111.086217,-199.866165 197.19019,-363.094574c91.455933,157.876678 197.190308,257.199707 197.190308,363.094574z" id="path2530"/>
+    <path fill="#ffffff" fill-rule="evenodd" stroke-width="31" marker-start="none" marker-mid="none" marker-end="none" stroke-miterlimit="4" stroke-dashoffset="0" d="m388.99704,362.649567c0,101.679596 -84.824829,184.202362 -189.34108,184.202362c-104.516357,0 -191.2749,-82.541046 -189.341311,-184.202362c2.569341,-136.36618 106.664553,-191.910614 189.341311,-348.641726c87.815323,151.59241 189.34108,246.961917 189.34108,348.641726z" id="path3520" stroke-linejoin="bevel" stroke-linecap="square"/>
+   </g>
+  </g>
+ </g>
+</svg>
