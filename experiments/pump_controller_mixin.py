@@ -3,6 +3,7 @@ from traitsui.api import View, HGroup, Item
 from traits.api import Instance, Bool, HasTraits, Tuple, Float
 from enable.savage.trait_defs.ui.svg_button import SVGButton
 from cns.widgets.icons import icons
+import sys
 import logging
 log = logging.getLogger(__name__)
 
@@ -42,7 +43,10 @@ class PumpControllerMixin(HasTraits):
         self.model.data.log_water(ts, infused)
 
     def pump_trigger(self, info=None):
-        self.iface_pump.run()
+        try:
+            self.iface_pump.run()
+        except:
+            log.error(sys.exc_info()[1])
 
     def pump_override(self, info=None):
         if not self.pump_toggle:
