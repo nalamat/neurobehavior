@@ -37,8 +37,8 @@ from __future__ import division
 # already installed. Can remove once we migrate completely to Python 3.4+.
 import enum
 
+import sys
 import threading
-
 from os import path
 
 from traits.api import Instance, File, Any, Int, Bool
@@ -181,7 +181,7 @@ class Controller(
 
         # Speaker in, mic, nose-poke IR, spout contact IR. Not everything will
         # necessarily be connected.
-        self.fs_ai = 250e3/8
+        self.fs_ai = 250e3/4
         self.engine.configure_hw_ai(self.fs_ai, '/Dev2/ai0:3', (-10, 10),
                                     names=['speaker', 'mic', 'np', 'spout'])
         # self.fs_ai2 = 500e3/16
@@ -262,6 +262,8 @@ class Controller(
         self.remind_requested = True
 
     def start_trial(self):
+        # log.debug('[start_trial] start')
+
         # Get the current position in the analog output buffer, and add a cetain
         # update_delay (to give us time to generate and upload the new signal).
         ts = self.get_ts()
@@ -303,7 +305,11 @@ class Controller(
         self.trial_info['target_start'] = ts
         self.trial_info['target_end'] = ts+duration/self.fs
 
+        # log.debug('[start_trial] end')
+
     def stop_trial(self, response):
+        # log.debug('[stop_trial] start, %s', response)
+
         trial_type = self.get_current_value('ttype')
         if response != 'no response':
             self.trial_info['response_time'] = \
@@ -352,6 +358,8 @@ class Controller(
                        **self.trial_info)
         self.trigger_next()
 
+        # log.debug('[stop_trial] end')
+
     def context_updated(self):
         if self.trial_state == TrialState.waiting_for_np_start:
             self.trigger_next()
@@ -372,7 +380,13 @@ class Controller(
 
     def samples_needed(self, names, offset, samples):
         masker = self.get_masker(self.masker_offset, samples)
-        self.engine.write_hw_ao(masker)
+        log.debug('[samples_needed] write start')
+        try:
+            self.engine.write_hw_ao(masker)
+        except:
+            log.debug('[samples_needed]')
+            log.error(sys.exc_info()[1])
+        log.debug('[samples_needed] write end')
         self.masker_offset += samples
 
     event_map = {
@@ -382,12 +396,16 @@ class Controller(
         ('falling', 'spout'): Event.spout_end,
     }
 
+    counter = 0
+
     def di_changed(self, name, change, timestamp):
         # The timestamp is the number of analog output samples that have been
         # generated at the time the event occured. Convert to time in seconds
         # since experiment start.
         timestamp /= self.fs
         log.debug('detected {} edge on {} at {}'.format(change, name,timestamp))
+        self.counter += 1
+        log.debug('event %d', self.counter)
         event = self.event_map[change, name]
         self.handle_event(event, timestamp)
 
@@ -465,15 +483,19 @@ class Controller(
                 # Record the time of nose-poke withdrawal if it is the first
                 # time since initiating a trial.
                 log.debug('Animal withdrew during response period')
+                self.timer.cancel();
                 if 'np_end' not in self.trial_info:
                     self.trial_info['np_end'] = timestamp
             elif event == Event.np_start:
+                self.timer.cancel();
                 self.trial_info['response_ts'] = timestamp
                 self.stop_trial(response='nose poke')
             elif event == Event.spout_start:
+                self.timer.cancel();
                 self.trial_info['response_ts'] = timestamp
                 self.stop_trial(response='spout contact')
             elif event == Event.response_duration_elapsed:
+                self.timer.cancel();
                 self.trial_info['response_ts'] = timestamp
                 self.stop_trial(response='no response')
 
