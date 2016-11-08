@@ -150,7 +150,7 @@ class Controller(
 
     fs = 100e3
     masker_on = False
-    ligh_on = False
+    light_on = False
 
     def apply(self, info=None):
         AbstractExperimentController.apply(self, info)
@@ -349,7 +349,7 @@ class Controller(
         phase = (offset % self.masker.shape[-1]) % period
         delay = phase_delay-phase
         if delay<0: delay+=period
-        offset += int(delay);
+        offset += int(delay)
 
         # Generate combined signal
         target = self.get_target()
@@ -483,12 +483,18 @@ class Controller(
                     self.target_play()
 
             elif event == Event.spout_start:
-                if self.get_current_value('spout_target'):
-                    self.target_play()
-                if self.get_current_value('spout_pump_toggle'):
-                    self.pump_override_on()
-                elif self.get_current_value('spout_pump_trigger'):
-                    self.pump_trigger()
+                if not self.get_current_value('spout_after_button') or \
+                        self.get_current_value('spout_after_button') and \
+                        self.trial_state == TrialState.waiting_for_response:
+                    if self.get_current_value('spout_after_button'):
+                        self.trial_state = TrialState.waiting_for_np_start
+                        self.timer.cancel()
+                    if self.get_current_value('spout_target'):
+                        self.target_play()
+                    if self.get_current_value('spout_pump_toggle'):
+                        self.pump_override_on()
+                    elif self.get_current_value('spout_pump_trigger'):
+                        self.pump_trigger()
 
             elif event == Event.spout_end:
                 if self.get_current_value('spout_pump_toggle'):
@@ -501,6 +507,10 @@ class Controller(
                     self.pump_override_on()
                 elif self.get_current_value('button_pump_trigger'):
                     self.pump_trigger()
+                if self.get_current_value('spout_after_button'):
+                    self.trial_state = TrialState.waiting_for_response
+                    self.start_timer('response_duration',
+                                     Event.response_duration_elapsed)
 
             elif event == Event.button_release:
                 if self.get_current_value('button_pump_toggle'):
@@ -509,6 +519,9 @@ class Controller(
             elif event == Event.to_duration_elapsed:
                 self.engine.set_sw_do('light', 1)
                 self.light_on = True
+
+            elif event == Event.response_duration_elapsed:
+                self.trial_state = TrialState.waiting_for_np_start
 
         else:
             if self.trial_state == TrialState.waiting_for_np_start:
@@ -646,13 +659,15 @@ class Paradigm(
             show_border=True,
             )
 
-    spout_target       = Bool(False , label='Play Target' , **kw)
+    spout_target       = Bool(False , label='Play Target', **kw)
     spout_pump_trigger = Bool(False, label='Trigger Pump', **kw)
-    spout_pump_toggle  = Bool(True, label='Toggle Pump' , **kw)
+    spout_pump_toggle  = Bool(True , label='Toggle Pump' , **kw)
+    spout_after_button  = Bool(True , label='After Button' , **kw)
     spout_group = VGroup(
             'spout_target',
             'spout_pump_trigger',
             'spout_pump_toggle',
+            'spout_after_button',
             label='Lick Spout',
             show_border=True,
             )
