@@ -41,6 +41,8 @@ import threading
 import sys
 from os import path
 import win32api
+from time import time
+from Queue import Queue
 
 from traits.api import Instance, File, Any, Int, Bool
 from traitsui.api import View, Include, VGroup, HGroup
@@ -48,7 +50,6 @@ from traitsui.api import View, Include, VGroup, HGroup
 from experiments.evaluate import Expression
 
 from cns import get_config
-from time import time
 
 # These mixins are shared with the positive_cmr_training paradigm.  I use the
 # underscore so it's clear that these files do not define stand-alone paradigms.
@@ -150,6 +151,8 @@ class Controller(
 
     fs = 100e3
     masker_on = False
+    target_on = False
+    target_ts = 0
     light_on = False
 
     def apply(self, info=None):
@@ -178,6 +181,7 @@ class Controller(
             m = 'Masker file {} does not exist'
             raise ValueError(m.format(masker_filename))
         self.masker_offset = 0
+        self.masker_last_write = 0
         self.fs, masker = wavfile.read(masker_filename, mmap=True)
         self.masker = masker.astype('float64')/np.iinfo(np.int16).max * test_sf
 
@@ -188,8 +192,12 @@ class Controller(
             m = 'Go file {} does not exist'
             raise ValueError(m.format(target_filename))
         self.target_offset = 0
-        self.fs, target = wavfile.read(target_filename, mmap=True)
-        self.target = target.astype('float64')/np.iinfo(np.int16).max * test_sf
+        self.fs, target_flat = wavfile.read(target_filename[:-4]+'_flat'+target_filename[-4:], mmap=True)
+        self.fs, target_ramp = wavfile.read(target_filename[:-4]+'_ramp'+target_filename[-4:], mmap=True)
+        self.fs, target      = wavfile.read(target_filename, mmap=True)
+        self.target_flat = target_flat.astype('float64')/np.iinfo(np.int16).max * test_sf
+        self.target_ramp = target_ramp.astype('float64')/np.iinfo(np.int16).max * test_sf
+        self.target      = target     .astype('float64')/np.iinfo(np.int16).max * test_sf
 
         self.trial_state = TrialState.waiting_for_np_start
         self.engine = Engine()
@@ -239,6 +247,12 @@ class Controller(
 
         self.set_current_value('ttype', 'GO')
 
+        # Multithreaded evend handling
+        # self.event_queue = Queue()
+        # self.event_thread_stop = threading.Event()
+        # self.event_thread = threading.Thread(target=self.event_loop)
+        # self.event_thread.start()
+
         self.state = 'paused'
         self.engine.start()
         # self.trigger_next()
@@ -260,6 +274,8 @@ class Controller(
         super(Controller, self).log_trial(**kwargs)
 
     def stop_experiment(self, info):
+        # self.event_thread_stop.set()
+        # self.event_thread.join()
         self.engine.stop()
         self.iface_pump.disconnect()
 
@@ -321,7 +337,7 @@ class Controller(
             self.engine.write_hw_ao(signal, offset)
             self.masker_offset = offset + duration
         except:
-            log.error('[stop_trial] Update delay %f is too small', ud)
+            log.error(sys.exc_info()[1])
 
         # print(self.trial_info)
         # self.log_trial(score=score, response=response, ttype=trial_type,
@@ -342,29 +358,81 @@ class Controller(
         ud = self.get_current_value('update_delay')*1e-3 # Convert msec to sec
         offset = int(round((ts+ud)*self.fs))
 
-        # Insert the target at a specific phase of the modulated masker
-        masker_frequency = self.get_current_value('masker_frequency')
-        period = self.fs/masker_frequency
-        phase_delay = self.get_current_value('phase_delay')/360.0*period
-        phase = (offset % self.masker.shape[-1]) % period
-        delay = phase_delay-phase
-        if delay<0: delay+=period
-        offset += int(delay)
+        if self.masker_on:
+            # Insert the target at a specific phase of the modulated masker
+            masker_frequency = self.get_current_value('masker_frequency')
+            period = self.fs/masker_frequency
+            phase_delay = self.get_current_value('phase_delay')/360.0*period
+            phase = (offset % self.masker.shape[-1]) % period
+            delay = phase_delay-phase
+            if delay<0: delay+=period
+            offset += int(delay)
 
         # Generate combined signal
-        target = self.get_target()
+        target = [self.target_ramp, self.target_flat, self.target_flat, -self.target_ramp[::-1]]
+        target = np.concatenate(target)
         duration = target.shape[-1]
-        signal = self.get_masker(offset, duration)
+        masker = self.get_masker(offset, duration)
+        signal = masker + target
 
         log.debug('Inserting target at %d', offset)
         log.debug('Overwriting %d samples in buffer', duration)
 
-        signal += target
         try:
             self.engine.write_hw_ao(signal, offset)
             self.masker_offset = offset + duration
         except:
-            log.error('[start_trial] Update delay %f is too small', ud)
+            log.error(sys.exc_info()[1])
+
+    def target_toggle(self, info=None):
+        ts = self.get_ts()
+        log.debug('[target_toggle] at {}'.format(ts))
+        ud = self.get_current_value('update_delay')*1e-3 # Convert msec to sec
+        offset = int(round((ts+ud)*self.fs))
+
+        # Generate combined signal
+        if self.target_on:
+            self.target_on = False
+            len = self.target_flat.shape[-1]
+            pos = offset - self.target_ts
+            rem = len - pos % len
+
+            # print("#########################")
+            # print("# off: {}".format(offset))
+            # print("# ts : {}".format(self.target_ts))
+            # print("# len: {}".format(len))
+            # print("# pos: {}".format(pos))
+            # print("# rem: {}".format(rem))
+            # print("#########################")
+
+            target = [self.get_target(pos, rem), -self.target_ramp[::-1]]
+            target = np.concatenate(target)
+            # Zeor-pad if the target is less than 1 sec long
+            if target.shape[-1] < self.fs:
+                target = np.concatenate(
+                    [target, np.zeros(self.fs - target.shape[-1])]
+                    )
+        else:
+            self.target_on = True
+            # Start playing the target for 1 sec (fs samples)
+            target = [self.target_ramp, self.get_target(0, self.fs)]
+            target = np.concatenate(target)
+
+        duration = target.shape[-1]
+        self.target_ts = offset + self.target_ramp.shape[-1]
+        self.target_offset = duration - self.target_ramp.shape[-1]
+        self.masker_offset = offset + duration
+        masker = self.get_masker(offset, duration)
+        signal = masker + target
+
+        log.debug('Inserting target start at %d', offset)
+        log.debug('Overwriting %d samples in buffer', duration)
+        # log.debug('Timestamp at insertion: %d', self.get_ts()*self.fs)
+
+        try:
+            self.engine.write_hw_ao(signal, offset)
+        except:
+            log.error(sys.exc_info()[1])
 
     def masker_update(self):
         # Get the current position in the analog output buffer, and add a cetain
@@ -419,9 +487,21 @@ class Controller(
         self.model.data.raw.send(samples)
 
     def samples_needed(self, names, offset, samples):
-        masker = self.get_masker(self.masker_offset, samples)
-        self.engine.write_hw_ao(masker)
+        if samples > 5*self.fs: samples = 5*self.fs
+        signal = self.get_masker(self.masker_offset, samples)
         self.masker_offset += samples
+        if self.target_on:
+            signal += self.get_target(self.target_offset, samples)
+            self.target_offset += samples
+        # log.debug('[samples_needed] samples  : %d', samples)
+        # log.debug('[samples_needed] offset   : %d', offset)
+        # if self.masker_offset != samples:
+        #     log.debug('[samples_needed] timestamp: %d', self.get_ts()*self.fs)
+        with self._lock:
+            try:
+                self.engine.write_hw_ao(signal)
+            except:
+                log.error(sys.exc_info()[1])
 
     event_map = {
         ('rising' , 'np'    ): Event.np_start      ,
@@ -445,28 +525,45 @@ class Controller(
         except:
             log.error(sys.exc_info()[1])
 
+    # Multithreaded event handling
+    # def event_loop(self):
+    #     log.debug('[event_loop] start')
+    #
+    #     while not self.event_thread_stop.is_set():
+    #         if not self.event_queue.empty():
+    #             log.debug('[event_loop] get')
+    #             with self._lock:
+    #                 self._handle_event(*self.event_queue.get())
+    #         else:
+    #             self.event_thread_stop.wait(.1)
+    #
+    #     log.debug('[event_loop] stop')
+
     def handle_event(self, event, timestamp=None):
         # Ensure that we don't attempt to process several events at the same
         # time. This essentially queues the events such that the next event
         # doesn't get processed until `_handle_event` finishes processing the
         # current one.
+
+        # Only events generated by NI-DAQmx callbacks will have a timestamp.
+        # Since we want all timing information to be in units of the analog
+        # output sample clock, we will capture the value of the sample
+        # clock if a timestamp is not provided. Since there will be some
+        # delay between the time the event occurs and the time we read the
+        # analog clock, the timestamp won't be super-accurate. However, it's
+        # not super-important since these events are not reference points
+        # around which we would do a perievent analysis. Important reference
+        # points would include nose-poke initiation and withdraw, spout
+        # contact, sound onset, lights on, lights off. These reference
+        # points will be tracked via NI-DAQmx or can be calculated (i.e., we
+        # know exactly when the target onset occurs because we precisely
+        # specify the location of the target in the analog output buffer).
+
         with self._lock:
-            # Only events generated by NI-DAQmx callbacks will have a timestamp.
-            # Since we want all timing information to be in units of the analog
-            # output sample clock, we will capture the value of the sample
-            # clock if a timestamp is not provided. Since there will be some
-            # delay between the time the event occurs and the time we read the
-            # analog clock, the timestamp won't be super-accurate. However, it's
-            # not super-important since these events are not reference points
-            # around which we would do a perievent analysis. Important reference
-            # points would include nose-poke initiation and withdraw, spout
-            # contact, sound onset, lights on, lights off. These reference
-            # points will be tracked via NI-DAQmx or can be calculated (i.e., we
-            # know exactly when the target onset occurs because we precisely
-            # specify the location of the target in the analog output buffer).
             if timestamp is None:
                 timestamp = self.get_ts()
             self._handle_event(event, timestamp)
+        # self.event_queue.put((event,timestamp))
 
     def _handle_event(self, event, timestamp):
         '''
@@ -501,18 +598,24 @@ class Controller(
                     self.pump_override_off()
 
             elif event == Event.button_push:
-                if self.get_current_value('button_target'):
+                if self.get_current_value('button_target_play'):
                     self.target_play()
+                elif self.get_current_value('button_target_toggle'):
+                    self.target_toggle()
                 if self.get_current_value('button_pump_toggle'):
                     self.pump_override_on()
                 elif self.get_current_value('button_pump_trigger'):
                     self.pump_trigger()
                 if self.get_current_value('spout_after_button'):
+                    if self.trial_state == TrialState.waiting_for_response:
+                        self.timer.cancel()
                     self.trial_state = TrialState.waiting_for_response
                     self.start_timer('response_duration',
                                      Event.response_duration_elapsed)
 
             elif event == Event.button_release:
+                if self.get_current_value('button_target_toggle'):
+                    self.target_toggle()
                 if self.get_current_value('button_pump_toggle'):
                     self.pump_override_off()
 
@@ -603,33 +706,35 @@ class Controller(
         self.timer = threading.Timer(duration, self.handle_event, [event])
         self.timer.start()
 
-    def get_masker(self, masker_offset, masker_duration):
-        '''
-        Get the next `duration` samples of the masker starting at `offset`. If
-        reading past the end of the array, loop around to the beginning.
-        '''
+    def get_masker(self, offset, duration):
         masker_sf = 10.0**(-self.get_current_value('masker_level')/20.0)
         if self.masker_on is False: masker_sf = 0;
-        masker_size = self.masker.shape[-1]
-        offset = masker_offset % masker_size
-        duration = masker_duration
+        return self.get_cyclic(self.masker, offset, duration) * masker_sf
+
+    def get_target(self, offset, duration):
+        target_sf = 10.0**(-self.get_current_value('target_level')/20.0)
+        return self.get_cyclic(self.target_flat, offset, duration) * target_sf
+
+    def get_cyclic(self, signal, offset, duration):
+        '''
+        Get the next `duration` samples of the signal starting at `offset`. If
+        reading past the end of the array, loop around to the beginning.
+        '''
+        size = signal.shape[-1]
+        offset = offset % size
         result = []
         while True:
-            if (offset+duration) < masker_size:
-                subset = self.masker[offset:offset+duration]
+            if (offset+duration) < size:
+                subset = signal[offset:offset+duration]
                 duration = 0
             else:
-                subset = self.masker[offset:]
+                subset = signal[offset:]
                 offset = 0
                 duration = duration-subset.shape[-1]
             result.append(subset)
             if duration == 0:
                 break
-        return np.concatenate(result, axis=-1) * masker_sf
-
-    def get_target(self):
-        target_sf = 10.0**(-self.get_current_value('target_level')/20.0)
-        return self.target * target_sf
+        return np.concatenate(result, axis=-1)
 
     def get_ts(self):
         return self.engine.ao_sample_clock()/self.fs
@@ -648,21 +753,23 @@ class Paradigm(
     '''
     kw = {'context':True, 'log':False}
 
-    button_target       = Bool(True , label='Play Target' , **kw)
-    button_pump_trigger = Bool(False, label='Trigger Pump', **kw)
-    button_pump_toggle  = Bool(False, label='Toggle Pump' , **kw)
+    button_target_play   = Bool(False, label='Play Target'  , **kw)
+    button_target_toggle = Bool(True , label='Toggle Target', **kw)
+    button_pump_trigger  = Bool(False, label='Trigger Pump' , **kw)
+    button_pump_toggle   = Bool(False, label='Toggle Pump'  , **kw)
     button_group = VGroup(
-            'button_target',
+            'button_target_play',
+            'button_target_toggle',
             'button_pump_trigger',
             'button_pump_toggle',
             label='Push Button',
             show_border=True,
             )
 
-    spout_target       = Bool(False , label='Play Target', **kw)
+    spout_target       = Bool(False, label='Play Target' , **kw)
     spout_pump_trigger = Bool(False, label='Trigger Pump', **kw)
     spout_pump_toggle  = Bool(True , label='Toggle Pump' , **kw)
-    spout_after_button  = Bool(True , label='After Button' , **kw)
+    spout_after_button = Bool(True , label='After Button', **kw)
     spout_group = VGroup(
             'spout_target',
             'spout_pump_trigger',

@@ -37,10 +37,13 @@ class PositiveStage1ToolBar(ExperimentToolBar):
 
     target_play   = SVGButton('Play Target'   , filename=icons['speaker'  ],
         tooltip='Play target sound' , **kw)
+    target_toggle   = SVGButton('Toggle Target'   , filename=icons['speaker'  ],
+        tooltip='Toggke target sound' , **kw)
     masker_toggle = SVGButton('Toggle Masker' , filename=icons['speaker'  ],
         tooltip='Toggle masker sound', **kw)
     sound_group = VGroup(
         Item('target_play'   , enabled_when=paused, **item_kw),
+        Item('target_toggle' , enabled_when=paused, **item_kw),
         Item('masker_toggle' , enabled_when=paused, **item_kw),
         )
 
