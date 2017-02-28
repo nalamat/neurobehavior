@@ -230,6 +230,7 @@ class Controller(
         self.engine.register_di_change_callback(self.di_changed,
                                                 debounce=self.fs*50e-3)
 
+        self.model.data.speaker.fs    = self.fs_ai
         self.model.data.microphone.fs = self.fs_ai
         self.model.data.np.fs         = self.fs_ai
         self.model.data.spout.fs      = self.fs_ai
@@ -320,29 +321,28 @@ class Controller(
             if score == 'HIT':
                 # TODO: Investigate why are changes to reward_volume applied on
                 # the second trial rather than the first one?
-                self.set_pump_rate(self.get_current_value('pump_rate'))
-                self.set_pump_volume(self.get_current_value('reward_volume'))
                 self.pump_trigger([])
 
             self.start_timer('iti_duration', Event.iti_duration_elapsed)
             self.trial_state = TrialState.waiting_for_iti
 
         # Overrwrite output buffer with the masker to stop sound
-        ts = self.get_ts()
-        ud = self.get_current_value('update_delay')*1e-3 # Convert msec to sec
-        offset = int(round((ts+ud)*self.fs))
-        duration = self.get_target().shape[-1]
-        signal = self.get_masker(offset, duration)
-        try:
-            self.engine.write_hw_ao(signal, offset)
-            self.masker_offset = offset + duration
-        except:
-            log.error(sys.exc_info()[1])
+        # ts = self.get_ts()
+        # ud = self.get_current_value('update_delay')*1e-3 # Convert msec to sec
+        # offset = int(round((ts+ud)*self.fs))
+        # duration = self.get_target().shape[-1]
+        # signal = self.get_masker(offset, duration)
+        # try:
+        #     self.engine.write_hw_ao(signal, offset)
+        #     self.masker_offset = offset + duration
+        # except:
+        #     log.error(sys.exc_info()[1])
 
         # print(self.trial_info)
         # self.log_trial(score=score, response=response, ttype=trial_type,
         #                **self.trial_info)
         # self.trigger_next()
+
 
     def context_updated(self):
         self.refresh_context()
@@ -350,6 +350,7 @@ class Controller(
         # self.evaluate_pending_expressions(self.current_setting)
         # if self.trial_state == TrialState.waiting_for_np_start:
         #     self.trigger_next()
+
 
     def target_play(self, info=None):
         # Get the current position in the analog output buffer, and add a cetain
@@ -369,8 +370,9 @@ class Controller(
             offset += int(delay)
 
         # Generate combined signal
+        target_sf = 10.0**(-float(self.get_current_value('target_level'))/20.0)
         target = [self.target_ramp, self.target_flat, self.target_flat, -self.target_ramp[::-1]]
-        target = np.concatenate(target)
+        target = np.concatenate(target) * target_sf
         duration = target.shape[-1]
         masker = self.get_masker(offset, duration)
         signal = masker + target
@@ -383,6 +385,7 @@ class Controller(
             self.masker_offset = offset + duration
         except:
             log.error(sys.exc_info()[1])
+
 
     def target_toggle(self, info=None):
         ts = self.get_ts()
@@ -418,6 +421,8 @@ class Controller(
             target = [self.target_ramp, self.get_target(0, self.fs)]
             target = np.concatenate(target)
 
+        target_sf = 10.0**(-float(self.get_current_value('target_level'))/20.0)
+        target = target * target_sf
         duration = target.shape[-1]
         self.target_ts = offset + self.target_ramp.shape[-1]
         self.target_offset = duration - self.target_ramp.shape[-1]
@@ -472,19 +477,52 @@ class Controller(
         if hasattr(self, 'timer'): self.timer.cancel()
         self.start_timer('to_duration', Event.to_duration_elapsed)
 
+
+    ############################################################################
+    # Callback for buttons defined in the controller class
+    ############################################################################
+
+    def button_stage1(self, info=None):
+        self.model.paradigm.button_target_play   = False
+        self.model.paradigm.button_target_toggle = False
+        self.model.paradigm.button_pump_trigger  = False
+        self.model.paradigm.button_pump_toggle   = True
+        self.model.paradigm.spout_target         = True
+        self.model.paradigm.spout_pump_trigger   = False
+        self.model.paradigm.spout_pump_toggle    = True
+        self.model.paradigm.spout_after_button   = False
+        self.model.paradigm.np_target            = False
+
+
+    def button_stage2(self, info=None):
+        self.model.paradigm.button_target_play   = False
+        self.model.paradigm.button_target_toggle = True
+        self.model.paradigm.button_pump_trigger  = False
+        self.model.paradigm.button_pump_toggle   = False
+        self.model.paradigm.spout_target         = False
+        self.model.paradigm.spout_pump_trigger   = True
+        self.model.paradigm.spout_pump_toggle    = False
+        self.model.paradigm.spout_after_button   = True
+        self.model.paradigm.np_target            = False
+
+
     ############################################################################
     # Callbacks for NI Engine
     ############################################################################
+
     def samples_acquired(self, names, samples):
         # Speaker in, mic, nose-poke IR, spout contact IR
-        speaker, mic, np, spout = samples
-        self.model.data.microphone.send(speaker)
+        speaker, microphone, np, spout = samples
+        self.model.data.speaker.send(speaker)
+        self.model.data.microphone.send(microphone)
         self.model.data.np.send(np)
         self.model.data.spout.send(spout)
+
 
     def samples_acquired2(self, names, samples):
         self.model.data.ch1.send(samples[1])
         self.model.data.raw.send(samples)
+
 
     def samples_needed(self, names, offset, samples):
         if samples > 5*self.fs: samples = 5*self.fs
@@ -512,6 +550,7 @@ class Controller(
         ('falling', 'button'): Event.button_release,
     }
 
+
     def di_changed(self, name, change, timestamp):
         # The timestamp is the number of analog output samples that have been
         # generated at the time the event occured. Convert to time in seconds
@@ -524,6 +563,7 @@ class Controller(
             self.handle_event(event, timestamp)
         except:
             log.error(sys.exc_info()[1])
+
 
     # Multithreaded event handling
     # def event_loop(self):
@@ -538,6 +578,7 @@ class Controller(
     #             self.event_thread_stop.wait(.1)
     #
     #     log.debug('[event_loop] stop')
+
 
     def handle_event(self, event, timestamp=None):
         # Ensure that we don't attempt to process several events at the same
@@ -565,6 +606,7 @@ class Controller(
             self._handle_event(event, timestamp)
         # self.event_queue.put((event,timestamp))
 
+
     def _handle_event(self, event, timestamp):
         '''
         Give the current experiment state, process the appropriate response for
@@ -580,12 +622,14 @@ class Controller(
                     self.target_play()
 
             elif event == Event.spout_start:
+
+
                 if not self.get_current_value('spout_after_button') or \
                         self.get_current_value('spout_after_button') and \
                         self.trial_state == TrialState.waiting_for_response:
                     if self.get_current_value('spout_after_button'):
                         self.trial_state = TrialState.waiting_for_np_start
-                        self.timer.cancel()
+                        if hasattr(self, 'timer'): self.timer.cancel()
                     if self.get_current_value('spout_target'):
                         self.target_play()
                     if self.get_current_value('spout_pump_toggle'):
@@ -608,16 +652,17 @@ class Controller(
                     self.pump_trigger()
                 if self.get_current_value('spout_after_button'):
                     if self.trial_state == TrialState.waiting_for_response:
-                        self.timer.cancel()
+                        if hasattr(self, 'timer'): self.timer.cancel()
                     self.trial_state = TrialState.waiting_for_response
-                    self.start_timer('response_duration',
-                                     Event.response_duration_elapsed)
 
             elif event == Event.button_release:
                 if self.get_current_value('button_target_toggle'):
                     self.target_toggle()
                 if self.get_current_value('button_pump_toggle'):
                     self.pump_override_off()
+                if self.get_current_value('spout_after_button'):
+                    self.start_timer('response_duration',
+                                     Event.response_duration_elapsed)
 
             elif event == Event.to_duration_elapsed:
                 self.engine.set_sw_do('light', 1)
@@ -698,6 +743,7 @@ class Controller(
                 if event == Event.iti_duration_elapsed:
                     self.trial_state = TrialState.waiting_for_np_start
 
+
     def start_timer(self, variable, event):
         # Even if the duration is 0, we should still create a timer because this
         # allows the `_handle_event` code to finish processing the event. The
@@ -707,12 +753,12 @@ class Controller(
         self.timer.start()
 
     def get_masker(self, offset, duration):
-        masker_sf = 10.0**(-self.get_current_value('masker_level')/20.0)
+        masker_sf = 10.0**(-float(self.get_current_value('masker_level'))/20.0)
         if self.masker_on is False: masker_sf = 0;
         return self.get_cyclic(self.masker, offset, duration) * masker_sf
 
     def get_target(self, offset, duration):
-        target_sf = 10.0**(-self.get_current_value('target_level')/20.0)
+        target_sf = 10.0**(-float(self.get_current_value('target_level'))/20.0)
         return self.get_cyclic(self.target_flat, offset, duration) * target_sf
 
     def get_cyclic(self, signal, offset, duration):
@@ -754,9 +800,9 @@ class Paradigm(
     kw = {'context':True, 'log':False}
 
     button_target_play   = Bool(False, label='Play Target'  , **kw)
-    button_target_toggle = Bool(True , label='Toggle Target', **kw)
+    button_target_toggle = Bool(False, label='Toggle Target', **kw)
     button_pump_trigger  = Bool(False, label='Trigger Pump' , **kw)
-    button_pump_toggle   = Bool(False, label='Toggle Pump'  , **kw)
+    button_pump_toggle   = Bool(True , label='Toggle Pump'  , **kw)
     button_group = VGroup(
             'button_target_play',
             'button_target_toggle',
@@ -766,10 +812,10 @@ class Paradigm(
             show_border=True,
             )
 
-    spout_target       = Bool(False, label='Play Target' , **kw)
+    spout_target       = Bool(True , label='Play Target' , **kw)
     spout_pump_trigger = Bool(False, label='Trigger Pump', **kw)
     spout_pump_toggle  = Bool(True , label='Toggle Pump' , **kw)
-    spout_after_button = Bool(True , label='After Button', **kw)
+    spout_after_button = Bool(False, label='After Button', **kw)
     spout_group = VGroup(
             'spout_target',
             'spout_pump_trigger',

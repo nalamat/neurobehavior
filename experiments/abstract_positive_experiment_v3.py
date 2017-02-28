@@ -66,6 +66,13 @@ class AbstractPositiveExperiment(AbstractExperiment):
         # set up microphone plot
         value_range = DataRange1D(low_setting=-4, high_setting=1.5)
         value_mapper = LinearMapper(range=value_range)
+        plot = ExtremesChannelPlot(source=self.data.speaker,
+                           index_mapper=index_mapper, value_mapper=value_mapper,
+                           line_color='green')
+        container.add(plot)
+
+        value_range = DataRange1D(low_setting=-4, high_setting=1.5)
+        value_mapper = LinearMapper(range=value_range)
         plot = ExtremesChannelPlot(source=self.data.microphone,
                            index_mapper=index_mapper, value_mapper=value_mapper,
                            line_color='black')

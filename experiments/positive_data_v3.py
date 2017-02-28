@@ -16,12 +16,17 @@ log = logging.getLogger(__name__)
 
 class PositiveData(AbstractExperimentData):
 
+    speaker    = Instance(FileChannel)
     microphone = Instance(FileChannel)
-    np = Instance(FileChannel)
-    spout = Instance(FileChannel)
-    channels = 16
+    np         = Instance(FileChannel)
+    spout      = Instance(FileChannel)
+    channels   = 16
     # ch1 = Instance(FileChannel)
     # raw = Instance(FileMultiChannel)
+
+    def _speaker_default(self):
+       return FileChannel(node=self.store_node, name='speaker',
+                          dtype=np.float32)
 
     def _microphone_default(self):
         return FileChannel(node=self.store_node, name='microphone',

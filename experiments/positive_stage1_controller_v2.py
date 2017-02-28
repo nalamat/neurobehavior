@@ -35,11 +35,20 @@ class PositiveStage1ToolBar(ExperimentToolBar):
         show_labels=False,
         )
 
-    target_play   = SVGButton('Play Target'   , filename=icons['speaker'  ],
+    button_stage1 = SVGButton('Stage 1'   , filename=icons['configure'],
+        tooltip='Stage 1 training' , **kw)
+    button_stage2 = SVGButton('Stage 2'   , filename=icons['configure'],
+        tooltip='Stage 2 training' , **kw)
+    stage_group = VGroup(
+        Item('button_stage1' , **item_kw),
+        Item('button_stage2' , **item_kw),
+        )
+
+    target_play   = SVGButton('Play Target'   , filename=icons['speaker'],
         tooltip='Play target sound' , **kw)
-    target_toggle   = SVGButton('Toggle Target'   , filename=icons['speaker'  ],
+    target_toggle = SVGButton('Toggle Target' , filename=icons['speaker'],
         tooltip='Toggke target sound' , **kw)
-    masker_toggle = SVGButton('Toggle Masker' , filename=icons['speaker'  ],
+    masker_toggle = SVGButton('Toggle Masker' , filename=icons['speaker'],
         tooltip='Toggle masker sound', **kw)
     sound_group = VGroup(
         Item('target_play'   , enabled_when=paused, **item_kw),
@@ -68,6 +77,7 @@ class PositiveStage1ToolBar(ExperimentToolBar):
         VGroup(
             main_group,
             HGroup(
+                stage_group,
                 sound_group,
                 pump_group,
                 light_group,

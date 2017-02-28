@@ -173,8 +173,12 @@ class Controller(
             m = 'Go file {} does not exist'
             raise ValueError(m.format(target_filename))
         self.target_offset = 0
-        self.fs, target = wavfile.read(target_filename, mmap=True)
-        self.target = target.astype('float64')/np.iinfo(np.int16).max * test_sf
+        self.fs, target_flat = wavfile.read(target_filename[:-4]+'_flat'+target_filename[-4:], mmap=True)
+        self.fs, target_ramp = wavfile.read(target_filename[:-4]+'_ramp'+target_filename[-4:], mmap=True)
+        self.fs, target      = wavfile.read(target_filename, mmap=True)
+        self.target_flat = target_flat.astype('float64')/np.iinfo(np.int16).max * test_sf
+        self.target_ramp = target_ramp.astype('float64')/np.iinfo(np.int16).max * test_sf
+        self.target      = target     .astype('float64')/np.iinfo(np.int16).max * test_sf
 
         self.trial_state = TrialState.waiting_for_np_start
         self.engine = Engine()
@@ -211,6 +215,7 @@ class Controller(
         self.engine.register_di_change_callback(self.di_changed,
                                                 debounce=self.fs*50e-3)
 
+        self.model.data.speaker.fs    = self.fs_ai
         self.model.data.microphone.fs = self.fs_ai
         self.model.data.np.fs         = self.fs_ai
         self.model.data.spout.fs      = self.fs_ai
@@ -264,46 +269,14 @@ class Controller(
     def start_trial(self):
         # log.debug('[start_trial] start')
 
-        # Get the current position in the analog output buffer, and add a cetain
-        # update_delay (to give us time to generate and upload the new signal).
-        ts = self.get_ts()
-        ud = self.get_current_value('update_delay')*1e-3 # Convert msec to sec
-        offset = int(round((ts+ud)*self.fs))
-
-        # Insert the target at a specific phase of the modulated masker
-        masker_frequency = self.get_current_value('masker_frequency')
-        period = self.fs/masker_frequency
-        phase_delay = self.get_current_value('phase_delay')/360.0*period
-        phase = (offset % self.masker.shape[-1]) % period
-        delay = phase_delay-phase
-        if delay<0: delay+=period
-        offset += int(delay);
-
-        masker_sf = 10.0**(-self.get_current_value('masker_level')/20.0)
-        target_sf = 10.0**(-self.get_current_value('target_level')/20.0)
-
-        # Generate combined signal
-        target = self.get_target() * target_sf
-        duration = target.shape[-1]
-        signal = self.get_masker(offset, duration) * masker_sf
-
-        log.debug('Inserting target at %d', offset)
-        log.debug('Overwriting %d samples in buffer', duration)
-
-        signal += target
-        try:
-            self.engine.write_hw_ao(signal, offset)
-            self.masker_offset = offset + duration
-        except:
-            log.error('[start_trial] Update delay %f is too small', ud)
+        self.target_play()
 
         # TODO - the hold duration will include the update delay. Do we need
         # super-precise tracking of hold period or can it vary by a couple 10s
         # to 100s of msec?
         self.trial_state = TrialState.waiting_for_hold_period
         self.start_timer('hold_duration', Event.hold_duration_elapsed)
-        self.trial_info['target_start'] = ts
-        self.trial_info['target_end'] = ts+duration/self.fs
+
 
         # log.debug('[start_trial] end')
 
@@ -341,17 +314,17 @@ class Controller(
             self.trial_state = TrialState.waiting_for_iti
 
         # Overrwrite output buffer with the masker to stop sound
-        ts = self.get_ts()
-        ud = self.get_current_value('update_delay')*1e-3 # Convert msec to sec
-        offset = int(round((ts+ud)*self.fs))
-        duration = self.get_target().shape[-1]
-        masker_sf = 10.0**(-self.get_current_value('masker_level')/20.0)
-        signal = self.get_masker(offset, duration) * masker_sf
-        try:
-            self.engine.write_hw_ao(signal, offset)
-            self.masker_offset = offset + duration
-        except:
-            log.error('[stop_trial] Update delay %f is too small', ud)
+        # ts = self.get_ts()
+        # ud = self.get_current_value('update_delay')*1e-3 # Convert msec to sec
+        # offset = int(round((ts+ud)*self.fs))
+        # duration = self.get_target().shape[-1]
+        # masker_sf = 10.0**(-float(self.get_current_value('masker_level'))/20.0)
+        # signal = self.get_masker(offset, duration) * masker_sf
+        # try:
+        #     self.engine.write_hw_ao(signal, offset)
+        #     self.masker_offset = offset + duration
+        # except:
+        #     log.error('[stop_trial] Update delay %f is too small', ud)
 
         print(self.trial_info)
         self.log_trial(score=score, response=response, ttype=trial_type,
@@ -364,13 +337,51 @@ class Controller(
         if self.trial_state == TrialState.waiting_for_np_start:
             self.trigger_next()
 
+    def target_play(self, info=None):
+        # Get the current position in the analog output buffer, and add a cetain
+        # update_delay (to give us time to generate and upload the new signal).
+        ts = self.get_ts()
+        ud = self.get_current_value('update_delay')*1e-3 # Convert msec to sec
+        offset = int(round((ts+ud)*self.fs))
+
+        # if self.masker_on:
+        # Insert the target at a specific phase of the modulated masker
+        masker_frequency = self.get_current_value('masker_frequency')
+        period = self.fs/masker_frequency
+        phase_delay = self.get_current_value('phase_delay')/360.0*period
+        phase = (offset % self.masker.shape[-1]) % period
+        delay = phase_delay-phase
+        if delay<0: delay+=period
+        offset += int(delay)
+
+        # Generate combined signal
+        target_sf = 10.0**(-float(self.get_current_value('target_level'))/20.0)
+        target = [self.target_ramp, self.target_flat, self.target_flat, -self.target_ramp[::-1]]
+        target = np.concatenate(target) * target_sf
+        duration = target.shape[-1]
+        masker = self.get_masker(offset, duration)
+        signal = masker + target
+
+        log.debug('Inserting target at %d', offset)
+        log.debug('Overwriting %d samples in buffer', duration)
+
+        self.trial_info['target_start'] = ts
+        self.trial_info['target_end'] = ts+duration/self.fs
+
+        try:
+            self.engine.write_hw_ao(signal, offset)
+            self.masker_offset = offset + duration
+        except:
+            log.error(sys.exc_info()[1])
+
     ############################################################################
     # Callbacks for NI Engine
     ############################################################################
     def samples_acquired(self, names, samples):
         # Speaker in, mic, nose-poke IR, spout contact IR
-        speaker, mic, np, spout = samples
-        self.model.data.microphone.send(speaker)
+        speaker, microphone, np, spout = samples
+        self.model.data.speaker.send(speaker)
+        self.model.data.microphone.send(microphone)
         self.model.data.np.send(np)
         self.model.data.spout.send(spout)
 
@@ -379,15 +390,21 @@ class Controller(
     #     self.model.data.raw.send(samples)
 
     def samples_needed(self, names, offset, samples):
-        masker = self.get_masker(self.masker_offset, samples)
-        log.debug('[samples_needed] write start')
-        try:
-            self.engine.write_hw_ao(masker)
-        except:
-            log.debug('[samples_needed]')
-            log.error(sys.exc_info()[1])
-        log.debug('[samples_needed] write end')
+        if samples > 5*self.fs: samples = 5*self.fs
+        signal = self.get_masker(self.masker_offset, samples)
         self.masker_offset += samples
+        # if self.target_on:
+        #     signal += self.get_target(self.target_offset, samples)
+        #     self.target_offset += samples
+        # log.debug('[samples_needed] samples  : %d', samples)
+        # log.debug('[samples_needed] offset   : %d', offset)
+        # if self.masker_offset != samples:
+        #     log.debug('[samples_needed] timestamp: %d', self.get_ts()*self.fs)
+        with self._lock:
+            try:
+                self.engine.write_hw_ao(signal)
+            except:
+                log.error(sys.exc_info()[1])
 
     event_map = {
         ('rising', 'np'): Event.np_start,
@@ -396,7 +413,7 @@ class Controller(
         ('falling', 'spout'): Event.spout_end,
     }
 
-    counter = 0
+    # counter = 0
 
     def di_changed(self, name, change, timestamp):
         # The timestamp is the number of analog output samples that have been
@@ -404,8 +421,8 @@ class Controller(
         # since experiment start.
         timestamp /= self.fs
         log.debug('detected {} edge on {} at {}'.format(change, name,timestamp))
-        self.counter += 1
-        log.debug('event %d', self.counter)
+        # self.counter += 1
+        # log.debug('event %d', self.counter)
         event = self.event_map[change, name]
         self.handle_event(event, timestamp)
 
@@ -522,21 +539,32 @@ class Controller(
         self.timer = threading.Timer(duration, self.handle_event, [event])
         self.timer.start()
 
-    def get_masker(self, masker_offset, masker_duration):
+    def get_ts(self):
+        return self.engine.ao_sample_clock()/self.fs
+
+    def get_masker(self, offset, duration):
+        masker_sf = 10.0**(-float(self.get_current_value('masker_level'))/20.0)
+        # if self.masker_on is False: masker_sf = 0;
+        return self.get_cyclic(self.masker, offset, duration) * masker_sf
+
+    def get_target(self, offset, duration):
+        target_sf = 10.0**(-float(self.get_current_value('target_level'))/20.0)
+        return self.get_cyclic(self.target_flat, offset, duration) * target_sf
+
+    def get_cyclic(self, signal, offset, duration):
         '''
-        Get the next `duration` samples of the masker starting at `offset`. If
+        Get the next `duration` samples of the signal starting at `offset`. If
         reading past the end of the array, loop around to the beginning.
         '''
-        masker_size = self.masker.shape[-1]
-        offset = masker_offset % masker_size
-        duration = masker_duration
+        size = signal.shape[-1]
+        offset = offset % size
         result = []
         while True:
-            if (offset+duration) < masker_size:
-                subset = self.masker[offset:offset+duration]
+            if (offset+duration) < size:
+                subset = signal[offset:offset+duration]
                 duration = 0
             else:
-                subset = self.masker[offset:]
+                subset = signal[offset:]
                 offset = 0
                 duration = duration-subset.shape[-1]
             result.append(subset)
@@ -544,12 +572,8 @@ class Controller(
                 break
         return np.concatenate(result, axis=-1)
 
-    def get_target(self):
-        return self.target
-
     def get_ts(self):
         return self.engine.ao_sample_clock()/self.fs
-
 
 class Paradigm(
         PositiveCMRParadigmMixin,

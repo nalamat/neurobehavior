@@ -44,6 +44,7 @@ class PumpControllerMixin(HasTraits):
 
     def pump_trigger(self, info=None):
         try:
+            self.pump_refresh()
             self.iface_pump.run()
         except:
             log.error(sys.exc_info()[1])
@@ -56,6 +57,7 @@ class PumpControllerMixin(HasTraits):
 
     def pump_override_on(self, info=None):
         if not self.pump_toggle:
+            self.pump_refresh()
             self.pump_trigger_cache = self.iface_pump.get_trigger()
             self.pump_volume_cache = self.iface_pump.get_volume()
             self.iface_pump.set_volume(0)
@@ -93,6 +95,10 @@ class PumpControllerMixin(HasTraits):
         if not halted: self.iface_pump.pause()
         self.current_pump_rate_delta = value
         if not halted: self.iface_pump.resume()
+
+    def pump_refresh(self):
+        self.set_pump_rate(self.get_current_value('pump_rate'))
+        self.set_pump_volume(self.get_current_value('reward_volume'))
 
 if __name__ == '__main__':
     PumpToolBar().configure_traits()
