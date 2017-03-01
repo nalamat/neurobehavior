@@ -371,7 +371,7 @@ class Controller(
 
         # Generate combined signal
         target_sf = 10.0**(-float(self.get_current_value('target_level'))/20.0)
-        target = [self.target_ramp, self.target_flat, self.target_flat, -self.target_ramp[::-1]]
+        target = [self.target_ramp, np.tile(self.target_flat, 10), -self.target_ramp[::-1]]
         target = np.concatenate(target) * target_sf
         duration = target.shape[-1]
         masker = self.get_masker(offset, duration)
