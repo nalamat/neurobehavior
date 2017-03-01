@@ -356,7 +356,7 @@ class Controller(
 
         # Generate combined signal
         target_sf = 10.0**(-float(self.get_current_value('target_level'))/20.0)
-        target = [self.target_ramp, self.target_flat, self.target_flat, -self.target_ramp[::-1]]
+        target = [self.target_ramp[:-1], np.tile(self.target_flat, 10), -self.target_ramp[::-1]]
         target = np.concatenate(target) * target_sf
         duration = target.shape[-1]
         masker = self.get_masker(offset, duration)
@@ -447,7 +447,10 @@ class Controller(
             # specify the location of the target in the analog output buffer).
             if timestamp is None:
                 timestamp = self.get_ts()
-            self._handle_event(event, timestamp)
+            try:
+                self._handle_event(event, timestamp)
+            except:
+                log.error(sys.exc_info()[1])
 
     def _handle_event(self, event, timestamp):
         '''
@@ -500,7 +503,8 @@ class Controller(
                 # Record the time of nose-poke withdrawal if it is the first
                 # time since initiating a trial.
                 log.debug('Animal withdrew during response period')
-                self.timer.cancel();
+                # self.start_timer('response_duration',
+                #                  Event.response_duration_elapsed)
                 if 'np_end' not in self.trial_info:
                     self.trial_info['np_end'] = timestamp
             elif event == Event.np_start:
