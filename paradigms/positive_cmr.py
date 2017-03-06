@@ -3,6 +3,7 @@ Appetitive comodulation masking release (continuous noise)
 ----------------------------------------------------------
 :Authors: **Brad Buran <bburan@alum.mit.edu>**
           **Antje Ihlefeld <ai33@nyu.edu>**
+          **Nima Alamatsaz <nima.alamatsaz@njit.edu>**
 
 :Method: Constant limits go-nogo
 :Status: Alpha.  Currently under development and testing.
@@ -137,7 +138,7 @@ class Controller(
         return self.trial_state.value
 
     preload_samples = 200000*5
-    #update_delay = 100000
+    update_delay = 200 # ms
 
     _lock = threading.Lock()
     # engine = Instance('daqengine.ni.Engine')
@@ -156,7 +157,7 @@ class Controller(
         # scaling factor. In general, this is a fairly reasonable approximation
         # of SDT (i.e., the nogo should be some undetectable variant of the go,
         # right)?
-        test_sf = 10.0**(self.get_current_value('test_att')/-20.0)
+        # test_sf = 10.0**(self.get_current_value('test_att')/-20.0)
 
         masker_filename = self.get_current_value('masker_filename')
         if not path.exists(masker_filename):
@@ -164,7 +165,7 @@ class Controller(
             raise ValueError(m.format(masker_filename))
         self.masker_offset = 0
         self.fs, masker = wavfile.read(masker_filename, mmap=True)
-        self.masker = masker.astype('float64')/np.iinfo(np.int16).max * test_sf
+        self.masker = masker.astype('float64')/np.iinfo(np.int16).max
 
         #self.update_delay = int(self.fs * 100e-3) # 100ms
 
@@ -176,9 +177,9 @@ class Controller(
         self.fs, target_flat = wavfile.read(target_filename[:-4]+'_flat'+target_filename[-4:], mmap=True)
         self.fs, target_ramp = wavfile.read(target_filename[:-4]+'_ramp'+target_filename[-4:], mmap=True)
         self.fs, target      = wavfile.read(target_filename, mmap=True)
-        self.target_flat = target_flat.astype('float64')/np.iinfo(np.int16).max * test_sf
-        self.target_ramp = target_ramp.astype('float64')/np.iinfo(np.int16).max * test_sf
-        self.target      = target     .astype('float64')/np.iinfo(np.int16).max * test_sf
+        self.target_flat = target_flat.astype('float64')/np.iinfo(np.int16).max
+        self.target_ramp = target_ramp.astype('float64')/np.iinfo(np.int16).max
+        self.target      = target     .astype('float64')/np.iinfo(np.int16).max
 
         self.trial_state = TrialState.waiting_for_np_start
         self.engine = Engine()
@@ -261,13 +262,19 @@ class Controller(
         self.engine.stop()
         self.iface_pump.disconnect()
 
-    def request_remind(self, info=None):
+    def remind(self, info=None):
         # If trial is already running, the remind will be presented on the next
         # trial.
         self.remind_requested = True
 
+    def cancel_remind(self, info=None):
+        self.remind_requested = False
+
+    def pause(self, info=None):
+        self.handle_event(Event.np_start)
+
     def start_trial(self):
-        # log.debug('[start_trial] start')
+        log.debug('Starting trial: %s', self.get_current_value('ttype'))
 
         self.target_play()
 
@@ -277,12 +284,7 @@ class Controller(
         self.trial_state = TrialState.waiting_for_hold_period
         self.start_timer('hold_duration', Event.hold_duration_elapsed)
 
-
-        # log.debug('[start_trial] end')
-
     def stop_trial(self, response):
-        # log.debug('[stop_trial] start, %s', response)
-
         trial_type = self.get_current_value('ttype')
         if response != 'no response':
             self.trial_info['response_time'] = \
@@ -309,6 +311,7 @@ class Controller(
                 # the second trial rather than the first one?
                 self.set_pump_volume(self.get_current_value('reward_volume'))
                 self.pump_trigger([])
+                # pass
 
             self.start_timer('iti_duration', Event.iti_duration_elapsed)
             self.trial_state = TrialState.waiting_for_iti
@@ -331,8 +334,6 @@ class Controller(
                        **self.trial_info)
         self.trigger_next()
 
-        # log.debug('[stop_trial] end')
-
     def context_updated(self):
         if self.trial_state == TrialState.waiting_for_np_start:
             self.trigger_next()
@@ -341,7 +342,7 @@ class Controller(
         # Get the current position in the analog output buffer, and add a cetain
         # update_delay (to give us time to generate and upload the new signal).
         ts = self.get_ts()
-        ud = self.get_current_value('update_delay')*1e-3 # Convert msec to sec
+        ud = self.update_delay*1e-3 # Convert msec to sec
         offset = int(round((ts+ud)*self.fs))
 
         # if self.masker_on:
@@ -356,7 +357,9 @@ class Controller(
 
         # Generate combined signal
         target_sf = 10.0**(-float(self.get_current_value('target_level'))/20.0)
-        target = [self.target_ramp[:-1], np.tile(self.target_flat, 10), -self.target_ramp[::-1]]
+        target_flat_duration = self.target_flat.shape[-1] / self.fs
+        target_reps = round(self.get_current_value('target_duration')/target_flat_duration)
+        target = [self.target_ramp[:-1], np.tile(self.target_flat, target_reps), -self.target_ramp[::-1]]
         target = np.concatenate(target) * target_sf
         duration = target.shape[-1]
         masker = self.get_masker(offset, duration)
@@ -596,8 +599,6 @@ class Paradigm(
     #        label='Go probability', log=False, context=True)
     repeat_fa = Bool(True, label='Repeat if FA?', log=True, context=True)
 
-
-
     traits_view = View(
             VGroup(
                 #'go_probability',
@@ -616,7 +617,7 @@ class Paradigm(
                 'target_filename',
                 'target_level',
                 'hw_att',
-                'test_att',
+                # 'test_att',
                 label='Sound',
                 ),
             )

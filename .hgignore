@@ -32,3 +32,5 @@ doc/*.aux
 
 .DS_Store
 scripts/temp.hdf5
+errors.txt
+scripts\FirstDayNoGoparadigm.par

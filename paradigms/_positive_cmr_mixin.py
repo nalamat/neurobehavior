@@ -18,7 +18,7 @@ class PositiveCMRParadigmMixin(HasTraits):
     target_number    = Int(                         label='Target token number'        , **kw)
     center_frequency = Int(                         label='Masker with/without flanker', **kw)
     hw_att           = Enum(0, 20, 40, 60         , label='HW attenuation (dB)'        , **kw)
-    test_att         = Float(0                    , label='Test attenuation (dB)'      , **kw)
+    # test_att         = Float(0                    , label='Test attenuation (dB)'      , **kw)
 
 
 class PositiveCMRControllerMixin(HasTraits):
