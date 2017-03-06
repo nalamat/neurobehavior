@@ -3,6 +3,7 @@ Appetitive comodulation masking release (continuous noise)
 ----------------------------------------------------------
 :Authors: **Brad Buran <bburan@alum.mit.edu>**
           **Antje Ihlefeld <ai33@nyu.edu>**
+          **Nima Alamatsaz <nima.alamatsaz@njit.edu>**
 
 :Method: Constant limits go-nogo
 :Status: Alpha.  Currently under development and testing.
@@ -51,7 +52,7 @@ from experiments.evaluate import Expression
 
 from cns import get_config
 
-# These mixins are shared with the positive_cmr_training paradigm.  I use the
+# These mixins are shared with the positive_cmr_training p  aradigm.  I use the
 # underscore so it's clear that these files do not define stand-alone paradigms.
 from ._positive_cmr_mixin import PositiveCMRParadigmMixin
 from ._positive_cmr_mixin import PositiveCMRControllerMixin
@@ -248,7 +249,7 @@ class Controller(
 
         self.set_current_value('ttype', 'GO')
 
-        # Multithreaded evend handling
+        # Multithreaded event handling
         # self.event_queue = Queue()
         # self.event_thread_stop = threading.Event()
         # self.event_thread = threading.Thread(target=self.event_loop)
