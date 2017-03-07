@@ -11,6 +11,7 @@ class PositiveCMRParadigmMixin(HasTraits):
     kw = {'context': True, 'log': True}
 
     masker_filename  = File('CMR/supermasker4.wav', label='Masker filename'            , **kw)
+    masker_frequency = Expression(10              , label='Masker frequency (Hz)'      , **kw)
     target_filename  = File('CMR/T01.wav'         , label='Target filename'            , **kw)
     masker_level     = Expression(0               , label='Masker level (dB)'          , **kw)
     target_level     = Expression(0               , label='Target level (dB)'          , **kw)

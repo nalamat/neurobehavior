@@ -266,6 +266,8 @@ class Controller(
         # If trial is already running, the remind will be presented on the next
         # trial.
         self.remind_requested = True
+        if self.trial_state == TrialState.waiting_for_np_start:
+            self.trigger_next()
 
     def cancel_remind(self, info=None):
         self.remind_requested = False
