@@ -65,10 +65,10 @@ def weights(target, values, check_bounds=False):
         pass
     return weights
 
-calibration_dtype = [('gain', 'd'), 
-                     ('voltage', 'd'), 
+calibration_dtype = [('gain', 'd'),
+                     ('voltage', 'd'),
                      ('frequency', 'd'),
-                     ('spl', 'd'), 
+                     ('spl', 'd'),
                      ('phase', 'd'),
                      ]
 
@@ -117,9 +117,9 @@ def load_mat_cal(name, equalized=False):
         impulse_fs = get_scalar(struct['fircal']['Fs'])
 
         # Load the correction factors
-        freq_correction = get_vector(struct['golaycal']['freq']) 
-        mag_correction = get_vector(struct['golaycal']['maginv']) 
-        phase_correction = get_vector(struct['golaycal']['phase']) 
+        freq_correction = get_vector(struct['golaycal']['freq'])
+        mag_correction = get_vector(struct['golaycal']['maginv'])
+        phase_correction = get_vector(struct['golaycal']['phase'])
 
         calibration = EqualizedCalibration(calibration, impulse, impulse_fs,
                                            freq_correction, mag_correction,
@@ -189,7 +189,7 @@ class Calibration(object):
     considered separately.  Note that gain can be a negative number.
 
     reference : ndarray of floats, shape (npoints, 5) (required)
-    
+
         Reference measurement values. Each row indicates reference gain,
         reference voltage, reference frequency, measured SPL and measured phase.
 
@@ -222,7 +222,7 @@ class Calibration(object):
         filter in a DSP or applied directly to a waveform using the
         `Calibration.equalize` method.
 
-    fir_fs : float (required if fir_coefficient is provided) 
+    fir_fs : float (required if fir_coefficient is provided)
 
         Sampling frequency used for computing the FIR coefficients
 
@@ -270,7 +270,7 @@ class Calibration(object):
             self.check_mode['gain'] = check_mode
             self.check_mode['voltage'] = check_mode
             self.check_mode['frequency'] = check_mode
-        
+
         # Reformat reference into a 3D arrays that we can use for trilinear
         # interpolation to estimate max SPL and average phase shift.
         gains = len(self.ref_gains)
@@ -285,7 +285,7 @@ class Calibration(object):
         if fir_coefficients is not None:
             self.fir_zi = signal.lfiltic(fir_coefficients, 1, 0)
             if fir_fs is None:
-                mesg = 'Must provide sampling frequency for fir_coefficients' 
+                mesg = 'Must provide sampling frequency for fir_coefficients'
                 raise ValueError(mesg)
             self.fir_fs = fir_fs
 
@@ -321,7 +321,7 @@ class Calibration(object):
         gain_correction = target_gain-cal_gain
         a += gain_correction
 
-        log.debug('%s: cal gain %f, target gain %f, correction %f', 
+        log.debug('%s: cal gain %f, target gain %f, correction %f',
                 self, cal_gain, target_gain, gain_correction)
 
         # Now we do a linear interpolation across the voltage axis, reducing the
@@ -333,7 +333,7 @@ class Calibration(object):
         voltage_correction = db(target_voltage, cal_voltage)
         a += voltage_correction
 
-        log.debug('%s: cal voltage %f, target voltage %f, correction %f', 
+        log.debug('%s: cal voltage %f, target voltage %f, correction %f',
                 self, cal_voltage, target_voltage, voltage_correction)
 
         return a
@@ -342,7 +342,7 @@ class Calibration(object):
         '''
         Computes speaker output (in dB SPL) for tones at the specified
         frequencies assuming 0 dB attenuation.
-        
+
         We consider gain separately from the attenuation in case the user is
         running the signal through an amplifier which has configurable gain.
         Gain will be whatever value the amplifier gain is set to.  If you have
@@ -358,7 +358,7 @@ class Calibration(object):
             believe FIRCal uses RMS (either case it's "only" 3 dB difference).
         gain : float (dB power)
             The output gain of the system (e.g. the amplifier)
-            
+
         In theory we could support multiple target voltages and gains; however,
         since we can only output a single target voltage and gain for any given
         waveform, only frequencies can be a sequence.
@@ -368,11 +368,11 @@ class Calibration(object):
         log.debug('%s: max output for %r is %r with gain %f and voltage %f',
                 self, frequencies, max_spl, gain, voltage)
         return max_spl
-    
+
     def get_max_spl(self, frequencies, voltage=1, gain=0):
         '''
         This is a DEPRECATED method to support code that just calls get_spl
-        
+
         This is not an accurately-named method and is misleading, hence the
         deprecation.
         '''
@@ -417,7 +417,7 @@ class Calibration(object):
 
         Relationship between band level and spectrum level
 
-        .. math:: 
+        .. math::
             band_level = spectrum_level + 10*log10(\delta f)
         '''
         ref_spl = self._reduce_spl(self.ref_spl, voltage, gain)
@@ -463,7 +463,7 @@ class Calibration(object):
         return a
 
     def get_phase(self, frequencies, voltage=1, gain=0):
-        ref_phase = self._reduce_phase(self.ref_phi, voltage, gain) 
+        ref_phase = self._reduce_phase(self.ref_phi, voltage, gain)
         ref_phase = np.unwrap(ref_phase)
         return np.interp(frequencies, self.ref_frequencies, ref_phase)
 
@@ -475,7 +475,7 @@ class Calibration(object):
         discrepancy = spl-level-attenuation
         sf = 1.0/(10**(discrepancy/20.0))
         log.debug('%s: output is %f dB SPL, hw atten is %f dB',
-                  self, spl, attenuation), 
+                  self, spl, attenuation),
         log.debug('%s: must scale by %f to achieve remaining %f dB', self, sf,
                   discrepancy)
         return sf
@@ -490,7 +490,7 @@ class Calibration(object):
         if self.fir_coefficients is None:
             raise ValueError, "No FIR data available"
         return signal.lfilter(self.fir_coefficients, 1, waveform)
-    
+
     def get_best_attenuation(self, expected_range, voltage=1, gain=0):
         '''
         Get the attenuation to use given the expected range of frequencies and
@@ -540,7 +540,7 @@ class EqualizedCalibration(Calibration):
     Assumes the system is flat across the frequency range of interest and
     perfectly linear.
 
-    spl : int or float 
+    spl : int or float
         Output of system (in dB SPL) between [freq_lb, freq_ub) at the specified
         gain and voltage.  Defaults to 100 dB SPL.
 
@@ -548,7 +548,7 @@ class EqualizedCalibration(Calibration):
         Output gain of system.  Typically this reflects what the gain of the
         amplifier was set to.  If you *never* change the gain of the amplifier,
         you can safely leave this at 0.
-    
+
     voltage : int or float (optional)
         RMS voltage used to generate calibration data
 
@@ -560,7 +560,7 @@ class EqualizedCalibration(Calibration):
 
     args and kwargs will be passed to Calibration
     '''
-    
+
     def __init__(self, calibration, impulse, impulse_fs, transfer_freq,
                  transfer_mag_inv, transfer_phase, gain=0, voltage=1):
         # Exploit the standard calibration logic by providing "flat" reference
@@ -580,8 +580,8 @@ class Attenuation(Calibration):
     '''
     Allows the user to specify level in dB attenuation.  This is for
     backwards-compatibility with legacy paradigms where the signal level was
-    controlled by having the user specify the actual attenuation.  
-    
+    controlled by having the user specify the actual attenuation.
+
     Note that attenuation must be specified as a negative value.  For example,
     if you wish to have 80 dB of attenuation, enter -80.
 
