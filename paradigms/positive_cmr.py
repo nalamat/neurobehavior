@@ -157,7 +157,6 @@ class Controller(
         # scaling factor. In general, this is a fairly reasonable approximation
         # of SDT (i.e., the nogo should be some undetectable variant of the go,
         # right)?
-        # test_sf = 10.0**(self.get_current_value('test_att')/-20.0)
 
         masker_filename = self.get_current_value('masker_filename')
         if not path.exists(masker_filename):
@@ -166,8 +165,6 @@ class Controller(
         self.masker_offset = 0
         self.fs, masker = wavfile.read(masker_filename, mmap=True)
         self.masker = masker.astype('float64')/np.iinfo(np.int16).max
-
-        #self.update_delay = int(self.fs * 100e-3) # 100ms
 
         target_filename = self.get_current_value('target_filename')
         if not path.exists(target_filename):
@@ -616,10 +613,10 @@ class Paradigm(
                 Include('speaker_group'),
                 'masker_filename',
                 'masker_level',
+                'masker_frequency',
                 'target_filename',
                 'target_level',
                 'hw_att',
-                # 'test_att',
                 label='Sound',
                 ),
             )
