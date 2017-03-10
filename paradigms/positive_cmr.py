@@ -173,10 +173,10 @@ class Controller(
         self.target_offset = 0
         self.fs, target_flat = wavfile.read(target_filename[:-4]+'_flat'+target_filename[-4:], mmap=True)
         self.fs, target_ramp = wavfile.read(target_filename[:-4]+'_ramp'+target_filename[-4:], mmap=True)
-        self.fs, target      = wavfile.read(target_filename, mmap=True)
+        # self.fs, target      = wavfile.read(target_filename, mmap=True)
         self.target_flat = target_flat.astype('float64')/np.iinfo(np.int16).max
         self.target_ramp = target_ramp.astype('float64')/np.iinfo(np.int16).max
-        self.target      = target     .astype('float64')/np.iinfo(np.int16).max
+        # self.target      = target     .astype('float64')/np.iinfo(np.int16).max
 
         self.trial_state = TrialState.waiting_for_np_start
         self.engine = Engine()
@@ -346,7 +346,7 @@ class Controller(
 
         # if self.masker_on:
         # Insert the target at a specific phase of the modulated masker
-        masker_frequency = self.get_current_value('masker_frequency')
+        masker_frequency = float(self.get_current_value('masker_frequency'))
         period = self.fs/masker_frequency
         phase_delay = self.get_current_value('phase_delay')/360.0*period
         phase = (offset % self.masker.shape[-1]) % period
@@ -360,6 +360,8 @@ class Controller(
         target_reps = round(self.get_current_value('target_duration')/target_flat_duration)
         target = [self.target_ramp[:-1], np.tile(self.target_flat, target_reps), -self.target_ramp[::-1]]
         target = np.concatenate(target) * target_sf
+        if target.shape[-1] < self.fs: # If target is less than 1s
+            target = np.concatenate([target, np.zeros(self.fs-target.shape[-1])])
         duration = target.shape[-1]
         masker = self.get_masker(offset, duration)
         signal = masker + target

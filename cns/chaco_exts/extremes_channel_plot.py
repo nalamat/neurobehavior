@@ -118,7 +118,10 @@ class ExtremesChannelPlot(ChannelPlot):
         self._screen_cache_valid = True
 
     def _map_screen(self, data):
-        return self.value_mapper.map_screen(data)
+        try:
+            return self.value_mapper.map_screen(data)
+        except:
+            return 0
 
     def _compute_screen_points_decimated(self):
         # We cache our prior decimations
@@ -135,6 +138,7 @@ class ExtremesChannelPlot(ChannelPlot):
 
 
         if self._cached_min is None: return
+        if self._cached_max is None: return
 
         # Now, map them to the screen
         samples = self._cached_min.shape[-1]
