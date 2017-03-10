@@ -31,4 +31,5 @@ doc/*.aux
 *.orig
 
 .DS_Store
-scripts/temp.hdf5
+errors.txt
+*.par

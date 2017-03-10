@@ -11,14 +11,14 @@ class PositiveCMRParadigmMixin(HasTraits):
     kw = {'context': True, 'log': True}
 
     masker_filename  = File('CMR/supermasker4.wav', label='Masker filename'            , **kw)
+    masker_level     = Expression('100.0'         , label='Masker attenuation (dB)'    , **kw)
+    masker_frequency = Expression('10.0'          , label='Masker frequency (Hz)'      , **kw)
     target_filename  = File('CMR/T01.wav'         , label='Target filename'            , **kw)
-    masker_level     = Expression(0               , label='Masker level (dB)'          , **kw)
-    target_level     = Expression(0               , label='Target level (dB)'          , **kw)
+    target_level     = Expression('0.0'           , label='Target attenuation (dB)'    , **kw)
     TMR              = Int(                         label='Target level'               , **kw)
     target_number    = Int(                         label='Target token number'        , **kw)
     center_frequency = Int(                         label='Masker with/without flanker', **kw)
     hw_att           = Enum(0, 20, 40, 60         , label='HW attenuation (dB)'        , **kw)
-    test_att         = Float(0                    , label='Test attenuation (dB)'      , **kw)
 
 
 class PositiveCMRControllerMixin(HasTraits):
