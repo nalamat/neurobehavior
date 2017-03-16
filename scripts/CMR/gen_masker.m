@@ -62,5 +62,5 @@ for which_noise_token = 1
 	% Fc: Low = 0; Mid = 1; High = 2; Center Frequency in Hz
 	
 	plot((1:size(masker,2))/t.Fs, masker);
-	audiowrite('Supermasker.wav', masker, t.Fs, 'bitspersample', 24); % on target mod0
+	audiowrite('Supermasker.wav', masker, t.Fs, 'bitspersample', 16); % on target mod0
 end
