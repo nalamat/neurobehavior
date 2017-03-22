@@ -76,9 +76,9 @@ class AbstractExperimentData(HasTraits):
         grouping = self.parameters + ['score']
         counts = trial_log.groupby(grouping).size().unstack('score')
         counts = counts.reindex_axis(response_types, axis='columns').fillna(0)
-        counts['trials'] = counts.sum(axis=1)
+        counts['trials'  ] = counts.sum(axis=1)
         counts['hit_rate'] = counts.HIT/(counts.HIT+counts.MISS)
-        counts['fa_rate'] = counts.FA/(counts.FA+counts.CR)
+        counts['fa_rate' ] = counts.FA/(counts.FA+counts.CR)
         clipped_rates = counts[['hit_rate', 'fa_rate']].clip(0.05, 0.95)
         z_score = clipped_rates.apply(norm.ppf)
         counts['z_score'] = z_score.hit_rate-z_score.fa_rate
