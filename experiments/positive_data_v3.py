@@ -62,6 +62,11 @@ class PositiveData(AbstractExperimentData):
         z_score = clipped_rates.apply(norm.ppf)
         counts['z_score'] = z_score.hit_rate-z_score.fa_rate
 
+        hit_nan = np.isnan(counts['hit_rate']);
+        counts['hit_rate'][hit_nan] = 1 - counts['fa_rate'][hit_nan]
+        fa_nan = np.isnan(counts['fa_rate']);
+        counts['fa_rate'][fa_nan] = 1 - counts['hit_rate'][fa_nan]
+
         # Compute median reaction time and response time
         median = trial_log.groupby(self.parameters) \
             [['reaction_time', 'response_time']].median().add_prefix('median_')

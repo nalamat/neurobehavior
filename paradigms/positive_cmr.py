@@ -62,6 +62,7 @@ from scipy.io import wavfile
 
 # __name__ is a special variable available to the module that will be
 # "paradigms.positive_cmr" (i.e. the "name" of the module as seen by Python).
+import json
 import logging
 log = logging.getLogger(__name__)
 
@@ -249,6 +250,8 @@ class Controller(
         # HDF5 data files do not natively support unicode strings so we need to
         # convert our filename to an ASCII string.  While we're at it, we should
         # probably strip the directory path as well and just save the basename.
+        log.info('Trial log: %s', json.dumps(kwargs))
+
         target_filename = self.get_current_value('target_filename')
         kwargs['target_filename'] = str(path.basename(target_filename))
         masker_filename = self.get_current_value('masker_filename')
@@ -328,7 +331,6 @@ class Controller(
         # except:
         #     log.error('[stop_trial] Update delay %f is too small', ud)
 
-        print(self.trial_info)
         self.log_trial(score=score, response=response, ttype=trial_type,
                        **self.trial_info)
         self.trigger_next()
