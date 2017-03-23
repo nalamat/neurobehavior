@@ -71,17 +71,29 @@ class AbstractExperimentData(HasTraits):
 
     def update_performance(self, trial_log):
         # Compute hit rate, FA rate, z-score and d'
-        self.parameters = ['to_duration']
         response_types = ['HIT', 'MISS', 'FA', 'CR']
         grouping = self.parameters + ['score']
         counts = trial_log.groupby(grouping).size().unstack('score')
         counts = counts.reindex_axis(response_types, axis='columns').fillna(0)
+
         counts['trials'  ] = counts.sum(axis=1)
         counts['hit_rate'] = counts.HIT/(counts.HIT+counts.MISS)
-        counts['fa_rate' ] = counts.FA/(counts.FA+counts.CR)
+        counts['fa_rate' ] = counts.FA /(counts.FA +counts.CR  )
+
+        # Hit rate for no go is CR rate and FA rate for go is miss rate
+        hit_nan = np.isnan(counts.hit_rate);
+        fa_nan  = np.isnan(counts.fa_rate );
+        counts.hit_rate[hit_nan] = 1-counts.fa_rate [hit_nan]
+        counts.fa_rate [fa_nan ] = 1-counts.hit_rate[fa_nan ]
+
+        # Clip hit and FA rates to 0.05 and 0.95 and calculate d' sensitivity by
+        # substracting Z score of hit rate of each go condition from Z score of
+        # FA rate of the sole no go condition. No go is assumed to be the last
+        # condition in the list and always has a d' of zero
         clipped_rates = counts[['hit_rate', 'fa_rate']].clip(0.05, 0.95)
         z_score = clipped_rates.apply(norm.ppf)
-        counts['z_score'] = z_score.hit_rate-z_score.fa_rate
+        counts['z_score'] = z_score.hit_rate-z_score.fa_rate.values[-1]
+        counts.z_score.values[-1] = 0
 
         # Compute median reaction time and response time
         median = trial_log.groupby(self.parameters) \

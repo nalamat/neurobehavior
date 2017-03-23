@@ -27,6 +27,7 @@ class ParInfoAdapter(TabularAdapter):
         ('Trials', 'trials'),
         ('Reaction time', 'median_reaction_time'),
         ('Response time', 'median_response_time'),
+        ('D prime', 'z_score'),
     ]
 
     parameter_text  = Property
