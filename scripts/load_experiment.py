@@ -101,6 +101,7 @@ def do_monkeypatch():
     # to use.
     monkeypatch = [
         tb.Table.append,
+        tb.Table.modify_rows,
         tb.Table.read,
         tb.EArray.append,
         tb.Array.__getitem__,
