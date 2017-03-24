@@ -12,6 +12,8 @@ from traits.api import (Instance, List, Property, Tuple, cached_property, Any,
 
 from cns.channel import FileChannel
 
+import traceback
+import sys
 
 class AbstractExperimentData(HasTraits):
 
@@ -24,11 +26,13 @@ class AbstractExperimentData(HasTraits):
 
     trial_log = Instance('pandas.DataFrame', ())
     trial_log_updated = Event
+    trial_log2 = Any
 
     event_log = Any
     event_log_updated = Event
 
     performance = Instance('pandas.DataFrame')
+    performance2 = Any
 
     def _event_log_default(self):
         fh = self.store_node._v_file
@@ -44,12 +48,60 @@ class AbstractExperimentData(HasTraits):
         self.event_log.append([(ts, event)])
         self.event_log_updated = ts, event
 
+    def _trial_log2_default(self):
+        return None
+
+    def _performance2_default(self):
+        return None
+
     def log_trial(self, **kwargs):
-        # This is a very inefficient implementation (appends require
-        # reallocating information in memory).
-        self.trial_log = self.trial_log.append(kwargs, ignore_index=True)
-        self.update_performance(self.trial_log)
-        self.trial_log_updated = kwargs
+        try:
+            # This is a very inefficient implementation (appends require
+            # reallocating information in memory).
+            self.trial_log = self.trial_log.append(kwargs, ignore_index=True)
+            self.trial_log_updated = kwargs
+            # If haven't done yet, create a table for saving trial log to the
+            # HDF5 file and set the column names. Column names should not change
+            # throughout a single session
+            if self.trial_log2 is None:
+                desc = []
+                for key, val in kwargs.iteritems():
+                    if type(val) is str:
+                        desc.append((key, 'S512'))
+                    else:
+                        desc.append((key, type(val)))
+                desc = np.dtype(desc)
+                fh = self.store_node._v_file
+                self.trial_log2 = fh.createTable(self.store_node, 'trial_log', desc)
+            self.trial_log2.append([tuple(kwargs.values())])
+
+            # Update performance, i.e. hit rate, FA rate and d' sensitivtiy
+            self.update_performance(self.trial_log)
+            # If haven't done yet, create a table for saving performance to the
+            # HDF5 file and set the column names. Column names should not change
+            # throughout a single session
+            dict = self.performance.to_dict('list')
+            # Index column that is usually target_level should be added manually
+            dict[self.performance.index.name] = list(self.performance.index.values)
+            if self.performance2 is None:
+                desc = []
+                for key, val in dict.iteritems():
+                    if type(val[0]) is str:
+                        desc.append((key, 'S512'))
+                    else:
+                        desc.append((key, type(val[0])))
+                desc = np.dtype(desc)
+                fh = self.store_node._v_file
+                self.performance2 = fh.createTable(self.store_node, 'peformance', desc)
+            # Do not append, but override previous content of the table
+            rows = zip(*dict.values())
+            nrows = self.performance2.nrows
+            if not nrows == 0:
+                self.performance2.modify_rows(start=0,stop=nrows,rows=rows[:nrows])
+            if len(rows) > nrows:
+                self.performance2.append(rows[nrows:])
+        except:
+            log.error(traceback.format_exc())
 
     def save(self):
         '''
@@ -57,11 +109,12 @@ class AbstractExperimentData(HasTraits):
         chance to save relevant data.
         '''
         # Dump the trial log table
-        fh = self.store_node._v_file
-        if len(self.trial_log):
-            fh.createTable(self.store_node, 'trial_log', self.trial_log)
-        else:
-            log.debug('No trials in the trial_log file!')
+        # fh = self.store_node._v_file
+        # if len(self.trial_log):
+        #     fh.createTable(self.store_node, 'trial_log', self.trial_log)
+        # else:
+        #     log.debug('No trials in the trial_log file!')
+        pass
 
     microphone = Instance(FileChannel)
 

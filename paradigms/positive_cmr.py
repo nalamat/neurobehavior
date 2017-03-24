@@ -39,6 +39,7 @@ from __future__ import division
 import enum
 
 import sys
+import traceback
 import threading
 from os import path
 
@@ -340,45 +341,45 @@ class Controller(
             self.trigger_next()
 
     def target_play(self, info=None):
-        # Get the current position in the analog output buffer, and add a cetain
-        # update_delay (to give us time to generate and upload the new signal).
-        ts = self.get_ts()
-        ud = self.update_delay*1e-3 # Convert msec to sec
-        offset = int(round((ts+ud)*self.fs))
-
-        # if self.masker_on:
-        # Insert the target at a specific phase of the modulated masker
-        masker_frequency = float(self.get_current_value('masker_frequency'))
-        period = self.fs/masker_frequency
-        phase_delay = self.get_current_value('phase_delay')/360.0*period
-        phase = (offset % self.masker.shape[-1]) % period
-        delay = phase_delay-phase
-        if delay<0: delay+=period
-        offset += int(delay)
-
-        # Generate combined signal
-        target_sf = 10.0**(-float(self.get_current_value('target_level'))/20.0)
-        target_flat_duration = self.target_flat.shape[-1] / self.fs
-        target_reps = round(self.get_current_value('target_duration')/target_flat_duration)
-        target = [self.target_ramp[:-1], np.tile(self.target_flat, target_reps), -self.target_ramp[::-1]]
-        target = np.concatenate(target) * target_sf
-        if target.shape[-1] < self.fs: # If target is less than 1s
-            target = np.concatenate([target, np.zeros(self.fs-target.shape[-1])])
-        duration = target.shape[-1]
-        masker = self.get_masker(offset, duration)
-        signal = masker + target
-
-        log.debug('Inserting target at %d', offset)
-        log.debug('Overwriting %d samples in buffer', duration)
-
-        self.trial_info['target_start'] = ts
-        self.trial_info['target_end'] = ts+duration/self.fs
-
         try:
+            # Get the current position in the analog output buffer, and add a cetain
+            # update_delay (to give us time to generate and upload the new signal).
+            ts = self.get_ts()
+            ud = self.update_delay*1e-3 # Convert msec to sec
+            offset = int(round((ts+ud)*self.fs))
+
+            # if self.masker_on:
+            # Insert the target at a specific phase of the modulated masker
+            masker_frequency = float(self.get_current_value('masker_frequency'))
+            period = self.fs/masker_frequency
+            phase_delay = self.get_current_value('phase_delay')/360.0*period
+            phase = (offset % self.masker.shape[-1]) % period
+            delay = phase_delay-phase
+            if delay<0: delay+=period
+            offset += int(delay)
+
+            # Generate combined signal
+            target_sf = 10.0**(-float(self.get_current_value('target_level'))/20.0)
+            target_flat_duration = self.target_flat.shape[-1] / self.fs
+            target_reps = round(self.get_current_value('target_duration')/target_flat_duration)
+            target = [self.target_ramp[:-1], np.tile(self.target_flat, target_reps), -self.target_ramp[::-1]]
+            target = np.concatenate(target) * target_sf
+            if target.shape[-1] < self.fs: # If target is less than 1s
+                target = np.concatenate([target, np.zeros(self.fs-target.shape[-1])])
+            duration = target.shape[-1]
+            masker = self.get_masker(offset, duration)
+            signal = masker + target
+
+            log.debug('Inserting target at %d', offset)
+            log.debug('Overwriting %d samples in buffer', duration)
+
+            self.trial_info['target_start'] = ts
+            self.trial_info['target_end'] = ts+duration/self.fs
+
             self.engine.write_hw_ao(signal, offset)
             self.masker_offset = offset + duration
         except:
-            log.error(sys.exc_info()[1])
+            log.error(traceback.format_exc())
 
     ############################################################################
     # Callbacks for NI Engine
@@ -391,44 +392,29 @@ class Controller(
         self.model.data.np.send(np)
         self.model.data.spout.send(spout)
 
-    # def samples_acquired2(self, names, samples):
-    #     self.model.data.ch1.send(samples[0])
-    #     self.model.data.raw.send(samples)
-
     def samples_needed(self, names, offset, samples):
         if samples > 5*self.fs: samples = 5*self.fs
         signal = self.get_masker(self.masker_offset, samples)
         self.masker_offset += samples
-        # if self.target_on:
-        #     signal += self.get_target(self.target_offset, samples)
-        #     self.target_offset += samples
-        # log.debug('[samples_needed] samples  : %d', samples)
-        # log.debug('[samples_needed] offset   : %d', offset)
-        # if self.masker_offset != samples:
-        #     log.debug('[samples_needed] timestamp: %d', self.get_ts()*self.fs)
         with self._lock:
             try:
                 self.engine.write_hw_ao(signal)
             except:
-                log.error(sys.exc_info()[1])
+                log.error(traceback.format_exc())
 
     event_map = {
-        ('rising', 'np'): Event.np_start,
-        ('falling', 'np'): Event.np_end,
-        ('rising', 'spout'): Event.spout_start,
+        ('rising' , 'np'   ): Event.np_start,
+        ('falling', 'np'   ): Event.np_end,
+        ('rising' , 'spout'): Event.spout_start,
         ('falling', 'spout'): Event.spout_end,
     }
-
-    # counter = 0
 
     def di_changed(self, name, change, timestamp):
         # The timestamp is the number of analog output samples that have been
         # generated at the time the event occured. Convert to time in seconds
         # since experiment start.
         timestamp /= self.fs
-        log.debug('detected {} edge on {} at {}'.format(change, name,timestamp))
-        # self.counter += 1
-        # log.debug('event %d', self.counter)
+        log.debug('Detected {} edge on {} at {}'.format(change, name,timestamp))
         event = self.event_map[change, name]
         self.handle_event(event, timestamp)
 
@@ -456,7 +442,7 @@ class Controller(
             try:
                 self._handle_event(event, timestamp)
             except:
-                log.error(sys.exc_info()[1])
+                log.error(traceback.format_exc())
 
     def _handle_event(self, event, timestamp):
         '''
