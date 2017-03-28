@@ -312,9 +312,10 @@ class Controller(
             if score == 'HIT':
                 # TODO: Investigate why are changes to reward_volume applied on
                 # the second trial rather than the first one?
-                self.set_pump_volume(self.get_current_value('reward_volume'))
-                self.pump_trigger([])
-                # pass
+                reward_volume = self.get_current_value('reward_volume')
+                if reward_volume > .5:
+                    self.set_pump_volume(self.get_current_value('reward_volume'))
+                    self.pump_trigger([])
 
             self.start_timer('iti_duration', Event.iti_duration_elapsed)
             self.trial_state = TrialState.waiting_for_iti
