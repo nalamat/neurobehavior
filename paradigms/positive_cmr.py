@@ -39,11 +39,13 @@ from __future__ import division
 import enum
 
 import sys
+import traceback
 import threading
 from os import path
 
 from traits.api import Instance, File, Any, Int, Bool
 from traitsui.api import View, Include, VGroup
+from pyface.api import error
 
 from experiments.evaluate import Expression
 
@@ -167,6 +169,7 @@ class Controller(
         self.masker = masker.astype('float64')
         sf = 7.07/np.sqrt(np.mean(self.masker**2))
         self.masker *= sf
+        self.masker_max = max(abs(self.masker))
 
         target_filename = self.get_current_value('target_filename')
         if not path.exists(target_filename):
@@ -181,6 +184,7 @@ class Controller(
         sf = 7.07/np.sqrt(np.mean(self.target_flat**2))
         self.target_flat *= sf
         self.target_ramp *= sf
+        self.target_max = max(abs(self.target_flat))
 
         self.trial_state = TrialState.waiting_for_np_start
         self.engine = Engine()
@@ -217,7 +221,7 @@ class Controller(
         self.model.data.spout.fs      = self.fs_ai
 
         # Configure the pump
-        # self.iface_pump.set_direction('infuse')
+        self.iface_pump.set_direction('infuse')
 
         # Generate a random seed based on the computer's clock.
         self.random_seed = int(time())
@@ -237,7 +241,7 @@ class Controller(
 
     def trigger_next(self):
         self.trial_info = {}
-        self.invalidate_context()
+        self.refresh_context()
         self.current_setting = self.next_setting()
         self.evaluate_pending_expressions(self.current_setting)
 
@@ -253,7 +257,7 @@ class Controller(
 
     def stop_experiment(self, info):
         self.engine.stop()
-        # self.iface_pump.disconnect()
+        self.iface_pump.disconnect()
 
     def remind(self, info=None):
         # If trial is already running, the remind will be presented on the next
@@ -304,9 +308,9 @@ class Controller(
             if score == 'HIT':
                 # TODO: Investigate why are changes to reward_volume applied on
                 # the second trial rather than the first one?
-                # self.set_pump_volume(self.get_current_value('reward_volume'))
-                # self.pump_trigger([])
-                pass
+                self.set_pump_volume(self.get_current_value('reward_volume'))
+                self.pump_trigger([])
+                # pass
 
             self.start_timer('iti_duration', Event.iti_duration_elapsed)
             self.trial_state = TrialState.waiting_for_iti
@@ -377,7 +381,7 @@ class Controller(
             self.engine.write_hw_ao(signal, offset)
             self.masker_offset = offset + duration
         except:
-            log.error(sys.exc_info()[1])
+            log.error(traceback.format_exc())
 
     ############################################################################
     # Callbacks for NI Engine
@@ -409,7 +413,7 @@ class Controller(
             try:
                 self.engine.write_hw_ao(signal)
             except:
-                log.error(sys.exc_info()[1])
+                log.error(traceback.format_exc())
 
     event_map = {
         ('rising', 'np'): Event.np_start,
@@ -455,7 +459,7 @@ class Controller(
             try:
                 self._handle_event(event, timestamp)
             except:
-                log.error(sys.exc_info()[1])
+                log.error(traceback.format_exc())
 
     def _handle_event(self, event, timestamp):
         '''
@@ -552,18 +556,28 @@ class Controller(
         return self.engine.ao_sample_clock()/self.fs
 
     def set_masker_level(self, level):
-        log.info('#### set_masker_level start')
-        masker_sf = 10.0**(-float(level)/20.0)
-        if max(abs(self.masker))*masker_sf > 10:
-            log.info('#### set_masker_level overflow')
-            self.model.paradigm.masker_level = 100
-        log.info('#### set_masker_level end')
+        try:
+            masker_sf = 10.0**(-float(level)/20.0)
+            target_sf = 10.0**(-float(self.get_current_value('target_level')))
+            if self.masker_max*masker_sf + self.target_max*target_sf > 10:
+                self.set_current_value('masker_level', self.old_context['masker_level'])
+                self.model.paradigm.masker_level = self.old_context['masker_level']
+                msg = '\n\nNew masker attenuation results in clipping of output.\nReverting back to the old value.'
+                error(self.info.ui.control, message=msg, title='Error applying changes')
+        except:
+            log.error(traceback.format_exc())
 
     def set_target_level(self, level):
-        target_sf = 10.0**(-float(level)/20.0)
-        if max(abs(self.target))*target_sf > 10:
-            self.set_current_value('target_level', 100)
-            raise ValueError('Current target attenuation results in clipping of output, consider increasing attenuation.')
+        try:
+            masker_sf = 10.0**(-float(self.get_current_value('masker_level')))
+            target_sf = 10.0**(-float(level))
+            if self.masker_max*masker_sf + self.target_max*target_sf > 10:
+                self.set_current_value('target_level', self.old_context['target_level'])
+                self.model.paradigm.target_level = self.old_context['target_level']
+                msg = '\n\nNew target attenuation results in clipping of output.\nReverting back to the old value.'
+                error(self.info.ui.control, message=msg, title='Error applying changes')
+        except:
+            log.error(traceback.format_exc())
 
     def get_masker(self, offset, duration):
         masker_sf = 10.0**(-float(self.get_current_value('masker_level'))/20.0)
