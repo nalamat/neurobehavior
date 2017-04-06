@@ -46,6 +46,7 @@ class PositiveCMRControllerMixin(HasTraits):
         self.update_masker()
 
     def set_masker_level(self, level):
+        log.info('#### set_masker_level base')
         self._update_masker_sf()
 
     def _update_masker_sf(self):
