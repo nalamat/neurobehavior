@@ -66,7 +66,7 @@ class AbstractExperimentData(HasTraits):
             if self.trial_log2 is None:
                 desc = []
                 for key, val in kwargs.iteritems():
-                    if type(val) is str:
+                    if type(val) is str or type(val) is unicode:
                         desc.append((key, 'S512'))
                     else:
                         desc.append((key, type(val)))
