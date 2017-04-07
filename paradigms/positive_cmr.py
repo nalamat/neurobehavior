@@ -43,11 +43,12 @@ import traceback
 import threading
 from os import path
 
-from traits.api import Instance, File, Any, Int, Bool
+from traits.api import Instance, File, Any, Int, Bool, on_trait_change
 from traitsui.api import View, Include, VGroup
 from pyface.api import error
 
 from experiments.evaluate import Expression
+from experiments.trial_setting import TrialSetting
 
 from cns import get_config
 from time import time
@@ -141,6 +142,7 @@ class Controller(
 
     preload_samples = 200000*5
     update_delay = 200 # ms
+    level_limit = 0
 
     _lock = threading.Lock()
     # engine = Instance('daqengine.ni.Engine')
@@ -169,7 +171,6 @@ class Controller(
         self.masker = masker.astype('float64')
         sf = 7.07/np.sqrt(np.mean(self.masker**2))
         self.masker *= sf
-        self.masker_max = max(abs(self.masker))
 
         target_filename = self.get_current_value('target_filename')
         if not path.exists(target_filename):
@@ -184,7 +185,12 @@ class Controller(
         sf = 7.07/np.sqrt(np.mean(self.target_flat**2))
         self.target_flat *= sf
         self.target_ramp *= sf
-        self.target_max = max(abs(self.target_flat))
+
+        masker_max = max(abs(self.masker))
+        target_max = max(abs(self.target_flat))
+        self.level_limit = -20*np.log10(10/(masker_max+target_max))
+        self.level_limit = np.ceil(self.level_limit*10)/10
+        log.info('Minimum allowed attenuation level: %d dB', self.level_limit)
 
         self.trial_state = TrialState.waiting_for_np_start
         self.engine = Engine()
@@ -355,9 +361,9 @@ class Controller(
         offset += int(delay)
 
         # Generate combined signal
-        target_sf = 10.0**(-float(self.get_current_value('target_level'))/20.0)
-        # if max(abs(self.target_flat))*target_sf > 10:
-        #     raise ValueError('Current target attenuation results in clipping of output, consider increasing attenuation.')
+        target_level = float(self.get_current_value('target_level'))
+        if target_level < self.level_limit: target_level = self.level_limit
+        target_sf = 10.0**(-target_level/20.0)
         target_flat_duration = self.target_flat.shape[-1] / self.fs
         target_reps = round(self.get_current_value('target_duration')/target_flat_duration)
         target = [self.target_ramp[:-1], np.tile(self.target_flat, target_reps), -self.target_ramp[::-1]]
@@ -367,9 +373,6 @@ class Controller(
         duration = target.shape[-1]
         masker = self.get_masker(offset, duration)
         signal = masker + target
-
-        # if max(abs(signal)) > 10:
-        #     raise ValueError('Current target/masker attenuation results in clipping of output, consider increasing attenuation.')
 
         log.debug('Inserting target at %d', offset)
         log.debug('Overwriting %d samples in buffer', duration)
@@ -555,36 +558,41 @@ class Controller(
     def get_ts(self):
         return self.engine.ao_sample_clock()/self.fs
 
+    # Track changes in the trial settings tabulator (usually for target_level)
+    @on_trait_change('model.paradigm.+container*.+context, +context')
+    def trait_change(self, instance, name, old, new):
+        if type(instance) is TrialSetting and name in ('masker_level','target_level'):
+            self.check_level(new)
+
     def set_masker_level(self, level):
-        try:
-            masker_sf = 10.0**(-float(level)/20.0)
-            target_sf = 10.0**(-float(self.get_current_value('target_level')))
-            if self.masker_max*masker_sf + self.target_max*target_sf > 10:
-                self.set_current_value('masker_level', self.old_context['masker_level'])
-                self.model.paradigm.masker_level = self.old_context['masker_level']
-                msg = '\n\nNew masker attenuation results in clipping of output.\nReverting back to the old value.'
-                error(self.info.ui.control, message=msg, title='Error applying changes')
-        except:
-            log.error(traceback.format_exc())
+        self.check_level(level)
 
     def set_target_level(self, level):
+        self.check_level(level)
+
+    # Only inform the user that the entered value is not allowed. The context
+    # target and masker levels will not be changed, however, when outputting the
+    # sounds the level limit is applied
+    def check_level(self, level):
         try:
-            masker_sf = 10.0**(-float(self.get_current_value('masker_level')))
-            target_sf = 10.0**(-float(level))
-            if self.masker_max*masker_sf + self.target_max*target_sf > 10:
-                self.set_current_value('target_level', self.old_context['target_level'])
-                self.model.paradigm.target_level = self.old_context['target_level']
-                msg = '\n\nNew target attenuation results in clipping of output.\nReverting back to the old value.'
+            if type(level) in (str, unicode):
+                level = float(level)
+            if level < self.level_limit:
+                msg = 'Masker or target attenuation values smaller than {0} dB are not allowed.\nWill use {0} dB instead.'.format(self.level_limit)
                 error(self.info.ui.control, message=msg, title='Error applying changes')
         except:
             log.error(traceback.format_exc())
 
     def get_masker(self, offset, duration):
-        masker_sf = 10.0**(-float(self.get_current_value('masker_level'))/20.0)
+        masker_level = float(self.get_current_value('masker_level'))
+        if masker_level < self.level_limit: masker_level = self.level_limit
+        masker_sf = 10.0**(-masker_level/20.0)
         return self.get_cyclic(self.masker, offset, duration) * masker_sf
 
     def get_target(self, offset, duration):
-        target_sf = 10.0**(-float(self.get_current_value('target_level'))/20.0)
+        target_level = float(self.get_current_value('target_level'))
+        if target_level < self.level_limit: target_level = self.level_limit
+        target_sf = 10.0**(-target_level/20.0)
         return self.get_cyclic(self.target_flat, offset, duration) * target_sf
 
     def get_cyclic(self, signal, offset, duration):

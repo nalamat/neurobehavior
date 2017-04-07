@@ -547,6 +547,7 @@ class AbstractExperimentController(Controller):
             return
 
         log.debug('Detected change to %s', name)
+
         trait = instance.trait(name)
         if trait.immediate:
             self.set_current_value(name, new)
