@@ -22,6 +22,7 @@ from time import strftime
 from os import path
 import threading
 import tables as tb
+import pandas
 
 def configure_logging(filename):
     time_format = '[%(asctime)s] :: %(name)s - %(levelname)s - %(message)s'
@@ -103,17 +104,18 @@ def do_monkeypatch():
         tb.Table.append,
         tb.Table.modify_rows,
         tb.Table.read,
-        tb.File.create_table,
-        tb.File.create_group,
-        tb.File.create_array,
-        tb.File.create_carray,
-        tb.File.create_earray,
-        tb.File.create_vlarray,
-        tb.File.get_node,
-        tb.File.set_node_attr,
-        tb.File.list_nodes,
+        tb.File.createTable,
+        tb.File.createGroup,
+        tb.File.createArray,
+        tb.File.createCArray,
+        tb.File.createEArray,
+        tb.File.createVLArray,
+        tb.File.getNode,
+        tb.File.setNodeAttr,
+        tb.File.listNodes,
         tb.EArray.append,
         tb.Array.__getitem__,
+        pandas.core.frame.DataFrame.append,
     ]
 
     def secure_lock(f, lock):

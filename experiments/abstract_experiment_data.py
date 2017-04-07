@@ -56,10 +56,12 @@ class AbstractExperimentData(HasTraits):
 
     def log_trial(self, **kwargs):
         try:
+            # log.info('#### log_trial checkpoint 1')
             # This is a very inefficient implementation (appends require
             # reallocating information in memory).
             self.trial_log = self.trial_log.append(kwargs, ignore_index=True)
             self.trial_log_updated = kwargs
+            # log.info('#### log_trial checkpoint 2')
             # If haven't done yet, create a table for saving trial log to the
             # HDF5 file and set the column names. Column names should not change
             # throughout a single session
@@ -70,36 +72,47 @@ class AbstractExperimentData(HasTraits):
                         desc.append((key, 'S512'))
                     else:
                         desc.append((key, type(val)))
+                # log.info('#### log_trial checkpoint 3')
                 desc = np.dtype(desc)
                 fh = self.store_node._v_file
                 self.trial_log2 = fh.createTable(self.store_node, 'trial_log', desc)
+                # log.info('#### log_trial checkpoint 4')
             self.trial_log2.append([tuple(kwargs.values())])
+            # log.info('#### log_trial checkpoint 5')
 
             # Update performance, i.e. hit rate, FA rate and d' sensitivtiy
             self.update_performance(self.trial_log)
+            # log.info('#### log_trial checkpoint 6')
             # If haven't done yet, create a table for saving performance to the
             # HDF5 file and set the column names. Column names should not change
             # throughout a single session
             dict = self.performance.to_dict('list')
+            # log.info('#### log_trial checkpoint 7')
             # Index column that is usually target_level should be added manually
             dict[self.performance.index.name] = list(self.performance.index.values)
+            # log.info('#### log_trial checkpoint 8')
             if self.performance2 is None:
                 desc = []
                 for key, val in dict.iteritems():
-                    if type(val[0]) is str:
+                    if type(val[0]) is str or type(val) is unicode:
                         desc.append((key, 'S512'))
                     else:
                         desc.append((key, type(val[0])))
+                # log.info('#### log_trial checkpoint 9')
                 desc = np.dtype(desc)
                 fh = self.store_node._v_file
                 self.performance2 = fh.createTable(self.store_node, 'peformance', desc)
+                # log.info('#### log_trial checkpoint 10')
             # Do not append, but override previous content of the table
             rows = zip(*dict.values())
+            # log.info('#### log_trial checkpoint 11')
             nrows = self.performance2.nrows
             if not nrows == 0:
                 self.performance2.modify_rows(start=0,stop=nrows,rows=rows[:nrows])
+            # log.info('#### log_trial checkpoint 12')
             if len(rows) > nrows:
                 self.performance2.append(rows[nrows:])
+            # log.info('#### log_trial checkpoint 13')
         except:
             log.error(traceback.format_exc())
 
