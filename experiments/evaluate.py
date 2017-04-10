@@ -274,7 +274,7 @@ class TestExpressions(unittest.TestCase):
         obj.a = 'a+5'
 
 class TestTraits(HasTraits):
-     
+
     a = Expression('a+4', context=True)
 
     @on_trait_change('a')
