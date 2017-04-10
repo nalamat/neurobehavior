@@ -43,7 +43,7 @@ import traceback
 import threading
 from os import path
 
-from traits.api import Instance, File, Any, Int, Bool, on_trait_change
+from traits.api import Instance, File, Any, Int, Float, Bool, on_trait_change
 from traitsui.api import View, Include, VGroup
 from pyface.api import error
 
@@ -141,8 +141,9 @@ class Controller(
         return self.trial_state.value
 
     preload_samples = 200000*5
-    update_delay = 200 # ms
-    level_limit = 0
+    kw = {'context': True, 'log': True}
+    update_delay = Float(200, **kw) # ms
+    signal_level = Float(0  , **kw)
 
     _lock = threading.Lock()
     # engine = Instance('daqengine.ni.Engine')
@@ -169,7 +170,7 @@ class Controller(
         self.masker_offset = 0
         self.fs, masker = wavfile.read(masker_filename, mmap=True)
         self.masker = masker.astype('float64')
-        sf = 7.07/np.sqrt(np.mean(self.masker**2))
+        sf = 1/np.sqrt(np.mean(self.masker**2))  # normalize by rms
         self.masker *= sf
 
         target_filename = self.get_current_value('target_filename')
@@ -182,15 +183,18 @@ class Controller(
         # self.fs, target      = wavfile.read(target_filename, mmap=True)
         self.target_flat = target_flat.astype('float64')
         self.target_ramp = target_ramp.astype('float64')
-        sf = 7.07/np.sqrt(np.mean(self.target_flat**2))
+        sf = 1/np.sqrt(np.mean(self.target_flat**2)) # normalize by rms
         self.target_flat *= sf
         self.target_ramp *= sf
 
-        masker_max = max(abs(self.masker))
-        target_max = max(abs(self.target_flat))
-        self.level_limit = -20*np.log10(10/(masker_max+target_max))
-        self.level_limit = np.ceil(self.level_limit*10)/10
-        log.info('Minimum allowed attenuation level: %d dB', self.level_limit)
+        signal_max = max(abs(self.masker)) + max(abs(self.target_flat))
+        self.masker      *= 10/signal_max
+        self.target_flat *= 10/signal_max
+        self.target_ramp *= 10/signal_max
+
+        signal_level = 20*np.log10(10/(signal_max))
+        signal_level = np.floor(self.signal_level*10)/10
+        self.set_current_value('signal_level', signal_level)
 
         self.trial_state = TrialState.waiting_for_np_start
         self.engine = Engine()
@@ -352,7 +356,7 @@ class Controller(
 
         # if self.masker_on:
         # Insert the target at a specific phase of the modulated masker
-        masker_frequency = float(self.get_current_value('masker_frequency'))
+        masker_frequency = self.get_current_value('masker_frequency')
         period = self.fs/masker_frequency
         phase_delay = self.get_current_value('phase_delay')/360.0*period
         phase = (offset % self.masker.shape[-1]) % period
@@ -361,8 +365,8 @@ class Controller(
         offset += int(delay)
 
         # Generate combined signal
-        target_level = float(self.get_current_value('target_level'))
-        if target_level < self.level_limit: target_level = self.level_limit
+        target_level = self.get_current_value('target_level')
+        if target_level < 0: target_level = 0
         target_sf = 10.0**(-target_level/20.0)
         target_flat_duration = self.target_flat.shape[-1] / self.fs
         target_reps = round(self.get_current_value('target_duration')/target_flat_duration)
@@ -575,23 +579,21 @@ class Controller(
     # sounds the level limit is applied
     def check_level(self, level):
         try:
-            if type(level) in (str, unicode):
-                level = float(level)
-            if level < self.level_limit:
-                msg = 'Masker or target attenuation values smaller than {0} dB are not allowed.\nWill use {0} dB instead.'.format(self.level_limit)
+            if level < 0:
+                msg = 'Negative masker or target attenuation values are not allowed.\nWill use 0 dB instead.'
                 error(self.info.ui.control, message=msg, title='Error applying changes')
         except:
             log.error(traceback.format_exc())
 
     def get_masker(self, offset, duration):
-        masker_level = float(self.get_current_value('masker_level'))
-        if masker_level < self.level_limit: masker_level = self.level_limit
+        masker_level = self.get_current_value('masker_level')
+        if masker_level < 0: masker_level = 0
         masker_sf = 10.0**(-masker_level/20.0)
         return self.get_cyclic(self.masker, offset, duration) * masker_sf
 
     def get_target(self, offset, duration):
-        target_level = float(self.get_current_value('target_level'))
-        if target_level < self.level_limit: target_level = self.level_limit
+        target_level = self.get_current_value('target_level')
+        if target_level < 0: target_level = 0
         target_sf = 10.0**(-target_level/20.0)
         return self.get_cyclic(self.target_flat, offset, duration) * target_sf
 
