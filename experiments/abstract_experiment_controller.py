@@ -573,6 +573,7 @@ class AbstractExperimentController(Controller):
         self.current_context = self.trait_get(context=True)
         self.current_context.update(self.model.data.trait_get(context=True))
         self.pending_expressions = self.shadow_paradigm.trait_get(context=True)
+        self.pending_expressions.update(self.model.paradigm.trait_get(context=True))
 
     def apply(self, info=None):
         '''

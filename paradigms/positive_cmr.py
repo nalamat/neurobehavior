@@ -231,7 +231,7 @@ class Controller(
         self.model.data.spout.fs      = self.fs_ai
 
         # Configure the pump
-        # self.iface_pump.set_direction('infuse')
+        self.iface_pump.set_direction('infuse')
 
         # Generate a random seed based on the computer's clock.
         self.random_seed = int(time())
@@ -257,18 +257,12 @@ class Controller(
                 c_nogo += 1
             else:
                 break
-        self.set_current_value('c_nogo', c_nogo)
-        # self.c_nogo = c_nogo
-
-        print('#########')
-        print(self.current_context)
+        self.model.data.c_nogo = c_nogo
 
         self.trial_info = {}
         self.refresh_context()
         self.current_setting = self.next_setting()
         self.evaluate_pending_expressions(self.current_setting)
-
-        print(self.current_context)
 
     def log_trial(self, **kwargs):
         # HDF5 data files do not natively support unicode strings so we need to
@@ -282,7 +276,7 @@ class Controller(
 
     def stop_experiment(self, info):
         self.engine.stop()
-        # self.iface_pump.disconnect()
+        self.iface_pump.disconnect()
 
     def remind(self, info=None):
         # If trial is already running, the remind will be presented on the next
@@ -333,9 +327,9 @@ class Controller(
             if score == 'HIT':
                 # TODO: Investigate why are changes to reward_volume applied on
                 # the second trial rather than the first one?
-                # self.set_pump_volume(self.get_current_value('reward_volume'))
-                # self.pump_trigger([])
-                pass
+                self.set_pump_volume(self.get_current_value('reward_volume'))
+                self.pump_trigger([])
+                # pass
 
             self.start_timer('iti_duration', Event.iti_duration_elapsed)
             self.trial_state = TrialState.waiting_for_iti
@@ -650,7 +644,6 @@ class Paradigm(
     #go_probability = Expression('0.5',
     #        label='Go probability', log=False, context=True)
     repeat_fa = Bool(True, label='Repeat if FA?', log=True, context=True)
-    c_nogo = Int(0, context=True, label='Consecutive nogos (excluding repeats)')
 
     traits_view = View(
             VGroup(
@@ -680,6 +673,7 @@ class Data(PositiveData, PositiveCLDataMixin, PumpDataMixin):
     '''
     Container for the data
     '''
+    c_nogo = Int(0, context=True, label='Consecutive nogos (excluding repeats)')
     pass
 
 
