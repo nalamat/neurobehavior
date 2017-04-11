@@ -36,7 +36,7 @@ class CLParadigmMixin(HasTraits):
 
     go_setting_order = Trait('shuffled set', choice.options,
             label='Go setting order', **kw)
-    go_probability = Expression('0.5', label='Go probability', **kw)
+    go_probability = Expression('0.5 if c_nogo<5 else 1', label='Go probability', **kw)
     repeat_fa = Bool(True, label='Repeat nogo if FA?', **kw)
 
     # GUI elements to facilitate adding and removing parameters from the go
@@ -103,8 +103,8 @@ class CLParadigmMixin(HasTraits):
         return ts
 
     def _trial_settings_default(self):
-        return [TrialSetting('NOGO', 200), TrialSetting('GO_REMIND', 20),
-                TrialSetting('GO', 20)]
+        return [TrialSetting('NOGO', 200), TrialSetting('GO_REMIND', 0),
+                TrialSetting('GO', 0)]
 
     def __sort_fired(self):
         self.trial_settings.sort()

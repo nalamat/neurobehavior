@@ -1,4 +1,4 @@
-from traits.api import HasTraits, Bool
+from traits.api import HasTraits, Bool, Int
 import numpy as np
 from cns import choice
 

@@ -129,6 +129,11 @@ def do_monkeypatch():
         wrapped_im = secure_lock(im, lock)
         setattr(im.im_class, im.im_func.func_name, wrapped_im)
 
+    def table_length(self):
+        with lock:
+            return self.nrows
+
+    setattr(tb.Table, 'length', property(table_length))
 
 CALIBRATION_HELP = '''Path to file containing calibration data for {} speaker.
 If this option is not specified, the most recent calibration file available
