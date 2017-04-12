@@ -43,7 +43,7 @@ class TrialLogAdapter(TabularAdapter):
         dataframe = getattr(object, trait)
         if len(dataframe) == 0:
             return None
-        return dataframe.iloc[row]
+        return dataframe.iloc[-row-1] # Reverse order
 
     def _get_parameter_text(self):
         parameters = self.object.parameters
