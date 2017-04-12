@@ -23,6 +23,7 @@ from os import path
 import threading
 import tables as tb
 import pandas
+from cns.widgets.file_handler import get_save_file
 
 def configure_logging(filename):
     time_format = '[%(asctime)s] :: %(name)s - %(levelname)s - %(message)s'
@@ -181,10 +182,14 @@ if __name__ == '__main__':
                        const='test', help='Test experiment')
     group.add_argument('-i', '--inspect', dest='mode', action='store_const',
                        const='inspect', help='Print available parameters')
+    group.add_argument('-F', '--folder', type=str,
+                       help="Open file selector for saving data to")
     group.add_argument('-f', '--file', type=str, help="File to save data to")
 
     parser.add_argument('-n', '--neural', dest='physiology',
                         action='store_true', help='Acquire neurophysiology',
+                        default=False)
+    parser.add_argument('--nopump', action='store_true', help='Deactivate pump',
                         default=False)
 
     parser.add_argument('--save-microphone', action='store_true',
@@ -249,6 +254,12 @@ if __name__ == '__main__':
         do_monkeypatch()
 
         # Finally, do the requested action
+        if args.folder is not None:
+            args.file = get_save_file(args.folder, 'HDF5 Files (*.h5;*.hdf5)|*.h5;*.hdf5')
+            print 'Selected file ', args.file
+            if args.file is None:
+                raise ValueError('No file was selected')
+
         if args.file is not None:
             loader.launch_experiment(args, args.file)
         elif args.mode == 'profile':

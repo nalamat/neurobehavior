@@ -262,6 +262,7 @@ def prepare_experiment(args, store_node, create_child=True):
             data=data,
             paradigm=paradigm,
             spool_physiology=args.physiology,
+            args=args,
             )
 
     if args.analyze:
