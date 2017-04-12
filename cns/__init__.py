@@ -6,7 +6,7 @@ def load_settings():
     # Load the default settings
     from os import environ
     from . import settings
-    
+
     try:
         # Load the computer-specific settings
         path = environ['NEUROBEHAVIOR_SETTINGS']
@@ -23,7 +23,7 @@ def load_settings():
     except IOError:
         log.debug('%s file defined by NEUROBEHAVIOR_SETTINGS is missing', path)
     return settings
-        
+
 _settings = load_settings()
 
 def set_config(setting, value):
@@ -31,13 +31,13 @@ def set_config(setting, value):
     Set value of setting
     '''
     setattr(_settings, setting, value)
-    
+
 def get_config(setting=None):
     '''
     Get value of setting
     '''
     if setting is not None:
-        return getattr(_settings, setting) 
+        return getattr(_settings, setting)
     else:
         setting_names = [s for s in dir(_settings) if s.upper() == s]
         setting_values = [getattr(_settings, s) for s in setting_names]

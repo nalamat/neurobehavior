@@ -103,8 +103,8 @@ class CLParadigmMixin(HasTraits):
         return ts
 
     def _trial_settings_default(self):
-        return [TrialSetting('NOGO', 200), TrialSetting('GO_REMIND', 0),
-                TrialSetting('GO', 0)]
+        return [TrialSetting('NOGO', 200), TrialSetting('GO_REMIND', 20),
+                TrialSetting('GO', 20)]
 
     def __sort_fired(self):
         self.trial_settings.sort()

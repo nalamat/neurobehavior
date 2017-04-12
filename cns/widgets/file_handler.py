@@ -6,11 +6,13 @@ import os
 log = logging.getLogger(__name__)
 
 def get_save_file(path, wildcard):
-    wildcard = wildcard.split('|')[1][1:]
+    # TODO: Extract extensions for all wildcard inputs
+    exts = wildcard.split('|')[1].split(';')
+    exts = tuple([x[1:] for x in exts])
     fd = FileDialog(action='save as', default_directory=path, wildcard=wildcard)
     if fd.open() == OK and fd.path <> '':
-        if not fd.path.endswith(wildcard):
-            fd.path += wildcard
+        if not fd.path.endswith(exts):
+            fd.path += exts[0]
         return fd.path
     return None
 
@@ -41,12 +43,12 @@ def check_valid(func):
     return _inner
 
 class FileHandler(Controller):
-    
+
     wildcard        = Str
     path            = File
     file            = Trait(None, File)
     modified_trait  = Trait(None, Str)
-    
+
     def init(self, info):
         if self.modified_trait is not None:
             info.object.on_trait_change(self.update_title, self.modified_trait)
@@ -57,7 +59,7 @@ class FileHandler(Controller):
 
     @confirm_if_modified
     def load_file(self, info):
-        fd = FileDialog(action='open', 
+        fd = FileDialog(action='open',
                         default_directory=self.path,
                         wildcard=self.wildcard)
         if fd.open() == OK and fd.path <> '':
@@ -74,7 +76,7 @@ class FileHandler(Controller):
                 raise
         else:
             return False
-                
+
     @check_valid
     def save_file(self, info):
         if self.file is None:
@@ -87,7 +89,7 @@ class FileHandler(Controller):
                 mesg = 'There was an error saving the file.\n'
                 mesg += str(e)
                 error(info.ui.control, mesg)
-                
+
     @check_valid
     def saveas_file(self, info):
         file = get_save_file(self.path, self.wildcard)
