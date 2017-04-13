@@ -5,6 +5,7 @@ from enable.savage.trait_defs.ui.svg_button import SVGButton
 from cns.widgets.icons import icons
 import sys
 import logging
+import traceback
 log = logging.getLogger(__name__)
 
 class PumpToolBar(ToolBar):
@@ -45,9 +46,10 @@ class PumpControllerMixin(HasTraits):
     def pump_trigger(self, info=None):
         try:
             self.pump_refresh()
-            self.iface_pump.run()
+            if self.get_current_value('reward_volume')>1:
+                self.iface_pump.run()
         except:
-            log.error(sys.exc_info()[1])
+            log.error(traceback.format_exc())
 
     def pump_override(self, info=None):
         if not self.pump_toggle:
