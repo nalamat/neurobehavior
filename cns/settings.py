@@ -177,7 +177,7 @@ PAIRED_COLORS_RGB_NORM = [
 
 # Format to use when generating time strings for use in a HDF5 node pathname
 # (see time.strptime for documentation re the format specifiers to use below)
-TIME_FORMAT = '%Y%m%d-%H%M%S'
+TIME_FORMAT = '%Y%m%d_%H%M%S'
 
 # Format to use when storing datetime strings as attributes in the HDF5 file
 DATE_FMT = '%Y-%m-%d'

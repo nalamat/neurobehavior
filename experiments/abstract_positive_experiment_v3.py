@@ -1,5 +1,7 @@
 from __future__ import division
 
+import traceback
+import threading
 from traits.api import Any, Instance, \
         Int, Float, Property, on_trait_change, cached_property
 from traitsui.api import Item, VGroup, InstanceEditor,\
@@ -63,7 +65,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
 
     def _add_experiment_plots(self, index_mapper, container, alpha=0.25):
 
-        # set up microphone plot
+        # set up speaker plot
         value_range = DataRange1D(low_setting=-4, high_setting=1.5)
         value_mapper = LinearMapper(range=value_range)
         plot = ExtremesChannelPlot(source=self.data.speaker,
@@ -71,6 +73,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
                            line_color='green')
         container.add(plot)
 
+        # set up microphone plot
         value_range = DataRange1D(low_setting=-4, high_setting=1.5)
         value_mapper = LinearMapper(range=value_range)
         plot = ExtremesChannelPlot(source=self.data.microphone,
@@ -78,14 +81,6 @@ class AbstractPositiveExperiment(AbstractExperiment):
                            line_color='black')
         self.microphone_plot = plot
         container.add(plot)
-
-        # set up channel 1 plot
-        # value_range = DataRange1D(low_setting=-4, high_setting=7)
-        # value_mapper = LinearMapper(range=value_range)
-        # plot = ExtremesChannelPlot(source=self.data.ch1,
-        #                 index_mapper=index_mapper, value_mapper=value_mapper,
-        #                 line_color='blue')
-        # container.add(plot)
 
         # set up nose poke plot
         value_range = DataRange1D(low_setting=-1, high_setting=16)
@@ -96,8 +91,6 @@ class AbstractPositiveExperiment(AbstractExperiment):
         container.add(plot)
 
         # set up lick spout plot
-        # value_range = DataRange1D(low_setting=-.5, high_setting=10.5)
-        # value_mapper = LinearMapper(range=value_range)
         plot = ExtremesChannelPlot(source=self.data.spout,
                            index_mapper=index_mapper, value_mapper=value_mapper,
                            line_color='orange')
@@ -107,67 +100,72 @@ class AbstractPositiveExperiment(AbstractExperiment):
         value_range = DataRange1D(low_setting=0+.2, high_setting=1+.2)
         value_mapper = LinearMapper(range=value_range)
 
-        # plot = TablesTimeseriesPlot(source=self.data,
-        #                             trait_name='event_log',
-        #                             changed_name='event_log_updated',
-        #                             event_name='initiated nose poke',
-        #                             marker='diamond',
-        #                             marker_color='black',
-        #                             marker_height=0.45,
-        #                             index_mapper=index_mapper,
-        #                             value_mapper=value_mapper)
-        # container.add(plot)
-        #
-        # plot = TablesTimeseriesPlot(source=self.data,
-        #                             trait_name='event_log',
-        #                             changed_name='event_log_updated',
-        #                             event_name='withdrew from nose poke',
-        #                             marker='diamond',
-        #                             marker_color='red',
-        #                             marker_height=0.45,
-        #                             index_mapper=index_mapper,
-        #                             value_mapper=value_mapper)
-        # container.add(plot)
-        #
-        # plot = TablesTimeseriesPlot(source=self.data,
-        #                             trait_name='event_log',
-        #                             changed_name='event_log_updated',
-        #                             event_name='spout contact',
-        #                             marker='diamond',
-        #                             marker_color='yellow',
-        #                             marker_height=0.45,
-        #                             index_mapper=index_mapper,
-        #                             value_mapper=value_mapper)
-        # container.add(plot)
-        #
-        # plot = TablesTimeseriesPlot(source=self.data,
-        #                             trait_name='event_log',
-        #                             changed_name='event_log_updated',
-        #                             event_name='withdrew from spout',
-        #                             marker='diamond',
-        #                             marker_color='green',
-        #                             marker_height=0.45,
-        #                             index_mapper=index_mapper,
-        #                             value_mapper=value_mapper)
-        # container.add(plot)
+        plot = TablesTimeseriesPlot(source=self.data,
+                                    trait_name='event_log',
+                                    changed_name='event_log_updated',
+                                    event_name='initiated nose poke',
+                                    marker='diamond',
+                                    marker_color='black',
+                                    marker_height=0.45,
+                                    index_mapper=index_mapper,
+                                    value_mapper=value_mapper)
+        container.add(plot)
+
+        plot = TablesTimeseriesPlot(source=self.data,
+                                    trait_name='event_log',
+                                    changed_name='event_log_updated',
+                                    event_name='withdrew from nose poke',
+                                    marker='diamond',
+                                    marker_color='red',
+                                    marker_height=0.45,
+                                    index_mapper=index_mapper,
+                                    value_mapper=value_mapper)
+        container.add(plot)
+
+        plot = TablesTimeseriesPlot(source=self.data,
+                                    trait_name='event_log',
+                                    changed_name='event_log_updated',
+                                    event_name='spout contact',
+                                    marker='diamond',
+                                    marker_color='yellow',
+                                    marker_height=0.45,
+                                    index_mapper=index_mapper,
+                                    value_mapper=value_mapper)
+        container.add(plot)
+
+        plot = TablesTimeseriesPlot(source=self.data,
+                                    trait_name='event_log',
+                                    changed_name='event_log_updated',
+                                    event_name='withdrew from spout',
+                                    marker='diamond',
+                                    marker_color='green',
+                                    marker_height=0.45,
+                                    index_mapper=index_mapper,
+                                    value_mapper=value_mapper)
+        container.add(plot)
 
         tool = ChannelRangeTool(component=plot, allow_drag=False,
                 value_factor=1)
         plot.tools.append(tool)
 
+    plot_lock = threading.Lock()
 
     @on_trait_change('data')
     def _generate_experiment_plot(self):
-        index_range = ChannelDataRange(trig_delay=0)
-        index_range.sources = [self.data.microphone]
-        index_mapper = LinearMapper(range=index_range)
-        self.index_range = index_range
-        container = OverlayPlotContainer(padding=[20, 20, 50, 5])
-        self._add_experiment_plots(index_mapper, container, 0.5)
-        plot = container.components[0]
-        add_default_grids(plot, major_index=1, minor_index=0.25)
-        add_time_axis(plot, orientation='top')
-        self.experiment_plot = container
+        try:
+            with self.plot_lock:
+                index_range = ChannelDataRange(trig_delay=0)
+                index_range.sources = [self.data.microphone]
+                index_mapper = LinearMapper(range=index_range)
+                self.index_range = index_range
+                container = OverlayPlotContainer(padding=[20, 20, 50, 5])
+                self._add_experiment_plots(index_mapper, container, 0.5)
+                plot = container.components[0]
+                add_default_grids(plot, major_index=1, minor_index=0.25)
+                add_time_axis(plot, orientation='top')
+                self.experiment_plot = container
+        except:
+            log.error(traceback.format_exc())
 
     status_group = VGroup(
             Item('animal'),

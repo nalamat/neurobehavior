@@ -135,8 +135,8 @@ def do_monkeypatch():
     def table_length(self):
         with lock:
             return self.nrows
-
     setattr(tb.Table, 'length', property(table_length))
+
 
 CALIBRATION_HELP = '''Path to file containing calibration data for {} speaker.
 If this option is not specified, the most recent calibration file available
@@ -278,7 +278,7 @@ if __name__ == '__main__':
             node_name   = loader.get_experiment(args.type).node_name
             time_fmt    = get_config('TIME_FORMAT')
             time        = datetime.now().strftime(time_fmt)
-            name        = '-'.join([args.animal, node_name, time]) + '.h5'
+            name        = '_'.join([args.animal, node_name, time]) + '.h5'
             args.file   = os.path.join(args.directory, name)
             print 'Will save data to ', args.file
             # Fall into args.file if statement
