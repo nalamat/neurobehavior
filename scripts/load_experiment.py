@@ -14,16 +14,18 @@ os.environ['QT_API'] = 'pyqt'
 # IMPORTANT!  Do not import any portion of the Neurobehavior code (e.g. cns,
 # experiments, paradigms, etc. until after the comment indicating it is safe to
 # do so in the code below.
+import os
 import sys
 import argparse
 import logging
 import logging.config
-from time import strftime
 from os import path
+from time import strftime
+from datetime import datetime
 import threading
 import tables as tb
 import pandas
-from cns.widgets.file_handler import get_save_file
+from cns.widgets.file_handler import get_save_file, get_directory
 
 def configure_logging(filename):
     time_format = '[%(asctime)s] :: %(name)s - %(levelname)s - %(message)s'
@@ -182,9 +184,16 @@ if __name__ == '__main__':
                        const='test', help='Test experiment')
     group.add_argument('-i', '--inspect', dest='mode', action='store_const',
                        const='inspect', help='Print available parameters')
-    group.add_argument('-F', '--folder', type=str,
-                       help="Open file selector for saving data to")
     group.add_argument('-f', '--file', type=str, help="File to save data to")
+    group.add_argument('-of', '--open-file', dest='open_file',
+                       action='store', const='', default=None, type=str, nargs='?',
+                       help="Open file dialog for saving data")
+    group.add_argument('-d', '--directory', dest='directory',
+                       action='store', default=None, type=str,
+                       help="Directory for saving animal data")
+    group.add_argument('-od', '--open-directory', dest='open_directory',
+                       action='store', const='', default=None, type=str, nargs='?',
+                       help="Open directory dialog for saving animal data")
 
     parser.add_argument('-n', '--neural', dest='physiology',
                         action='store_true', help='Acquire neurophysiology',
@@ -253,13 +262,35 @@ if __name__ == '__main__':
 
         do_monkeypatch()
 
-        # Finally, do the requested action
-        if args.folder is not None:
-            args.file = get_save_file(args.folder, 'HDF5 Files (*.h5;*.hdf5)|*.h5;*.hdf5')
-            print 'Selected file ', args.file
+        args.animal = None
+
+        if args.open_directory is not None:
+            args.directory = get_directory(args.open_directory)
+            if args.directory is None:
+                raise ValueError('No directory was selected')
+            print 'Selected directory ', args.directory
+            # Fall into args.directory if statement
+
+        if args.directory is not None:
+            if not os.path.isdir(args.directory):
+                os.makedirs(args.directory)
+            args.animal = os.path.basename(args.directory)
+            node_name   = loader.get_experiment(args.type).node_name
+            time_fmt    = get_config('TIME_FORMAT')
+            time        = datetime.now().strftime(time_fmt)
+            name        = '-'.join([args.animal, node_name, time]) + '.h5'
+            args.file   = os.path.join(args.directory, name)
+            print 'Will save data to ', args.file
+            # Fall into args.file if statement
+
+        if args.open_file is not None:
+            args.file = get_save_file(args.open_file, 'HDF5 Files (*.h5;*.hdf5)|*.h5;*.hdf5')
             if args.file is None:
                 raise ValueError('No file was selected')
+            print 'Selected file ', args.file
+            # Fall into args.file if statement
 
+        # Finally, do the requested action
         if args.file is not None:
             loader.launch_experiment(args, args.file)
         elif args.mode == 'profile':

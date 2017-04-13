@@ -9,7 +9,7 @@ from os.path import join
 from importlib import import_module
 from glob import glob
 
-from traits.api import Any, Trait, TraitError
+from traits.api import Any, Trait, TraitError, Str
 from experiments import trial_setting
 from cns import calibration
 
@@ -204,7 +204,7 @@ def prepare_experiment(args, store_node, create_child=True):
     # Create the experiment and data nodes. Hint! This is where you would
     # change the default pathname for the experiment if you wished.
     if create_child:
-        name = node_name + '_' + datetime.now().strftime(time_fmt)
+        name = node_name + '-' + datetime.now().strftime(time_fmt)
         exp_node = store_file.createGroup(store_node, name)
     else:
         exp_node = store_node
@@ -263,6 +263,7 @@ def prepare_experiment(args, store_node, create_child=True):
             paradigm=paradigm,
             spool_physiology=args.physiology,
             args=args,
+            animal=args.animal,
             )
 
     if args.analyze:
