@@ -300,7 +300,11 @@ class Controller(
         self.remind_requested = False
 
     def pause(self, info=None):
-        self.handle_event(Event.np_start)
+        if self.model.args.nopump:
+            if self.trial_state == TrialState.waiting_for_np_start:
+                self.handle_event(Event.np_start)
+            else:
+                self.handle_event(Event.spout_start)
 
     def start_trial(self):
         log.debug('Starting trial: %s', self.get_current_value('ttype'))
@@ -416,11 +420,12 @@ class Controller(
     def samples_acquired(self, names, samples):
         # Speaker in, mic, nose-poke IR, spout contact IR
         # with self._lock:
-        speaker, microphone, np, spout = samples
-        self.model.data.speaker.send(speaker)
-        self.model.data.microphone.send(microphone)
-        self.model.data.np.send(np)
-        self.model.data.spout.send(spout)
+        with self.model.plot_lock:
+            speaker, microphone, np, spout = samples
+            self.model.data.speaker.send(speaker)
+            self.model.data.microphone.send(microphone)
+            self.model.data.np.send(np)
+            self.model.data.spout.send(spout)
 
     def samples_needed(self, names, offset, samples):
         if samples > 5*self.fs: samples = 5*self.fs
@@ -502,7 +507,8 @@ class Controller(
         the event that occured. Depending on the experiment state, a particular
         event may not be processed.
         '''
-        self.model.data.log_event(timestamp, event.value)
+        with self.model.plot_lock:
+            self.model.data.log_event(timestamp, event.value)
 
         if self.trial_state == TrialState.waiting_for_np_start:
             if event == Event.np_start:
@@ -609,8 +615,8 @@ class Controller(
         try:
             if level < 0:
                 msg = 'Negative masker or target attenuation values are not allowed.\nWill use 0 dB instead.'
-                # error(self.info.ui.control, message=msg, title='Error applying changes')
-                log.error(msg)
+                error(self.info.ui.control, message=msg, title='Error applying changes')
+                # log.error(msg)
         except:
             log.error(traceback.format_exc())
 
