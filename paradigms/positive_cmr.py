@@ -261,7 +261,7 @@ class Controller(
         c_nogo = 0
         trial_log = self.model.data.trial_log
         while len(trial_log)-c_nogo-1 > 0:
-            if trial_log.ttype.values[len(trial_log)-c_nogo-1] is 'NOGO':
+            if trial_log.ttype.values[len(trial_log)-c_nogo-1] in ('NOGO', 'NOGO_REPEAT'):
                 c_nogo += 1
             else:
                 break
@@ -701,7 +701,7 @@ class Data(PositiveData, PositiveCLDataMixin, PumpDataMixin):
     '''
     Container for the data
     '''
-    c_nogo = Int(0, context=True, label='Consecutive nogos (excluding repeats)')
+    c_nogo = Int(0, context=True, label='Consecutive nogos (including repeats)')
     pass
 
 
