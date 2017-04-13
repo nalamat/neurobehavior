@@ -1,6 +1,6 @@
 from traits.api import Str, File, Trait
 from traitsui.api import Controller
-from pyface.api import FileDialog, confirm, NO, error, OK
+from pyface.api import FileDialog, DirectoryDialog, confirm, NO, error, OK
 import logging
 import os
 log = logging.getLogger(__name__)
@@ -14,6 +14,13 @@ def get_save_file(path, wildcard):
         if not fd.path.endswith(exts):
             fd.path += exts[0]
         return fd.path
+    return None
+
+def get_directory(path):
+    msg = 'Select the data folder for the current animal'
+    dialog = DirectoryDialog(action='open', message=msg, default_path=path)
+    if dialog.open() == OK:
+        return dialog.path.strip()
     return None
 
 def confirm_if_modified(func):
