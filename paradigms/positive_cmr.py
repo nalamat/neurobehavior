@@ -40,6 +40,7 @@ import enum
 
 import sys
 import time
+import json
 import traceback
 import threading
 import Queue
@@ -282,6 +283,9 @@ class Controller(
         kwargs['masker_filename'] = str(path.basename(masker_filename))
         super(Controller, self).log_trial(**kwargs)
 
+        log.info('Trial log: %s', json.dumps(kwargs))
+        log.info('Performance: %s', json.dumps(self.model.data.performance))
+
     def stop_experiment(self, info):
         self.engine.stop()
         if not self.model.args.nopump:
@@ -343,6 +347,7 @@ class Controller(
                 # TODO: Investigate why are changes to reward_volume applied on
                 # the second trial rather than the first one?
                 if not self.model.args.nopump:
+                    # TODO: check if removing this line is okay or not
                     self.set_pump_volume(self.get_current_value('reward_volume'))
                     self.pump_trigger([])
 
@@ -362,7 +367,6 @@ class Controller(
         # except:
         #     log.error('[stop_trial] Update delay %f is too small', ud)
 
-        print(self.trial_info)
         self.log_trial(score=score, response=response, ttype=trial_type,
                        **self.trial_info)
         self.trigger_next()
@@ -372,43 +376,43 @@ class Controller(
             self.trigger_next()
 
     def target_play(self, info=None):
-        # Get the current position in the analog output buffer, and add a cetain
-        # update_delay (to give us time to generate and upload the new signal).
-        ts = self.get_ts()
-        ud = self.update_delay*1e-3 # Convert msec to sec
-        offset = int(round((ts+ud)*self.fs))
-
-        # if self.masker_on:
-        # Insert the target at a specific phase of the modulated masker
-        masker_frequency = self.get_current_value('masker_frequency')
-        period = self.fs/masker_frequency
-        phase_delay = self.get_current_value('phase_delay')/360.0*period
-        phase = (offset % self.masker.shape[-1]) % period
-        delay = phase_delay-phase
-        if delay<0: delay+=period
-        offset += int(delay)
-
-        # Generate combined signal
-        target_level = self.get_current_value('target_level')
-        if target_level < 0: target_level = 0
-        target_sf = 10.0**(-target_level/20.0)
-        target_flat_duration = self.target_flat.shape[-1] / self.fs
-        target_reps = round(self.get_current_value('target_duration')/target_flat_duration)
-        target = [self.target_ramp[:-1], np.tile(self.target_flat, target_reps), -self.target_ramp[::-1]]
-        target = np.concatenate(target) * target_sf
-        if target.shape[-1] < self.fs: # If target is less than 1s
-            target = np.concatenate([target, np.zeros(self.fs-target.shape[-1])])
-        duration = target.shape[-1]
-        masker = self.get_masker(offset, duration)
-        signal = masker + target
-
-        log.debug('Inserting target at %d', offset)
-        log.debug('Overwriting %d samples in buffer', duration)
-
-        self.trial_info['target_start'] = ts
-        self.trial_info['target_end'] = ts+duration/self.fs
-
         try:
+            # Get the current position in the analog output buffer, and add a cetain
+            # update_delay (to give us time to generate and upload the new signal).
+            ts = self.get_ts()
+            ud = self.update_delay*1e-3 # Convert msec to sec
+            offset = int(round((ts+ud)*self.fs))
+
+            # if self.masker_on:
+            # Insert the target at a specific phase of the modulated masker
+            masker_frequency = self.get_current_value('masker_frequency')
+            period = self.fs/masker_frequency
+            phase_delay = self.get_current_value('phase_delay')/360.0*period
+            phase = (offset % self.masker.shape[-1]) % period
+            delay = phase_delay-phase
+            if delay<0: delay+=period
+            offset += int(delay)
+
+            # Generate combined signal
+            target_level = self.get_current_value('target_level')
+            if target_level < 0: target_level = 0
+            target_sf = 10.0**(-target_level/20.0)
+            target_flat_duration = self.target_flat.shape[-1] / self.fs
+            target_reps = round(self.get_current_value('target_duration')/target_flat_duration)
+            target = [self.target_ramp[:-1], np.tile(self.target_flat, target_reps), -self.target_ramp[::-1]]
+            target = np.concatenate(target) * target_sf
+            if target.shape[-1] < self.fs: # If target is less than 1s
+                target = np.concatenate([target, np.zeros(self.fs-target.shape[-1])])
+            duration = target.shape[-1]
+            masker = self.get_masker(offset, duration)
+            signal = masker + target
+
+            log.debug('Inserting target at %d', offset)
+            log.debug('Overwriting %d samples in buffer', duration)
+
+            self.trial_info['target_start'] = ts
+            self.trial_info['target_end'] = ts+duration/self.fs
+
             self.engine.write_hw_ao(signal, offset)
             self.masker_offset = offset + duration
         except:
@@ -445,22 +449,18 @@ class Controller(
             log.error(traceback.format_exc())
 
     event_map = {
-        ('rising', 'np'): Event.np_start,
-        ('falling', 'np'): Event.np_end,
-        ('rising', 'spout'): Event.spout_start,
-        ('falling', 'spout'): Event.spout_end,
+        ('rising' , 'np'   ): Event.np_start   ,
+        ('falling', 'np'   ): Event.np_end     ,
+        ('rising' , 'spout'): Event.spout_start,
+        ('falling', 'spout'): Event.spout_end  ,
     }
-
-    # counter = 0
 
     def di_changed(self, name, change, timestamp):
         # The timestamp is the number of analog output samples that have been
         # generated at the time the event occured. Convert to time in seconds
         # since experiment start.
         timestamp /= self.fs
-        log.debug('detected {} edge on {} at {}'.format(change, name,timestamp))
-        # self.counter += 1
-        # log.debug('event %d', self.counter)
+        log.debug('Detected {} edge on {} at {}'.format(change, name,timestamp))
         event = self.event_map[change, name]
         self.handle_event(event, timestamp)
 
