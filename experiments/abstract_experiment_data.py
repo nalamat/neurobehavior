@@ -3,17 +3,17 @@ from __future__ import division
 import logging
 log = logging.getLogger(__name__)
 
+import sys
+import json
+import traceback
+
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
 
 from traits.api import (Instance, List, Property, Tuple, cached_property, Any,
                         Int, Event, HasTraits)
-
 from cns.channel import FileChannel
-
-import traceback
-import sys
 
 class AbstractExperimentData(HasTraits):
 
