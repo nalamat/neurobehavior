@@ -36,8 +36,8 @@ class CLParadigmMixin(HasTraits):
 
     go_setting_order = Trait('shuffled set', choice.options,
             label='Go setting order', **kw)
-    go_probability = Expression('0.5 if c_nogo<4 else 1', label='Go probability', **kw)
-    repeat_fa = Bool(True, label='Repeat nogo if FA?', **kw)
+    go_probability = Expression('0.5 if c_nogo<3 else 1', label='Go probability', **kw)
+    repeat_fa = Bool(False, label='Repeat nogo if FA?', **kw)
 
     # GUI elements to facilitate adding and removing parameters from the go
     # settings list.

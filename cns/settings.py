@@ -119,7 +119,7 @@ CHACO_NOAXES_PADDING = 5
 CHACO_AXES_PADDING = [50, 5, 5, 50]
 
 # Options for pump syringe
-SYRINGE_DEFAULT = 'Popper 20cc (glass)'
+SYRINGE_DEFAULT = 'B-D 60cc (plastic)'
 SYRINGE_DATA = {
         'B-D 10cc (plastic)'    : 14.43,
         'B-D 20cc (plastic)'    : 19.05,

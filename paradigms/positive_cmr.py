@@ -283,9 +283,6 @@ class Controller(
         kwargs['masker_filename'] = str(path.basename(masker_filename))
         super(Controller, self).log_trial(**kwargs)
 
-        log.info('Trial log: %s', json.dumps(kwargs))
-        log.info('Performance: %s', json.dumps(self.model.data.performance))
-
     def stop_experiment(self, info):
         self.engine.stop()
         if not self.model.args.nopump:
