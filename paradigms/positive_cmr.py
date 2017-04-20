@@ -666,10 +666,6 @@ class Paradigm(
 
     # Parameters specific to the actual appetitive paradigm that are not needed
     # by the training program (and therefore not in the "mixin")
-    #go_probability = Expression('0.5',
-    #        label='Go probability', log=False, context=True)
-    repeat_fa = Bool(True, label='Repeat if FA?', log=True, context=True)
-
     traits_view = View(
             VGroup(
                 #'go_probability',
