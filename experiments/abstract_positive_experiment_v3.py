@@ -97,52 +97,52 @@ class AbstractPositiveExperiment(AbstractExperiment):
         container.add(plot)
 
         # set up epoch plot
-        value_range = DataRange1D(low_setting=0+.2, high_setting=1+.2)
-        value_mapper = LinearMapper(range=value_range)
-
-        plot = TablesTimeseriesPlot(source=self.data,
-                                    trait_name='event_log',
-                                    changed_name='event_log_updated',
-                                    event_name='initiated nose poke',
-                                    marker='diamond',
-                                    marker_color='black',
-                                    marker_height=0.45,
-                                    index_mapper=index_mapper,
-                                    value_mapper=value_mapper)
-        container.add(plot)
-
-        plot = TablesTimeseriesPlot(source=self.data,
-                                    trait_name='event_log',
-                                    changed_name='event_log_updated',
-                                    event_name='withdrew from nose poke',
-                                    marker='diamond',
-                                    marker_color='red',
-                                    marker_height=0.45,
-                                    index_mapper=index_mapper,
-                                    value_mapper=value_mapper)
-        container.add(plot)
-
-        plot = TablesTimeseriesPlot(source=self.data,
-                                    trait_name='event_log',
-                                    changed_name='event_log_updated',
-                                    event_name='spout contact',
-                                    marker='diamond',
-                                    marker_color='yellow',
-                                    marker_height=0.45,
-                                    index_mapper=index_mapper,
-                                    value_mapper=value_mapper)
-        container.add(plot)
-
-        plot = TablesTimeseriesPlot(source=self.data,
-                                    trait_name='event_log',
-                                    changed_name='event_log_updated',
-                                    event_name='withdrew from spout',
-                                    marker='diamond',
-                                    marker_color='green',
-                                    marker_height=0.45,
-                                    index_mapper=index_mapper,
-                                    value_mapper=value_mapper)
-        container.add(plot)
+        # value_range = DataRange1D(low_setting=0+.2, high_setting=1+.2)
+        # value_mapper = LinearMapper(range=value_range)
+        #
+        # plot = TablesTimeseriesPlot(source=self.data,
+        #                             trait_name='event_log',
+        #                             changed_name='event_log_updated',
+        #                             event_name='initiated nose poke',
+        #                             marker='diamond',
+        #                             marker_color='black',
+        #                             marker_height=0.45,
+        #                             index_mapper=index_mapper,
+        #                             value_mapper=value_mapper)
+        # container.add(plot)
+        #
+        # plot = TablesTimeseriesPlot(source=self.data,
+        #                             trait_name='event_log',
+        #                             changed_name='event_log_updated',
+        #                             event_name='withdrew from nose poke',
+        #                             marker='diamond',
+        #                             marker_color='red',
+        #                             marker_height=0.45,
+        #                             index_mapper=index_mapper,
+        #                             value_mapper=value_mapper)
+        # container.add(plot)
+        #
+        # plot = TablesTimeseriesPlot(source=self.data,
+        #                             trait_name='event_log',
+        #                             changed_name='event_log_updated',
+        #                             event_name='spout contact',
+        #                             marker='diamond',
+        #                             marker_color='yellow',
+        #                             marker_height=0.45,
+        #                             index_mapper=index_mapper,
+        #                             value_mapper=value_mapper)
+        # container.add(plot)
+        #
+        # plot = TablesTimeseriesPlot(source=self.data,
+        #                             trait_name='event_log',
+        #                             changed_name='event_log_updated',
+        #                             event_name='withdrew from spout',
+        #                             marker='diamond',
+        #                             marker_color='green',
+        #                             marker_height=0.45,
+        #                             index_mapper=index_mapper,
+        #                             value_mapper=value_mapper)
+        # container.add(plot)
 
         tool = ChannelRangeTool(component=plot, allow_drag=False,
                 value_factor=1)

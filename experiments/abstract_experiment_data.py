@@ -60,46 +60,50 @@ class AbstractExperimentData(HasTraits):
             # reallocating information in memory).
             self.trial_log = self.trial_log.append(kwargs, ignore_index=True)
             self.trial_log_updated = kwargs
-            # If haven't done yet, create a table for saving trial log to the
-            # HDF5 file and set the column names. Column names should not change
-            # throughout a single session
-            if self.trial_log2 is None:
-                desc = []
-                for key, val in kwargs.iteritems():
-                    if type(val) is str or type(val) is unicode:
-                        desc.append((key, 'S512'))
-                    else:
-                        desc.append((key, type(val)))
-                desc = np.dtype(desc)
-                fh = self.store_node._v_file
-                self.trial_log2 = fh.createTable(self.store_node, 'trial_log', desc)
-            self.trial_log2.append([tuple(kwargs.values())])
+            log.info('Trial log: %s', str(kwargs))
 
             # Update performance, i.e. hit rate, FA rate and d' sensitivtiy
             self.update_performance(self.trial_log)
+            perf = self.performance.to_dict('list')
+            # Index column that is usually target_level should be added manually
+            perf[self.performance.index.name] = list(self.performance.index.values)
+            log.info('Performance: %s', str(perf))
+
+            # If haven't done yet, create a table for saving trial log to the
+            # HDF5 file and set the column names. Column names should not change
+            # throughout a single session
+            # if self.trial_log2 is None:
+            #     desc = []
+            #     for key, val in kwargs.iteritems():
+            #         if type(val) is str or type(val) is unicode:
+            #             desc.append((key, 'S512'))
+            #         else:
+            #             desc.append((key, type(val)))
+            #     desc = np.dtype(desc)
+            #     fh = self.store_node._v_file
+            #     self.trial_log2 = fh.createTable(self.store_node, 'trial_log', desc)
+            # self.trial_log2.append([tuple(kwargs.values())])
+
             # If haven't done yet, create a table for saving performance to the
             # HDF5 file and set the column names. Column names should not change
             # throughout a single session
-            dict = self.performance.to_dict('list')
-            # Index column that is usually target_level should be added manually
-            dict[self.performance.index.name] = list(self.performance.index.values)
-            if self.performance2 is None:
-                desc = []
-                for key, val in dict.iteritems():
-                    if type(val[0]) is str or type(val) is unicode:
-                        desc.append((key, 'S512'))
-                    else:
-                        desc.append((key, type(val[0])))
-                desc = np.dtype(desc)
-                fh = self.store_node._v_file
-                self.performance2 = fh.createTable(self.store_node, 'performance', desc)
-            # Do not append, but override previous content of the table
-            rows = zip(*dict.values())
-            nrows = self.performance2.length
-            if not nrows == 0:
-                self.performance2.modify_rows(start=0,stop=nrows,rows=rows[:nrows])
-            if len(rows) > nrows:
-                self.performance2.append(rows[nrows:])
+            # if self.performance2 is None:
+            #     desc = []
+            #     for key, val in perf.iteritems():
+            #         if type(val[0]) is str or type(val) is unicode:
+            #             desc.append((key, 'S512'))
+            #         else:
+            #             desc.append((key, type(val[0])))
+            #     desc = np.dtype(desc)
+            #     fh = self.store_node._v_file
+            #     self.performance2 = fh.createTable(self.store_node, 'performance', desc)
+            # # Do not append, but override previous content of the table
+            # rows = zip(*perf.values())
+            # nrows = self.performance2.length
+            # if not nrows == 0:
+            #     self.performance2.modify_rows(start=0,stop=nrows,rows=rows[:nrows])
+            # if len(rows) > nrows:
+            #     self.performance2.append(rows[nrows:])
         except:
             log.error(traceback.format_exc())
 
