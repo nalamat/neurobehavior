@@ -27,7 +27,7 @@ import tables as tb
 import pandas
 from cns.widgets.file_handler import get_save_file, get_directory
 
-def configure_logging(filename):
+def configure_logging(filename, filename2):
     time_format = '[%(asctime)s] :: %(name)s - %(levelname)s - %(message)s'
     simple_format = '%(name)s - %(levelname)s - %(message)s'
 
@@ -50,7 +50,7 @@ def configure_logging(filename):
                     'formatter': 'time',
                     'filename': filename,
                     'level': 'DEBUG',
-                    }
+                    },
                 },
             # This is where you would change the logging level of specific modules.
             # This is very helpful when you are trying to debug a very specific
@@ -67,12 +67,22 @@ def configure_logging(filename):
                 'cns.chaco_exts': { 'level': 'INFO' },
                 'cns.channel': { 'level': 'INFO' },
                 'tdt': { 'level': 'INFO' },
-        'new_era': { 'level': 'DEBUG' },
+                'new_era': { 'level': 'DEBUG' },
                 },
             'root': {
                 'handlers': ['console', 'file'],
                 },
             }
+
+    if filename2 is not None:
+        logging_config['handlers']['file2'] = {
+                'class': 'logging.FileHandler',
+                'formatter': 'time',
+                'filename': filename2,
+                'level': 'DEBUG',
+                }
+        logging_config['root']['handlers'].append('file2')
+
     logging.config.dictConfig(logging_config)
 
 class VerifyUniqueParameters(argparse.Action):
@@ -226,9 +236,12 @@ if __name__ == '__main__':
     from cns import get_config
 
     # Configure the logging
-    log_root = get_config('LOG_ROOT')
+    log_root      = get_config('LOG_ROOT')
+    time_fmt      = get_config('TIME_FORMAT')
+    timestr       = datetime.now().strftime(time_fmt)
+    log_filename2 = None
     if path.exists(log_root):
-        log_filename = path.join(log_root, strftime('%Y%m%d_%H%M.log'))
+        log_filename = path.join(log_root, timestr + '.log')
     else:
         import tempfile
         import warnings
@@ -242,12 +255,6 @@ if __name__ == '__main__':
         to the appropriate log file directory.'''
         mesg = mesg.format(log_root, log_filename, log_root)
         warnings.warn(textwrap.dedent(mesg).replace('\n', ''))
-
-    configure_logging(log_filename)
-
-    ###############################################################################
-    # Everything after this point will get stored to the log file
-    ###############################################################################
 
     try:
         # Do some additional checking of argument list to make sure it is valid
@@ -274,12 +281,11 @@ if __name__ == '__main__':
         if args.directory is not None:
             if not os.path.isdir(args.directory):
                 os.makedirs(args.directory)
-            args.animal = os.path.basename(args.directory)
-            node_name   = loader.get_experiment(args.type).node_name
-            time_fmt    = get_config('TIME_FORMAT')
-            time        = datetime.now().strftime(time_fmt)
-            name        = '_'.join([args.animal, node_name, time]) + '.h5'
-            args.file   = os.path.join(args.directory, name)
+            args.animal   = os.path.basename(args.directory)
+            node_name     = loader.get_experiment(args.type).node_name
+            name          = '_'.join([args.animal, node_name, timestr])
+            args.file     = os.path.join(args.directory, name + '.h5')
+            log_filename2 = os.path.join(args.directory, name + '.log')
             print 'Will save data to ', args.file
             # Fall into args.file if statement
 
@@ -289,6 +295,12 @@ if __name__ == '__main__':
                 raise ValueError('No file was selected')
             print 'Selected file ', args.file
             # Fall into args.file if statement
+
+        configure_logging(log_filename, log_filename2)
+
+        ###############################################################################
+        # Everything after this point will get stored to the log file
+        ###############################################################################
 
         # Finally, do the requested action
         if args.file is not None:

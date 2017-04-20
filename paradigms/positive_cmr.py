@@ -706,4 +706,4 @@ class Experiment(AbstractPositiveExperiment, CLExperimentMixin):
     data = Instance(Data, ())
     paradigm = Instance(Paradigm, ())
 
-node_name = 'PositiveCMRExperiment'
+node_name = 'PositiveCMR'
