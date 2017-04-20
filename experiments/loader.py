@@ -9,7 +9,7 @@ from os.path import join
 from importlib import import_module
 from glob import glob
 
-from traits.api import Any, Trait, TraitError
+from traits.api import Any, Trait, TraitError, Str
 from experiments import trial_setting
 from cns import calibration
 
@@ -262,6 +262,8 @@ def prepare_experiment(args, store_node, create_child=True):
             data=data,
             paradigm=paradigm,
             spool_physiology=args.physiology,
+            args=args,
+            animal=args.animal,
             )
 
     if args.analyze:

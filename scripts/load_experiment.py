@@ -14,16 +14,20 @@ os.environ['QT_API'] = 'pyqt'
 # IMPORTANT!  Do not import any portion of the Neurobehavior code (e.g. cns,
 # experiments, paradigms, etc. until after the comment indicating it is safe to
 # do so in the code below.
+import os
 import sys
 import argparse
 import logging
 import logging.config
-from time import strftime
 from os import path
+from time import strftime
+from datetime import datetime
 import threading
 import tables as tb
+import pandas
+from cns.widgets.file_handler import get_save_file, get_directory
 
-def configure_logging(filename):
+def configure_logging(filename, filename2):
     time_format = '[%(asctime)s] :: %(name)s - %(levelname)s - %(message)s'
     simple_format = '%(name)s - %(levelname)s - %(message)s'
 
@@ -46,7 +50,7 @@ def configure_logging(filename):
                     'formatter': 'time',
                     'filename': filename,
                     'level': 'DEBUG',
-                    }
+                    },
                 },
             # This is where you would change the logging level of specific modules.
             # This is very helpful when you are trying to debug a very specific
@@ -63,12 +67,22 @@ def configure_logging(filename):
                 'cns.chaco_exts': { 'level': 'INFO' },
                 'cns.channel': { 'level': 'INFO' },
                 'tdt': { 'level': 'INFO' },
-        'new_era': { 'level': 'DEBUG' },
+                'new_era': { 'level': 'DEBUG' },
                 },
             'root': {
                 'handlers': ['console', 'file'],
                 },
             }
+
+    if filename2 is not None:
+        logging_config['handlers']['file2'] = {
+                'class': 'logging.FileHandler',
+                'formatter': 'time',
+                'filename': filename2,
+                'level': 'DEBUG',
+                }
+        logging_config['root']['handlers'].append('file2')
+
     logging.config.dictConfig(logging_config)
 
 class VerifyUniqueParameters(argparse.Action):
@@ -101,9 +115,20 @@ def do_monkeypatch():
     # to use.
     monkeypatch = [
         tb.Table.append,
+        tb.Table.modify_rows,
         tb.Table.read,
+        tb.File.createTable,
+        tb.File.createGroup,
+        tb.File.createArray,
+        tb.File.createCArray,
+        tb.File.createEArray,
+        tb.File.createVLArray,
+        tb.File.getNode,
+        tb.File.setNodeAttr,
+        tb.File.listNodes,
         tb.EArray.append,
         tb.Array.__getitem__,
+        pandas.core.frame.DataFrame.append,
     ]
 
     def secure_lock(f, lock):
@@ -116,6 +141,11 @@ def do_monkeypatch():
     for im in monkeypatch:
         wrapped_im = secure_lock(im, lock)
         setattr(im.im_class, im.im_func.func_name, wrapped_im)
+
+    def table_length(self):
+        with lock:
+            return self.nrows
+    setattr(tb.Table, 'length', property(table_length))
 
 
 CALIBRATION_HELP = '''Path to file containing calibration data for {} speaker.
@@ -165,9 +195,20 @@ if __name__ == '__main__':
     group.add_argument('-i', '--inspect', dest='mode', action='store_const',
                        const='inspect', help='Print available parameters')
     group.add_argument('-f', '--file', type=str, help="File to save data to")
+    group.add_argument('-of', '--open-file', dest='open_file',
+                       action='store', const='', default=None, type=str, nargs='?',
+                       help="Open file dialog for saving data")
+    group.add_argument('-d', '--directory', dest='directory',
+                       action='store', default=None, type=str,
+                       help="Directory for saving animal data")
+    group.add_argument('-od', '--open-directory', dest='open_directory',
+                       action='store', const='', default=None, type=str, nargs='?',
+                       help="Open directory dialog for saving animal data")
 
     parser.add_argument('-n', '--neural', dest='physiology',
                         action='store_true', help='Acquire neurophysiology',
+                        default=False)
+    parser.add_argument('--nopump', action='store_true', help='Deactivate pump',
                         default=False)
 
     parser.add_argument('--save-microphone', action='store_true',
@@ -195,9 +236,12 @@ if __name__ == '__main__':
     from cns import get_config
 
     # Configure the logging
-    log_root = get_config('LOG_ROOT')
+    log_root      = get_config('LOG_ROOT')
+    time_fmt      = get_config('TIME_FORMAT')
+    timestr       = datetime.now().strftime(time_fmt)
+    log_filename2 = None
     if path.exists(log_root):
-        log_filename = path.join(log_root, strftime('%Y%m%d_%H%M.log'))
+        log_filename = path.join(log_root, timestr + '.log')
     else:
         import tempfile
         import warnings
@@ -212,12 +256,6 @@ if __name__ == '__main__':
         mesg = mesg.format(log_root, log_filename, log_root)
         warnings.warn(textwrap.dedent(mesg).replace('\n', ''))
 
-    configure_logging(log_filename)
-
-    ###############################################################################
-    # Everything after this point will get stored to the log file
-    ###############################################################################
-
     try:
         # Do some additional checking of argument list to make sure it is valid
         if args.mode != 'inspect':
@@ -230,6 +268,39 @@ if __name__ == '__main__':
                 sys.exit(', '.join(invalid) + mesg)
 
         do_monkeypatch()
+
+        args.animal = None
+
+        if args.open_directory is not None:
+            args.directory = get_directory(args.open_directory)
+            if args.directory is None:
+                raise ValueError('No directory was selected')
+            print 'Selected directory ', args.directory
+            # Fall into args.directory if statement
+
+        if args.directory is not None:
+            if not os.path.isdir(args.directory):
+                os.makedirs(args.directory)
+            args.animal   = os.path.basename(args.directory)
+            node_name     = loader.get_experiment(args.type).node_name
+            name          = '_'.join([args.animal, node_name, timestr])
+            args.file     = os.path.join(args.directory, name + '.h5')
+            log_filename2 = os.path.join(args.directory, name + '.log')
+            print 'Will save data to ', args.file
+            # Fall into args.file if statement
+
+        if args.open_file is not None:
+            args.file = get_save_file(args.open_file, 'HDF5 Files (*.h5;*.hdf5)|*.h5;*.hdf5')
+            if args.file is None:
+                raise ValueError('No file was selected')
+            print 'Selected file ', args.file
+            # Fall into args.file if statement
+
+        configure_logging(log_filename, log_filename2)
+
+        ###############################################################################
+        # Everything after this point will get stored to the log file
+        ###############################################################################
 
         # Finally, do the requested action
         if args.file is not None:

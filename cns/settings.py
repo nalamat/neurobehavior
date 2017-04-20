@@ -20,7 +20,7 @@ MAX_SPEAKER_DAC_VOLTAGE = 7
 CHUNK_SIZE      = 50e6
 
 # Size of sample (in seconds) to use for computing the noise floor
-NOISE_DURATION  = 16 
+NOISE_DURATION  = 16
 
 try:
     BASE_DIRECTORY  = os.environ['NEUROBEHAVIOR_BASE']
@@ -41,7 +41,7 @@ except KeyError:
     mesg = mesg.replace('\n', ' ')
     #warnings.warn(mesg)
     neurobehavior_base_defined = False
-    
+
 
 LOG_ROOT        = path.join(BASE_DIRECTORY, 'logs')        # log files
 DATA_ROOT       = path.join(BASE_DIRECTORY, 'data')        # data files
@@ -119,7 +119,7 @@ CHACO_NOAXES_PADDING = 5
 CHACO_AXES_PADDING = [50, 5, 5, 50]
 
 # Options for pump syringe
-SYRINGE_DEFAULT = 'Popper 20cc (glass)'
+SYRINGE_DEFAULT = 'B-D 60cc (plastic)'
 SYRINGE_DATA = {
         'B-D 10cc (plastic)'    : 14.43,
         'B-D 20cc (plastic)'    : 19.05,
@@ -148,10 +148,10 @@ COLOR_NAMES = {
     }
 
 EXPERIMENT_COLORS  = {
-    'GO_REMIND': COLOR_NAMES['dark green'],
-    'GO': COLOR_NAMES['light green'],
-    'NOGO_REPEAT': COLOR_NAMES['dark red'],
-    'NOGO': COLOR_NAMES['light red'],
+    'GO_REMIND'  : COLOR_NAMES['dark green' ],
+    'GO'         : COLOR_NAMES['light green'],
+    'NOGO_REPEAT': COLOR_NAMES['dark red'   ],
+    'NOGO'       : COLOR_NAMES['light red'   ],
 
     # In the first version of the appetitive trial log (and also possibly the
     # aversive) the GO_REMIND ttype was logged as REMIND.  This is left in for
@@ -177,9 +177,9 @@ PAIRED_COLORS_RGB_NORM = [
 
 # Format to use when generating time strings for use in a HDF5 node pathname
 # (see time.strptime for documentation re the format specifiers to use below)
-TIME_FORMAT = '%Y_%m_%d_%H_%M_%S'
+TIME_FORMAT = '%Y%m%d_%H%M%S'
 
-# Format to use when storing datetime strings as attributes in the HDF5 file 
+# Format to use when storing datetime strings as attributes in the HDF5 file
 DATE_FMT = '%Y-%m-%d'
 TIME_FMT = '%H:%M:%S'
 DATETIME_FMT = DATE_FMT + ' ' + TIME_FMT

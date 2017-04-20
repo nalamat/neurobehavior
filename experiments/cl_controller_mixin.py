@@ -1,6 +1,9 @@
-from traits.api import HasTraits, Bool
+from traits.api import HasTraits, Bool, Int
 import numpy as np
 from cns import choice
+
+import logging
+log = logging.getLogger(__name__)
 
 class CLControllerMixin(HasTraits):
 
@@ -43,7 +46,7 @@ class CLControllerMixin(HasTraits):
 
         # This is a regular case.  Select the appropriate setting.
         prev_trial = self.model.data.trial_log.iloc[-1]
-        if (prev_trial['response'] == 'FA') and self.get_current_value('repeat_fa'):
+        if (prev_trial['score'] == 'FA') and self.get_current_value('repeat_fa'):
             return self.nogo_repeat_setting()
         if np.random.uniform() <= self.get_current_value('go_probability'):
             return self.current_sequence.next()

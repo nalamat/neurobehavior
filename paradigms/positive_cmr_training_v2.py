@@ -145,7 +145,7 @@ class Controller(
         return self.trial_state.value
 
     preload_samples = 200000*5
-    #update_delay = 100000
+    update_delay = 200 # ms
 
     _lock = threading.Lock()
     engine = Instance('daqengine.ni.Engine')
@@ -175,7 +175,7 @@ class Controller(
         # scaling factor. In general, this is a fairly reasonable approximation
         # of SDT (i.e., the nogo should be some undetectable variant of the go,
         # right)?
-        test_sf = 10.0**(self.get_current_value('test_att')/-20.0)
+        # test_sf = 10.0**(self.get_current_value('test_att')/-20.0)
 
         masker_filename = self.get_current_value('masker_filename')
         if not path.exists(masker_filename):
@@ -184,9 +184,7 @@ class Controller(
         self.masker_offset = 0
         self.masker_last_write = 0
         self.fs, masker = wavfile.read(masker_filename, mmap=True)
-        self.masker = masker.astype('float64')/np.iinfo(np.int16).max * test_sf
-
-        #self.update_delay = int(self.fs * 100e-3) # 100ms
+        self.masker = masker.astype('float64')/np.iinfo(np.int16).max
 
         target_filename = self.get_current_value('target_filename')
         if not path.exists(target_filename):
@@ -195,10 +193,8 @@ class Controller(
         self.target_offset = 0
         self.fs, target_flat = wavfile.read(target_filename[:-4]+'_flat'+target_filename[-4:], mmap=True)
         self.fs, target_ramp = wavfile.read(target_filename[:-4]+'_ramp'+target_filename[-4:], mmap=True)
-        self.fs, target      = wavfile.read(target_filename, mmap=True)
-        self.target_flat = target_flat.astype('float64')/np.iinfo(np.int16).max * test_sf
-        self.target_ramp = target_ramp.astype('float64')/np.iinfo(np.int16).max * test_sf
-        self.target      = target     .astype('float64')/np.iinfo(np.int16).max * test_sf
+        self.target_flat = target_flat.astype('float64')/np.iinfo(np.int16).max
+        self.target_ramp = target_ramp.astype('float64')/np.iinfo(np.int16).max
 
         self.trial_state = TrialState.waiting_for_np_start
         self.engine = Engine()
@@ -249,12 +245,6 @@ class Controller(
 
         self.set_current_value('ttype', 'GO')
 
-        # Multithreaded event handling
-        # self.event_queue = Queue()
-        # self.event_thread_stop = threading.Event()
-        # self.event_thread = threading.Thread(target=self.event_loop)
-        # self.event_thread.start()
-
         self.state = 'paused'
         self.engine.start()
         # self.trigger_next()
@@ -276,8 +266,6 @@ class Controller(
         super(Controller, self).log_trial(**kwargs)
 
     def stop_experiment(self, info):
-        # self.event_thread_stop.set()
-        # self.event_thread.join()
         self.engine.stop()
         self.iface_pump.disconnect()
 
@@ -356,13 +344,15 @@ class Controller(
     def target_play(self, info=None):
         # Get the current position in the analog output buffer, and add a cetain
         # update_delay (to give us time to generate and upload the new signal).
-        ts = self.get_ts()
-        ud = self.get_current_value('update_delay')*1e-3 # Convert msec to sec
-        offset = int(round((ts+ud)*self.fs))
 
-        if self.masker_on:
+        try:
+            ts = self.get_ts()
+            ud = self.update_delay*1e-3 # Convert msec to sec
+            offset = int(round((ts+ud)*self.fs))
+
+            # if self.masker_on:
             # Insert the target at a specific phase of the modulated masker
-            masker_frequency = self.get_current_value('masker_frequency')
+            masker_frequency = float(self.get_current_value('masker_frequency'))
             period = self.fs/masker_frequency
             phase_delay = self.get_current_value('phase_delay')/360.0*period
             phase = (offset % self.masker.shape[-1]) % period
@@ -370,18 +360,21 @@ class Controller(
             if delay<0: delay+=period
             offset += int(delay)
 
-        # Generate combined signal
-        target_sf = 10.0**(-float(self.get_current_value('target_level'))/20.0)
-        target = [self.target_ramp, np.tile(self.target_flat, 10), -self.target_ramp[::-1]]
-        target = np.concatenate(target) * target_sf
-        duration = target.shape[-1]
-        masker = self.get_masker(offset, duration)
-        signal = masker + target
+            # Generate combined signal
+            target_sf = 10.0**(-float(self.get_current_value('target_level'))/20.0)
+            target_flat_duration = self.target_flat.shape[-1] / self.fs
+            target_reps = round(self.get_current_value('target_duration')/target_flat_duration)
+            target = [self.target_ramp[:-1], np.tile(self.target_flat, target_reps), -self.target_ramp[::-1]]
+            target = np.concatenate(target) * target_sf
+            if target.shape[-1] < self.fs: # If target is less than 1s
+                target = np.concatenate([target, np.zeros(self.fs-target.shape[-1])])
+            duration = target.shape[-1]
+            masker = self.get_masker(offset, duration)
+            signal = masker + target
 
-        log.debug('Inserting target at %d', offset)
-        log.debug('Overwriting %d samples in buffer', duration)
+            log.debug('Inserting target at %d', offset)
+            log.debug('Overwriting %d samples in buffer', duration)
 
-        try:
             self.engine.write_hw_ao(signal, offset)
             self.masker_offset = offset + duration
         except:
@@ -389,53 +382,45 @@ class Controller(
 
 
     def target_toggle(self, info=None):
-        ts = self.get_ts()
-        log.debug('[target_toggle] at {}'.format(ts))
-        ud = self.get_current_value('update_delay')*1e-3 # Convert msec to sec
-        offset = int(round((ts+ud)*self.fs))
-
-        # Generate combined signal
-        if self.target_on:
-            self.target_on = False
-            len = self.target_flat.shape[-1]
-            pos = offset - self.target_ts
-            rem = len - pos % len
-
-            # print("#########################")
-            # print("# off: {}".format(offset))
-            # print("# ts : {}".format(self.target_ts))
-            # print("# len: {}".format(len))
-            # print("# pos: {}".format(pos))
-            # print("# rem: {}".format(rem))
-            # print("#########################")
-
-            target = [self.get_target(pos, rem), -self.target_ramp[::-1]]
-            target = np.concatenate(target)
-            # Zeor-pad if the target is less than 1 sec long
-            if target.shape[-1] < self.fs:
-                target = np.concatenate(
-                    [target, np.zeros(self.fs - target.shape[-1])]
-                    )
-        else:
-            self.target_on = True
-            # Start playing the target for 1 sec (fs samples)
-            target = [self.target_ramp, self.get_target(0, self.fs)]
-            target = np.concatenate(target)
-
-        target_sf = 10.0**(-float(self.get_current_value('target_level'))/20.0)
-        target = target * target_sf
-        duration = target.shape[-1]
-        self.target_ts = offset + self.target_ramp.shape[-1]
-        self.target_offset = duration - self.target_ramp.shape[-1]
-        self.masker_offset = offset + duration
-        masker = self.get_masker(offset, duration)
-        signal = masker + target
-
-        log.debug('Inserting target start at %d', offset)
-        log.debug('Overwriting %d samples in buffer', duration)
-        # log.debug('Timestamp at insertion: %d', self.get_ts()*self.fs)
-
         try:
+            ts = self.get_ts()
+            log.debug('[target_toggle] at {}'.format(ts))
+            ud = self.update_delay*1e-3 # Convert msec to sec
+            offset = int(round((ts+ud)*self.fs))
+
+            # Generate combined signal
+            if self.target_on:
+                self.target_on = False
+                len = self.target_flat.shape[-1]
+                pos = offset - self.target_ts
+                rem = len - pos % len
+
+                target = [self.get_target(pos, rem), -self.target_ramp[::-1]]
+                target = np.concatenate(target)
+                # Zeor-pad if the target is less than 1 sec long
+                if target.shape[-1] < self.fs:
+                    target = np.concatenate(
+                        [target, np.zeros(self.fs - target.shape[-1])]
+                        )
+            else:
+                self.target_on = True
+                # Start playing the target for 1 sec (fs samples)
+                target = [self.target_ramp, self.get_target(0, self.fs)]
+                target = np.concatenate(target)
+
+            target_sf = 10.0**(-float(self.get_current_value('target_level'))/20.0)
+            target = target * target_sf
+            duration = target.shape[-1]
+            self.target_ts = offset + self.target_ramp.shape[-1]
+            self.target_offset = duration - self.target_ramp.shape[-1]
+            self.masker_offset = offset + duration
+            masker = self.get_masker(offset, duration)
+            signal = masker + target
+
+            log.debug('Inserting target start at %d', offset)
+            log.debug('Overwriting %d samples in buffer', duration)
+            # log.debug('Timestamp at insertion: %d', self.get_ts()*self.fs)
+
             self.engine.write_hw_ao(signal, offset)
         except:
             log.error(sys.exc_info()[1])
@@ -444,7 +429,7 @@ class Controller(
         # Get the current position in the analog output buffer, and add a cetain
         # update_delay (to give us time to generate and upload the new signal).
         ts = self.get_ts()
-        ud = self.get_current_value('update_delay')*1e-3 # Convert msec to sec
+        ud = self.update_delay*1e-3 # Convert msec to sec
         offset = int(round((ts+ud)*self.fs))
         duration = self.fs
         signal = self.get_masker(offset, duration)
@@ -564,21 +549,6 @@ class Controller(
             self.handle_event(event, timestamp)
         except:
             log.error(sys.exc_info()[1])
-
-
-    # Multithreaded event handling
-    # def event_loop(self):
-    #     log.debug('[event_loop] start')
-    #
-    #     while not self.event_thread_stop.is_set():
-    #         if not self.event_queue.empty():
-    #             log.debug('[event_loop] get')
-    #             with self._lock:
-    #                 self._handle_event(*self.event_queue.get())
-    #         else:
-    #             self.event_thread_stop.wait(.1)
-    #
-    #     log.debug('[event_loop] stop')
 
 
     def handle_event(self, event, timestamp=None):
@@ -855,7 +825,6 @@ class Paradigm(
                     'target_filename',
                     'target_level',
                     'hw_att',
-                    'test_att',
                     label='Sound',
                     ),
         )

@@ -39,16 +39,20 @@ from __future__ import division
 import enum
 
 import sys
+import time
+import json
+import traceback
 import threading
+import Queue
 from os import path
 
-from traits.api import Instance, File, Any, Int, Bool
+from traits.api import Instance, File, Any, Int, Float, Bool, on_trait_change
 from traitsui.api import View, Include, VGroup
+from pyface.api import error
 
 from experiments.evaluate import Expression
-
+from experiments.trial_setting import TrialSetting
 from cns import get_config
-from time import time
 
 # These mixins are shared with the positive_cmr_training paradigm.  I use the
 # underscore so it's clear that these files do not define stand-alone paradigms.
@@ -138,8 +142,14 @@ class Controller(
         return self.trial_state.value
 
     preload_samples = 200000*5
-    update_delay = 200 # ms
+    kw = {'context': True, 'log': True}
+    update_delay = Float(200, **kw) # ms
+    signal_level = Float(0  , **kw)
 
+    handler_thread = None
+    handler_stop = False
+    queue = Queue.Queue()
+    queue_lock = threading.Lock()
     _lock = threading.Lock()
     # engine = Instance('daqengine.ni.Engine')
 
@@ -149,99 +159,117 @@ class Controller(
         return
 
     def start_experiment(self, info):
-        self.refresh_context()
+        try:
+            self.refresh_context()
+            # Load the masker and target. Scale to +/-1 V based on the maximum value
+            # of a signed 16 bit integer. Right now we assume that the nogo is
+            # silent (i.e., a scaling factor of 0). Go trials will have a nonzero
+            # scaling factor. In general, this is a fairly reasonable approximation
+            # of SDT (i.e., the nogo should be some undetectable variant of the go,
+            # right)?
+            masker_filename = self.get_current_value('masker_filename')
+            if not path.exists(masker_filename):
+                m = 'Masker file {} does not exist'
+                raise ValueError(m.format(masker_filename))
+            self.masker_offset = 0
+            self.fs, masker = wavfile.read(masker_filename, mmap=True)
+            self.masker = masker.astype('float64')
+            sf = 1/np.sqrt(np.mean(self.masker**2))  # normalize by rms
+            self.masker *= sf
 
-        # Load the masker and target. Scale to +/-1 V based on the maximum value
-        # of a signed 16 bit integer. Right now we assume that the nogo is
-        # silent (i.e., a scaling factor of 0). Go trials will have a nonzero
-        # scaling factor. In general, this is a fairly reasonable approximation
-        # of SDT (i.e., the nogo should be some undetectable variant of the go,
-        # right)?
+            target_filename = self.get_current_value('target_filename')
+            if not path.exists(target_filename):
+                m = 'Go file {} does not exist'
+                raise ValueError(m.format(target_filename))
+            self.target_offset = 0
+            self.fs, target_flat = wavfile.read(target_filename[:-4]+'_flat'+target_filename[-4:], mmap=True)
+            self.fs, target_ramp = wavfile.read(target_filename[:-4]+'_ramp'+target_filename[-4:], mmap=True)
+            # self.fs, target      = wavfile.read(target_filename, mmap=True)
+            self.target_flat = target_flat.astype('float64')
+            self.target_ramp = target_ramp.astype('float64')
+            sf = 1/np.sqrt(np.mean(self.target_flat**2)) # normalize by rms
+            self.target_flat *= sf
+            self.target_ramp *= sf
 
-        masker_filename = self.get_current_value('masker_filename')
-        if not path.exists(masker_filename):
-            m = 'Masker file {} does not exist'
-            raise ValueError(m.format(masker_filename))
-        self.masker_offset = 0
-        self.fs, masker = wavfile.read(masker_filename, mmap=True)
-        self.masker = masker.astype('float64')/np.iinfo(np.int16).max
+            signal_max = max(abs(self.masker)) + max(abs(self.target_flat))
+            self.masker      *= 10/signal_max
+            self.target_flat *= 10/signal_max
+            self.target_ramp *= 10/signal_max
 
-        target_filename = self.get_current_value('target_filename')
-        if not path.exists(target_filename):
-            m = 'Go file {} does not exist'
-            raise ValueError(m.format(target_filename))
-        self.target_offset = 0
-        self.fs, target_flat = wavfile.read(target_filename[:-4]+'_flat'+target_filename[-4:], mmap=True)
-        self.fs, target_ramp = wavfile.read(target_filename[:-4]+'_ramp'+target_filename[-4:], mmap=True)
-        # self.fs, target      = wavfile.read(target_filename, mmap=True)
-        self.target_flat = target_flat.astype('float64')/np.iinfo(np.int16).max
-        self.target_ramp = target_ramp.astype('float64')/np.iinfo(np.int16).max
-        # self.target      = target     .astype('float64')/np.iinfo(np.int16).max
+            signal_level = 20*np.log10(10/(signal_max))
+            signal_level = np.floor(self.signal_level*10)/10
+            self.set_current_value('signal_level', signal_level)
 
-        self.trial_state = TrialState.waiting_for_np_start
-        self.engine = Engine()
+            self.trial_state = TrialState.waiting_for_np_start
+            self.engine = Engine()
 
-        # Speaker in, mic, nose-poke IR, spout contact IR. Not everything will
-        # necessarily be connected.
-        self.fs_ai = 250e3/4
-        self.engine.configure_hw_ai(self.fs_ai, '/Dev2/ai0:3', (-10, 10),
-                                    names=['speaker', 'mic', 'np', 'spout'])
-        # self.fs_ai2 = 500e3/16
-        # channels = []
-        # for i in range(0, self.data.model.channels): channels.append('ch' + str(i))
-        # self.engine.configure_hw_ai2(self.fs_ai2, '/Dev1/ai0:15', (-10, 10))
-        #                             # names=channels)
+            # Speaker in, mic, nose-poke IR, spout contact IR. Not everything will
+            # necessarily be connected.
+            self.fs_ai = 250e3/4
+            self.engine.configure_hw_ai(self.fs_ai, '/Dev2/ai0:3', (-10, 10),
+                                        names=['speaker', 'mic', 'np', 'spout'])
 
-        # Speaker out
-        self.engine.configure_hw_ao(self.fs, '/Dev2/ao0', (-10, 10),
-                                    names=['speaker'])
+            # Speaker out
+            self.engine.configure_hw_ao(self.fs, '/Dev2/ao0', (-10, 10),
+                                        names=['speaker'])
 
-        # Nose poke and spout contact TTL. If we want to monitor additional
-        # events occuring in the behavior booth (e.g., room light on/off), we
-        # can connect the output controlling the light/pump to an input and
-        # monitor state changes on that input.
-        self.engine.configure_hw_di(self.fs, '/Dev2/port0/line1:2',
-                                    clock='/Dev2/Ctr0', names=['spout', 'np'])
+            # Nose poke and spout contact TTL. If we want to monitor additional
+            # events occuring in the behavior booth (e.g., room light on/off), we
+            # can connect the output controlling the light/pump to an input and
+            # monitor state changes on that input.
+            self.engine.configure_hw_di(self.fs, '/Dev2/port0/line1:2',
+                                        clock='/Dev2/Ctr0', names=['spout', 'np'])
 
-        # Control for room light
-        self.engine.configure_sw_do('/Dev2/port1/line1', names=['light'])
-        self.engine.set_sw_do('light' , 1)
+            # Control for room light
+            self.engine.configure_sw_do('/Dev2/port1/line1', names=['light'])
+            self.engine.set_sw_do('light' , 1)
 
-        self.engine.register_ao_callback(self.samples_needed)
-        self.engine.register_ai_callback(self.samples_acquired)
-        # self.engine.register_ai2_callback(self.samples_acquired2)
-        self.engine.register_di_change_callback(self.di_changed,
-                                                debounce=self.fs*50e-3)
+            self.engine.register_ao_callback(self.samples_needed)
+            self.engine.register_ai_callback(self.samples_acquired)
+            self.engine.register_di_change_callback(self.di_changed,
+                                                    debounce=self.fs*50e-3)
 
-        self.model.data.speaker.fs    = self.fs_ai
-        self.model.data.microphone.fs = self.fs_ai
-        self.model.data.np.fs         = self.fs_ai
-        self.model.data.spout.fs      = self.fs_ai
-        # self.model.data.ch1.fs        = self.fs_ai2
-        # self.model.data.raw.fs        = self.fs_ai2
+            self.model.data.speaker.fs    = self.fs_ai
+            self.model.data.microphone.fs = self.fs_ai
+            self.model.data.np.fs         = self.fs_ai
+            self.model.data.spout.fs      = self.fs_ai
 
-        # Configure the pump
-        self.iface_pump.set_direction('infuse')
+            # Configure the pump
+            if not self.model.args.nopump:
+                self.iface_pump.set_direction('infuse')
 
-        # Generate a random seed based on the computer's clock.
-        self.random_seed = int(time())
+            # Generate a random seed based on the computer's clock.
+            self.random_seed = int(time.time())
 
-        self.random_generator = np.random.RandomState(self.random_seed)
+            self.random_generator = np.random.RandomState(self.random_seed)
 
-        node = info.object.experiment_node
-        node._v_attrs['trial_sequence_random_seed'] = self.random_seed
+            node = info.object.experiment_node
+            node._v_attrs['trial_sequence_random_seed'] = self.random_seed
 
-        self.state = 'running'
+            self.state = 'running'
 
-        if self.model.spool_physiology:
-            self.physiology_handler.start_physiology()
+            if self.model.spool_physiology:
+                self.physiology_handler.start_physiology()
 
-        self.engine.start()
-        self.trigger_next()
+            self.handler_thread = threading.Thread(target=self.handler_loop, args=[])
+            self.handler_thread.start()
+            self.engine.start()
+            self.trigger_next()
+        except:
+            log.error(traceback.format_exc())
 
     def trigger_next(self):
+        c_nogo = 0
+        trial_log = self.model.data.trial_log
+        while len(trial_log)-c_nogo-1 > 0:
+            if trial_log.ttype.values[len(trial_log)-c_nogo-1] in ('NOGO', 'NOGO_REPEAT'):
+                c_nogo += 1
+            else:
+                break
+        self.model.data.c_nogo = c_nogo
+
         self.trial_info = {}
-        self.invalidate_context()
+        self.refresh_context()
         self.current_setting = self.next_setting()
         self.evaluate_pending_expressions(self.current_setting)
 
@@ -257,7 +285,10 @@ class Controller(
 
     def stop_experiment(self, info):
         self.engine.stop()
-        self.iface_pump.disconnect()
+        if not self.model.args.nopump:
+            self.iface_pump.disconnect()
+        self.handler_stop = True
+        self.handler_thread.join()
 
     def remind(self, info=None):
         # If trial is already running, the remind will be presented on the next
@@ -270,7 +301,11 @@ class Controller(
         self.remind_requested = False
 
     def pause(self, info=None):
-        self.handle_event(Event.np_start)
+        if self.model.args.nopump:
+            if self.trial_state == TrialState.waiting_for_np_start:
+                self.handle_event(Event.np_start)
+            else:
+                self.handle_event(Event.spout_start)
 
     def start_trial(self):
         log.debug('Starting trial: %s', self.get_current_value('ttype'))
@@ -308,9 +343,10 @@ class Controller(
             if score == 'HIT':
                 # TODO: Investigate why are changes to reward_volume applied on
                 # the second trial rather than the first one?
-                self.set_pump_volume(self.get_current_value('reward_volume'))
-                self.pump_trigger([])
-                # pass
+                if not self.model.args.nopump:
+                    # TODO: check if removing this line is okay or not
+                    self.set_pump_volume(self.get_current_value('reward_volume'))
+                    self.pump_trigger([])
 
             self.start_timer('iti_duration', Event.iti_duration_elapsed)
             self.trial_state = TrialState.waiting_for_iti
@@ -328,7 +364,6 @@ class Controller(
         # except:
         #     log.error('[stop_trial] Update delay %f is too small', ud)
 
-        print(self.trial_info)
         self.log_trial(score=score, response=response, ttype=trial_type,
                        **self.trial_info)
         self.trigger_next()
@@ -338,60 +373,60 @@ class Controller(
             self.trigger_next()
 
     def target_play(self, info=None):
-        # Get the current position in the analog output buffer, and add a cetain
-        # update_delay (to give us time to generate and upload the new signal).
-        ts = self.get_ts()
-        ud = self.update_delay*1e-3 # Convert msec to sec
-        offset = int(round((ts+ud)*self.fs))
-
-        # if self.masker_on:
-        # Insert the target at a specific phase of the modulated masker
-        masker_frequency = float(self.get_current_value('masker_frequency'))
-        period = self.fs/masker_frequency
-        phase_delay = self.get_current_value('phase_delay')/360.0*period
-        phase = (offset % self.masker.shape[-1]) % period
-        delay = phase_delay-phase
-        if delay<0: delay+=period
-        offset += int(delay)
-
-        # Generate combined signal
-        target_sf = 10.0**(-float(self.get_current_value('target_level'))/20.0)
-        target_flat_duration = self.target_flat.shape[-1] / self.fs
-        target_reps = round(self.get_current_value('target_duration')/target_flat_duration)
-        target = [self.target_ramp[:-1], np.tile(self.target_flat, target_reps), -self.target_ramp[::-1]]
-        target = np.concatenate(target) * target_sf
-        if target.shape[-1] < self.fs: # If target is less than 1s
-            target = np.concatenate([target, np.zeros(self.fs-target.shape[-1])])
-        duration = target.shape[-1]
-        masker = self.get_masker(offset, duration)
-        signal = masker + target
-
-        log.debug('Inserting target at %d', offset)
-        log.debug('Overwriting %d samples in buffer', duration)
-
-        self.trial_info['target_start'] = ts
-        self.trial_info['target_end'] = ts+duration/self.fs
-
         try:
+            # Get the current position in the analog output buffer, and add a cetain
+            # update_delay (to give us time to generate and upload the new signal).
+            ts = self.get_ts()
+            ud = self.update_delay*1e-3 # Convert msec to sec
+            offset = int(round((ts+ud)*self.fs))
+
+            # if self.masker_on:
+            # Insert the target at a specific phase of the modulated masker
+            masker_frequency = self.get_current_value('masker_frequency')
+            period = self.fs/masker_frequency
+            phase_delay = self.get_current_value('phase_delay')/360.0*period
+            phase = (offset % self.masker.shape[-1]) % period
+            delay = phase_delay-phase
+            if delay<0: delay+=period
+            offset += int(delay)
+
+            # Generate combined signal
+            target_level = self.get_current_value('target_level')
+            if target_level < 0: target_level = 0
+            target_sf = 10.0**(-target_level/20.0)
+            target_flat_duration = self.target_flat.shape[-1] / self.fs
+            target_reps = round(self.get_current_value('target_duration')/target_flat_duration)
+            target = [self.target_ramp[:-1], np.tile(self.target_flat, target_reps), -self.target_ramp[::-1]]
+            target = np.concatenate(target) * target_sf
+            if target.shape[-1] < self.fs: # If target is less than 1s
+                target = np.concatenate([target, np.zeros(self.fs-target.shape[-1])])
+            duration = target.shape[-1]
+            masker = self.get_masker(offset, duration)
+            signal = masker + target
+
+            log.debug('Inserting target at %d', offset)
+            log.debug('Overwriting %d samples in buffer', duration)
+
+            self.trial_info['target_start'] = ts
+            self.trial_info['target_end'] = ts+duration/self.fs
+
             self.engine.write_hw_ao(signal, offset)
             self.masker_offset = offset + duration
         except:
-            log.error(sys.exc_info()[1])
+            log.error(traceback.format_exc())
 
     ############################################################################
     # Callbacks for NI Engine
     ############################################################################
     def samples_acquired(self, names, samples):
         # Speaker in, mic, nose-poke IR, spout contact IR
-        speaker, microphone, np, spout = samples
-        self.model.data.speaker.send(speaker)
-        self.model.data.microphone.send(microphone)
-        self.model.data.np.send(np)
-        self.model.data.spout.send(spout)
-
-    # def samples_acquired2(self, names, samples):
-    #     self.model.data.ch1.send(samples[0])
-    #     self.model.data.raw.send(samples)
+        # with self._lock:
+        with self.model.plot_lock:
+            speaker, microphone, np, spout = samples
+            self.model.data.speaker.send(speaker)
+            self.model.data.microphone.send(microphone)
+            self.model.data.np.send(np)
+            self.model.data.spout.send(spout)
 
     def samples_needed(self, names, offset, samples):
         if samples > 5*self.fs: samples = 5*self.fs
@@ -404,38 +439,44 @@ class Controller(
         # log.debug('[samples_needed] offset   : %d', offset)
         # if self.masker_offset != samples:
         #     log.debug('[samples_needed] timestamp: %d', self.get_ts()*self.fs)
-        with self._lock:
-            try:
-                self.engine.write_hw_ao(signal)
-            except:
-                log.error(sys.exc_info()[1])
+        # with self._lock:
+        try:
+            self.engine.write_hw_ao(signal)
+        except:
+            log.error(traceback.format_exc())
 
     event_map = {
-        ('rising', 'np'): Event.np_start,
-        ('falling', 'np'): Event.np_end,
-        ('rising', 'spout'): Event.spout_start,
-        ('falling', 'spout'): Event.spout_end,
+        ('rising' , 'np'   ): Event.np_start   ,
+        ('falling', 'np'   ): Event.np_end     ,
+        ('rising' , 'spout'): Event.spout_start,
+        ('falling', 'spout'): Event.spout_end  ,
     }
-
-    # counter = 0
 
     def di_changed(self, name, change, timestamp):
         # The timestamp is the number of analog output samples that have been
         # generated at the time the event occured. Convert to time in seconds
         # since experiment start.
         timestamp /= self.fs
-        log.debug('detected {} edge on {} at {}'.format(change, name,timestamp))
-        # self.counter += 1
-        # log.debug('event %d', self.counter)
+        log.debug('Detected {} edge on {} at {}'.format(change, name,timestamp))
         event = self.event_map[change, name]
         self.handle_event(event, timestamp)
+
+    def handler_loop(self):
+        while not self.handler_stop:
+            try:
+                if not self.queue.empty():
+                    with self.queue_lock: (event, timestamp) = self.queue.get()
+                    with self._lock: self._handle_event(event, timestamp)
+            except:
+                log.error(traceback.format_exc())
+            time.sleep(.001) # 1 ms
 
     def handle_event(self, event, timestamp=None):
         # Ensure that we don't attempt to process several events at the same
         # time. This essentially queues the events such that the next event
         # doesn't get processed until `_handle_event` finishes processing the
         # current one.
-        with self._lock:
+        # with self._lock:
             # Only events generated by NI-DAQmx callbacks will have a timestamp.
             # Since we want all timing information to be in units of the analog
             # output sample clock, we will capture the value of the sample
@@ -449,12 +490,13 @@ class Controller(
             # points will be tracked via NI-DAQmx or can be calculated (i.e., we
             # know exactly when the target onset occurs because we precisely
             # specify the location of the target in the analog output buffer).
-            if timestamp is None:
-                timestamp = self.get_ts()
-            try:
-                self._handle_event(event, timestamp)
-            except:
-                log.error(sys.exc_info()[1])
+        if timestamp is None:
+            timestamp = self.get_ts()
+        try:
+            # self._handle_event(event, timestamp)
+            with self.queue_lock: self.queue.put((event, timestamp))
+        except:
+            log.error(traceback.format_exc())
 
     def _handle_event(self, event, timestamp):
         '''
@@ -462,7 +504,8 @@ class Controller(
         the event that occured. Depending on the experiment state, a particular
         event may not be processed.
         '''
-        self.model.data.log_event(timestamp, event.value)
+        with self.model.plot_lock:
+            self.model.data.log_event(timestamp, event.value)
 
         if self.trial_state == TrialState.waiting_for_np_start:
             if event == Event.np_start:
@@ -550,13 +593,40 @@ class Controller(
     def get_ts(self):
         return self.engine.ao_sample_clock()/self.fs
 
+    # Track changes in the trial settings tabulator (usually for target_level)
+    @on_trait_change('model.paradigm.+container*.+context, +context')
+    def trait_change(self, instance, name, old, new):
+        if type(instance) is TrialSetting and name in ('masker_level','target_level'):
+            self.check_level(new)
+
+    def set_masker_level(self, level):
+        self.check_level(level)
+
+    def set_target_level(self, level):
+        self.check_level(level)
+
+    # Only inform the user that the entered value is not allowed. The context
+    # target and masker levels will not be changed, however, when outputting the
+    # sounds the level limit is applied
+    def check_level(self, level):
+        try:
+            if level < 0:
+                msg = 'Negative masker or target attenuation values are not allowed.\nWill use 0 dB instead.'
+                error(self.info.ui.control, message=msg, title='Error applying changes')
+                # log.error(msg)
+        except:
+            log.error(traceback.format_exc())
+
     def get_masker(self, offset, duration):
-        masker_sf = 10.0**(-float(self.get_current_value('masker_level'))/20.0)
-        # if self.masker_on is False: masker_sf = 0;
+        masker_level = self.get_current_value('masker_level')
+        if masker_level < 0: masker_level = 0
+        masker_sf = 10.0**(-masker_level/20.0)
         return self.get_cyclic(self.masker, offset, duration) * masker_sf
 
     def get_target(self, offset, duration):
-        target_sf = 10.0**(-float(self.get_current_value('target_level'))/20.0)
+        target_level = self.get_current_value('target_level')
+        if target_level < 0: target_level = 0
+        target_sf = 10.0**(-target_level/20.0)
         return self.get_cyclic(self.target_flat, offset, duration) * target_sf
 
     def get_cyclic(self, signal, offset, duration):
@@ -596,10 +666,6 @@ class Paradigm(
 
     # Parameters specific to the actual appetitive paradigm that are not needed
     # by the training program (and therefore not in the "mixin")
-    #go_probability = Expression('0.5',
-    #        label='Go probability', log=False, context=True)
-    repeat_fa = Bool(True, label='Repeat if FA?', log=True, context=True)
-
     traits_view = View(
             VGroup(
                 #'go_probability',
@@ -628,6 +694,7 @@ class Data(PositiveData, PositiveCLDataMixin, PumpDataMixin):
     '''
     Container for the data
     '''
+    c_nogo = Int(0, context=True, label='Consecutive nogos (including repeats)')
     pass
 
 
@@ -639,4 +706,4 @@ class Experiment(AbstractPositiveExperiment, CLExperimentMixin):
     data = Instance(Data, ())
     paradigm = Instance(Paradigm, ())
 
-node_name = 'PositiveCMRExperiment'
+node_name = 'PositiveCMR'
