@@ -375,9 +375,6 @@ class Controller(
             log.debug('Inserting target at %d', offset)
             log.debug('Overwriting %d samples in buffer', duration)
 
-            # self.trial_info['target_start'] = ts
-            # self.trial_info['target_end'] = ts+duration/self.fs
-
             self.engine.write_hw_ao(signal, offset)
             self.masker_offset = offset + duration
         except:
@@ -828,7 +825,6 @@ class Paradigm(
                     'target_filename',
                     'target_level',
                     'hw_att',
-                    # 'test_att',
                     label='Sound',
                     ),
         )
