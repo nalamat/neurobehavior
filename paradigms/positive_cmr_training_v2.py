@@ -233,7 +233,8 @@ class Controller(
         self.model.data.spout.fs      = self.fs_ai
 
         # Configure the pump
-        self.iface_pump.set_direction('infuse')
+        if not self.model.args.nopump:
+            self.iface_pump.set_direction('infuse')
 
         # Generate a random seed based on the computer's clock.
         self.random_seed = int(time())
@@ -267,7 +268,8 @@ class Controller(
 
     def stop_experiment(self, info):
         self.engine.stop()
-        self.iface_pump.disconnect()
+        if not self.model.args.nopump:
+            self.iface_pump.disconnect()
 
     def request_remind(self, info=None):
         # If trial is already running, the remind will be presented on the next
@@ -310,7 +312,8 @@ class Controller(
             if score == 'HIT':
                 # TODO: Investigate why are changes to reward_volume applied on
                 # the second trial rather than the first one?
-                self.pump_trigger([])
+                if not self.model.args.nopump:
+                    self.pump_trigger([])
 
             self.start_timer('iti_duration', Event.iti_duration_elapsed)
             self.trial_state = TrialState.waiting_for_iti
@@ -397,7 +400,7 @@ class Controller(
 
                 target = [self.get_target(pos, rem), -self.target_ramp[::-1]]
                 target = np.concatenate(target)
-                # Zeor-pad if the target is less than 1 sec long
+                # Zero-pad if the target is less than 1 sec long
                 if target.shape[-1] < self.fs:
                     target = np.concatenate(
                         [target, np.zeros(self.fs - target.shape[-1])]
@@ -423,7 +426,7 @@ class Controller(
 
             self.engine.write_hw_ao(signal, offset)
         except:
-            log.error(sys.exc_info()[1])
+            log.error(traceback.format_exc())
 
     def masker_update(self):
         # Get the current position in the analog output buffer, and add a cetain
@@ -447,7 +450,8 @@ class Controller(
         self.pump_override()
 
     def pump_trigger2(self, info=None):
-        self.pump_trigger()
+        if not self.model.args.nopump:
+            self.pump_trigger()
 
     def light_toggle(self, info=None):
         if self.light_on:
@@ -506,7 +510,7 @@ class Controller(
 
 
     def samples_acquired2(self, names, samples):
-        self.model.data.ch1.send(samples[1])
+        # self.model.data.ch1.send(samples[1])
         self.model.data.raw.send(samples)
 
 
@@ -515,7 +519,10 @@ class Controller(
         signal = self.get_masker(self.masker_offset, samples)
         self.masker_offset += samples
         if self.target_on:
-            signal += self.get_target(self.target_offset, samples)
+            target = self.get_target(self.target_offset, samples)
+            target_sf = 10.0**(-float(self.get_current_value('target_level'))/20.0)
+            target = target * target_sf
+            signal += target
             self.target_offset += samples
         # log.debug('[samples_needed] samples  : %d', samples)
         # log.debug('[samples_needed] offset   : %d', offset)
@@ -729,8 +736,7 @@ class Controller(
         return self.get_cyclic(self.masker, offset, duration) * masker_sf
 
     def get_target(self, offset, duration):
-        target_sf = 10.0**(-float(self.get_current_value('target_level'))/20.0)
-        return self.get_cyclic(self.target_flat, offset, duration) * target_sf
+        return self.get_cyclic(self.target_flat, offset, duration)
 
     def get_cyclic(self, signal, offset, duration):
         '''
