@@ -127,6 +127,11 @@ def do_monkeypatch():
         tb.File.setNodeAttr,
         tb.File.listNodes,
         tb.EArray.append,
+        tb.EArray.setAttr,
+        tb.EArray.read,
+        tb.EArray.__setitem__,
+        tb.EArray.__getitem__,
+        tb.EArray.__len__,
         tb.Array.__getitem__,
         pandas.core.frame.DataFrame.append,
     ]
