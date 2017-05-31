@@ -133,7 +133,8 @@ def do_monkeypatch():
         tb.EArray.__getitem__,
         tb.EArray.__len__,
         tb.Array.__getitem__,
-        pandas.core.frame.DataFrame.append,
+        pandas.DataFrame.append,
+        pandas.core.indexing._iLocIndexer.__getitem__,
     ]
 
     def secure_lock(f, lock):
