@@ -85,7 +85,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
         # set up nose poke plot
         value_range = DataRange1D(low_setting=-1, high_setting=16)
         value_mapper = LinearMapper(range=value_range)
-        plot = ExtremesChannelPlot(source=self.data.np,
+        plot = ExtremesChannelPlot(source=self.data.poke,
                            index_mapper=index_mapper, value_mapper=value_mapper,
                            line_color='blue')
         container.add(plot)

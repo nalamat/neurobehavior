@@ -89,12 +89,12 @@ class TrialState(enum.Enum):
     Defines the possible states that the experiment can be in. We use an Enum to
     minimize problems that arise from typos by the programmer (e.g., they may
     accidentally set the state to "waiting_for_nose_poke_start" rather than
-    "waiting_for_np_start").
+    "waiting_for_poke_start").
 
     This is specific to appetitive reinforcement paradigms.
     '''
-    waiting_for_np_start    = 'waiting for nose-poke start'
-    waiting_for_np_duration = 'waiting for nose-poke duration'
+    waiting_for_poke_start    = 'waiting for nose-poke start'
+    waiting_for_poke_duration = 'waiting for nose-poke duration'
     waiting_for_hold_period = 'waiting for hold period'
     waiting_for_response    = 'waiting for response'
     waiting_for_to          = 'waiting for timeout'
@@ -108,9 +108,9 @@ class Event(enum.Enum):
 
     This is specific to appetitive reinforcement paradigms.
     '''
-    np_start                  = 'initiated nose poke'
-    np_end                    = 'withdrew from nose poke'
-    np_duration_elapsed       = 'nose poke duration met'
+    poke_start                  = 'initiated nose poke'
+    poke_end                    = 'withdrew from nose poke'
+    poke_duration_elapsed       = 'nose poke duration met'
     hold_duration_elapsed     = 'hold period over'
     response_duration_elapsed = 'response timed out'
     spout_start               = 'spout contact'
@@ -136,7 +136,7 @@ class Controller(
 
     # Track the current state of the experiment. How the controller responds to
     # events will depend on the state.
-    trial_state = Instance(TrialState, TrialState.waiting_for_np_start)
+    trial_state = Instance(TrialState, TrialState.waiting_for_poke_start)
 
     def _get_status(self):
         return self.trial_state.value
@@ -200,14 +200,14 @@ class Controller(
             signal_level = np.floor(self.signal_level*10)/10
             self.set_current_value('signal_level', signal_level)
 
-            self.trial_state = TrialState.waiting_for_np_start
+            self.trial_state = TrialState.waiting_for_poke_start
             self.engine = Engine()
 
             # Speaker in, mic, nose-poke IR, spout contact IR. Not everything will
             # necessarily be connected.
             self.fs_ai = 250e3/4
             self.engine.configure_hw_ai(self.fs_ai, '/Dev2/ai0:3', (-10, 10),
-                                        names=['speaker', 'mic', 'np', 'spout'])
+                                        names=['speaker', 'mic', 'poke', 'spout'])
 
             # Speaker out
             self.engine.configure_hw_ao(self.fs, '/Dev2/ao0', (-10, 10),
@@ -218,7 +218,7 @@ class Controller(
             # can connect the output controlling the light/pump to an input and
             # monitor state changes on that input.
             self.engine.configure_hw_di(self.fs, '/Dev2/port0/line1:2',
-                                        clock='/Dev2/Ctr0', names=['spout', 'np'])
+                                        clock='/Dev2/Ctr0', names=['spout', 'poke'])
 
             # Control for room light
             self.engine.configure_sw_do('/Dev2/port1/line1', names=['light'])
@@ -231,7 +231,7 @@ class Controller(
 
             self.model.data.speaker.fs    = self.fs_ai
             self.model.data.microphone.fs = self.fs_ai
-            self.model.data.np.fs         = self.fs_ai
+            self.model.data.poke.fs         = self.fs_ai
             self.model.data.spout.fs      = self.fs_ai
 
             # Configure the pump
@@ -294,7 +294,7 @@ class Controller(
         # If trial is already running, the remind will be presented on the next
         # trial.
         self.remind_requested = True
-        if self.trial_state == TrialState.waiting_for_np_start:
+        if self.trial_state == TrialState.waiting_for_poke_start:
             self.trigger_next()
 
     def cancel_remind(self, info=None):
@@ -302,8 +302,8 @@ class Controller(
 
     def pause(self, info=None):
         if self.model.args.nopump:
-            if self.trial_state == TrialState.waiting_for_np_start:
-                self.handle_event(Event.np_start)
+            if self.trial_state == TrialState.waiting_for_poke_start:
+                self.handle_event(Event.poke_start)
             else:
                 self.handle_event(Event.spout_start)
 
@@ -327,7 +327,7 @@ class Controller(
             self.trial_info['response_time'] = np.nan
 
         self.trial_info['reaction_time'] = \
-            self.trial_info.get('np_end', np.nan)-self.trial_info['np_start']
+            self.trial_info.get('poke_end', np.nan)-self.trial_info['poke_start']
 
         if trial_type in ('GO', 'GO_REMIND'):
             score = 'HIT' if response == 'spout contact' else 'MISS'
@@ -369,7 +369,7 @@ class Controller(
         self.trigger_next()
 
     def context_updated(self):
-        if self.trial_state == TrialState.waiting_for_np_start:
+        if self.trial_state == TrialState.waiting_for_poke_start:
             self.trigger_next()
 
     def target_play(self, info=None):
@@ -422,10 +422,10 @@ class Controller(
         # Speaker in, mic, nose-poke IR, spout contact IR
         # with self._lock:
         with self.model.plot_lock:
-            speaker, microphone, np, spout = samples
+            speaker, microphone, poke, spout = samples
             self.model.data.speaker.send(speaker)
             self.model.data.microphone.send(microphone)
-            self.model.data.np.send(np)
+            self.model.data.poke.send(poke)
             self.model.data.spout.send(spout)
 
     def samples_needed(self, names, offset, samples):
@@ -446,8 +446,8 @@ class Controller(
             log.error(traceback.format_exc())
 
     event_map = {
-        ('rising' , 'np'   ): Event.np_start   ,
-        ('falling', 'np'   ): Event.np_end     ,
+        ('rising' , 'poke' ): Event.poke_start   ,
+        ('falling', 'poke' ): Event.poke_end     ,
         ('rising' , 'spout'): Event.spout_start,
         ('falling', 'spout'): Event.spout_end  ,
     }
@@ -507,36 +507,36 @@ class Controller(
         with self.model.plot_lock:
             self.model.data.log_event(timestamp, event.value)
 
-        if self.trial_state == TrialState.waiting_for_np_start:
-            if event == Event.np_start:
+        if self.trial_state == TrialState.waiting_for_poke_start:
+            if event == Event.poke_start:
                 # Animal has nose-poked in an attempt to initiate a trial.
-                self.trial_state = TrialState.waiting_for_np_duration
-                self.start_timer('np_duration', Event.np_duration_elapsed)
+                self.trial_state = TrialState.waiting_for_poke_duration
+                self.start_timer('poke_duration', Event.poke_duration_elapsed)
                 # If the animal does not maintain the nose-poke long enough,
                 # this value will get overwritten with the next nose-poke.
-                self.trial_info['np_start'] = timestamp
+                self.trial_info['poke_start'] = timestamp
 
-        elif self.trial_state == TrialState.waiting_for_np_duration:
-            if event == Event.np_end:
+        elif self.trial_state == TrialState.waiting_for_poke_duration:
+            if event == Event.poke_end:
                 # Animal has withdrawn from nose-poke too early. Cancel the
-                # timer so that it does not fire a 'event_np_duration_elapsed'.
+                # timer so that it does not fire a 'event_poke_duration_elapsed'.
                 log.debug('Animal withdrew too early')
                 self.timer.cancel()
-                self.trial_state = TrialState.waiting_for_np_start
-            elif event == Event.np_duration_elapsed:
+                self.trial_state = TrialState.waiting_for_poke_start
+            elif event == Event.poke_duration_elapsed:
                 self.start_trial()
 
         elif self.trial_state == TrialState.waiting_for_hold_period:
             # All animal-initiated events (poke/spout) are ignored during this
             # period but we may choose to record the time of nose-poke withdraw
             # if it occurs.
-            if event == Event.np_end:
+            if event == Event.poke_end:
                 # Record the time of nose-poke withdrawal if it is the first
                 # time since initiating a trial.
                 log.debug('Animal withdrew during hold period')
-                if 'np_end' not in self.trial_info:
-                    log.debug('Recording np_end')
-                    self.trial_info['np_end'] = timestamp
+                if 'poke_end' not in self.trial_info:
+                    log.debug('Recording poke_end')
+                    self.trial_info['poke_end'] = timestamp
             elif event == Event.hold_duration_elapsed:
                 self.trial_state = TrialState.waiting_for_response
                 self.start_timer('response_duration',
@@ -546,15 +546,15 @@ class Controller(
             # If the animal happened to initiate a nose-poke during the hold
             # period above and is still maintaining the nose-poke, they have to
             # manually withdraw and re-poke for us to process the event.
-            if event == Event.np_end:
+            if event == Event.poke_end:
                 # Record the time of nose-poke withdrawal if it is the first
                 # time since initiating a trial.
                 log.debug('Animal withdrew during response period')
                 # self.start_timer('response_duration',
                 #                  Event.response_duration_elapsed)
-                if 'np_end' not in self.trial_info:
-                    self.trial_info['np_end'] = timestamp
-            elif event == Event.np_start:
+                if 'poke_end' not in self.trial_info:
+                    self.trial_info['poke_end'] = timestamp
+            elif event == Event.poke_start:
                 self.timer.cancel();
                 self.trial_info['response_ts'] = timestamp
                 self.stop_trial(response='nose poke')
@@ -574,13 +574,13 @@ class Controller(
                 self.start_timer('iti_duration',
                                  Event.iti_duration_elapsed)
                 self.trial_state = TrialState.waiting_for_iti
-            elif event in (Event.spout_start, Event.np_start):
+            elif event in (Event.spout_start, Event.poke_start):
                 self.timer.cancel()
                 self.start_timer('to_duration', Event.to_duration_elapsed)
 
         elif self.trial_state == TrialState.waiting_for_iti:
             if event == Event.iti_duration_elapsed:
-                self.trial_state = TrialState.waiting_for_np_start
+                self.trial_state = TrialState.waiting_for_poke_start
 
     def start_timer(self, variable, event):
         # Even if the duration is 0, we should still create a timer because this

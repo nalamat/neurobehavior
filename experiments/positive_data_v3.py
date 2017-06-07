@@ -17,7 +17,7 @@ class PositiveData(AbstractExperimentData):
 
     speaker    = Instance(FileChannel)
     microphone = Instance(FileChannel)
-    np         = Instance(FileChannel)
+    poke       = Instance(FileChannel)
     spout      = Instance(FileChannel)
     channels   = 16
 
@@ -29,8 +29,8 @@ class PositiveData(AbstractExperimentData):
         return FileChannel(node=self.store_node, name='microphone',
                            dtype=np.float32)
 
-    def _np_default(self):
-        return FileChannel(node=self.store_node, name='np', dtype=np.float32)
+    def _poke_default(self):
+        return FileChannel(node=self.store_node, name='poke', dtype=np.float32)
 
     def _spout_default(self):
         return FileChannel(node=self.store_node, name='spout', dtype=np.float32)
