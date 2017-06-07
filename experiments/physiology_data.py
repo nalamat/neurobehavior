@@ -21,13 +21,13 @@ class PhysiologyData(HasTraits):
     # is retained at the end of the experiment.
 
     raw         = Instance(FileMultiChannel)
-    sweep       = Instance(FileChannel)
-    ts          = Instance(FileTimeseries)
-    epoch       = Instance(FileEpoch)
+    # sweep       = Instance(FileChannel)
+    # ts          = Instance(FileTimeseries)
+    # epoch       = Instance(FileEpoch)
 
-    def _sweep_default(self):
-        return FileChannel(node=self.store_node, name='sweep', dtype=np.bool,
-                           use_checksum=True)
+    # def _sweep_default(self):
+    #     return FileChannel(node=self.store_node, name='sweep', dtype=np.bool,
+    #                        use_checksum=True)
 
     def _raw_default(self):
         return FileMultiChannel(node=self.store_node, channels=CHANNELS,
@@ -35,12 +35,12 @@ class PhysiologyData(HasTraits):
                                 compression_type='lzo', compression_level=1,
                                 use_shuffle=True, use_checksum=True)
 
-    def _ts_default(self):
-        return FileTimeseries(node=self.store_node, name='ts', dtype=np.int32,
-                              use_checksum=True)
-
-    def _epoch_default(self):
-        return FileEpoch(node=self.store_node, name='epoch', dtype=np.int32)
+    # def _ts_default(self):
+    #     return FileTimeseries(node=self.store_node, name='ts', dtype=np.int32,
+    #                           use_checksum=True)
+    #
+    # def _epoch_default(self):
+    #     return FileEpoch(node=self.store_node, name='epoch', dtype=np.int32)
 
     #############################################################################
     # TEMPORARY DATA
