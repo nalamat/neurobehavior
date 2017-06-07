@@ -13,7 +13,7 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm):
     to_duration       = Expression(1  , label='TO duration (s)'        , **kw)
     hold_duration     = Expression(0.2, label='Hold duration (s)'      , **kw)
     response_duration = Expression(3  , label='Response duration (s)'  , **kw)
-    np_duration       = Expression(0.2, label='Poke duration (s)'      , **kw)
+    poke_duration     = Expression(0.2, label='Poke duration (s)'      , **kw)
     phase_delay       = Expression(45 , label='Phase delay (deg)'      , **kw)
     pump_rate         = Expression(1.5, label='Pump rate (ml/min)'     , **kw)
     reward_volume     = Expression(25 , label='Reward volume (ul)'     , **kw)
@@ -24,7 +24,7 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm):
             'hold_duration',
             'response_duration',
             'to_duration',
-            'np_duration',
+            'poke_duration',
             'phase_delay',
             'pump_rate',
             'reward_volume',
