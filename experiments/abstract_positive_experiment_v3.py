@@ -76,10 +76,10 @@ class AbstractPositiveExperiment(AbstractExperiment):
         # set up microphone plot
         value_range = DataRange1D(low_setting=-4, high_setting=1.5)
         value_mapper = LinearMapper(range=value_range)
-        plot = ExtremesChannelPlot(source=self.data.microphone,
+        plot = ExtremesChannelPlot(source=self.data.mic,
                            index_mapper=index_mapper, value_mapper=value_mapper,
                            line_color='black')
-        self.microphone_plot = plot
+        self.mic_plot = plot
         container.add(plot)
 
         # set up nose poke plot
@@ -155,7 +155,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
         try:
             with self.plot_lock:
                 index_range = ChannelDataRange(trig_delay=0)
-                index_range.sources = [self.data.microphone]
+                index_range.sources = [self.data.mic]
                 index_mapper = LinearMapper(range=index_range)
                 self.index_range = index_range
                 container = OverlayPlotContainer(padding=[20, 20, 50, 5])
