@@ -172,7 +172,7 @@ class Controller(
                 m = 'Masker file {} does not exist'
                 raise ValueError(m.format(masker_filename))
             self.masker_offset = 0
-            self.fs, masker = wavfile.read(masker_filename, mmap=True)
+            self.fs_ao, masker = wavfile.read(masker_filename, mmap=True)
             self.masker = masker.astype('float64')
             sf = 1/np.sqrt(np.mean(self.masker**2))  # normalize by rms
             self.masker *= sf
@@ -182,9 +182,9 @@ class Controller(
                 m = 'Go file {} does not exist'
                 raise ValueError(m.format(target_filename))
             self.target_offset = 0
-            self.fs, target_flat = wavfile.read(target_filename[:-4]+'_flat'+target_filename[-4:], mmap=True)
-            self.fs, target_ramp = wavfile.read(target_filename[:-4]+'_ramp'+target_filename[-4:], mmap=True)
-            # self.fs, target      = wavfile.read(target_filename, mmap=True)
+            self.fs_ao, target_flat = wavfile.read(target_filename[:-4]+'_flat'+target_filename[-4:], mmap=True)
+            self.fs_ao, target_ramp = wavfile.read(target_filename[:-4]+'_ramp'+target_filename[-4:], mmap=True)
+            # self.fs_ao, target      = wavfile.read(target_filename, mmap=True)
             self.target_flat = target_flat.astype('float64')
             self.target_ramp = target_ramp.astype('float64')
             sf = 1/np.sqrt(np.mean(self.target_flat**2)) # normalize by rms
@@ -210,14 +210,14 @@ class Controller(
                                         names=['speaker', 'mic', 'poke', 'spout'])
 
             # Speaker out
-            self.engine.configure_hw_ao(self.fs, '/Dev2/ao0', (-10, 10),
+            self.engine.configure_hw_ao(self.fs_ao, '/Dev2/ao0', (-10, 10),
                                         names=['speaker'])
 
             # Nose poke and spout contact TTL. If we want to monitor additional
             # events occuring in the behavior booth (e.g., room light on/off), we
             # can connect the output controlling the light/pump to an input and
             # monitor state changes on that input.
-            self.engine.configure_hw_di(self.fs, '/Dev2/port0/line1:2',
+            self.engine.configure_hw_di(self.fs_ao, '/Dev2/port0/line1:2',
                                         clock='/Dev2/Ctr0', names=['spout', 'poke'])
 
             # Control for room light
@@ -227,12 +227,12 @@ class Controller(
             self.engine.register_ao_callback(self.samples_needed)
             self.engine.register_ai_callback(self.samples_acquired)
             self.engine.register_di_change_callback(self.di_changed,
-                                                    debounce=self.fs*50e-3)
+                                                    debounce=self.fs_ao*50e-3)
 
-            self.model.data.speaker.fs    = self.fs_ai
-            self.model.data.microphone.fs = self.fs_ai
-            self.model.data.poke.fs         = self.fs_ai
-            self.model.data.spout.fs      = self.fs_ai
+            self.model.data.speaker.fs = self.fs_ai
+            self.model.data.mic.fs     = self.fs_ai
+            self.model.data.poke.fs    = self.fs_ai
+            self.model.data.spout.fs   = self.fs_ai
 
             # Configure the pump
             if not self.model.args.nopump:
@@ -354,7 +354,7 @@ class Controller(
         # Overrwrite output buffer with the masker to stop sound
         # ts = self.get_ts()
         # ud = self.get_current_value('update_delay')*1e-3 # Convert msec to sec
-        # offset = int(round((ts+ud)*self.fs))
+        # offset = int(round((ts+ud)*self.fs_ao))
         # duration = self.get_target().shape[-1]
         # masker_sf = 10.0**(-float(self.get_current_value('masker_level'))/20.0)
         # signal = self.get_masker(offset, duration) * masker_sf
@@ -378,12 +378,12 @@ class Controller(
             # update_delay (to give us time to generate and upload the new signal).
             ts = self.get_ts()
             ud = self.update_delay*1e-3 # Convert msec to sec
-            offset = int(round((ts+ud)*self.fs))
+            offset = int(round((ts+ud)*self.fs_ao))
 
             # if self.masker_on:
             # Insert the target at a specific phase of the modulated masker
             masker_frequency = self.get_current_value('masker_frequency')
-            period = self.fs/masker_frequency
+            period = self.fs_ao/masker_frequency
             phase_delay = self.get_current_value('phase_delay')/360.0*period
             phase = (offset % self.masker.shape[-1]) % period
             delay = phase_delay-phase
@@ -394,12 +394,12 @@ class Controller(
             target_level = self.get_current_value('target_level')
             if target_level < 0: target_level = 0
             target_sf = 10.0**(-target_level/20.0)
-            target_flat_duration = self.target_flat.shape[-1] / self.fs
+            target_flat_duration = self.target_flat.shape[-1] / self.fs_ao
             target_reps = round(self.get_current_value('target_duration')/target_flat_duration)
             target = [self.target_ramp[:-1], np.tile(self.target_flat, target_reps), -self.target_ramp[::-1]]
             target = np.concatenate(target) * target_sf
-            if target.shape[-1] < self.fs: # If target is less than 1s
-                target = np.concatenate([target, np.zeros(self.fs-target.shape[-1])])
+            if target.shape[-1] < self.fs_ao: # If target is less than 1s
+                target = np.concatenate([target, np.zeros(self.fs_ao-target.shape[-1])])
             duration = target.shape[-1]
             masker = self.get_masker(offset, duration)
             signal = masker + target
@@ -408,7 +408,7 @@ class Controller(
             log.debug('Overwriting %d samples in buffer', duration)
 
             self.trial_info['target_start'] = ts
-            self.trial_info['target_end'] = ts+duration/self.fs
+            self.trial_info['target_end'] = ts+duration/self.fs_ao
 
             self.engine.write_hw_ao(signal, offset)
             self.masker_offset = offset + duration
@@ -422,14 +422,14 @@ class Controller(
         # Speaker in, mic, nose-poke IR, spout contact IR
         # with self._lock:
         with self.model.plot_lock:
-            speaker, microphone, poke, spout = samples
+            speaker, mic, poke, spout = samples
             self.model.data.speaker.send(speaker)
-            self.model.data.microphone.send(microphone)
+            self.model.data.mic.send(mic)
             self.model.data.poke.send(poke)
             self.model.data.spout.send(spout)
 
     def samples_needed(self, names, offset, samples):
-        if samples > 5*self.fs: samples = 5*self.fs
+        if samples > 5*self.fs_ao: samples = 5*self.fs_ao
         signal = self.get_masker(self.masker_offset, samples)
         self.masker_offset += samples
         # if self.target_on:
@@ -438,7 +438,7 @@ class Controller(
         # log.debug('[samples_needed] samples  : %d', samples)
         # log.debug('[samples_needed] offset   : %d', offset)
         # if self.masker_offset != samples:
-        #     log.debug('[samples_needed] timestamp: %d', self.get_ts()*self.fs)
+        #     log.debug('[samples_needed] timestamp: %d', self.get_ts()*self.fs_ao)
         # with self._lock:
         try:
             self.engine.write_hw_ao(signal)
@@ -456,7 +456,7 @@ class Controller(
         # The timestamp is the number of analog output samples that have been
         # generated at the time the event occured. Convert to time in seconds
         # since experiment start.
-        timestamp /= self.fs
+        timestamp /= self.fs_ao
         log.debug('Detected {} edge on {} at {}'.format(change, name,timestamp))
         event = self.event_map[change, name]
         self.handle_event(event, timestamp)
@@ -591,7 +591,7 @@ class Controller(
         self.timer.start()
 
     def get_ts(self):
-        return self.engine.ao_sample_clock()/self.fs
+        return self.engine.ao_sample_clock()/self.fs_ao
 
     # Track changes in the trial settings tabulator (usually for target_level)
     @on_trait_change('model.paradigm.+container*.+context, +context')
@@ -651,7 +651,7 @@ class Controller(
         return np.concatenate(result, axis=-1)
 
     def get_ts(self):
-        return self.engine.ao_sample_clock()/self.fs
+        return self.engine.ao_sample_clock()/self.fs_ao
 
 class Paradigm(
         PositiveCMRParadigmMixin,
