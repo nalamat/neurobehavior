@@ -277,6 +277,17 @@ class Controller(
         # HDF5 data files do not natively support unicode strings so we need to
         # convert our filename to an ASCII string.  While we're at it, we should
         # probably strip the directory path as well and just save the basename.
+        if 'poke_end' not in self.trial_info: self.trial_info['poke_end'] = np.nan
+        
+        self.model.data.poke_epoch.append([(
+            self.trial_info['poke_start'], self.trial_info['poke_end']
+        )])
+        self.model.data.target_epoch.append([(
+            self.trial_info['target_start'], self.trial_info['target_end']
+        )])
+        self.model.data.trial_epoch.append([(
+            self.trial_info['poke_start'], self.trial_info['response_ts']
+        )])
         target_filename = self.get_current_value('target_filename')
         kwargs['target_filename'] = str(path.basename(target_filename))
         masker_filename = self.get_current_value('masker_filename')
@@ -562,6 +573,8 @@ class Controller(
                 self.timer.cancel();
                 self.trial_info['response_ts'] = timestamp
                 self.stop_trial(response='spout contact')
+            # elif event == Event.spout_end:
+            #     pass
             elif event == Event.response_duration_elapsed:
                 self.timer.cancel();
                 self.trial_info['response_ts'] = timestamp
