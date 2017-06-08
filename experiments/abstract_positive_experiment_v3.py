@@ -96,6 +96,12 @@ class AbstractPositiveExperiment(AbstractExperiment):
                            line_color='orange')
         container.add(plot)
 
+        plot = EpochPlot(source=self.data.target_epoch, marker='diamond',
+                marker_color=(.5, .5, .5, 1.0), marker_height=0.9,
+                marker_size=10,
+                index_mapper=index_mapper, value_mapper=value_mapper)
+        container.add(plot)
+
         # set up epoch plot
         # value_range = DataRange1D(low_setting=0+.2, high_setting=1+.2)
         # value_mapper = LinearMapper(range=value_range)
