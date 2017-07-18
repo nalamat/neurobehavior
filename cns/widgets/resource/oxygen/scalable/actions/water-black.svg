@@ -1,0 +1,18 @@
+<?xml version="1.0"?><svg width="394.4135099999999" height="554.93317" xmlns="http://www.w3.org/2000/svg">
+ <title>water drop</title>
+ <defs>
+  <pattern height="100" width="100" y="0" x="0" patternUnits="userSpaceOnUse" id="gridpattern">
+   <image height="100" width="100" y="0" x="0" id="svg_1"/>
+  </pattern>
+ </defs>
+ <metadata id="metadata7">image/svg+xml</metadata>
+ <g>
+  <title>Layer 1</title>
+  <g id="layer1">
+   <g id="g2462">
+    <path id="path2530" d="m391.416168,362.499298c0,104.015472 -86.773315,188.433807 -193.690598,188.433807c-106.91729,0 -195.668651,-84.437134 -193.690491,-188.433807c2.6283,-139.498657 109.114677,-196.31897 193.690491,-356.650448c89.832779,155.074704 193.690598,252.634945 193.690598,356.650448z" stroke-dashoffset="0" stroke-miterlimit="4" marker-end="none" marker-mid="none" marker-start="none" stroke-width="0" fill-rule="evenodd" fill="#000000"/>
+    <path stroke-linecap="square" stroke-linejoin="bevel" id="path3520" d="m382.128693,362.500702c0,98.528961 -82.423401,178.494659 -183.980804,178.494659c-101.557495,0 -185.859908,-79.983398 -183.981069,-178.494659c2.49661,-132.140732 103.644887,-185.964066 183.981069,-337.838713c85.329254,146.89517 183.980804,239.309568 183.980804,337.838713z" stroke-dashoffset="0" stroke-miterlimit="4" marker-end="none" marker-mid="none" marker-start="none" stroke-width="3" fill-rule="evenodd" fill="#000000"/>
+   </g>
+  </g>
+ </g>
+</svg>
