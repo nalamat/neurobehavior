@@ -182,19 +182,15 @@ class Controller(
                 m = 'Go file {} does not exist'
                 raise ValueError(m.format(target_filename))
             self.target_offset = 0
-            self.fs_ao, target_flat = wavfile.read(target_filename[:-4]+'_flat'+target_filename[-4:], mmap=True)
-            self.fs_ao, target_ramp = wavfile.read(target_filename[:-4]+'_ramp'+target_filename[-4:], mmap=True)
-            # self.fs_ao, target      = wavfile.read(target_filename, mmap=True)
-            self.target_flat = target_flat.astype('float64')
-            self.target_ramp = target_ramp.astype('float64')
-            sf = 1/np.sqrt(np.mean(self.target_flat**2)) # normalize by rms
-            self.target_flat *= sf
-            self.target_ramp *= sf
+            self.fs_ao, target = wavfile.read(target_filename, mmap=True)
+            self.target = target.astype('float64')
+            sf = 1/np.sqrt(np.mean(self.target**2)) # normalize by rms
+            self.target *= sf
 
-            signal_max = max(abs(self.masker)) + max(abs(self.target_flat))
-            self.masker      *= 10/signal_max
-            self.target_flat *= 10/signal_max
-            self.target_ramp *= 10/signal_max
+
+            signal_max = max(abs(self.masker)) + max(abs(self.target))
+            self.masker *= 10/signal_max
+            self.target *= 10/signal_max
 
             signal_level = 20*np.log10(10/(signal_max))
             signal_level = np.floor(self.signal_level*10)/10
@@ -405,12 +401,16 @@ class Controller(
             target_level = self.get_current_value('target_level')
             if target_level < 0: target_level = 0
             target_sf = 10.0**(-target_level/20.0)
-            target_flat_duration = self.target_flat.shape[-1] / self.fs_ao
-            target_reps = round(self.get_current_value('target_duration')/target_flat_duration)
-            target = [self.target_ramp[:-1], np.tile(self.target_flat, target_reps), -self.target_ramp[::-1]]
-            target = np.concatenate(target) * target_sf
-            if target.shape[-1] < self.fs_ao: # If target is less than 1s
+            target_duration = self.target.shape[-1] / self.fs_ao
+            target_reps = round(self.get_current_value('target_duration')/target_duration)
+            target = np.tile(self.target, target_reps) * target_sf
+            if target.shape[-1] < self.fs_ao: # Zero-pad if target is less than 1s
                 target = np.concatenate([target, np.zeros(self.fs_ao-target.shape[-1])])
+            # Ramp beginning and end of the target
+            target_ramp_length = self.get_current_value('target_ramp_duration') * 1e-3 * self.fs_ao
+            target_ramp = np.sin(2*np.pi*1/target_ramp_length/4*np.arange(target_ramp_length))**2
+            target[0:target_ramp_length]      *= target_ramp
+            target[:-target_ramp_length-1:-1] *= target_ramp
             duration = target.shape[-1]
             masker = self.get_masker(offset, duration)
             signal = masker + target
@@ -640,7 +640,7 @@ class Controller(
         target_level = self.get_current_value('target_level')
         if target_level < 0: target_level = 0
         target_sf = 10.0**(-target_level/20.0)
-        return self.get_cyclic(self.target_flat, offset, duration) * target_sf
+        return self.get_cyclic(self.target, offset, duration) * target_sf
 
     def get_cyclic(self, signal, offset, duration):
         '''
@@ -697,6 +697,7 @@ class Paradigm(
                 'masker_frequency',
                 'target_filename',
                 'target_level',
+                'target_ramp_duration',
                 'hw_att',
                 label='Sound',
                 ),
