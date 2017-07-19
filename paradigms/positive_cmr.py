@@ -93,12 +93,13 @@ class TrialState(enum.Enum):
 
     This is specific to appetitive reinforcement paradigms.
     '''
-    waiting_for_poke_start    = 'waiting for nose-poke start'
-    waiting_for_poke_duration = 'waiting for nose-poke duration'
-    waiting_for_hold_period = 'waiting for hold period'
-    waiting_for_response    = 'waiting for response'
-    waiting_for_to          = 'waiting for timeout'
-    waiting_for_iti         = 'waiting for intertrial interval'
+    waiting_for_poke_start         = 'waiting for nose poke start'
+    waiting_for_poke_duration      = 'waiting for nose poke duration'
+    waiting_for_poke_hold_duration = 'waiting for nose poke hold duration'
+    waiting_for_hold_period        = 'waiting for hold period'
+    waiting_for_response           = 'waiting for response'
+    waiting_for_to                 = 'waiting for timeout'
+    waiting_for_iti                = 'waiting for intertrial interval'
 
 
 class Event(enum.Enum):
@@ -108,16 +109,17 @@ class Event(enum.Enum):
 
     This is specific to appetitive reinforcement paradigms.
     '''
-    poke_start                  = 'initiated nose poke'
-    poke_end                    = 'withdrew from nose poke'
-    poke_duration_elapsed       = 'nose poke duration met'
-    hold_duration_elapsed     = 'hold period over'
-    response_duration_elapsed = 'response timed out'
-    spout_start               = 'spout contact'
-    spout_end                 = 'withdrew from spout'
-    to_duration_elapsed       = 'timeout over'
-    iti_duration_elapsed      = 'ITI over'
-    trial_start               = 'trial start'
+    poke_start                 = 'initiated nose poke'
+    poke_end                   = 'withdrew from nose poke'
+    poke_duration_elapsed      = 'nose poke duration met'
+    poke_hold_duration_elapsed = 'nose poke hold duration met'
+    hold_duration_elapsed      = 'hold period over'
+    response_duration_elapsed  = 'response timed out'
+    spout_start                = 'spout contact'
+    spout_end                  = 'withdrew from spout'
+    to_duration_elapsed        = 'timeout over'
+    iti_duration_elapsed       = 'ITI over'
+    trial_start                = 'trial start'
 
 
 class Controller(
@@ -551,7 +553,24 @@ class Controller(
                 self.timer.cancel()
                 self.trial_state = TrialState.waiting_for_poke_start
             elif event == Event.poke_duration_elapsed:
-                self.start_trial()
+                if self.get_current_value('poke_hold_duration') <= 0 \
+                    or self.get_current_value('ttype') in ('NOGO', 'NOGO_REPEAT'):
+                    self.start_trial()
+                else:
+                    log.debug('Starting trial: %s', self.get_current_value('ttype'))
+                    self.target_play()
+                    self.trial_state = TrialState.waiting_for_poke_hold_duration
+                    self.start_timer('poke_hold_duration', Event.poke_hold_duration_elapsed)
+
+        elif self.trial_state == TrialState.waiting_for_poke_hold_duration:
+            if event == Event.poke_end:
+                log.debug('Animal withdrew too early during poke hold period')
+                log.debug('Trial canceled')
+                self.timer.cancel()
+                self.trial_state = TrialState.waiting_for_poke_start
+            elif event == Event.poke_hold_duration_elapsed:
+                self.trial_state = TrialState.waiting_for_hold_period
+                self.start_timer('hold_duration', Event.hold_duration_elapsed)
 
         elif self.trial_state == TrialState.waiting_for_hold_period:
             # All animal-initiated events (poke/spout) are ignored during this
