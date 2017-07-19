@@ -273,14 +273,6 @@ class Controller(
         # HDF5 data files do not natively support unicode strings so we need to
         # convert our filename to an ASCII string.  While we're at it, we should
         # probably strip the directory path as well and just save the basename.
-        if 'poke_end' not in self.trial_info: self.trial_info['poke_end'] = np.nan
-
-        self.model.data.poke_epoch.append([(
-            self.trial_info['poke_start'], self.trial_info['poke_end']
-        )])
-        self.model.data.target_epoch.append([(
-            self.trial_info['target_start'], self.trial_info['target_end']
-        )])
         self.model.data.trial_epoch.append([(
             self.trial_info['poke_start'], self.trial_info['response_ts']
         )])
@@ -354,6 +346,10 @@ class Controller(
                     # TODO: check if removing this line is okay or not
                     self.set_pump_volume(self.get_current_value('reward_volume'))
                     self.pump_trigger([])
+                ts = self.get_ts()
+                pump_duration = self.get_current_value('reward_volume') / 1e3 \
+                    / self.get_current_value('pump_rate') * 60
+                self.model.data.pump_epoch.append([(ts, ts+pump_duration)])
 
             self.start_timer('iti_duration', Event.iti_duration_elapsed)
             self.trial_state = TrialState.waiting_for_iti
@@ -418,8 +414,10 @@ class Controller(
             log.debug('Inserting target at %d', offset)
             log.debug('Overwriting %d samples in buffer', duration)
 
+            target_end = ts + self.get_current_value('target_duration')
             self.trial_info['target_start'] = ts
-            self.trial_info['target_end'] = ts+duration/self.fs_ao
+            self.trial_info['target_end'] = target_end
+            self.model.data.target_epoch.append([(ts, target_end)])
 
             self.engine.write_hw_ao(signal, offset)
             self.masker_offset = offset + duration
@@ -509,6 +507,9 @@ class Controller(
         except:
             log.error(traceback.format_exc())
 
+    poke_start_ts  = np.nan
+    spout_start_ts = np.nan
+
     def _handle_event(self, event, timestamp):
         '''
         Give the current experiment state, process the appropriate response for
@@ -517,6 +518,21 @@ class Controller(
         '''
         with self.model.plot_lock:
             self.model.data.log_event(timestamp, event.value)
+
+        if event == Event.poke_start:
+            if self.poke_start_ts is not np.nan:
+                self.model.data.poke_epoch.append([(self.poke_start_ts, np.nan)])
+            self.poke_start_ts = timestamp
+        elif event == Event.poke_end:
+            self.model.data.poke_epoch.append([(self.poke_start_ts, timestamp)])
+            self.poke_start.ts = np.nan
+        elif event == Event.spout_start:
+            if self.spout_start_ts is not np.nan:
+                self.model.data.spout_epoch.append([(self.spout_start_ts, np.nan)])
+            self.spout_start_ts = timestamp
+        elif event == Event.spout_end:
+            self.model.data.spout_epoch.append([(self.spout_start_ts, timestamp)])
+            self.spout_start.ts = np.nan
 
         if self.trial_state == TrialState.waiting_for_poke_start:
             if event == Event.poke_start:
@@ -571,6 +587,7 @@ class Controller(
                 self.stop_trial(response='nose poke')
             elif event == Event.spout_start:
                 self.timer.cancel();
+                self.trial_info['spout_start'] = timestamp
                 self.trial_info['response_ts'] = timestamp
                 self.stop_trial(response='spout contact')
             # elif event == Event.spout_end:
