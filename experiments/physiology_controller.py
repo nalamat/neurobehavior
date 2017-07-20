@@ -78,6 +78,7 @@ class PhysiologyController(Controller):
 
     def setup_physiology(self):
         self.fs = 500e3/16
+        self.model.data.ts.fs = self.fs
         self.model.data.raw.fs = self.fs
         self.model.data.processed.fs = self.fs
         # # Load the circuit
@@ -120,6 +121,7 @@ class PhysiologyController(Controller):
 
     def samples_acquired(self, names, samples):
         self.model.data.raw.send(samples)
+        # self.model.data.ts.send()
         # self.model.data.processed.send(samples)
         # self.buffer_raw.send(samples)
 
@@ -263,4 +265,4 @@ class PhysiologyController(Controller):
             offset = 1
         else:
             offset = 2
-        self.iface_physiology.set_tag('ch_offset', offset*16+1)
+        # self.iface_physiology.set_tag('ch_offset', offset*16+1)

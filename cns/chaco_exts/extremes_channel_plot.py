@@ -136,15 +136,17 @@ class ExtremesChannelPlot(ChannelPlot):
             self._cached_min = ptp[0]
             self._cached_max = ptp[1]
 
+        if self._cached_min is None: self._cached_min = 0
+        if self._cached_max is None: self._cached_max = 0
 
-        if self._cached_min is None: return
-        if self._cached_max is None: return
-
-        # Now, map them to the screen
-        samples = self._cached_min.shape[-1]
-        s_val_min = self._map_screen(self._cached_min)
-        s_val_max = self._map_screen(self._cached_max)
-        self._cached_screen_data = s_val_min, s_val_max
+        try:
+            # Now, map them to the screen
+            samples = self._cached_min.shape[-1]
+            s_val_min = self._map_screen(self._cached_min)
+            s_val_max = self._map_screen(self._cached_max)
+            self._cached_screen_data = s_val_min, s_val_max
+        except:
+            return
 
         total_samples = self._cached_data.shape[-1]
         t = self.index_values[:total_samples:self.dec_factor][:samples]
@@ -162,14 +164,17 @@ class ExtremesChannelPlot(ChannelPlot):
             gc.set_line_width(self.line_width)
 
             gc.begin_path()
-            if self.draw_mode == 'normal':
-                idx, val = points
-                gc.lines(np.c_[idx, val])
-            else:
-                idx, (mins, maxes) = points
-                starts = np.column_stack((idx, mins))
-                ends = np.column_stack((idx, maxes))
-                gc.line_set(starts, ends)
+            try:
+                if self.draw_mode == 'normal':
+                    idx, val = points
+                    gc.lines(np.c_[idx, val])
+                else:
+                    idx, (mins, maxes) = points
+                    starts = np.column_stack((idx, mins))
+                    ends = np.column_stack((idx, maxes))
+                    gc.line_set(starts, ends)
+            except:
+                pass
 
             gc.stroke_path()
             self._draw_default_axes(gc)
