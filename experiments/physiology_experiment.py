@@ -167,7 +167,7 @@ class PhysiologyExperiment(HasTraits):
     sort_window_3            = Instance(SortWindow)
     channel_sort             = Property(depends_on='sort_window_+.channel')
 
-    channel                 = Enum('processed', 'raw')
+    channel                 = Enum('raw', 'processed')
     channel_mode            = Enum('TBSI', 'TDT', 'Test')
 
     # Overlays
@@ -205,11 +205,11 @@ class PhysiologyExperiment(HasTraits):
 
     def _channel_changed(self, new):
         if new == 'raw':
-            self.physiology_plot.channel = self.data.raw
+            self.physiology_plot.source = self.data.raw
         else:
-            self.physiology_plot.channel = self.data.processed
+            self.physiology_plot.source = self.data.processed
 
-    @on_trait_change('data, parent')
+    @on_trait_change('data, parent, object')
     def _generate_physiology_plot(self):
         # NOTE THAT ORDER IS IMPORTANT.  First plots added are at bottom of
         # z-stack, so the physiology must be last so it appears on top.
@@ -219,8 +219,7 @@ class PhysiologyExperiment(HasTraits):
 
         # Create the index range shared by all the plot components
         self.physiology_index_range = ChannelDataRange(span=5, trig_delay=0,
-                # timeseries=self.data.ts, sources=[self.data.processed])
-                timeseries=self.data.ts, sources=[self.data.raw])
+                timeseries=None, sources=[self.data.raw])
 
         # Create the TTL plot
         index_mapper = LinearMapper(range=self.physiology_index_range)
@@ -249,7 +248,6 @@ class PhysiologyExperiment(HasTraits):
 
         # Create the neural plots
         value_mapper = LinearMapper(range=self.physiology_value_range)
-        # plot = ExtremesMultiChannelPlot(source=self.data.processed,
         plot = ExtremesMultiChannelPlot(source=self.data.raw,
                 index_mapper=index_mapper, value_mapper=value_mapper)
         self.settings.sync_trait('visible_channels', plot, 'channel_visible', mutual=False)
