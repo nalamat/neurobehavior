@@ -527,14 +527,14 @@ class Controller(
             self.poke_start_ts = timestamp
         elif event == Event.poke_end:
             self.model.data.poke_epoch.append([(self.poke_start_ts, timestamp)])
-            self.poke_start.ts = np.nan
+            self.poke_start_ts = np.nan
         elif event == Event.spout_start:
             if self.spout_start_ts is not np.nan:
                 self.model.data.spout_epoch.append([(self.spout_start_ts, np.nan)])
             self.spout_start_ts = timestamp
         elif event == Event.spout_end:
             self.model.data.spout_epoch.append([(self.spout_start_ts, timestamp)])
-            self.spout_start.ts = np.nan
+            self.spout_start_ts = np.nan
 
         if self.trial_state == TrialState.waiting_for_poke_start:
             if event == Event.poke_start:
