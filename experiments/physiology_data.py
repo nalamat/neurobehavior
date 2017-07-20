@@ -22,7 +22,7 @@ class PhysiologyData(HasTraits):
 
     raw         = Instance(FileMultiChannel)
     sweep       = Instance(FileChannel)
-    ts          = Instance(FileTimeseries)
+    # ts          = Instance(FileTimeseries)
     epoch       = Instance(FileEpoch)
 
     def _sweep_default(self):
@@ -35,9 +35,9 @@ class PhysiologyData(HasTraits):
                                 compression_type='lzo', compression_level=1,
                                 use_shuffle=True, use_checksum=True)
 
-    def _ts_default(self):
-        return FileTimeseries(node=self.store_node, name='ts', dtype=np.int32,
-                              use_checksum=True)
+    # def _ts_default(self):
+    #     return FileTimeseries(node=self.store_node, name='ts', dtype=np.int32,
+    #                           use_checksum=True)
 
     def _epoch_default(self):
         return FileEpoch(node=self.store_node, name='epoch', dtype=np.int32)
