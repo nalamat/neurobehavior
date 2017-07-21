@@ -203,22 +203,28 @@ class Controller(
         self.trial_state = TrialState.waiting_for_poke_start
         self.engine = Engine()
 
-        # Speaker in, mic, nose-poke IR, spout contact IR. Not everything will
-        # necessarily be connected.
-        self.fs_ai = 250e3/4
-        self.engine.configure_hw_ai(self.fs_ai, '/Dev2/ai0:3', (-10, 10),
-                                    names=['speaker', 'mic', 'poke', 'spout'])
-
-        # Speaker out
-        self.engine.configure_hw_ao(self.fs_ao, '/Dev2/ao0', (-10, 10),
-                                    names=['speaker'])
+        if self.model.spool_physiology:
+            self.physiology_handler.start_physiology()
 
         # Nose poke and spout contact TTL. If we want to monitor additional
         # events occuring in the behavior booth (e.g., room light on/off), we
         # can connect the output controlling the light/pump to an input and
         # monitor state changes on that input.
         self.engine.configure_hw_di(self.fs_ao, '/Dev2/port0/line1:2',
-                                    clock='/Dev2/Ctr0', names=['spout', 'poke'])
+                                    clock='/Dev2/Ctr0', names=['spout', 'poke'],
+                                    start_trigger='/Dev2/ao/StartTrigger')
+
+        # Speaker in, mic, nose-poke IR, spout contact IR. Not everything will
+        # necessarily be connected.
+        self.fs_ai = 250e3/4
+        self.engine.configure_hw_ai(self.fs_ai, '/Dev2/ai0:3', (-10, 10),
+                                    names=['speaker', 'mic', 'poke', 'spout'],
+                                    start_trigger='/Dev2/ao/StartTrigger')
+
+        # Speaker out
+        # The AO task on Dev2 is considered as the master task
+        self.engine.configure_hw_ao(self.fs_ao, '/Dev2/ao0', (-10, 10),
+                                    names=['speaker'])
 
         # Control for room light
         self.engine.configure_sw_do('/Dev2/port1/line1', names=['light'])
@@ -247,9 +253,6 @@ class Controller(
         node._v_attrs['trial_sequence_random_seed'] = self.random_seed
 
         self.state = 'running'
-
-        if self.model.spool_physiology:
-            self.physiology_handler.start_physiology()
 
         self.handler_thread = threading.Thread(target=self.handler_loop, args=[])
         self.handler_thread.start()
