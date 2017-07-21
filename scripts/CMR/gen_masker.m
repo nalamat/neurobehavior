@@ -3,7 +3,7 @@ close all
 clc
 spth = '.\'; % path where stimuli are saved
 rms = inline('sqrt(mean(x.^2))','x');
-t.Fs = 128e3; % sampling frequency in Hz
+t.Fs = 100e3; % sampling frequency in Hz
 t.Duration = 30; % total stimulus duration in s [That's exactly 8 cycles @ 16 Hz]
 t.Ramp = 10e-3; % ramp duration
 t.TargetMaskerDelay = 156.3e-3; %  time delay between onset of the masker and onset of the target
