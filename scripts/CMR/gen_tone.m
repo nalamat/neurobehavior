@@ -1,5 +1,5 @@
-fs = 128000; %97656
-fc = 2000;
+fs = 100e3; %97656
+fc = 1e3;
 
 % generate the flat stimulus
 flat_len = .1;
@@ -13,9 +13,10 @@ xlim([0 flat_len]);
 grid on;
 % pause;
 
-audiowrite('T02_flat.wav', y, fs);
+audiowrite('T01.wav', y, fs);
 % a = audioplayer([y y y y y y y y y y y y y y], fs);
 % play(a);
+return;
 
 % generate the ramp
 ramp_len = 20e-3;
