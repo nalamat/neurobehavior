@@ -122,6 +122,7 @@ class PhysiologyController(Controller):
         self.parent.engine.configure_hw_ai2(self.fs, '/Dev1/ai0:15', (-10, 10),
             names=channels, start_trigger='/Dev2/ao/StartTrigger')
         self.parent.engine.register_ai2_callback(self.samples_acquired)
+        self.parent.engine.set_ai2_timebase('/Dev2/20MHzTimebase', 20e6)
 
     def samples_acquired(self, names, samples):
         self.model.data.raw.send(samples)

@@ -211,7 +211,7 @@ class Controller(
         # can connect the output controlling the light/pump to an input and
         # monitor state changes on that input.
         self.engine.configure_hw_di(self.fs_ao, '/Dev2/port0/line1:2',
-                                    clock='/Dev2/Ctr0', names=['spout', 'poke'],
+                                    clock='/Dev2/Ctr1', names=['spout', 'poke'],
                                     start_trigger='/Dev2/ao/StartTrigger')
 
         # Speaker in, mic, nose-poke IR, spout contact IR. Not everything will
@@ -228,7 +228,7 @@ class Controller(
 
         # Control for room light
         self.engine.configure_sw_do('/Dev2/port1/line1', names=['light'])
-        self.engine.set_sw_do('light' , 1)
+        self.engine.set_sw_do('light', 1)
 
         self.engine.register_ao_callback(self.samples_needed)
         self.engine.register_ai_callback(self.samples_acquired)
