@@ -398,15 +398,15 @@ class Controller(
             ud = self.update_delay*1e-3 # Convert msec to sec
             offset = int(round((ts+ud)*self.fs_ao))
 
-            # if self.masker_on:
             # Insert the target at a specific phase of the modulated masker
             masker_frequency = self.get_current_value('masker_frequency')
-            period = self.fs_ao/masker_frequency
-            phase_delay = self.get_current_value('phase_delay')/360.0*period
-            phase = (offset % self.masker.shape[-1]) % period
-            delay = phase_delay-phase
-            if delay<0: delay+=period
-            offset += int(delay)
+            if masker_frequency <> 0:
+                period = self.fs_ao/masker_frequency
+                phase_delay = self.get_current_value('phase_delay')/360.0*period
+                phase = (offset % self.masker.shape[-1]) % period
+                delay = phase_delay-phase
+                if delay<0: delay+=period
+                offset += int(delay)
 
             # Generate combined signal
             target_level = self.get_current_value('target_level')
@@ -419,9 +419,10 @@ class Controller(
                 target = np.concatenate([target, np.zeros(self.fs_ao-target.shape[-1])])
             # Ramp beginning and end of the target
             target_ramp_length = self.get_current_value('target_ramp_duration') * 1e-3 * self.fs_ao
-            target_ramp = np.sin(2*np.pi*1/target_ramp_length/4*np.arange(target_ramp_length))**2
-            target[0:target_ramp_length]      *= target_ramp
-            target[:-target_ramp_length-1:-1] *= target_ramp
+            if target_ramp_length <> 0:
+                target_ramp = np.sin(2*np.pi*1/target_ramp_length/4*np.arange(target_ramp_length))**2
+                target[0:target_ramp_length]      *= target_ramp
+                target[:-target_ramp_length-1:-1] *= target_ramp
             duration = target.shape[-1]
             masker = self.get_masker(offset, duration)
             signal = masker + target
