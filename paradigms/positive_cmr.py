@@ -219,12 +219,16 @@ class Controller(
         self.fs_ai = 250e3/4
         self.engine.configure_hw_ai(self.fs_ai, '/Dev2/ai0:3', (-10, 10),
                                     names=['speaker', 'mic', 'poke', 'spout'],
-                                    start_trigger='/Dev2/ao/StartTrigger')
+                                    start_trigger='/Dev2/ao/StartTrigger',
+                                    timebase_src='/Dev2/20MHzTimebase',
+                                    timebase_rate=20e6)
 
         # Speaker out
         # The AO task on Dev2 is considered as the master task
         self.engine.configure_hw_ao(self.fs_ao, '/Dev2/ao0', (-10, 10),
-                                    names=['speaker'])
+                                    names=['speaker'],
+                                    timebase_src='/Dev2/20MHzTimebase',
+                                    timebase_rate=20e6)
 
         # Control for room light
         self.engine.configure_sw_do('/Dev2/port1/line1', names=['light'])
