@@ -59,10 +59,10 @@ def decimate_extremes(data, downsample):
     # make a copy of a reshaped array before performing the operation, so we
     # force it now so the copy only occurs once.
     if data.ndim == 2:
-        shape = (len(data), -1, downsample)
+        shape = (len(data), -1, int(downsample))
     else:
-        shape = (-1, downsample)
-    data = data[..., :-offset].reshape(shape).copy()
+        shape = (-1, int(downsample))
+    data = data[..., :-int(offset)].reshape(shape).copy()
     return data.min(last_dim), data.max(last_dim)
 
 class ExtremesChannelPlot(ChannelPlot):
@@ -127,7 +127,7 @@ class ExtremesChannelPlot(ChannelPlot):
         # We cache our prior decimations
         if self._cached_min is not None:
             n_cached = self._cached_min.shape[-1]*self.dec_factor
-            to_decimate = self._cached_data[..., n_cached:]
+            to_decimate = self._cached_data[..., int(n_cached):]
             mins, maxes = decimate_extremes(to_decimate, self.dec_factor)
             self._cached_min = np.hstack((self._cached_min, mins))
             self._cached_max = np.hstack((self._cached_max, maxes))
@@ -149,7 +149,7 @@ class ExtremesChannelPlot(ChannelPlot):
             return
 
         total_samples = self._cached_data.shape[-1]
-        t = self.index_values[:total_samples:self.dec_factor][:samples]
+        t = self.index_values[:int(total_samples):int(self.dec_factor)][:int(samples)]
         t_screen = self.index_mapper.map_screen(t)
         self._cached_screen_index = t_screen
         self._screen_cache_valid = True
