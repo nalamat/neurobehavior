@@ -418,11 +418,13 @@ class Controller(
             target_sf = 10.0**(-target_level/20.0)
             target_duration = self.target.shape[-1] / self.fs_ao
             target_reps = round(self.get_current_value('target_duration')/target_duration)
+            target_reps = int(target_reps)
             target = np.tile(self.target, target_reps) * target_sf
             if target.shape[-1] < self.fs_ao: # Zero-pad if target is less than 1s
                 target = np.concatenate([target, np.zeros(self.fs_ao-target.shape[-1])])
             # Ramp beginning and end of the target
             target_ramp_length = self.get_current_value('target_ramp_duration') * 1e-3 * self.fs_ao
+            target_ramp_length = int(target_ramp_length)
             if target_ramp_length <> 0:
                 target_ramp = np.sin(2*np.pi*1/target_ramp_length/4*np.arange(target_ramp_length))**2
                 target[0:target_ramp_length]      *= target_ramp
