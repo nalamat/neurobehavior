@@ -158,6 +158,7 @@ class Controller(
     fs = 100e3
 
     def setup_experiment(self, info):
+        self.model.data.setup()
         return
 
     def start_experiment(self, info):
@@ -354,6 +355,7 @@ class Controller(
 
         if score == 'FA':
             # Turn the light off
+            log.debug('Entering timeout')
             self.engine.set_sw_do('light', 0)
             self.start_timer('to_duration', Event.to_duration_elapsed)
             self.trial_state = TrialState.waiting_for_to
@@ -361,6 +363,7 @@ class Controller(
             if score == 'HIT':
                 # TODO: Investigate why are changes to reward_volume applied on
                 # the second trial rather than the first one?
+                log.debug('Trigerring pump')
                 if not self.model.args.nopump:
                     # TODO: check if removing this line is okay or not
                     self.set_pump_volume(self.get_current_value('reward_volume'))
@@ -370,8 +373,9 @@ class Controller(
                     / self.get_current_value('pump_rate') * 60
                 self.model.data.pump_epoch.append([(ts, ts+pump_duration)])
 
-            self.start_timer('iti_duration', Event.iti_duration_elapsed)
+            log.debug('Entering intertrial interval')
             self.trial_state = TrialState.waiting_for_iti
+            self.start_timer('iti_duration', Event.iti_duration_elapsed)
 
         # Overrwrite output buffer with the masker to stop sound
         # ts = self.get_ts()
@@ -386,6 +390,7 @@ class Controller(
         # except:
         #     log.error('[stop_trial] Update delay %f is too small', ud)
 
+        log.debug('Logging trial')
         self.log_trial(score=score, response=response, ttype=trial_type,
                        **self.trial_info)
         self.trigger_next()
@@ -555,6 +560,8 @@ class Controller(
         elif event == Event.spout_end:
             self.model.data.spout_epoch.append([(self.spout_start_ts, timestamp)])
             self.spout_start_ts = np.nan
+
+        log.debug('Handling %s in %s', event, self.trial_state)
 
         if self.trial_state == TrialState.waiting_for_poke_start:
             if event == Event.poke_start:
