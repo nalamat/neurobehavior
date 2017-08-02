@@ -148,24 +148,22 @@ class AbstractPositiveExperiment(AbstractExperiment):
                 value_factor=1)
         plot.tools.append(tool)
 
-    plot_lock = threading.Lock()
-
     @on_trait_change('data')
     def _generate_experiment_plot(self):
         try:
-            with self.plot_lock:
-                index_range = ChannelDataRange(trig_delay=0)
-                index_range.sources = [self.data.mic]
-                index_mapper = LinearMapper(range=index_range)
-                self.index_range = index_range
-                container = OverlayPlotContainer(padding=[20, 20, 50, 5])
-                self._add_experiment_plots(index_mapper, container, 0.5)
-                plot = container.components[0]
-                add_default_grids(plot, major_index=1, minor_index=0.25)
-                add_time_axis(plot, orientation='top')
-                self.experiment_plot = container
+            index_range = ChannelDataRange(trig_delay=0)
+            index_range.sources = [self.data.mic]
+            index_mapper = LinearMapper(range=index_range)
+            self.index_range = index_range
+            container = OverlayPlotContainer(padding=[20, 20, 50, 5])
+            self._add_experiment_plots(index_mapper, container, 0.5)
+            plot = container.components[0]
+            add_default_grids(plot, major_index=1, minor_index=0.25)
+            add_time_axis(plot, orientation='top')
+            self.experiment_plot = container
         except:
             log.error(traceback.format_exc())
+            raise
 
     status_group = VGroup(
             Item('animal'),
