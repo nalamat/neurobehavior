@@ -1,6 +1,6 @@
 '''
-Appetitive comodulation masking release (continuous noise)
 ----------------------------------------------------------
+Appetitive comodulation masking release (continuous noise)
 :Authors: **Brad Buran <bburan@alum.mit.edu>**
           **Antje Ihlefeld <ai33@nyu.edu>**
           **Nima Alamatsaz <nima.alamatsaz@njit.edu>**
@@ -46,8 +46,8 @@ import threading
 import Queue
 from os import path
 
-from traits.api import Instance, File, Any, Int, Float, Bool, on_trait_change
-from traitsui.api import View, Include, VGroup, HGroup
+from traits.api import Instance, File, Any, Int, Float, Bool, String, on_trait_change
+from traitsui.api import View, Include, VGroup, HGroup, Item
 from pyface.api import error
 
 from experiments.evaluate import Expression
@@ -284,6 +284,7 @@ class Controller(
         self.refresh_context()
         self.current_setting = self.next_setting()
         self.evaluate_pending_expressions(self.current_setting)
+        self.model.data.trial_type = self.get_current_value('ttype')
 
     def log_trial(self, **kwargs):
         # HDF5 data files do not natively support unicode strings so we need to
@@ -776,6 +777,7 @@ class Data(PositiveData, PositiveCLDataMixin, PumpDataMixin):
     Container for the data
     '''
     c_nogo = Int(0, context=True, label='Consecutive nogos (including repeats)')
+    trial_type = String('GO_REMIND', context=True, label='Upcoming trial')
     pass
 
 
@@ -788,6 +790,7 @@ class Experiment(AbstractPositiveExperiment, CLExperimentMixin):
     paradigm = Instance(Paradigm, ())
 
     experiment_summary_group = VGroup(
+        'object.data.trial_type',
         'object.data.water_infused',
         label='Experiment Summary',
         style='readonly',
