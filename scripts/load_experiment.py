@@ -229,7 +229,6 @@ def do_monkeypatch():
     lock = threading.Lock()
     for im in monkeypatch:
         wrapped_im = secure_lock(im, lock)
-        print im
         setattr(im.im_class, im.im_func.func_name, wrapped_im)
 
     def table_length(self):
