@@ -69,20 +69,22 @@ class AbstractExperimentData(HasTraits):
             perf[self.performance.index.name] = list(self.performance.index.values)
             log.info('Performance: %s', str(perf))
 
+            # TODO: Since kwargs might have different fields after each trial,
+            # find a way to store trial log dynamically in HFD5
             # If haven't done yet, create a table for saving trial log to the
             # HDF5 file and set the column names. Column names should not change
             # throughout a single session
-            if self.trial_log2 is None:
-                desc = []
-                for key, val in kwargs.iteritems():
-                    if type(val) is str or type(val) is unicode:
-                        desc.append((key, 'S512'))
-                    else:
-                        desc.append((key, type(val)))
-                desc = np.dtype(desc)
-                fh = self.store_node._v_file
-                self.trial_log2 = fh.createTable(self.store_node, 'trial_log', desc)
-            self.trial_log2.append([tuple(kwargs.values())])
+            # if self.trial_log2 is None:
+            #     desc = []
+            #     for key, val in kwargs.iteritems():
+            #         if type(val) is str or type(val) is unicode:
+            #             desc.append((key, 'S512'))
+            #         else:
+            #             desc.append((key, type(val)))
+            #     desc = np.dtype(desc)
+            #     fh = self.store_node._v_file
+            #     self.trial_log2 = fh.createTable(self.store_node, 'trial_log', desc)
+            # self.trial_log2.append([tuple(kwargs.values())])
 
             # If haven't done yet, create a table for saving performance to the
             # HDF5 file and set the column names. Column names should not change

@@ -256,9 +256,9 @@ class Controller(
 
         self.state = 'running'
 
+        self.engine.start()
         self.thread = threading.Thread(target=self.thread_loop, args=[])
         self.thread.start()
-        self.engine.start()
         self.trigger_next()
 
         if self.engine.ai_sample_clock_rate() <> self.fs_ai:
@@ -300,11 +300,11 @@ class Controller(
         super(Controller, self).log_trial(**kwargs)
 
     def stop_experiment(self, info):
+        self.thread_stop = True
+        self.thread.join()
         if not self.model.args.nopump:
             self.iface_pump.disconnect()
         self.engine.stop()
-        self.thread_stop = True
-        self.thread.join()
 
     def remind(self, info=None):
         # If trial is already running, the remind will be presented on the next
@@ -495,11 +495,22 @@ class Controller(
         self.handle_event(event, timestamp)
 
     def thread_loop(self):
+        pump_ts = 0
+
         while not self.thread_stop:
             try:
                 if not self.queue.empty():
                     with self.queue_lock: (event, timestamp) = self.queue.get()
                     with self._lock: self._handle_event(event, timestamp)
+
+                # Monitor pump for changes in infused volume every 0.5s
+                # This will update the data.water_infused variable and also
+                # log the current volume along with at timestamp in HDF5
+                ts = self.get_ts()
+                if ts-pump_ts >= .5:
+                    pump_ts = ts
+                    if not self.model.args.nopump:
+                        self.monitor_pump()
             except:
                 log.error(traceback.format_exc())
             time.sleep(.001) # 1 ms
