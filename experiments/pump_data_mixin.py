@@ -4,13 +4,13 @@ import numpy as np
 class PumpDataMixin(HasTraits):
 
     PUMP_DATA_VERSION = Float(2.0)
-    
+
     water_log = Any
     water_infused = Float
 
     def _water_log_default(self):
         file = self.store_node._v_file
-        description = np.dtype([('timestamp', 'i'), ('infused', 'f')])
+        description = np.dtype([('timestamp', 'f'), ('infused', 'f')])
         node = file.createTable(self.store_node, 'water_log', description)
         node.append([(0, 0)])
         return node
