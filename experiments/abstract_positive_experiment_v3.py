@@ -183,6 +183,12 @@ class AbstractPositiveExperiment(AbstractExperiment):
             label='Experiment overview',
             )
 
+    experiment_summary_group = VGroup(
+        label='Experiment Summary',
+        style='readonly',
+        show_border=True,
+        )
+
     traits_group = HSplit(
             VGroup(
                 Item('handler.toolbar', style='custom'),
@@ -205,11 +211,7 @@ class AbstractPositiveExperiment(AbstractExperiment):
                 show_labels=False,
                 ),
             VGroup(
-                VGroup(
-                    label='Experiment Summary',
-                    style='readonly',
-                    show_border=True,
-                    ),
+                Include('experiment_summary_group'),
                 VGroup(
                     label='Analysis settings',
                     show_border=True,
