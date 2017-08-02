@@ -47,7 +47,7 @@ import Queue
 from os import path
 
 from traits.api import Instance, File, Any, Int, Float, Bool, on_trait_change
-from traitsui.api import View, Include, VGroup
+from traitsui.api import View, Include, VGroup, HGroup
 from pyface.api import error
 
 from experiments.evaluate import Expression
@@ -148,14 +148,11 @@ class Controller(
     update_delay = Float(200, **kw) # ms
     signal_level = Float(0  , **kw)
 
-    handler_thread = None
-    handler_stop = False
+    thread = None
+    thread_stop = False
     queue = Queue.Queue()
     queue_lock = threading.Lock()
     _lock = threading.Lock()
-    # engine = Instance('daqengine.ni.Engine')
-
-    fs = 100e3
 
     def setup_experiment(self, info):
         self.model.data.setup()
@@ -259,8 +256,8 @@ class Controller(
 
         self.state = 'running'
 
-        self.handler_thread = threading.Thread(target=self.handler_loop, args=[])
-        self.handler_thread.start()
+        self.thread = threading.Thread(target=self.thread_loop, args=[])
+        self.thread.start()
         self.engine.start()
         self.trigger_next()
 
@@ -303,11 +300,11 @@ class Controller(
         super(Controller, self).log_trial(**kwargs)
 
     def stop_experiment(self, info):
-        self.engine.stop()
         if not self.model.args.nopump:
             self.iface_pump.disconnect()
-        self.handler_stop = True
-        self.handler_thread.join()
+        self.engine.stop()
+        self.thread_stop = True
+        self.thread.join()
 
     def remind(self, info=None):
         # If trial is already running, the remind will be presented on the next
@@ -320,7 +317,7 @@ class Controller(
         self.remind_requested = False
 
     def pause(self, info=None):
-        if self.model.args.nopump:
+        # if self.model.args.nopump:
             if self.trial_state == TrialState.waiting_for_poke_start:
                 self.handle_event(Event.poke_start)
             else:
@@ -497,8 +494,8 @@ class Controller(
         event = self.event_map[change, name]
         self.handle_event(event, timestamp)
 
-    def handler_loop(self):
-        while not self.handler_stop:
+    def thread_loop(self):
+        while not self.thread_stop:
             try:
                 if not self.queue.empty():
                     with self.queue_lock: (event, timestamp) = self.queue.get()
@@ -782,5 +779,12 @@ class Experiment(AbstractPositiveExperiment, CLExperimentMixin):
 
     data = Instance(Data, ())
     paradigm = Instance(Paradigm, ())
+
+    experiment_summary_group = VGroup(
+        'object.data.water_infused',
+        label='Experiment Summary',
+        style='readonly',
+        show_border=True,
+        )
 
 node_name = 'PositiveCMR'
