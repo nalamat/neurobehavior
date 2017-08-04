@@ -68,84 +68,53 @@ class AbstractPositiveExperiment(AbstractExperiment):
         # set up speaker plot
         value_range = DataRange1D(low_setting=-4, high_setting=1.5)
         value_mapper = LinearMapper(range=value_range)
-        plot = ExtremesChannelPlot(source=self.data.speaker,
-                           index_mapper=index_mapper, value_mapper=value_mapper,
-                           line_color='green')
+        plot = ExtremesChannelPlot(source=self.data.speaker, line_color='red',
+            index_mapper=index_mapper, value_mapper=value_mapper)
         container.add(plot)
 
         # set up microphone plot
-        value_range = DataRange1D(low_setting=-4, high_setting=1.5)
-        value_mapper = LinearMapper(range=value_range)
-        plot = ExtremesChannelPlot(source=self.data.mic,
-                           index_mapper=index_mapper, value_mapper=value_mapper,
-                           line_color='black')
+        plot = ExtremesChannelPlot(source=self.data.mic, line_color='orange',
+            index_mapper=index_mapper, value_mapper=value_mapper)
         self.mic_plot = plot
         container.add(plot)
 
         # set up nose poke plot
         value_range = DataRange1D(low_setting=-1, high_setting=16)
         value_mapper = LinearMapper(range=value_range)
-        plot = ExtremesChannelPlot(source=self.data.poke,
-                           index_mapper=index_mapper, value_mapper=value_mapper,
-                           line_color='blue')
+        plot = ExtremesChannelPlot(source=self.data.poke, line_color='green',
+            index_mapper=index_mapper, value_mapper=value_mapper)
         container.add(plot)
 
         # set up lick spout plot
-        plot = ExtremesChannelPlot(source=self.data.spout,
-                           index_mapper=index_mapper, value_mapper=value_mapper,
-                           line_color='orange')
+        plot = ExtremesChannelPlot(source=self.data.spout, line_color='blue',
+            index_mapper=index_mapper, value_mapper=value_mapper)
         container.add(plot)
 
         # set up epoch plot
         value_range = DataRange1D(low_setting=0+.2, high_setting=1+.2)
         value_mapper = LinearMapper(range=value_range)
 
-        plot = TablesTimeseriesPlot(source=self.data,
-                                    trait_name='event_log',
-                                    changed_name='event_log_updated',
-                                    event_name='initiated nose poke',
-                                    marker='diamond',
-                                    marker_color='black',
-                                    marker_height=0.45,
-                                    index_mapper=index_mapper,
-                                    value_mapper=value_mapper)
+        kw = {'source':self.data, 'trait_name':'event_log',
+            'changed_name':'event_log_updated', 'index_mapper':index_mapper,
+            'value_mapper':value_mapper, 'marker_size':7, 'marker_edge_width':0}
+
+        # nose poke epoch
+        plot = TablesTimeseriesPlot(event_name='initiated nose poke',
+            marker='triangle', marker_color='green', **kw)
+        container.add(plot)
+        plot = TablesTimeseriesPlot(event_name='withdrew from nose poke',
+            marker='inverted_triangle', marker_color='green', **kw)
         container.add(plot)
 
-        plot = TablesTimeseriesPlot(source=self.data,
-                                    trait_name='event_log',
-                                    changed_name='event_log_updated',
-                                    event_name='withdrew from nose poke',
-                                    marker='diamond',
-                                    marker_color='red',
-                                    marker_height=0.45,
-                                    index_mapper=index_mapper,
-                                    value_mapper=value_mapper)
+        # lick spout epoch
+        plot = TablesTimeseriesPlot(event_name='spout contact',
+            marker='triangle', marker_color='blue', **kw)
+        container.add(plot)
+        plot = TablesTimeseriesPlot(event_name='withdrew from spout',
+            marker='inverted_triangle', marker_color='blue', **kw)
         container.add(plot)
 
-        plot = TablesTimeseriesPlot(source=self.data,
-                                    trait_name='event_log',
-                                    changed_name='event_log_updated',
-                                    event_name='spout contact',
-                                    marker='diamond',
-                                    marker_color='yellow',
-                                    marker_height=0.45,
-                                    index_mapper=index_mapper,
-                                    value_mapper=value_mapper)
-        container.add(plot)
-
-        plot = TablesTimeseriesPlot(source=self.data,
-                                    trait_name='event_log',
-                                    changed_name='event_log_updated',
-                                    event_name='withdrew from spout',
-                                    marker='diamond',
-                                    marker_color='green',
-                                    marker_height=0.45,
-                                    index_mapper=index_mapper,
-                                    value_mapper=value_mapper)
-        container.add(plot)
-
-        tool = ChannelRangeTool(component=plot, allow_drag=False,
-                value_factor=1)
+        tool = ChannelRangeTool(component=plot, allow_drag=False, value_factor=1)
         plot.tools.append(tool)
 
     @on_trait_change('data')
