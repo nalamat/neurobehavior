@@ -339,7 +339,7 @@ class Controller(
         log.debug('Stopping trial')
 
         trial_type = self.get_current_value('ttype')
-        if response != 'no response':
+        if response != 'no response' and 'target_start' in self.trial_info:
             self.trial_info['response_time'] = \
                 self.trial_info['response_ts']-self.trial_info['target_start']
         else:
@@ -507,6 +507,7 @@ class Controller(
         while not self.thread_stop:
             try:
                 if not self.queue.empty():
+                    log.debug('Fetching from queue')
                     (event, timestamp) = self.queue.get()
                     log.debug('Fetched event %s at %f from the queue', event, timestamp)
                     self._handle_event(event, timestamp)
@@ -546,6 +547,7 @@ class Controller(
 
             log.debug('Adding event %s at %f to the queue', event, timestamp)
             self.queue.put((event, timestamp))
+            log.debug('Event added to queue')
         except:
             log.error(traceback.format_exc())
 
