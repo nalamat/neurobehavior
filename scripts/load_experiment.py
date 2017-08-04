@@ -419,4 +419,4 @@ if __name__ == '__main__':
             raw_input("Hit enter to exit")
 
     finally:
-        print "Log file saved to ", log_filename
+        print "Log file saved to", log_filename

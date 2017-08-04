@@ -151,7 +151,6 @@ class Controller(
     thread = None
     thread_stop = False
     queue = Queue.Queue()
-    queue_lock = threading.Lock()
 
     def setup_experiment(self, info):
         self.model.data.setup()
@@ -271,6 +270,7 @@ class Controller(
 
 
     def trigger_next(self):
+        log.debug('Triggering next trial')
         c_nogo = 0
         trial_log = self.model.data.trial_log
         while len(trial_log)-c_nogo-1 > 0:
@@ -290,6 +290,7 @@ class Controller(
         # HDF5 data files do not natively support unicode strings so we need to
         # convert our filename to an ASCII string.  While we're at it, we should
         # probably strip the directory path as well and just save the basename.
+        log.debug('Logging trial epoch to HDF5')
         self.model.data.trial_epoch.append([(
             self.trial_info['poke_start'], self.trial_info['response_ts']
         )])
@@ -335,6 +336,8 @@ class Controller(
         self.start_timer('hold_duration', Event.hold_duration_elapsed)
 
     def stop_trial(self, response):
+        log.debug('Stopping trial')
+
         trial_type = self.get_current_value('ttype')
         if response != 'no response':
             self.trial_info['response_time'] = \
@@ -349,6 +352,8 @@ class Controller(
             score = 'HIT' if response == 'spout contact' else 'MISS'
         elif trial_type in ('NOGO', 'NOGO_REPEAT'):
             score = 'FA' if response == 'spout contact' else 'CR'
+
+        log.debug('Score is %s', score)
 
         if score == 'FA':
             # Turn the light off
@@ -365,9 +370,12 @@ class Controller(
                     # TODO: check if removing this line is okay or not
                     self.set_pump_volume(self.get_current_value('reward_volume'))
                     self.pump_trigger([])
+                else:
+                    log.debug('Pump not triggered in "-nopump" mode')
                 ts = self.get_ts()
                 pump_duration = self.get_current_value('reward_volume') / 1e3 \
                     / self.get_current_value('pump_rate') * 60
+                log.debug('Logging pump epoch to HDF5')
                 self.model.data.pump_epoch.append([(ts, ts+pump_duration)])
 
             log.debug('Entering intertrial interval')
@@ -387,7 +395,6 @@ class Controller(
         # except:
         #     log.error('[stop_trial] Update delay %f is too small', ud)
 
-        log.debug('Logging trial')
         self.log_trial(score=score, response=response, ttype=trial_type,
                        **self.trial_info)
         self.trigger_next()
@@ -398,6 +405,7 @@ class Controller(
 
     def target_play(self, info=None):
         try:
+            log.debug('Initializing target')
             # Get the current position in the analog output buffer, and add a cetain
             # update_delay (to give us time to generate and upload the new signal).
             ts = self.get_ts()
@@ -437,14 +445,15 @@ class Controller(
 
             log.debug('Inserting target at %d', offset)
             log.debug('Overwriting %d samples in buffer', duration)
+            self.engine.write_hw_ao(signal, offset)
+            self.masker_offset = offset + duration
 
+            log.debug('Logging target epoch to HDF5')
             target_end = ts + self.get_current_value('target_duration')
             self.trial_info['target_start'] = ts
             self.trial_info['target_end'] = target_end
             self.model.data.target_epoch.append([(ts, target_end)])
 
-            self.engine.write_hw_ao(signal, offset)
-            self.masker_offset = offset + duration
         except:
             log.error(traceback.format_exc())
 
@@ -477,8 +486,8 @@ class Controller(
             log.error(traceback.format_exc())
 
     event_map = {
-        ('rising' , 'poke' ): Event.poke_start   ,
-        ('falling', 'poke' ): Event.poke_end     ,
+        ('rising' , 'poke' ): Event.poke_start ,
+        ('falling', 'poke' ): Event.poke_end   ,
         ('rising' , 'spout'): Event.spout_start,
         ('falling', 'spout'): Event.spout_end  ,
     }
@@ -498,7 +507,8 @@ class Controller(
         while not self.thread_stop:
             try:
                 if not self.queue.empty():
-                    with self.queue_lock: (event, timestamp) = self.queue.get()
+                    (event, timestamp) = self.queue.get()
+                    log.debug('Fetched event %s at %f from the queue', event, timestamp)
                     self._handle_event(event, timestamp)
 
                 # Monitor pump for changes in infused volume every 0.5s
@@ -532,11 +542,10 @@ class Controller(
         # know exactly when the target onset occurs because we precisely
         # specify the location of the target in the analog output buffer).
         try:
-            if timestamp is None:
-                timestamp = self.get_ts()
+            if timestamp is None: timestamp = self.get_ts()
 
-            with self.queue_lock:
-                self.queue.put((event, timestamp))
+            log.debug('Adding event %s at %f to the queue', event, timestamp)
+            self.queue.put((event, timestamp))
         except:
             log.error(traceback.format_exc())
 
@@ -553,16 +562,20 @@ class Controller(
 
         if event == Event.poke_start:
             if self.poke_start_ts is not np.nan:
+                log.debug('Logging poke epoch to HDF5')
                 self.model.data.poke_epoch.append([(self.poke_start_ts, np.nan)])
             self.poke_start_ts = timestamp
         elif event == Event.poke_end:
+            log.debug('Logging poke epoch to HDF5')
             self.model.data.poke_epoch.append([(self.poke_start_ts, timestamp)])
             self.poke_start_ts = np.nan
         elif event == Event.spout_start:
             if self.spout_start_ts is not np.nan:
+                log.debug('Logging spout epoch to HDF5')
                 self.model.data.spout_epoch.append([(self.spout_start_ts, np.nan)])
             self.spout_start_ts = timestamp
         elif event == Event.spout_end:
+            log.debug('Logging spout epoch to HDF5')
             self.model.data.spout_epoch.append([(self.spout_start_ts, timestamp)])
             self.spout_start_ts = np.nan
 

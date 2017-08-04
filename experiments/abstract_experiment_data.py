@@ -35,6 +35,7 @@ class AbstractExperimentData(HasTraits):
     performance2 = Any
 
     def _event_log_default(self):
+        log.debug('Creating node "event_log" in HDF5')
         fh = self.store_node._v_file
         description = np.dtype([('ts', np.float64), ('event', 'S512')])
         node = fh.createTable(self.store_node, 'event_log', description)
@@ -45,6 +46,7 @@ class AbstractExperimentData(HasTraits):
         # (i.e. records) to append to the table.  Since we only append a single
         # row at a time, we need to nest it as a list that contains a single
         # record.
+        log.debug('Logging event to HDF5')
         self.event_log.append([(ts, event)])
         self.event_log_updated = ts, event
 
@@ -58,6 +60,7 @@ class AbstractExperimentData(HasTraits):
         try:
             # This is a very inefficient implementation (appends require
             # reallocating information in memory).
+            log.debug('Logging trial')
             self.trial_log = self.trial_log.append(kwargs, ignore_index=True)
             self.trial_log_updated = kwargs
             log.info('Trial log: %s', str(kwargs))
@@ -83,6 +86,7 @@ class AbstractExperimentData(HasTraits):
             #             desc.append((key, type(val)))
             #     desc = np.dtype(desc)
             #     fh = self.store_node._v_file
+            #     log.debug('Creating node "trial_log" in HDF5')
             #     self.trial_log2 = fh.createTable(self.store_node, 'trial_log', desc)
             # self.trial_log2.append([tuple(kwargs.values())])
 
@@ -98,6 +102,7 @@ class AbstractExperimentData(HasTraits):
             #             desc.append((key, type(val[0])))
             #     desc = np.dtype(desc)
             #     fh = self.store_node._v_file
+            #     log.debug('Creating node "performance" in HDF5')
             #     self.performance2 = fh.createTable(self.store_node, 'performance', desc)
             # # Do not append, but override previous content of the table
             # rows = zip(*perf.values())
