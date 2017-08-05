@@ -299,6 +299,8 @@ if __name__ == '__main__':
                         default=False)
     parser.add_argument('--nopump', action='store_true', help='Deactivate pump',
                         default=False)
+    parser.add_argument('--sim', action='store_true', help='Simulation mode',
+                        default=False)
 
     parser.add_argument('--save-microphone', action='store_true',
             help='Save microphone data?', default=False)

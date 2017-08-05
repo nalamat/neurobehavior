@@ -59,7 +59,7 @@ from cns import get_config
 from ._positive_cmr_mixin import PositiveCMRParadigmMixin
 from ._positive_cmr_mixin import PositiveCMRControllerMixin
 
-from daqengine.ni import Engine
+import daqengine
 
 import numpy as np
 from scipy.io import wavfile
@@ -197,7 +197,11 @@ class Controller(
         self.set_current_value('signal_level', signal_level)
 
         self.trial_state = TrialState.waiting_for_poke_start
-        self.engine = Engine()
+
+        if self.model.args.sim:
+            self.engine = daqengine.sim.Engine()
+        else:
+            self.engine = daqengine.ni.Engine()
 
         if self.model.spool_physiology:
             self.physiology_handler.start_physiology()
