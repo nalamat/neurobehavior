@@ -91,12 +91,12 @@ class AbstractPositiveExperiment(AbstractExperiment):
         container.add(plot)
 
         # set up epoch plot
-        value_range = DataRange1D(low_setting=0+.2, high_setting=1+.2)
+        value_range = DataRange1D(low_setting=0, high_setting=2)
         value_mapper = LinearMapper(range=value_range)
 
         kw = {'source':self.data, 'trait_name':'event_log',
             'changed_name':'event_log_updated', 'index_mapper':index_mapper,
-            'value_mapper':value_mapper, 'marker_size':7, 'marker_edge_width':0}
+            'value_mapper':value_mapper, 'marker_size':8, 'marker_edge_width':0}
 
         # nose poke epoch
         plot = TablesTimeseriesPlot(event_name='initiated nose poke',
