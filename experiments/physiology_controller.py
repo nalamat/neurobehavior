@@ -13,8 +13,6 @@ import numpy as np
 import threading
 import traceback
 
-from daqengine.ni import Engine
-
 import logging
 log = logging.getLogger(__name__)
 
