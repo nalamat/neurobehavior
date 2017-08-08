@@ -215,8 +215,8 @@ def do_monkeypatch():
         # tb.attributeset.AttributeSet._g__setattr,
         tb.attributeset.AttributeSet._g__delattr,
         tb.attributeset.AttributeSet._g_update_node_location,
-        pandas.DataFrame.append,
-        pandas.core.indexing._iLocIndexer.__getitem__,
+        # pandas.DataFrame.append,
+        # pandas.core.indexing._iLocIndexer.__getitem__,
     ]
 
     def secure_lock(f, lock):
