@@ -299,7 +299,7 @@ class Controller(
         # convert our filename to an ASCII string.  While we're at it, we should
         # probably strip the directory path as well and just save the basename.
         log.debug('Logging trial epoch to HDF5')
-        self.model.data.trial_epoch.append([(
+        self.model.data.trial_epoch.send([(
             self.trial_info['poke_start'], self.trial_info['response_ts']
         )])
         target_filename = self.get_current_value('target_filename')
@@ -385,7 +385,7 @@ class Controller(
                 pump_duration = self.get_current_value('reward_volume') / 1e3 \
                     / self.get_current_value('pump_rate') * 60
                 log.debug('Logging pump epoch to HDF5')
-                self.model.data.pump_epoch.append([(ts, ts+pump_duration)])
+                self.model.data.pump_epoch.send([(ts, ts+pump_duration)])
 
             log.debug('Entering intertrial interval')
             self.trial_state = TrialState.waiting_for_iti
@@ -461,7 +461,7 @@ class Controller(
             target_end = ts + self.get_current_value('target_duration')
             self.trial_info['target_start'] = ts
             self.trial_info['target_end'] = target_end
-            self.model.data.target_epoch.append([(ts, target_end)])
+            self.model.data.target_epoch.send([(ts, target_end)])
 
         except:
             log.error(traceback.format_exc())
@@ -574,20 +574,20 @@ class Controller(
         if event == Event.poke_start:
             if self.poke_start_ts is not np.nan:
                 log.debug('Logging poke epoch to HDF5')
-                self.model.data.poke_epoch.append([(self.poke_start_ts, np.nan)])
+                self.model.data.poke_epoch.send([(self.poke_start_ts, np.nan)])
             self.poke_start_ts = timestamp
         elif event == Event.poke_end:
             log.debug('Logging poke epoch to HDF5')
-            self.model.data.poke_epoch.append([(self.poke_start_ts, timestamp)])
+            self.model.data.poke_epoch.send([(self.poke_start_ts, timestamp)])
             self.poke_start_ts = np.nan
         elif event == Event.spout_start:
             if self.spout_start_ts is not np.nan:
                 log.debug('Logging spout epoch to HDF5')
-                self.model.data.spout_epoch.append([(self.spout_start_ts, np.nan)])
+                self.model.data.spout_epoch.send([(self.spout_start_ts, np.nan)])
             self.spout_start_ts = timestamp
         elif event == Event.spout_end:
             log.debug('Logging spout epoch to HDF5')
-            self.model.data.spout_epoch.append([(self.spout_start_ts, timestamp)])
+            self.model.data.spout_epoch.send([(self.spout_start_ts, timestamp)])
             self.spout_start_ts = np.nan
 
         log.debug('Handling %s in %s', event, self.trial_state)
