@@ -62,4 +62,3 @@ class EpochPlot(ChannelPlot):
             self.invalidate_draw()
             self._data_cache_valid = False
             self.request_redraw()
-
