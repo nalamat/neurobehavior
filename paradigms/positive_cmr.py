@@ -523,7 +523,7 @@ class Controller(
 
                 # Monitor pump for changes in infused volume every 0.5s
                 # This will update the data.water_infused variable and also
-                # log the current volume along with at timestamp in HDF5
+                # log the current volume along with its timestamp in HDF5
                 ts = self.get_ts()
                 if ts-pump_ts >= .5:
                     pump_ts = ts
@@ -686,6 +686,8 @@ class Controller(
         elif self.trial_state == TrialState.waiting_for_iti:
             if event == Event.iti_duration_elapsed:
                 self.trial_state = TrialState.waiting_for_poke_start
+
+        log.debug('Event handled')
 
     def start_timer(self, variable, event):
         # Even if the duration is 0, we should still create a timer because this

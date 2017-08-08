@@ -134,6 +134,7 @@ class AbstractExperimentData(HasTraits):
                            dtype=np.float32)
 
     def update_performance(self, trial_log):
+        log.debug('Updating performnace')
         # Compute hit rate, FA rate, z-score and d'
         response_types = ['HIT', 'MISS', 'FA', 'CR']
         grouping = self.parameters + ['score']
@@ -145,10 +146,10 @@ class AbstractExperimentData(HasTraits):
         counts['fa_rate' ] = counts.FA /(counts.FA +counts.CR  )
 
         # Hit rate for no go is CR rate and FA rate for go is miss rate
-        hit_nan = np.isnan(counts.hit_rate);
-        fa_nan  = np.isnan(counts.fa_rate );
-        counts.hit_rate[hit_nan] = 1-counts.fa_rate [hit_nan]
-        counts.fa_rate [fa_nan ] = 1-counts.hit_rate[fa_nan ]
+        hit_nan = np.isnan(counts.loc[:,'hit_rate']);
+        fa_nan  = np.isnan(counts.loc[:,'fa_rate']);
+        counts.loc[hit_nan,'hit_rate'] = 1-counts.loc[hit_nan,'fa_rate' ]
+        counts.loc[fa_nan ,'fa_rate' ] = 1-counts.loc[fa_nan ,'hit_rate']
 
         # Clip hit and FA rates to 0.05 and 0.95 and calculate d' sensitivity by
         # substracting Z score of hit rate of each go condition from Z score of
@@ -164,3 +165,4 @@ class AbstractExperimentData(HasTraits):
             [['reaction_time', 'response_time']].median().add_prefix('median_')
 
         self.performance = counts.join(median)
+        log.debug('Performance updated')
