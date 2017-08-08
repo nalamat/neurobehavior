@@ -306,7 +306,7 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
     late_seq    = Property(Array('b'), depends_on='masked_trial_log')
     early_seq   = Property(Array('b'), depends_on='masked_trial_log')
     normal_seq  = Property(Array('b'), depends_on='masked_trial_log')
-    
+
     @cached_property
     def _get_yes_seq(self):
         return self.spout_seq
@@ -317,11 +317,11 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
 
     @cached_property
     def _get_nogo_normal_seq(self):
-        return self.string_array_equal(self.ttype_seq, 'NOGO') 
+        return self.string_array_equal(self.ttype_seq, 'NOGO')
 
     @cached_property
     def _get_nogo_repeat_seq(self):
-        return self.string_array_equal(self.ttype_seq, 'NOGO_REPEAT') 
+        return self.string_array_equal(self.ttype_seq, 'NOGO_REPEAT')
 
     @cached_property
     def _get_nogo_seq(self):
@@ -412,4 +412,4 @@ class PositiveData(AbstractExperimentData, SDTDataMixin):
     @cached_property
     def _get_cr_seq(self):
         return ((self.nogo_seq & self.normal_seq) | self.early_seq) & \
-                ~self.spout_seq               
+                ~self.spout_seq

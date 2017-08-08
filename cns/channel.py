@@ -135,7 +135,7 @@ class FileMixin(HasTraits):
         filters = tables.Filters(complevel=self.compression_level,
                 complib=self.compression_type, fletcher32=self.use_checksum,
                 shuffle=self.use_shuffle)
-        earray = self.node._v_file.createEArray(self.node._v_pathname,
+        earray = self.node._v_file.create_earray(self.node._v_pathname,
                 self.name, atom, self._get_shape(), filters=filters,
                 expectedrows=int(self.fs*self.expected_duration))
         for k, v in self.trait_get(attr=True).items():

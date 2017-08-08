@@ -35,6 +35,7 @@ class AbstractExperimentData(HasTraits):
     performance2 = Any
 
     def _event_log_default(self):
+        log.debug('Creating node "event_log" in HDF5')
         fh = self.store_node._v_file
         description = np.dtype([('ts', np.float64), ('event', 'S512')])
         node = fh.createTable(self.store_node, 'event_log', description)
@@ -45,6 +46,7 @@ class AbstractExperimentData(HasTraits):
         # (i.e. records) to append to the table.  Since we only append a single
         # row at a time, we need to nest it as a list that contains a single
         # record.
+        log.debug('Logging event to HDF5')
         self.event_log.append([(ts, event)])
         self.event_log_updated = ts, event
 
@@ -58,6 +60,7 @@ class AbstractExperimentData(HasTraits):
         try:
             # This is a very inefficient implementation (appends require
             # reallocating information in memory).
+            log.debug('Logging trial')
             self.trial_log = self.trial_log.append(kwargs, ignore_index=True)
             self.trial_log_updated = kwargs
             log.info('Trial log: %s', str(kwargs))
@@ -69,6 +72,8 @@ class AbstractExperimentData(HasTraits):
             perf[self.performance.index.name] = list(self.performance.index.values)
             log.info('Performance: %s', str(perf))
 
+            # TODO: Since kwargs might have different fields after each trial,
+            # find a way to store trial log dynamically in HFD5
             # If haven't done yet, create a table for saving trial log to the
             # HDF5 file and set the column names. Column names should not change
             # throughout a single session
@@ -81,6 +86,7 @@ class AbstractExperimentData(HasTraits):
             #             desc.append((key, type(val)))
             #     desc = np.dtype(desc)
             #     fh = self.store_node._v_file
+            #     log.debug('Creating node "trial_log" in HDF5')
             #     self.trial_log2 = fh.createTable(self.store_node, 'trial_log', desc)
             # self.trial_log2.append([tuple(kwargs.values())])
 
@@ -96,6 +102,7 @@ class AbstractExperimentData(HasTraits):
             #             desc.append((key, type(val[0])))
             #     desc = np.dtype(desc)
             #     fh = self.store_node._v_file
+            #     log.debug('Creating node "performance" in HDF5')
             #     self.performance2 = fh.createTable(self.store_node, 'performance', desc)
             # # Do not append, but override previous content of the table
             # rows = zip(*perf.values())
@@ -127,6 +134,7 @@ class AbstractExperimentData(HasTraits):
                            dtype=np.float32)
 
     def update_performance(self, trial_log):
+        log.debug('Updating performnace')
         # Compute hit rate, FA rate, z-score and d'
         response_types = ['HIT', 'MISS', 'FA', 'CR']
         grouping = self.parameters + ['score']
@@ -138,10 +146,10 @@ class AbstractExperimentData(HasTraits):
         counts['fa_rate' ] = counts.FA /(counts.FA +counts.CR  )
 
         # Hit rate for no go is CR rate and FA rate for go is miss rate
-        hit_nan = np.isnan(counts.hit_rate);
-        fa_nan  = np.isnan(counts.fa_rate );
-        counts.hit_rate[hit_nan] = 1-counts.fa_rate [hit_nan]
-        counts.fa_rate [fa_nan ] = 1-counts.hit_rate[fa_nan ]
+        hit_nan = np.isnan(counts.loc[:,'hit_rate']);
+        fa_nan  = np.isnan(counts.loc[:,'fa_rate']);
+        counts.loc[hit_nan,'hit_rate'] = 1-counts.loc[hit_nan,'fa_rate' ]
+        counts.loc[fa_nan ,'fa_rate' ] = 1-counts.loc[fa_nan ,'hit_rate']
 
         # Clip hit and FA rates to 0.05 and 0.95 and calculate d' sensitivity by
         # substracting Z score of hit rate of each go condition from Z score of
@@ -157,3 +165,4 @@ class AbstractExperimentData(HasTraits):
             [['reaction_time', 'response_time']].median().add_prefix('median_')
 
         self.performance = counts.join(median)
+        log.debug('Performance updated')

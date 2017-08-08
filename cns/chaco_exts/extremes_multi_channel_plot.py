@@ -10,7 +10,7 @@ from traits.api import List, Float, Property, cached_property
 class ExtremesMultiChannelPlot(ExtremesChannelPlot):
 
     source = Instance('cns.channel.MultiChannel')
-    
+
     # Offset of all channels along the value axis
     channel_offset  = Float(0.25e-3)
     # Distance between each channel along the value axis
@@ -65,7 +65,7 @@ class ExtremesMultiChannelPlot(ExtremesChannelPlot):
         with gc:
             gc.clip_to_rect(self.x, self.y, self.width, self.height)
             gc.set_stroke_color(self.line_color_)
-            gc.set_line_width(self.line_width) 
+            gc.set_line_width(self.line_width)
 
             gc.begin_path()
             if self.draw_mode == 'normal':
