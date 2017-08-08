@@ -18,11 +18,15 @@ class PositiveData(AbstractExperimentData):
     epoch_node = Any
 
     def setup(self):
-        self.poke_epoch
-        self.spout_epoch
-        self.target_epoch
-        self.pump_epoch
-        self.trial_epoch
+        self.speaker._buffer
+        self.mic._buffer
+        self.poke._buffer
+        self.spout._buffer
+        self.poke_epoch._buffer
+        self.spout_epoch._buffer
+        self.target_epoch._buffer
+        self.pump_epoch._buffer
+        self.trial_epoch._buffer
 
     def _trace_node_default(self):
         return get_or_append_node(self.store_node, 'trace')
