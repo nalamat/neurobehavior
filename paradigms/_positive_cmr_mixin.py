@@ -10,15 +10,16 @@ class PositiveCMRParadigmMixin(HasTraits):
 
     kw = {'context': True, 'log': True}
 
-    masker_filename  = File('CMR/Supermasker.wav', label='Masker filename'            , **kw)
-    masker_level     = Float(200.0               , label='Masker attenuation (dB)'    , **kw)
-    masker_frequency = Float(10.0                , label='Masker frequency (Hz)'      , **kw)
-    target_filename  = File('CMR/T01.wav'        , label='Target filename'            , **kw)
-    target_level     = Float(0.0                 , label='Target attenuation (dB)'    , **kw)
-    hw_att           = Enum(0, 40                , label='HW attenuation (dB)'        , **kw)
-    # TMR              = Int(                        label='Target level'               , **kw)
-    # target_number    = Int(                        label='Target token number'        , **kw)
-    # center_frequency = Int(                        label='Masker with/without flanker', **kw)
+    masker_filename      = File('CMR/Supermasker.wav', label='Masker filename'            , **kw)
+    masker_level         = Float(200.0               , label='Masker attenuation (dB)'    , **kw)
+    masker_frequency     = Float(10.0                , label='Masker frequency (Hz)'      , **kw)
+    target_filename      = File('CMR/T01.wav'        , label='Target filename'            , **kw)
+    target_level         = Float(0.0                 , label='Target attenuation (dB)'    , **kw)
+    target_ramp_duration = Float(20.0                , label='Target ramp duration (ms)'  , **kw)
+    hw_att               = Enum(0, 40                , label='HW attenuation (dB)'        , **kw)
+    # TMR                  = Int(                        label='Target level'               , **kw)
+    # target_number        = Int(                        label='Target token number'        , **kw)
+    # center_frequency     = Int(                        label='Masker with/without flanker', **kw)
 
 
 class PositiveCMRControllerMixin(HasTraits):

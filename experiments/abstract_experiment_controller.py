@@ -9,7 +9,7 @@ from pyface.qt import QtGui
 
 import subprocess
 from os import path
-import os
+import platform
 
 from .evaluate import evaluate_value, evaluate_expressions
 
@@ -285,7 +285,7 @@ class AbstractExperimentController(Controller):
                 node._v_attrs['setting_' + k] = v
 
             # Get the computer host name so we know which computer was used
-            node._v_attrs['computer'] = os.environ['COMPUTERNAME']
+            node._v_attrs['computer'] = platform.uname()[1]
 
             # This will actually store a pickled copy of the calibration data
             # that can *only* be recovered with Python (and a copy of the

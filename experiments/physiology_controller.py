@@ -11,14 +11,18 @@ from cns.pipeline import deinterleave_bits
 
 import numpy as np
 import threading
+import traceback
 
-from daqengine.ni import Engine
+import logging
+log = logging.getLogger(__name__)
 
 CHANNELS = get_config('PHYSIOLOGY_CHANNELS')
 PHYSIOLOGY_WILDCARD = get_config('PHYSIOLOGY_WILDCARD')
 SPIKE_SNIPPET_SIZE = get_config('PHYSIOLOGY_SPIKE_SNIPPET_SIZE')
 
 from .utils import load_instance, dump_instance
+
+CHANNELS = get_config('PHYSIOLOGY_CHANNELS')
 
 class PhysiologyController(Controller):
 
@@ -47,12 +51,6 @@ class PhysiologyController(Controller):
     def _shell_variables_default(self):
         return dict(controller=self, c=self)
 
-    def _buffer_raw_default(self):
-        # return FileChannel(node=self.store_node, name='raw', dtype=np.float32)
-        return FileMultiChannel(node=self.parent.model.data.store_node, channels=16,
-                                name='raw', dtype=np.float32,
-                                compression_type='lzo', compression_level=1,
-                                use_shuffle=True, use_checksum=True)
     def init(self, info):
         self.model = info.object
         self.setup_physiology()
@@ -113,54 +111,56 @@ class PhysiologyController(Controller):
         pass
 
     def start_physiology(self, info=None):
-        # print '#############################################'
-        # print 'Starting physiology'
-        # print '#############################################'
-
         channels = []
-        for i in range(0, self.parent.model.data.channels): channels.append('ch' + str(i))
-        self.parent.engine.configure_hw_ai2(self.fs, '/Dev1/ai0:15', (-10, 10), names=channels)
+        for i in range(0, CHANNELS): channels.append('ch' + str(i))
+        self.parent.engine.configure_hw_ai2(self.fs, '/Dev1/ai0:15', (-10, 10),
+            names=channels, start_trigger='/Dev2/ao/StartTrigger',
+            timebase_src='/Dev2/20MHzTimebase', timebase_rate=20e6)
         self.parent.engine.register_ai2_callback(self.samples_acquired)
 
     def samples_acquired(self, names, samples):
         self.model.data.raw.send(samples)
-        self.model.data.processed.send(samples)
+
+        # self.model.data.ts.send()
+        # self.model.data.processed.send(samples)
         # self.buffer_raw.send(samples)
 
     @on_trait_change('model.data')
     def update_data(self):
         # Ensure that the data store has the correct sampling frequency
-        for i in range(CHANNELS):
-            data_spikes = self.model.data.spikes
-            for src, dest in zip(self.buffer_spikes, data_spikes):
-                dest.fs = src.fs
-                dest.snippet_size = SPIKE_SNIPPET_SIZE
-        self.model.data.raw.fs = self.buffer_raw.fs
-        self.model.data.processed.fs = self.buffer_filt.fs
-        self.model.data.ts.fs = self.iface_physiology.fs
-        self.model.data.epoch.fs = self.iface_physiology.fs
-        self.model.data.sweep.fs = self.buffer_ttl.fs
-
-        # Setup the pipeline
-        targets = [self.model.data.sweep]
-        self.physiology_ttl_pipeline = deinterleave_bits(targets)
+        # for i in range(CHANNELS):
+        #     data_spikes = self.model.data.spikes
+        #     for src, dest in zip(self.buffer_spikes, data_spikes):
+        #         dest.fs = src.fs
+        #         dest.snippet_size = SPIKE_SNIPPET_SIZE
+        # self.model.data.raw.fs = self.buffer_raw.fs
+        # self.model.data.processed.fs = self.buffer_filt.fs
+        # self.model.data.ts.fs = self.iface_physiology.fs
+        # self.model.data.epoch.fs = self.iface_physiology.fs
+        # self.model.data.sweep.fs = self.buffer_ttl.fs
+        #
+        # # Setup the pipeline
+        # targets = [self.model.data.sweep]
+        # self.physiology_ttl_pipeline = deinterleave_bits(targets)
+        pass
 
     def start(self):
         # self.timer = Timer(100, self.monitor_physiology)
         pass
 
     def stop(self):
-        self.timer.stop()
+        # self.timer.stop()
         # self.process.stop()
+        pass
 
     def monitor_physiology(self):
         # Acquire raw physiology data
-        waveform = self.buffer_raw.read()
-        self.model.data.raw.send(waveform)
+        # waveform = self.buffer_raw.read()
+        # self.model.data.raw.send(waveform)
 
-        # Acquire filtered physiology data
-        # waveform = self.buffer_filt.read()
-        self.model.data.processed.send(waveform)
+        # # Acquire filtered physiology data
+        # # waveform = self.buffer_filt.read()
+        # self.model.data.processed.send(waveform)
 
         # Acquire sweep data
         # ttl = self.buffer_ttl.read()
@@ -190,6 +190,7 @@ class PhysiologyController(Controller):
         #     ts = data[:,0].view('int32')
         #     cl = data[:,-1].view('int32')
         #     self.model.data.spikes[i].send(snip, ts, cl)
+        pass
 
     @on_trait_change('model.settings.spike_signs')
     def set_spike_signs(self, value):
@@ -264,4 +265,4 @@ class PhysiologyController(Controller):
             offset = 1
         else:
             offset = 2
-        self.iface_physiology.set_tag('ch_offset', offset*16+1)
+        # self.iface_physiology.set_tag('ch_offset', offset*16+1)

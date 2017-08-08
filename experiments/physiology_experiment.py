@@ -1,5 +1,5 @@
 import numpy as np
-from enable.api import Component, ComponentEditor 
+from enable.api import Component, ComponentEditor
 from chaco.api import (LinearMapper, DataRange1D,
         OverlayPlotContainer)
 from traitsui.api import VGroup, HGroup, Item, Include, View, \
@@ -47,24 +47,24 @@ def ptt(event_times, trig_times):
     return np.concatenate([event_times-tt for tt in trig_times])
 
 class Histogram(HasTraits):
-    
+
     channel = Range(1, CHANNELS, 1)
     spikes = Any
     timeseries = Any
     bin_size = Float(0.25)
     bin_lb = Float(-1)
     bin_ub = Float(5)
-    
+
     bins = Property(depends_on='bin_+')
-    
+
     def _get_bins(self):
         return np.arange(self.bin_lb, self.bin_ub, self.bin_size)
-    
+
     def _get_counts(self):
         spikes = self.spikes[self.channel-1]
         et = spikes.timestamps/spikes.fs
         return np.histogram(ptt(spikes, et), bins=self.bins)[0]
-    
+
     def _get_histogram(self):
         self.spikes.timestamps[:]
 
@@ -73,30 +73,30 @@ class SortWindow(HasTraits):
     settings    = Any
     channels    = Any
     channel     = Range(1, CHANNELS, 1)
-    
+
     plot        = Instance(SnippetChannelPlot)
     threshold   = Property(Float, depends_on='channel')
     sign        = Property(Bool, depends_on='channel')
     windows     = Property(List(Tuple(Float, Float, Float)), depends_on='channel')
     tool        = Instance(WindowTool)
-    
+
     def _get_sign(self):
         return self.settings[self.channel-1].spike_sign
-    
+
     def _set_sign(self, value):
         self.settings[self.channel-1].spike_sign = value
-    
+
     def _get_threshold(self):
         return self.settings[self.channel-1].spike_threshold*VOLTAGE_SCALE
-    
+
     def _set_threshold(self, value):
         self.settings[self.channel-1].spike_threshold = value/VOLTAGE_SCALE
-        
+
     def _get_windows(self):
         if self.settings is None:
             return []
         return self.settings[self.channel-1].spike_windows
-    
+
     def _set_windows(self, value):
         if self.settings is None:
             return
@@ -111,7 +111,7 @@ class SortWindow(HasTraits):
         value_mapper = LinearMapper(range=DataRange1D(low=-0.00025, high=0.00025))
         plot = SnippetChannelPlot(history=20,
                 source=self.channels[self.channel-1],
-                value_mapper=value_mapper, 
+                value_mapper=value_mapper,
                 index_mapper=index_mapper,
                 bgcolor='white', padding=[60, 5, 5, 20])
         add_default_grids(plot, major_index=1e-3, minor_index=1e-4,
@@ -121,7 +121,7 @@ class SortWindow(HasTraits):
         axis = PlotAxis(orientation='left', component=plot,
                 tick_label_formatter=scale_formatter, title='Signal (mV)')
         plot.overlays.append(axis)
-        axis = PlotAxis(orientation='bottom', component=plot, 
+        axis = PlotAxis(orientation='bottom', component=plot,
                 tick_label_formatter=scale_formatter)
         plot.overlays.append(axis)
 
@@ -130,12 +130,12 @@ class SortWindow(HasTraits):
         plot.overlays.append(zoom)
         self.tool = WindowTool(component=plot)
         plot.overlays.append(self.tool)
-        
+
         # Whenever we draw a window, the settings should immediately be updated!
         self.sync_trait('windows', self.tool)
         return plot
-    
-    THRESHOLD_EDITOR = RangeEditor(low=-5e-4*VOLTAGE_SCALE, 
+
+    THRESHOLD_EDITOR = RangeEditor(low=-5e-4*VOLTAGE_SCALE,
                                    high=5e-4*VOLTAGE_SCALE)
 
     traits_view = View(
@@ -167,14 +167,14 @@ class PhysiologyExperiment(HasTraits):
     sort_window_3            = Instance(SortWindow)
     channel_sort             = Property(depends_on='sort_window_+.channel')
 
-    channel                 = Enum('processed', 'raw')
+    channel                 = Enum('raw', 'processed')
     channel_mode            = Enum('TBSI', 'TDT', 'Test')
 
     # Overlays
     spike_overlay            = Instance(SpikeOverlay)
     threshold_overlay        = Instance(ThresholdOverlay)
     parent                   = Any
-    
+
     # Show the overlays?
     visualize_spikes         = Bool(False)
     visualize_thresholds     = Bool(False)
@@ -205,11 +205,11 @@ class PhysiologyExperiment(HasTraits):
 
     def _channel_changed(self, new):
         if new == 'raw':
-            self.physiology_plot.channel = self.data.raw
+            self.physiology_plot.source = self.data.raw
         else:
-            self.physiology_plot.channel = self.data.processed
+            self.physiology_plot.source = self.data.processed
 
-    @on_trait_change('data, parent')
+    @on_trait_change('data, parent, object')
     def _generate_physiology_plot(self):
         # NOTE THAT ORDER IS IMPORTANT.  First plots added are at bottom of
         # z-stack, so the physiology must be last so it appears on top.
@@ -218,37 +218,37 @@ class PhysiologyExperiment(HasTraits):
         container = OverlayPlotContainer(padding=[50, 20, 20, 50])
 
         # Create the index range shared by all the plot components
-        self.physiology_index_range = ChannelDataRange(span=5, trig_delay=1,
-                timeseries=self.data.ts, sources=[self.data.processed])
+        self.physiology_index_range = ChannelDataRange(span=5, trig_delay=0,
+                timeseries=None, sources=[self.data.raw])
 
         # Create the TTL plot
         index_mapper = LinearMapper(range=self.physiology_index_range)
         value_mapper = LinearMapper(range=DataRange1D(low=0, high=1))
-        plot = TTLPlot(source=self.data.sweep,
-                index_mapper=index_mapper, value_mapper=value_mapper,
-                reference=0, fill_color=(0.25, 0.41, 0.88, 0.1),
-                line_color='transparent', rect_center=0.5, rect_height=1.0)
-        container.add(plot)
+        # plot = TTLPlot(source=self.data.sweep,
+        #         index_mapper=index_mapper, value_mapper=value_mapper,
+        #         reference=0, fill_color=(0.25, 0.41, 0.88, 0.1),
+        #         line_color='transparent', rect_center=0.5, rect_height=1.0)
+        # container.add(plot)
 
         # Create the epoch plot
-        plot = EpochPlot(source=self.data.epoch, marker='diamond',
-                marker_color=(.5, .5, .5, 1.0), marker_height=0.9,
-                marker_size=10,
-                index_mapper=index_mapper, value_mapper=value_mapper)
-        container.add(plot)
-
-        add_default_grids(plot, major_index=1, minor_index=0.25)
+        # plot = EpochPlot(source=self.data.epoch, marker='diamond',
+        #         marker_color=(.5, .5, .5, 1.0), marker_height=0.9,
+        #         marker_size=10,
+        #         index_mapper=index_mapper, value_mapper=value_mapper)
+        # container.add(plot)
+        #
+        # add_default_grids(plot, major_index=1, minor_index=0.25)
 
         # Hack alert.  Can we separate this out into a separate function?
-        if self.parent is not None:
-            try:
-                self.parent._add_experiment_plots(index_mapper, container)
-            except AttributeError:
-                pass
+        # if self.parent is not None:
+        #     try:
+        #         self.parent._add_experiment_plots(index_mapper, container)
+        #     except AttributeError:
+        #         pass
 
         # Create the neural plots
         value_mapper = LinearMapper(range=self.physiology_value_range)
-        plot = ExtremesMultiChannelPlot(source=self.data.processed,
+        plot = ExtremesMultiChannelPlot(source=self.data.raw,
                 index_mapper=index_mapper, value_mapper=value_mapper)
         self.settings.sync_trait('visible_channels', plot, 'channel_visible', mutual=False)
 
@@ -268,19 +268,19 @@ class PhysiologyExperiment(HasTraits):
         tool = MultiChannelRangeTool(component=plot)
         plot.tools.append(tool)
 
-        overlay = SpikeOverlay(plot=plot, spikes=self.data.spikes)
-        self.sync_trait('visualize_spikes', overlay, 'visible')
-        plot.overlays.append(overlay)
-        self.spike_overlay = overlay
-        
+        # overlay = SpikeOverlay(plot=plot, spikes=self.data.spikes)
+        # self.sync_trait('visualize_spikes', overlay, 'visible')
+        # plot.overlays.append(overlay)
+        # self.spike_overlay = overlay
+
         # Create the threshold overlay plot
-        overlay = ThresholdOverlay(plot=plot, visible=False)
-        self.sync_trait('visualize_thresholds', overlay, 'visible')
-        self.settings.sync_trait('spike_thresholds', overlay, 'sort_thresholds', mutual=False)
-        self.settings.sync_trait('spike_signs', overlay, 'sort_signs', mutual=False)
-        self.sync_trait('channel_sort', overlay, 'sort_channels', mutual=False)
-        plot.overlays.append(overlay)
-        self.threshold_overlay = overlay
+        # overlay = ThresholdOverlay(plot=plot, visible=False)
+        # self.sync_trait('visualize_thresholds', overlay, 'visible')
+        # self.settings.sync_trait('spike_thresholds', overlay, 'sort_thresholds', mutual=False)
+        # self.settings.sync_trait('spike_signs', overlay, 'sort_signs', mutual=False)
+        # self.sync_trait('channel_sort', overlay, 'sort_channels', mutual=False)
+        # plot.overlays.append(overlay)
+        # self.threshold_overlay = overlay
 
         self.physiology_container = container
 
@@ -342,7 +342,7 @@ class PhysiologyExperiment(HasTraits):
 
     physiology_view_settings_group = VGroup(
             Include('trigger_buttons'),
-            Item('object.physiology_index_range.update_mode', 
+            Item('object.physiology_index_range.update_mode',
                 label='Trigger mode'),
             Item('object.physiology_index_range.span',
                 label='X span',
@@ -361,9 +361,9 @@ class PhysiologyExperiment(HasTraits):
                     Include('physiology_settings_group'),
                     VGroup(
                         HGroup(
-                            Item('visualize_spikes', 
+                            Item('visualize_spikes',
                                  label='Show sorted spikes?'),
-                            Item('visualize_thresholds', 
+                            Item('visualize_thresholds',
                                  label='Show sort threshold?'),
                             show_border=True,
                             ),
@@ -382,8 +382,8 @@ class PhysiologyExperiment(HasTraits):
                         ),
                     ),
                 Tabbed(
-                    Item('physiology_container', 
-                        editor=ComponentEditor(width=500, height=800), 
+                    Item('physiology_container',
+                        editor=ComponentEditor(width=500, height=800),
                         width=500,
                         resizable=True),
                     Item('handler.shell_variables', editor=ShellEditor()),
@@ -417,4 +417,3 @@ if __name__ == '__main__':
 
     # Delete the temporary file
     os.unlink(tempfile)
-
