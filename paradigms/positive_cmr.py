@@ -526,9 +526,11 @@ class Controller(
                 # log the current volume along with its timestamp in HDF5
                 ts = self.get_ts()
                 if ts-pump_ts >= .5:
+                    log.debug('Monitoring pump')
                     pump_ts = ts
                     if not self.model.args.nopump:
                         self.monitor_pump()
+                    log.debug('Pump monitored')
             except:
                 log.error(traceback.format_exc())
             time.sleep(.001) # 1 ms
