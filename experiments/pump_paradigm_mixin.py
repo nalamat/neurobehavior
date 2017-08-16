@@ -7,12 +7,12 @@ SYRINGE_DATA = get_config('SYRINGE_DATA')
 SYRINGE_DEFAULT = get_config('SYRINGE_DEFAULT')
 
 class PumpParadigmMixin(HasTraits):
-    
+
     kw = {'context': True, 'store': 'attribute', 'log': True}
-    
-    pump_rate = Expression(0.5, label='Pump rate (ml/min)', **kw)
-    pump_rate_delta = Float(0.025, label='Pump rate delta (ml)', **kw)
-    pump_syringe = Enum(SYRINGE_DEFAULT, sorted(SYRINGE_DATA.keys()),
+
+    pump_rate     = Expression(1.5, label='Pump rate (ml/min)', **kw)
+    reward_volume = Float(25, label='Reward volume (ul)', **kw)
+    pump_syringe  = Enum(SYRINGE_DEFAULT, sorted(SYRINGE_DATA.keys()),
                         label='Syringe', ignore=True, **kw)
     pump_syringe_diameter = Property(label='Syringe diameter (mm)',
                                      depends_on='pump_syringe', **kw)
@@ -34,7 +34,7 @@ class PumpParadigmMixin(HasTraits):
                 'pump_syringe',
                 Item('pump_syringe_diameter', style='readonly'),
                 ),
-            label='Pump Settings', 
+            label='Pump Settings',
             show_border=True,
             )
 
@@ -47,6 +47,8 @@ class PumpParadigmMixin(HasTraits):
             )
 
     pump_paradigm_mixin_syringe_group = VGroup(
+            Item('pump_rate'),
+            Item('reward_volume'),
             Item('pump_syringe'),
             Item('pump_syringe_diameter', style='readonly'),
             label='Syringe',
