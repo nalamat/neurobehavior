@@ -246,8 +246,7 @@ class Controller(
             self.model.data.spout.fs   = self.fs_ai
 
             # Configure the pump
-            if not self.model.args.nopump:
-                self.iface_pump.set_direction('infuse')
+            self.pump_init()
 
             # Generate a random seed based on the computer's clock.
             self.random_seed = int(time.time())
@@ -371,20 +370,7 @@ class Controller(
             self.trial_state = TrialState.waiting_for_to
         else:
             if score == 'HIT':
-                # TODO: Investigate why are changes to reward_volume applied on
-                # the second trial rather than the first one?
-                log.debug('Trigerring pump')
-                if not self.model.args.nopump:
-                    # TODO: check if removing this line is okay or not
-                    self.set_pump_volume(self.get_current_value('reward_volume'))
-                    self.pump_trigger([])
-                else:
-                    log.debug('Pump not triggered in "-nopump" mode')
-                ts = self.get_ts()
-                pump_duration = self.get_current_value('reward_volume') / 1e3 \
-                    / self.get_current_value('pump_rate') * 60
-                log.debug('Logging pump epoch to HDF5')
-                self.model.data.pump_epoch.send([(ts, ts+pump_duration)])
+                self.pump_trigger()
 
             log.debug('Entering intertrial interval')
             self.trial_state = TrialState.waiting_for_iti

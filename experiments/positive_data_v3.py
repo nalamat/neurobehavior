@@ -58,7 +58,6 @@ class PositiveData(AbstractExperimentData):
     poke_epoch    = Instance(FileEpoch)
     spout_epoch   = Instance(FileEpoch)
     target_epoch  = Instance(FileEpoch)
-    pump_epoch    = Instance(FileEpoch)
     trial_epoch   = Instance(FileEpoch)
 
     def _poke_epoch_default(self):
@@ -72,10 +71,6 @@ class PositiveData(AbstractExperimentData):
     def _target_epoch_default(self):
         log.debug('Creating epoch node "target" in HDF5')
         return FileEpoch(node=self.epoch_node, name='target', fs=1, dtype=np.float32)
-
-    def _pump_epoch_default(self):
-        log.debug('Creating epoch node "pump" in HDF5')
-        return FileEpoch(node=self.epoch_node, name='pump'  , fs=1, dtype=np.float32)
 
     def _trial_epoch_default(self):
         log.debug('Creating epoch node "trial" in HDF5')
