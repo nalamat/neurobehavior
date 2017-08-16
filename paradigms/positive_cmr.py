@@ -212,28 +212,28 @@ class Controller(
             # events occuring in the behavior booth (e.g., room light on/off), we
             # can connect the output controlling the light/pump to an input and
             # monitor state changes on that input.
-            self.engine.configure_hw_di(self.fs_ao, '/dev2/port0/line1:2',
-                                        clock='/dev2/Ctr1', names=['spout', 'poke'],
-                                        start_trigger='/dev2/ao/StartTrigger')
+            self.engine.configure_hw_di(self.fs_ao, '/dev1/port0/line1:2',
+                                        clock='/dev1/ctr1', names=['spout', 'poke'],
+                                        start_trigger='/dev1/ao/starttrigger')
 
             # Speaker in, mic, nose-poke IR, spout contact IR. Not everything will
             # necessarily be connected.
             self.fs_ai = 250e3/4
-            self.engine.configure_hw_ai(self.fs_ai, '/dev2/ai0:3', (-10, 10),
+            self.engine.configure_hw_ai(self.fs_ai, '/dev1/ai0:3', (-10, 10),
                                         names=['speaker', 'mic', 'poke', 'spout'],
-                                        start_trigger='/dev2/ao/StartTrigger',
-                                        timebase_src='/dev2/20MHzTimebase',
+                                        start_trigger='/dev1/ao/starttrigger',
+                                        timebase_src='/dev1/20mhztimebase',
                                         timebase_rate=20e6)
 
             # Speaker out
-            # The AO task on dev2 is considered as the master task
-            self.engine.configure_hw_ao(self.fs_ao, '/dev2/ao0', (-10, 10),
+            # The AO task on dev1 is considered as the master task
+            self.engine.configure_hw_ao(self.fs_ao, '/dev1/ao0', (-10, 10),
                                         names=['speaker'],
-                                        timebase_src='/dev2/20MHzTimebase',
+                                        timebase_src='/dev1/20mhztimebase',
                                         timebase_rate=20e6)
 
             # Control for room light
-            self.engine.configure_sw_do('/dev2/port1/line1', names=['light'])
+            self.engine.configure_sw_do('/dev1/port1/line1', names=['light'])
             self.engine.set_sw_do('light', 1)
 
             self.engine.register_ao_callback(self.samples_needed)
@@ -526,9 +526,11 @@ class Controller(
                 # log the current volume along with its timestamp in HDF5
                 ts = self.get_ts()
                 if ts-pump_ts >= .5:
+                    log.debug('Monitoring pump')
                     pump_ts = ts
                     if not self.model.args.nopump:
                         self.monitor_pump()
+                    log.debug('Pump monitored')
             except:
                 log.error(traceback.format_exc())
             time.sleep(.001) # 1 ms

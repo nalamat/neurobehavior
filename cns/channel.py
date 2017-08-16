@@ -450,6 +450,82 @@ class FileChannel(FileMixin, Channel):
     name  = 'FileChannel'
     dtype = Any(np.float32)
 
+class ProcessedChannel(Channel):
+    '''
+    References and filters the data when requested
+    '''
+
+    filter_freq_lp      = Float(6e3, filter=True)
+    filter_freq_hp      = Float(300, filter=True)
+    filter_btype        = Enum('highpass', 'bandpass', 'lowpass', None,
+                               filter=True)
+    filter_order        = Int(8, filter=True)
+    filter_type         = Enum('butter', 'ellip', 'cheby1', 'cheby2', 'bessel',
+                               filter=True)
+
+    filter_instable     = Property(depends_on='filter_coefficients')
+    filter_coefficients = Property(depends_on='+filter, fs')
+
+    _padding            = Property(depends_on='filter_order')
+
+    @cached_property
+    def _get_filter_instable(self):
+        b, a = self.filter_coefficients
+        return not np.all(np.abs(np.roots(a)) < 1)
+
+    @on_trait_change('filter_coefficients')
+    def _fire_change(self):
+        # Objects that use this channel as a datasource need to know when the
+        # data changes.  Since changes to the filter coefficients, differential
+        # matrix or filter function affect the entire dataset, we fire the
+        # changed event.  This will tell, for example, the
+        # ExtremesMultiChannelPlot to clear it's cache and redraw the entire
+        # waveform.
+        self.changed = True
+
+    @cached_property
+    def _get_filter_coefficients(self):
+        if self.filter_btype is None:
+            return [], []
+        if self.filter_btype == 'bandpass':
+            Wp = np.array([self.filter_freq_hp, self.filter_freq_lp])
+        elif self.filter_btype == 'highpass':
+            Wp = self.filter_freq_hp
+        else:
+            Wp = self.filter_freq_lp
+        Wp = Wp/(0.5*self.fs)
+
+        return signal.iirfilter(self.filter_order, Wp, 60, 2,
+                                ftype=self.filter_type,
+                                btype=self.filter_btype,
+                                output='ba')
+
+    @cached_property
+    def _get__padding(self):
+        return 3*self.filter_order
+
+    def __getitem__(self, slice):
+        # We need to stabilize the edges of the chunk with extra data from
+        # adjacent chunks.  Expand the time slice to obtain this extra data.
+        if slice[-1].start == slice[-1].stop: return np.array([])
+        padding = self._padding
+
+        data = slice_overlap(self._buffer, slice[-1], padding, padding)
+
+        # For the filtering, we do not need all the channels, so we can throw
+        # out the extra channels by slicing along the second axis
+        # data = data[slice[:-1]]
+        if self.filter_btype is not None:
+            b, a = self.filter_coefficients
+            # Since we have already padded the data at both ends padlen can be
+            # set to 0.  The "unstable" edges of the filtered waveform will be
+            # chopped off before returning the result.
+            data = signal.filtfilt(b, a, data, padlen=0)
+        return data[padding:-padding]
+
+class ProcessedFileChannel(FileMixin, ProcessedChannel):
+    pass
+
 class MultiChannel(Channel):
 
     # Default to 0 to make it clear that the class has not been properly

@@ -113,9 +113,9 @@ class PhysiologyController(Controller):
     def start_physiology(self, info=None):
         channels = []
         for i in range(0, CHANNELS): channels.append('ch' + str(i))
-        self.parent.engine.configure_hw_ai2(self.fs, '/Dev1/ai0:15', (-10, 10),
-            names=channels, start_trigger='/Dev2/ao/StartTrigger',
-            timebase_src='/Dev2/20MHzTimebase', timebase_rate=20e6)
+        self.parent.engine.configure_hw_ai2(self.fs, '/dev2/ai0:15', (-10, 10),
+            names=channels, start_trigger='/dev1/ao/starttrigger',
+            timebase_src='/dev1/20mhztimebase', timebase_rate=20e6)
         self.parent.engine.register_ai2_callback(self.samples_acquired)
 
     def samples_acquired(self, names, samples):
