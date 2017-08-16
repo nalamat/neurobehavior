@@ -46,7 +46,7 @@ import threading
 import Queue
 from os import path
 
-from traits.api import Instance, File, Any, Int, Float, Bool, String, on_trait_change
+from traits.api import Instance, File, Any, Int, Float, Bool, String, Enum, on_trait_change
 from traitsui.api import View, Include, VGroup, HGroup, Item
 from pyface.api import error
 
@@ -152,7 +152,6 @@ class Controller(
 
     def setup_experiment(self, info):
         self.model.data.setup()
-        return
 
     def start_experiment(self, info):
         try:
@@ -714,6 +713,10 @@ class Controller(
     def set_target_level(self, level):
         self.check_level(level)
 
+    # @on_trait_change('model.paradigm.experiment_mode')
+    # def experiment_mode_change(self, object, name, old, new):
+    #     print name, 'changed from', old, 'to', new
+
     # Only inform the user that the entered value is not allowed. The context
     # target and masker levels will not be changed, however, when outputting the
     # sounds the level limit is applied
@@ -773,11 +776,13 @@ class Paradigm(
     events, frequency of the stimulus, which speaker is active, etc.).
     '''
 
+    experiment_mode = Enum('Automatic', 'Stage 1 training', 'Stage 2 training')
+
     # Parameters specific to the actual appetitive paradigm that are not needed
     # by the training program (and therefore not in the "mixin")
     traits_view = View(
             VGroup(
-                #'go_probability',
+                Item('experiment_mode'),
                 Include('constant_limits_paradigm_mixin_group'),
                 Include('abstract_positive_paradigm_group'),
                 Include('pump_paradigm_mixin_syringe_group'),
