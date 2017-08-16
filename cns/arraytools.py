@@ -47,7 +47,7 @@ def chunk_samples(x, max_bytes=10e6, block_size=None, axis=-1):
     axis : int
         Axis over which the data is chunked.
     block_size : None
-        Ensure that the number of samples is a multiple of block_size. 
+        Ensure that the number of samples is a multiple of block_size.
 
     Examples
     --------
@@ -94,12 +94,12 @@ def chunk_samples(x, max_bytes=10e6, block_size=None, axis=-1):
     if not samples:
         raise ValueError, "cannot achieve requested chunk size"
     return int(samples)
-    
+
 def chunk_iter(x, chunk_samples=None, step_samples=None, loverlap=0, roverlap=0,
                padding='const', axis=-1, ndslice=None, initial_padding=0,
                final_padding=0):
     '''
-    Return an iterable that yields the data in chunks along the specified axis.  
+    Return an iterable that yields the data in chunks along the specified axis.
 
     x : ndarray
         The array that will be chunked
@@ -293,7 +293,7 @@ def chunk_iter(x, chunk_samples=None, step_samples=None, loverlap=0, roverlap=0,
     Typically roverlap and loverlap are used when you have algorithms that may
     require data from adjacent chunks to properly process the actual chunk
     itself (e.g. stablizing the edges of a digital filter or performing feature
-    detection where the feature may cross the chunk boundary).  
+    detection where the feature may cross the chunk boundary).
 
     In contrast, step_samples is used when you have an algorithm that computes a
     running metric (e.g. you can set step_samples to smaller than the chunk_size
@@ -309,7 +309,7 @@ def chunk_iter(x, chunk_samples=None, step_samples=None, loverlap=0, roverlap=0,
 
     if step_samples is None:
         step_samples = chunk_samples
-    
+
     while i < samples:
         s = slice(i, i+chunk_samples)
         yield slice_overlap(x, s, start_overlap=loverlap, stop_overlap=roverlap,
@@ -411,7 +411,12 @@ def slice_overlap(a, s, start_overlap=0, stop_overlap=0, axis=-1, ndslice=None,
     if n_start_padding or n_stop_padding:
         start_ext = _get_padding(b, n_start_padding, 'start', padding, axis)
         stop_ext = _get_padding(b, n_stop_padding, 'stop', padding, axis)
-        b = np.c_[start_ext, b, stop_ext]
+        if len(b.shape)==1:
+            b = np.r_[start_ext, b, stop_ext]
+        elif len(b.shape)==2:
+            b = np.c_[start_ext, b, stop_ext]
+        else:
+            raise(ValueError('Arrays with more than 2 dimensions not supported'))
     return b
 
 def _get_padding(x, n, where='start', padding='const', axis=-1):
@@ -428,8 +433,11 @@ def _get_padding(x, n, where='start', padding='const', axis=-1):
     else:
         pad_value = padding
 
+    if len(pad_value)==0: pad_value = 0
+
     shape = list(x.shape)
     shape[axis] = n
+    
     return np.ones(shape, dtype=x.dtype) * pad_value
 
 if __name__ == '__main__':
