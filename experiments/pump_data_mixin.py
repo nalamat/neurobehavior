@@ -15,6 +15,9 @@ class PumpDataMixin(HasTraits):
     epoch_node    = Any
     pump_epoch    = Instance(FileEpoch)
 
+    def setup(self):
+        self.pump_epoch._buffer
+
     def _water_log_default(self):
         file = self.store_node._v_file
         description = np.dtype([('timestamp', 'f'), ('infused', 'f')])

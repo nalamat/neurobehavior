@@ -154,7 +154,8 @@ class Controller(
     queue = Queue.Queue()
 
     def setup_experiment(self, info):
-        self.model.data.setup()
+        PositiveData.setup(self.model.data)
+        PumpDataMixin.setup(self.model.data)
 
     def start_experiment(self, info):
         try:

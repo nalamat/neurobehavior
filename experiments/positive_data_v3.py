@@ -25,7 +25,6 @@ class PositiveData(AbstractExperimentData):
         self.poke_epoch._buffer
         self.spout_epoch._buffer
         self.target_epoch._buffer
-        self.pump_epoch._buffer
         self.trial_epoch._buffer
 
     def _trace_node_default(self):
