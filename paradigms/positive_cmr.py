@@ -402,66 +402,6 @@ class Controller(
         if self.trial_state == TrialState.waiting_for_poke_start:
             self.trigger_next()
 
-    def target_play(self):
-        try:
-            log.debug('Initializing target')
-            # Get the current position in the analog output buffer, and add a cetain
-            # update_delay (to give us time to generate and upload the new signal).
-            ts = self.get_ts()
-            ud = self.update_delay*1e-3 # Convert msec to sec
-            offset = int(round((ts+ud)*self.fs_ao))
-
-            # Insert the target at a specific phase of the modulated masker
-            masker_frequency = self.get_current_value('masker_frequency')
-            if masker_frequency <> 0:
-                period = self.fs_ao/masker_frequency
-                phase_delay = self.get_current_value('phase_delay')/360.0*period
-                phase = (offset % self.masker.shape[-1]) % period
-                delay = phase_delay-phase
-                if delay<0: delay+=period
-                offset += int(delay)
-
-            # Generate combined signal
-            target_level = self.get_current_value('target_level')
-            if target_level < 0: target_level = 0
-            target_sf = 10.0**(-target_level/20.0)
-            target_duration = self.target.shape[-1] / self.fs_ao
-            target_reps = round(self.get_current_value('target_duration')/target_duration)
-            target_reps = int(target_reps)
-            target = np.tile(self.target, target_reps) * target_sf
-            if target.shape[-1] < self.fs_ao: # Zero-pad if target is less than 1s
-                target = np.concatenate([target, np.zeros(self.fs_ao-target.shape[-1])])
-            # Ramp beginning and end of the target
-            target_ramp_length = self.get_current_value('target_ramp_duration') * 1e-3 * self.fs_ao
-            target_ramp_length = int(target_ramp_length)
-            if target_ramp_length <> 0:
-                target_ramp = np.sin(2*np.pi*1/target_ramp_length/4*np.arange(target_ramp_length))**2
-                target[0:target_ramp_length]      *= target_ramp
-                target[:-target_ramp_length-1:-1] *= target_ramp
-            duration = target.shape[-1]
-            masker = self.get_masker(offset, duration)
-            signal = masker + target
-
-            log.debug('Inserting target at %d', offset)
-            log.debug('Overwriting %d samples in buffer', duration)
-            self.engine.write_hw_ao(signal, offset)
-            self.masker_offset = offset + duration
-
-            log.debug('Logging target epoch to HDF5')
-            target_end = ts + self.get_current_value('target_duration')
-            self.trial_info['target_start'] = ts
-            self.trial_info['target_end'] = target_end
-            self.model.data.target_epoch.send([(ts, target_end)])
-
-        except:
-            log.error(traceback.format_exc())
-
-    def target_start(self):
-        raise NotImplementedError
-
-    def target_stop(self):
-        raise NotImplementedError
-
     ############################################################################
     # Callbacks for NI Engine
     ############################################################################
@@ -477,14 +417,13 @@ class Controller(
         if samples > 5*self.fs_ao: samples = 5*self.fs_ao
         signal = self.get_masker(self.masker_offset, samples)
         self.masker_offset += samples
-        # if self.target_on:
-        #     signal += self.get_target(self.target_offset, samples)
-        #     self.target_offset += samples
+        if self.target_playing:
+            signal += self.get_target(self.target_offset, samples)
+            self.target_offset += samples
         # log.debug('[samples_needed] samples  : %d', samples)
         # log.debug('[samples_needed] offset   : %d', offset)
         # if self.masker_offset != samples:
         #     log.debug('[samples_needed] timestamp: %d', self.get_ts()*self.fs_ao)
-        # with self._lock:
         try:
             self.engine.write_hw_ao(signal)
         except:
@@ -609,12 +548,12 @@ class Controller(
 
             elif event == Event.button_end:
                 self.target_stop()
-                if self.trial_state == TrialState.waiting_for_reponse:
+                if self.trial_state == TrialState.waiting_for_response:
                     if hasattr(self, 'timer'): self.timer.cancel()
                     self.start_timer('response_duration', Event.response_duration_elapsed)
 
             elif event == Event.spout_start:
-                if self.trial_state == TrialState.waiting_for_reponse:
+                if self.trial_state == TrialState.waiting_for_response:
                     self.pump_trigger()
                     self.trial_state = TrialState.waiting_for_button
 
@@ -763,6 +702,107 @@ class Controller(
         except:
             log.error(traceback.format_exc())
 
+    target_playing = False
+    target_offset = 0          # Relative offset
+    target_start_offset = 0    # Absolute offset where the target was started
+
+    def target_init(self, mode):
+        try:
+            if mode=='play' and self.target_playing:
+                log.debug('Target already playing')
+                return
+            if mode=='start' and self.target_playing:
+                log.debug('Target already started')
+                return
+            if mode=='stop' and not self.target_playing:
+                log.debug('Target already stopped')
+                return
+
+            log.debug('Initializing to {} target'.format(mode))
+            # Get the current position in the analog output buffer, and add a cetain
+            # update_delay (to give us time to generate and upload the new signal).
+            ts = self.get_ts()
+            ud = self.update_delay*1e-3 # Convert msec to sec
+            offset = int(round((ts+ud)*self.fs_ao))
+
+            # Insert the target at a specific phase of the modulated masker
+            masker_frequency = self.get_current_value('masker_frequency')
+            if mode=='play' and masker_frequency <> 0:
+                period = self.fs_ao/masker_frequency
+                phase_delay = self.get_current_value('phase_delay')/360.0*period
+                phase = (offset % self.masker.shape[-1]) % period
+                delay = phase_delay-phase
+                if delay<0: delay+=period
+                offset += int(delay)
+
+            # Generate target
+            if   mode=='play':
+                self.target_offset = 0
+                target_duration = self.get_current_value('target_duration')
+            elif mode=='start':
+                self.target_offset = 0
+                target_duration = 5   # sec, can be almost any value
+                self.target_start_offset = offset
+                self.target_playing = True
+            elif mode=='stop':
+                self.target_offset = offset - self.target_start_offset
+                target_duration = self.get_current_value('target_ramp_duration') * 1e-3
+                self.target_playing = False
+            else:
+                raise(ValueError('Wrong value given for the mode parameter. ' +
+                    'Should be "play", "start" or "stop"'))
+
+            target_duration = int(target_duration * self.fs_ao)
+            target = self.get_target(self.target_offset, target_duration)
+
+            # Ramp beginning and end of the target
+            target_ramp_length = self.get_current_value('target_ramp_duration') * 1e-3 * self.fs_ao
+            target_ramp_length = int(target_ramp_length)
+            if target_ramp_length <> 0:
+                target_ramp = np.sin(2*np.pi*1/target_ramp_length/4*np.arange(target_ramp_length))**2
+                if mode=='play' or mode=='start':
+                    target[0:target_ramp_length]      *= target_ramp
+                if mode=='play' or mode=='stop':
+                    target[:-target_ramp_length-1:-1] *= target_ramp
+
+            # Zero-pad if target is less than 1s
+            duration = target.shape[-1]
+            if duration < self.fs_ao:
+                target = np.concatenate([target, np.zeros(self.fs_ao-duration)])
+                duration = target.shape[-1]
+
+            # Combine target with masker and
+            log.debug('Inserting target at %d', offset)
+            log.debug('Overwriting %d samples in buffer', duration)
+            masker = self.get_masker(offset, duration)
+            signal = masker + target
+            self.engine.write_hw_ao(signal, offset)
+            self.masker_offset = offset + duration
+            if mode=='start': self.target_offset += target_duration
+
+            if mode=='play' or mode=='stop':
+                log.debug('Logging target epoch to HDF5')
+                if mode=='play':
+                    target_start = offset / self.fs_ao
+                    target_end = target_start + self.get_current_value('target_duration')
+                elif mode=='stop':
+                    target_start = self.target_start_offset / self.fs_ao
+                    target_end = (offset + target_ramp_length) / self.fs_ao
+                self.trial_info['target_start'] = target_start
+                self.trial_info['target_end'  ] = target_end
+                self.model.data.target_epoch.send([(target_start, target_end)])
+        except:
+            log.error(traceback.format_exc())
+
+    def target_play(self):
+        self.target_init('play')
+
+    def target_start(self):
+        self.target_init('start')
+
+    def target_stop(self):
+        self.target_init('stop')
+
     def get_masker(self, offset, duration):
         masker_level = self.get_current_value('masker_level')
         if masker_level < 0: masker_level = 0
@@ -773,6 +813,7 @@ class Controller(
         target_level = self.get_current_value('target_level')
         if target_level < 0: target_level = 0
         target_sf = 10.0**(-target_level/20.0)
+
         return self.get_cyclic(self.target, offset, duration) * target_sf
 
     def get_cyclic(self, signal, offset, duration):
