@@ -341,6 +341,12 @@ class Controller(
         if self.state <> 'running': return
         self.pump_override()
 
+    @on_trait_change('model.paradigm.toggle_light_button')
+    def toggle_light_button(self):
+        if self.state <> 'running': return
+        state = self.engine.get_sw_do('light')
+        self.engine.set_sw_do('light', 1 - state)
+
     def start_trial(self):
         log.debug('Starting trial: %s', self.get_current_value('ttype'))
 
@@ -845,6 +851,7 @@ class Paradigm(
 
     toggle_target_button = Button('Toggle Target')
     toggle_pump_button   = Button('Toggle Pump')
+    toggle_light_button  = Button('Toggle Light')
 
     # Parameters specific to the actual appetitive paradigm that are not needed
     # by the training program (and therefore not in the "mixin")
@@ -872,7 +879,8 @@ class Paradigm(
                 ),
             VGroup(
                 Item('toggle_target_button', show_label=False),
-                Item('toggle_pump_button', show_label=False),
+                Item('toggle_pump_button'  , show_label=False),
+                Item('toggle_light_button' , show_label=False),
                 label='Manual',
                 ),
             )
