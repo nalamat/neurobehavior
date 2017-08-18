@@ -46,7 +46,8 @@ import threading
 import Queue
 from os import path
 
-from traits.api import Instance, File, Any, Int, Float, Bool, String, Enum, on_trait_change
+from traits.api import Instance, File, Any, Int, Float, Bool, String, Enum, \
+    Button, on_trait_change
 from traitsui.api import View, Include, VGroup, HGroup, Item
 from pyface.api import error
 
@@ -329,12 +330,16 @@ class Controller(
     def cancel_remind(self, info=None):
         self.remind_requested = False
 
-    def pause(self, info=None):
-        # if self.model.args.nopump:
-            if self.trial_state == TrialState.waiting_for_poke_start:
-                self.handle_event(Event.poke_start)
-            else:
-                self.handle_event(Event.spout_start)
+    @on_trait_change('model.paradigm.toggle_target_button')
+    def toggle_target_button(self):
+        if self.state <> 'running': return
+        if self.target_playing: self.target_stop()
+        else: self.target_start()
+
+    @on_trait_change('model.paradigm.toggle_pump_button')
+    def toggle_pump_button(self):
+        if self.state <> 'running': return
+        self.pump_override()
 
     def start_trial(self):
         log.debug('Starting trial: %s', self.get_current_value('ttype'))
@@ -381,19 +386,6 @@ class Controller(
             self.trial_state = TrialState.waiting_for_iti
             self.start_timer('iti_duration', Event.iti_duration_elapsed)
 
-        # Overrwrite output buffer with the masker to stop sound
-        # ts = self.get_ts()
-        # ud = self.get_current_value('update_delay')*1e-3 # Convert msec to sec
-        # offset = int(round((ts+ud)*self.fs_ao))
-        # duration = self.get_target().shape[-1]
-        # masker_sf = 10.0**(-float(self.get_current_value('masker_level'))/20.0)
-        # signal = self.get_masker(offset, duration) * masker_sf
-        # try:
-        #     self.engine.write_hw_ao(signal, offset)
-        #     self.masker_offset = offset + duration
-        # except:
-        #     log.error('[stop_trial] Update delay %f is too small', ud)
-
         self.log_trial(score=score, response=response, ttype=trial_type,
                        **self.trial_info)
         self.trigger_next()
@@ -420,10 +412,8 @@ class Controller(
         if self.target_playing:
             signal += self.get_target(self.target_offset, samples)
             self.target_offset += samples
-        # log.debug('[samples_needed] samples  : %d', samples)
-        # log.debug('[samples_needed] offset   : %d', offset)
-        # if self.masker_offset != samples:
-        #     log.debug('[samples_needed] timestamp: %d', self.get_ts()*self.fs_ao)
+        log.debug('Samples needed at offset %f for duration %f',
+                offset / self.fs_ao, samples / self.fs_ao)
         try:
             self.engine.write_hw_ao(signal)
         except:
@@ -443,7 +433,7 @@ class Controller(
         # generated at the time the event occured. Convert to time in seconds
         # since experiment start.
         timestamp /= self.fs_ao
-        log.debug('Detected {} edge on {} at {}'.format(change, name,timestamp))
+        log.debug('Detected %s edge on %s at %f', change, name, timestamp)
         event = self.event_map[change, name]
         self.handle_event(event, timestamp)
 
@@ -718,7 +708,7 @@ class Controller(
                 log.debug('Target already stopped')
                 return
 
-            log.debug('Initializing to {} target'.format(mode))
+            log.debug('Initializing to %s the target', mode)
             # Get the current position in the analog output buffer, and add a cetain
             # update_delay (to give us time to generate and upload the new signal).
             ts = self.get_ts()
@@ -772,8 +762,8 @@ class Controller(
                 duration = target.shape[-1]
 
             # Combine target with masker and
-            log.debug('Inserting target at %d', offset)
-            log.debug('Overwriting %d samples in buffer', duration)
+            log.debug('Inserting target at %f', offset / self.fs_ao)
+            log.debug('Overwriting %f samples in buffer', duration / self.fs_ao)
             masker = self.get_masker(offset, duration)
             signal = masker + target
             self.engine.write_hw_ao(signal, offset)
@@ -853,6 +843,9 @@ class Paradigm(
 
     experiment_mode = Enum('Automatic', 'Stage 1 training', 'Stage 2 training')
 
+    toggle_target_button = Button('Toggle Target')
+    toggle_pump_button   = Button('Toggle Pump')
+
     # Parameters specific to the actual appetitive paradigm that are not needed
     # by the training program (and therefore not in the "mixin")
     traits_view = View(
@@ -876,6 +869,11 @@ class Paradigm(
                 'target_ramp_duration',
                 'hw_att',
                 label='Sound',
+                ),
+            VGroup(
+                Item('toggle_target_button', show_label=False),
+                Item('toggle_pump_button', show_label=False),
+                label='Manual',
                 ),
             )
 
