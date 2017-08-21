@@ -18,6 +18,7 @@ from cns.chaco_exts.channel_data_range import ChannelDataRange
 from cns.chaco_exts.extremes_channel_plot import ExtremesChannelPlot
 from cns.chaco_exts.helpers import add_default_grids, add_time_axis
 from cns.chaco_exts.tables_timeseries_plot import TablesTimeseriesPlot
+from cns.chaco_exts.epoch_rect_plot import EpochRectPlot
 
 from cns import get_config
 COLORS = get_config('EXPERIMENT_COLORS')
@@ -65,32 +66,54 @@ class AbstractPositiveExperiment(AbstractExperiment):
 
     def _add_experiment_plots(self, index_mapper, container, alpha=0.25):
 
-        # set up speaker plot
+        # microphone and speaker plots
         value_range = DataRange1D(low_setting=-4, high_setting=1.5)
         value_mapper = LinearMapper(range=value_range)
-        plot = ExtremesChannelPlot(source=self.data.speaker, line_color='red',
-            index_mapper=index_mapper, value_mapper=value_mapper)
-        container.add(plot)
 
-        # set up microphone plot
-        plot = ExtremesChannelPlot(source=self.data.mic, line_color='orange',
+        plot = ExtremesChannelPlot(source=self.data.mic, line_color='black',
             index_mapper=index_mapper, value_mapper=value_mapper)
         self.mic_plot = plot
-        container.add(plot)
 
-        # set up nose poke plot
-        value_range = DataRange1D(low_setting=-1, high_setting=16)
-        value_mapper = LinearMapper(range=value_range)
-        plot = ExtremesChannelPlot(source=self.data.poke, line_color='green',
+        container.add(plot)
+        plot = ExtremesChannelPlot(source=self.data.speaker, line_color='green',
             index_mapper=index_mapper, value_mapper=value_mapper)
         container.add(plot)
 
-        # set up lick spout plot
+
+        # target, pump and timeout rectangle epoch plots
+        value_range = DataRange1D(low_setting=0, high_setting=1)
+        value_mapper = LinearMapper(range=value_range)
+
+        plot = EpochRectPlot(source=self.data.target_epoch,
+            rect_color=(0,1,0,.5), rect_ypos=0.35, rect_height=0.2,
+            index_mapper=index_mapper, value_mapper=value_mapper)
+        container.add(plot)
+
+        plot = EpochRectPlot(source=self.data.pump_epoch,
+            rect_color=(0,0,1,.5), rect_ypos=0.35, rect_height=0.2,
+            index_mapper=index_mapper, value_mapper=value_mapper)
+        container.add(plot)
+
+        plot = EpochRectPlot(source=self.data.timeout_epoch,
+            rect_color=(1,0,0,.5), rect_ypos=0.35, rect_height=0.2,
+            index_mapper=index_mapper, value_mapper=value_mapper)
+        container.add(plot)
+
+
+        # poke and spout analog plots
+        value_range = DataRange1D(low_setting=-1, high_setting=16)
+        value_mapper = LinearMapper(range=value_range)
+
+        plot = ExtremesChannelPlot(source=self.data.poke, line_color='orange',
+            index_mapper=index_mapper, value_mapper=value_mapper)
+        container.add(plot)
+
         plot = ExtremesChannelPlot(source=self.data.spout, line_color='blue',
             index_mapper=index_mapper, value_mapper=value_mapper)
         container.add(plot)
 
-        # set up epoch plot
+
+        # poke, spout and button epoch marker plots
         value_range = DataRange1D(low_setting=0, high_setting=2)
         value_mapper = LinearMapper(range=value_range)
 
@@ -98,21 +121,27 @@ class AbstractPositiveExperiment(AbstractExperiment):
             'changed_name':'event_log_updated', 'index_mapper':index_mapper,
             'value_mapper':value_mapper, 'marker_size':8, 'marker_edge_width':0}
 
-        # nose poke epoch
         plot = TablesTimeseriesPlot(event_name='initiated nose poke',
-            marker='triangle', marker_color='green', **kw)
+            marker='triangle', marker_color='orange', **kw)
         container.add(plot)
         plot = TablesTimeseriesPlot(event_name='withdrew from nose poke',
-            marker='inverted_triangle', marker_color='green', **kw)
+            marker='inverted_triangle', marker_color='orange', **kw)
         container.add(plot)
 
-        # lick spout epoch
         plot = TablesTimeseriesPlot(event_name='spout contact',
             marker='triangle', marker_color='blue', **kw)
         container.add(plot)
         plot = TablesTimeseriesPlot(event_name='withdrew from spout',
             marker='inverted_triangle', marker_color='blue', **kw)
         container.add(plot)
+
+        plot = TablesTimeseriesPlot(event_name='push button pressed',
+            marker='triangle', marker_color='brown', **kw)
+        container.add(plot)
+        plot = TablesTimeseriesPlot(event_name='push button released',
+            marker='inverted_triangle', marker_color='brown', **kw)
+        container.add(plot)
+
 
         tool = ChannelRangeTool(component=plot, allow_drag=False, value_factor=1)
         plot.tools.append(tool)
