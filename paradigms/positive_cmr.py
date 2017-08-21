@@ -154,6 +154,12 @@ class Controller(
     thread_stop = False
     queue = Queue.Queue()
 
+    # Keep track of epoch start times
+    poke_start_ts    = np.nan
+    spout_start_ts   = np.nan
+    button_start_ts  = np.nan
+    timeout_start_ts = np.nan
+
     def setup_experiment(self, info):
         PositiveData.setup(self.model.data)
         PumpDataMixin.setup(self.model.data)
@@ -238,8 +244,8 @@ class Controller(
                                         timebase_rate=20e6)
 
             # Control for room light
-            self.engine.configure_sw_do('/dev1/port1/line1', names=['light'])
-            self.engine.set_sw_do('light', 1)
+            self.engine.configure_sw_do('/dev1/port1/line1', names=['light'],
+                                    initial_state=[1])
 
             self.engine.register_ao_callback(self.samples_needed)
             self.engine.register_ai_callback(self.samples_acquired)
@@ -345,7 +351,7 @@ class Controller(
     def toggle_light_button(self):
         if self.state <> 'running': return
         state = self.engine.get_sw_do('light')
-        self.engine.set_sw_do('light', 1 - state)
+        self.switch_light(1 - state)
 
     def start_trial(self):
         log.debug('Starting trial: %s', self.get_current_value('ttype'))
@@ -381,7 +387,7 @@ class Controller(
         if score == 'FA':
             # Turn the light off
             log.debug('Entering timeout')
-            self.engine.set_sw_do('light', 0)
+            self.switch_light(0)
             self.start_timer('to_duration', Event.to_duration_elapsed)
             self.trial_state = TrialState.waiting_for_to
         else:
@@ -495,9 +501,6 @@ class Controller(
         except:
             log.error(traceback.format_exc())
 
-    poke_start_ts  = np.nan
-    spout_start_ts = np.nan
-
     def _handle_event(self, event, timestamp):
         '''
         Give the current experiment state, process the appropriate response for
@@ -524,6 +527,15 @@ class Controller(
             log.debug('Logging spout epoch to HDF5')
             self.model.data.spout_epoch.send([(self.spout_start_ts, timestamp)])
             self.spout_start_ts = np.nan
+        elif event == Event.button_start:
+            if self.button_start_ts is not np.nan:
+                log.debug('Logging button epoch to HDF5')
+                self.model.data.button_epoch.send([(self.button_start_ts, np.nan)])
+            self.button_start_ts = timestamp
+        elif event == Event.button_end:
+            log.debug('Logging button epoch to HDF5')
+            self.model.data.button_epoch.send([(self.button_start_ts, timestamp)])
+            self.button_start_ts = np.nan
 
         log.debug('Handling %s in %s', event, self.trial_state)
 
@@ -640,7 +652,7 @@ class Controller(
             elif self.trial_state == TrialState.waiting_for_to:
                 if event == Event.to_duration_elapsed:
                     # Turn the light back on
-                    self.engine.set_sw_do('light', 1)
+                    self.switch_light(1)
                     self.start_timer('iti_duration',
                                      Event.iti_duration_elapsed)
                     self.trial_state = TrialState.waiting_for_iti
@@ -833,8 +845,18 @@ class Controller(
                 break
         return np.concatenate(result, axis=-1)
 
-    def get_ts(self):
-        return self.engine.ao_sample_clock()/self.fs_ao
+    def switch_light(self, state):
+        self.engine.set_sw_do('light', 1 if state else 0)
+        ts = self.get_ts()
+        if not state:
+            if self.timeout_start_ts is not np.nan:
+                log.debug('Logging timeout epoch to HDF5')
+                self.model.data.timeout_epoch.send([(self.timeout_start_ts, np.nan)])
+            self.timeout_start_ts = ts
+        else:
+            log.debug('Logging timeout epoch to HDF5')
+            self.model.data.timeout_epoch.send([(self.timeout_start_ts, ts)])
+            self.timeout_start_ts = np.nan
 
 class Paradigm(
         PositiveCMRParadigmMixin,

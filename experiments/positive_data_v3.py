@@ -26,6 +26,8 @@ class PositiveData(AbstractExperimentData):
         self.spout_epoch._buffer
         self.target_epoch._buffer
         self.trial_epoch._buffer
+        self.timeout_epoch._buffer
+        self.button_epoch._buffer
 
     def _trace_node_default(self):
         return get_or_append_node(self.store_node, 'trace')
@@ -58,6 +60,8 @@ class PositiveData(AbstractExperimentData):
     spout_epoch   = Instance(FileEpoch)
     target_epoch  = Instance(FileEpoch)
     trial_epoch   = Instance(FileEpoch)
+    timeout_epoch = Instance(FileEpoch)
+    button_epoch  = Instance(FileEpoch)
 
     def _poke_epoch_default(self):
         log.debug('Creating epoch node "poke" in HDF5')
@@ -74,3 +78,11 @@ class PositiveData(AbstractExperimentData):
     def _trial_epoch_default(self):
         log.debug('Creating epoch node "trial" in HDF5')
         return FileEpoch(node=self.epoch_node, name='trial' , fs=1, dtype=np.float32)
+
+    def _timeout_epoch_default(self):
+        log.debug('Creating epoch node "trial" in HDF5')
+        return FileEpoch(node=self.epoch_node, name='timeout' , fs=1, dtype=np.float32)
+
+    def _button_epoch_default(self):
+        log.debug('Creating epoch node "trial" in HDF5')
+        return FileEpoch(node=self.epoch_node, name='button' , fs=1, dtype=np.float32)
