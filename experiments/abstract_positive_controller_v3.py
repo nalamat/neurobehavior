@@ -24,7 +24,7 @@ import logging
 log = logging.getLogger(__name__)
 
 class PositiveExperimentToolBar(ExperimentToolBar):
-    
+
     traits_view = View(
             HGroup(Item('apply',
                         enabled_when="object.handler.pending_changes"),
@@ -46,7 +46,7 @@ class PositiveExperimentToolBar(ExperimentToolBar):
             )
 
 class AbstractPositiveController(AbstractExperimentController):
-    
+
     # Override default implementation of toolbar used by AbstractExperiment
     toolbar = Instance(PositiveExperimentToolBar, (), toolbar=True)
     fs_conversion = Int
@@ -63,7 +63,7 @@ class AbstractPositiveController(AbstractExperimentController):
 
     pipeline_TTL1   = Any
     pipeline_TTL2   = Any
-    
+
     # All experiment controller subclasses are responsible for checking the
     # value of this attribute when making a decision about what the next trial
     # should be.  If True, this means that the user has clicked the "remind"
@@ -76,7 +76,7 @@ class AbstractPositiveController(AbstractExperimentController):
         self.current_trial_end_ts = self.get_trial_end_ts()
         self.state = 'running'
         self.process.trigger('A', 'high')
-        
+
         # Add tasks to the queue
         self.tasks.append((self.monitor_behavior, 1))
         self.tasks.append((self.monitor_pump, 5))
@@ -149,7 +149,7 @@ class AbstractPositiveController(AbstractExperimentController):
                     # Since we are compressing 4 samples into a single buffer
                     # slot, we may need to repeat the read twice so we have all
                     # the information we need for analysis of the response.
-                    self.pipeline_TTL1.send(self.buffer_TTL1.read_all()) 
+                    self.pipeline_TTL1.send(self.buffer_TTL1.read_all())
                     self.pipeline_TTL2.send(self.buffer_TTL2.read_all())
 
                     # Note that the ts_start and ts_end were originally recorded
@@ -161,7 +161,7 @@ class AbstractPositiveController(AbstractExperimentController):
                     # file while the low resolution (sampled at the TTL rate)
                     # are stored in the trial log.
                     self.log_trial(
-                            ts_start=np.floor(ts_start/self.fs_conversion), 
+                            ts_start=np.floor(ts_start/self.fs_conversion),
                             ts_end=np.floor(ts_end/self.fs_conversion),
                             response=response,
                             )
@@ -170,7 +170,7 @@ class AbstractPositiveController(AbstractExperimentController):
                     log.exception(e)
                     log.debug("Waiting for more data")
                     pass
-                
+
             self.trigger_next()
 
     def is_go(self):
@@ -181,7 +181,7 @@ class AbstractPositiveController(AbstractExperimentController):
     # to implement a new backend, you would subclass this and override the
     # appropriate set_* methods.
     ############################################################################
-    
+
     def set_intertrial_duration(self, value):
         self.iface_behavior.cset_tag('int_dur_n', value, 's', 'n')
 
@@ -287,7 +287,7 @@ class AbstractPositiveController(AbstractExperimentController):
         self.invalidate_context()
         self.current_setting = self.next_setting()
         self.evaluate_pending_expressions(self.current_setting)
-        
+
         speaker = self.get_current_value('speaker')
         self.iface_behavior.set_tag('go?', self.is_go())
 

@@ -56,8 +56,10 @@ class ExperimentToolBar(ToolBar):
                         tooltip='stop', **kw)
     remind  = SVGButton('Remind', filename=icons['warn'],
                         tooltip='Remind', **kw)
+    remind_nogo  = SVGButton('Nogo', filename=icons['warn'],
+                        tooltip='Remind Nogo', **kw)
     cancel_remind = SVGButton('Cancel Remind', filename=icons['warn'],
-            tooltip='Remind', **kw)
+            tooltip='Cancel Remind', **kw)
     item_kw = dict(show_label=False)
 
     traits_view = View(
@@ -73,6 +75,9 @@ class ExperimentToolBar(ToolBar):
                    '_',
                    Item('remind',
                         enabled_when="object.handler.state=='running' and not object.handler.remind_requested",
+                        **item_kw),
+                   Item('remind_nogo',
+                        enabled_when="object.handler.state=='running' and not object.handler.remind_nogo_requested",
                         **item_kw),
                 #    Item('cancel_remind',
                 #         enabled_when="object.handler.state=='running' and object.handler.remind_requested",

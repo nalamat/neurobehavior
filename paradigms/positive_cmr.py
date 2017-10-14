@@ -132,7 +132,8 @@ class Controller(
     '''
     random_generator = Any
     random_seed = Int
-    remind_requested = Bool
+    remind_requested = Bool(False)
+    remind_nogo_requested = Bool(False)
 
     # Track the current state of the experiment. How the controller responds to
     # events will depend on the state.
@@ -320,11 +321,21 @@ class Controller(
         # If trial is already running, the remind will be presented on the next
         # trial.
         self.remind_requested = True
+        self.remind_nogo_requested = False
+        if self.trial_state == TrialState.waiting_for_poke_start:
+            self.trigger_next()
+
+    def remind_nogo(self, info=None):
+        # If trial is already running, the remind will be presented on the next
+        # trial.
+        self.remind_nogo_requested = True
+        self.remind_requested = False
         if self.trial_state == TrialState.waiting_for_poke_start:
             self.trigger_next()
 
     def cancel_remind(self, info=None):
         self.remind_requested = False
+        self.remind_nogo_requested = False
 
     def pause(self, info=None):
         # if self.model.args.nopump:

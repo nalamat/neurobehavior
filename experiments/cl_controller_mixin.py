@@ -8,6 +8,7 @@ log = logging.getLogger(__name__)
 class CLControllerMixin(HasTraits):
 
     remind_requested = Bool(False)
+    remind_nogo_requested = Bool(False)
 
     def _create_selector(self):
         # The selector is a generator function that yields values from a list
@@ -35,6 +36,9 @@ class CLControllerMixin(HasTraits):
         if self.remind_requested:
             self.remind_requested = False
             return self.remind_setting()
+        if self.remind_nogo_requested:
+            self.remind_nogo_requested = False
+            return self.nogo_setting()
         if len(self.model.data.trial_log) == 0:
             return self.initial_setting()
 
