@@ -119,7 +119,7 @@ class PhysiologyController(Controller):
         self.parent.engine.register_ai2_callback(self.samples_acquired)
 
     def samples_acquired(self, names, samples):
-        self.model.data.raw.send(samples)
+        self.model.data.raw.send(samples/1000)
 
         # self.model.data.ts.send()
         # self.model.data.processed.send(samples)
