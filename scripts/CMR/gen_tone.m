@@ -1,4 +1,4 @@
-fs = 100e3; %97656
+fs = 100e3;
 fc = 1e3;
 
 % generate the flat stimulus
@@ -8,12 +8,12 @@ flat_len = flat_len - 1/fs;
 
 t = 0:1/fs:flat_len;
 y = sin(2*pi*fc*t);
-plot(t, y);
-xlim([0 flat_len]);
-grid on;
+% plot(t, y);
+% xlim([0 flat_len]);
+% grid on;
 % pause;
 
-audiowrite('T01.wav', y, fs);
+audiowrite('T01_000.wav', y, fs);
 % a = audioplayer([y y y y y y y y y y y y y y], fs);
 % play(a);
 return;
