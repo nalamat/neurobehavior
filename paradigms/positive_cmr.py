@@ -46,7 +46,8 @@ import threading
 import Queue
 from os import path
 
-from traits.api import Instance, File, Any, Int, Float, Bool, String, on_trait_change
+from traits.api import Instance, File, Any, Int, Float, Bool, String, Enum, \
+    Button, on_trait_change
 from traitsui.api import View, Include, VGroup, HGroup, Item
 from pyface.api import error
 
@@ -98,6 +99,7 @@ class TrialState(enum.Enum):
     waiting_for_response           = 'waiting for response'
     waiting_for_to                 = 'waiting for timeout'
     waiting_for_iti                = 'waiting for intertrial interval'
+    waiting_for_button             = 'waiting for button press'
 
 
 class Event(enum.Enum):
@@ -118,6 +120,8 @@ class Event(enum.Enum):
     to_duration_elapsed        = 'timeout over'
     iti_duration_elapsed       = 'ITI over'
     trial_start                = 'trial start'
+    button_start               = 'push button pressed'
+    button_end                 = 'push button released'
 
 
 class Controller(
@@ -151,9 +155,15 @@ class Controller(
     thread_stop = False
     queue = Queue.Queue()
 
+    # Keep track of epoch start times
+    poke_start_ts    = np.nan
+    spout_start_ts   = np.nan
+    button_start_ts  = np.nan
+    timeout_start_ts = np.nan
+
     def setup_experiment(self, info):
-        self.model.data.setup()
-        return
+        PositiveData.setup(self.model.data)
+        PumpDataMixin.setup(self.model.data)
 
     def start_experiment(self, info):
         try:
@@ -213,8 +223,9 @@ class Controller(
             # events occuring in the behavior booth (e.g., room light on/off), we
             # can connect the output controlling the light/pump to an input and
             # monitor state changes on that input.
-            self.engine.configure_hw_di(self.fs_ao, '/dev1/port0/line1:2',
-                                        clock='/dev1/ctr1', names=['spout', 'poke'],
+            self.engine.configure_hw_di(self.fs_ao, '/dev1/port0/line1:3',
+                                        clock='/dev1/ctr1',
+                                        names=['spout', 'poke', 'button'],
                                         start_trigger='/dev1/ao/starttrigger')
 
             # Speaker in, mic, nose-poke IR, spout contact IR. Not everything will
@@ -234,8 +245,8 @@ class Controller(
                                         timebase_rate=20e6)
 
             # Control for room light
-            self.engine.configure_sw_do('/dev1/port1/line1', names=['light'])
-            self.engine.set_sw_do('light', 1)
+            self.engine.configure_sw_do('/dev1/port1/line1', names=['light'],
+                                    initial_state=[1])
 
             self.engine.register_ao_callback(self.samples_needed)
             self.engine.register_ai_callback(self.samples_acquired)
@@ -248,8 +259,7 @@ class Controller(
             self.model.data.spout.fs   = self.fs_ai
 
             # Configure the pump
-            if not self.model.args.nopump:
-                self.iface_pump.set_direction('infuse')
+            self.pump_init()
 
             # Generate a random seed based on the computer's clock.
             self.random_seed = int(time.time())
@@ -337,12 +347,22 @@ class Controller(
         self.remind_requested = False
         self.remind_nogo_requested = False
 
-    def pause(self, info=None):
-        # if self.model.args.nopump:
-            if self.trial_state == TrialState.waiting_for_poke_start:
-                self.handle_event(Event.poke_start)
-            else:
-                self.handle_event(Event.spout_start)
+    @on_trait_change('model.paradigm.toggle_target_button')
+    def toggle_target_button(self):
+        if self.state <> 'running': return
+        if self.target_playing: self.target_stop()
+        else: self.target_start()
+
+    @on_trait_change('model.paradigm.toggle_pump_button')
+    def toggle_pump_button(self):
+        if self.state <> 'running': return
+        self.pump_override()
+
+    @on_trait_change('model.paradigm.toggle_light_button')
+    def toggle_light_button(self):
+        if self.state <> 'running': return
+        state = self.engine.get_sw_do('light')
+        self.switch_light(1 - state)
 
     def start_trial(self):
         log.debug('Starting trial: %s', self.get_current_value('ttype'))
@@ -378,42 +398,16 @@ class Controller(
         if score == 'FA':
             # Turn the light off
             log.debug('Entering timeout')
-            self.engine.set_sw_do('light', 0)
+            self.switch_light(0)
             self.start_timer('to_duration', Event.to_duration_elapsed)
             self.trial_state = TrialState.waiting_for_to
         else:
             if score == 'HIT':
-                # TODO: Investigate why are changes to reward_volume applied on
-                # the second trial rather than the first one?
-                log.debug('Trigerring pump')
-                if not self.model.args.nopump:
-                    # TODO: check if removing this line is okay or not
-                    self.set_pump_volume(self.get_current_value('reward_volume'))
-                    self.pump_trigger([])
-                else:
-                    log.debug('Pump not triggered in "-nopump" mode')
-                ts = self.get_ts()
-                pump_duration = self.get_current_value('reward_volume') / 1e3 \
-                    / self.get_current_value('pump_rate') * 60
-                log.debug('Logging pump epoch to HDF5')
-                self.model.data.pump_epoch.send([(ts, ts+pump_duration)])
+                self.pump_trigger()
 
             log.debug('Entering intertrial interval')
             self.trial_state = TrialState.waiting_for_iti
             self.start_timer('iti_duration', Event.iti_duration_elapsed)
-
-        # Overrwrite output buffer with the masker to stop sound
-        # ts = self.get_ts()
-        # ud = self.get_current_value('update_delay')*1e-3 # Convert msec to sec
-        # offset = int(round((ts+ud)*self.fs_ao))
-        # duration = self.get_target().shape[-1]
-        # masker_sf = 10.0**(-float(self.get_current_value('masker_level'))/20.0)
-        # signal = self.get_masker(offset, duration) * masker_sf
-        # try:
-        #     self.engine.write_hw_ao(signal, offset)
-        #     self.masker_offset = offset + duration
-        # except:
-        #     log.error('[stop_trial] Update delay %f is too small', ud)
 
         self.log_trial(score=score, response=response, ttype=trial_type,
                        **self.trial_info)
@@ -422,60 +416,6 @@ class Controller(
     def context_updated(self):
         if self.trial_state == TrialState.waiting_for_poke_start:
             self.trigger_next()
-
-    def target_play(self, info=None):
-        try:
-            log.debug('Initializing target')
-            # Get the current position in the analog output buffer, and add a cetain
-            # update_delay (to give us time to generate and upload the new signal).
-            ts = self.get_ts()
-            ud = self.update_delay*1e-3 # Convert msec to sec
-            offset = int(round((ts+ud)*self.fs_ao))
-
-            # Insert the target at a specific phase of the modulated masker
-            masker_frequency = self.get_current_value('masker_frequency')
-            if masker_frequency <> 0:
-                period = self.fs_ao/masker_frequency
-                phase_delay = self.get_current_value('phase_delay')/360.0*period
-                phase = (offset % self.masker.shape[-1]) % period
-                delay = phase_delay-phase
-                if delay<0: delay+=period
-                offset += int(delay)
-
-            # Generate combined signal
-            target_level = self.get_current_value('target_level')
-            if target_level < 0: target_level = 0
-            target_sf = 10.0**(-target_level/20.0)
-            target_duration = self.target.shape[-1] / self.fs_ao
-            target_reps = round(self.get_current_value('target_duration')/target_duration)
-            target_reps = int(target_reps)
-            target = np.tile(self.target, target_reps) * target_sf
-            if target.shape[-1] < self.fs_ao: # Zero-pad if target is less than 1s
-                target = np.concatenate([target, np.zeros(self.fs_ao-target.shape[-1])])
-            # Ramp beginning and end of the target
-            target_ramp_length = self.get_current_value('target_ramp_duration') * 1e-3 * self.fs_ao
-            target_ramp_length = int(target_ramp_length)
-            if target_ramp_length <> 0:
-                target_ramp = np.sin(2*np.pi*1/target_ramp_length/4*np.arange(target_ramp_length))**2
-                target[0:target_ramp_length]      *= target_ramp
-                target[:-target_ramp_length-1:-1] *= target_ramp
-            duration = target.shape[-1]
-            masker = self.get_masker(offset, duration)
-            signal = masker + target
-
-            log.debug('Inserting target at %d', offset)
-            log.debug('Overwriting %d samples in buffer', duration)
-            self.engine.write_hw_ao(signal, offset)
-            self.masker_offset = offset + duration
-
-            log.debug('Logging target epoch to HDF5')
-            target_end = ts + self.get_current_value('target_duration')
-            self.trial_info['target_start'] = ts
-            self.trial_info['target_end'] = target_end
-            self.model.data.target_epoch.send([(ts, target_end)])
-
-        except:
-            log.error(traceback.format_exc())
 
     ############################################################################
     # Callbacks for NI Engine
@@ -492,24 +432,23 @@ class Controller(
         if samples > 5*self.fs_ao: samples = 5*self.fs_ao
         signal = self.get_masker(self.masker_offset, samples)
         self.masker_offset += samples
-        # if self.target_on:
-        #     signal += self.get_target(self.target_offset, samples)
-        #     self.target_offset += samples
-        # log.debug('[samples_needed] samples  : %d', samples)
-        # log.debug('[samples_needed] offset   : %d', offset)
-        # if self.masker_offset != samples:
-        #     log.debug('[samples_needed] timestamp: %d', self.get_ts()*self.fs_ao)
-        # with self._lock:
+        if self.target_playing:
+            signal += self.get_target(self.target_offset, samples)
+            self.target_offset += samples
+        log.debug('Samples needed at offset %f for duration %f',
+                offset / self.fs_ao, samples / self.fs_ao)
         try:
             self.engine.write_hw_ao(signal)
         except:
             log.error(traceback.format_exc())
 
     event_map = {
-        ('rising' , 'poke' ): Event.poke_start ,
-        ('falling', 'poke' ): Event.poke_end   ,
-        ('rising' , 'spout'): Event.spout_start,
-        ('falling', 'spout'): Event.spout_end  ,
+        ('rising' , 'poke'  ): Event.poke_start  ,
+        ('falling', 'poke'  ): Event.poke_end    ,
+        ('rising' , 'spout' ): Event.spout_start ,
+        ('falling', 'spout' ): Event.spout_end   ,
+        ('rising' , 'button'): Event.button_start,
+        ('falling', 'button'): Event.button_end  ,
     }
 
     def di_changed(self, name, change, timestamp):
@@ -517,7 +456,7 @@ class Controller(
         # generated at the time the event occured. Convert to time in seconds
         # since experiment start.
         timestamp /= self.fs_ao
-        log.debug('Detected {} edge on {} at {}'.format(change, name,timestamp))
+        log.debug('Detected %s edge on %s at %f', change, name, timestamp)
         event = self.event_map[change, name]
         self.handle_event(event, timestamp)
 
@@ -573,9 +512,6 @@ class Controller(
         except:
             log.error(traceback.format_exc())
 
-    poke_start_ts  = np.nan
-    spout_start_ts = np.nan
-
     def _handle_event(self, event, timestamp):
         '''
         Give the current experiment state, process the appropriate response for
@@ -602,103 +538,142 @@ class Controller(
             log.debug('Logging spout epoch to HDF5')
             self.model.data.spout_epoch.send([(self.spout_start_ts, timestamp)])
             self.spout_start_ts = np.nan
+        elif event == Event.button_start:
+            if self.button_start_ts is not np.nan:
+                log.debug('Logging button epoch to HDF5')
+                self.model.data.button_epoch.send([(self.button_start_ts, np.nan)])
+            self.button_start_ts = timestamp
+        elif event == Event.button_end:
+            log.debug('Logging button epoch to HDF5')
+            self.model.data.button_epoch.send([(self.button_start_ts, timestamp)])
+            self.button_start_ts = np.nan
 
         log.debug('Handling %s in %s', event, self.trial_state)
 
-        if self.trial_state == TrialState.waiting_for_poke_start:
-            if event == Event.poke_start:
-                # Animal has nose-poked in an attempt to initiate a trial.
-                self.trial_state = TrialState.waiting_for_poke_duration
-                self.start_timer('poke_duration', Event.poke_duration_elapsed)
-                # If the animal does not maintain the nose-poke long enough,
-                # this value will get overwritten with the next nose-poke.
-                self.trial_info['poke_start'] = timestamp
+        if self.model.paradigm.experiment_mode == 'Stage 1 training':
+            if event == Event.spout_start:
+                self.target_start()
+                self.pump_override_on()
 
-        elif self.trial_state == TrialState.waiting_for_poke_duration:
-            if event == Event.poke_end:
-                # Animal has withdrawn from nose-poke too early. Cancel the
-                # timer so that it does not fire a 'event_poke_duration_elapsed'.
-                log.debug('Animal withdrew too early')
-                self.timer.cancel()
-                self.trial_state = TrialState.waiting_for_poke_start
-            elif event == Event.poke_duration_elapsed:
-                if self.get_current_value('poke_hold_duration') <= 0 \
-                    or self.get_current_value('ttype') in ('NOGO', 'NOGO_REPEAT'):
-                    self.start_trial()
-                else:
-                    log.debug('Starting trial: %s', self.get_current_value('ttype'))
-                    self.target_play()
-                    self.trial_state = TrialState.waiting_for_poke_hold_duration
-                    self.start_timer('poke_hold_duration', Event.poke_hold_duration_elapsed)
+            elif event == Event.spout_end:
+                self.target_stop()
+                self.pump_override_off()
 
-        elif self.trial_state == TrialState.waiting_for_poke_hold_duration:
-            if event == Event.poke_end:
-                log.debug('Animal withdrew too early during poke hold period')
-                log.debug('Trial canceled')
-                self.timer.cancel()
-                self.trial_state = TrialState.waiting_for_poke_start
-            elif event == Event.poke_hold_duration_elapsed:
-                self.trial_state = TrialState.waiting_for_hold_period
-                self.start_timer('hold_duration', Event.hold_duration_elapsed)
-
-        elif self.trial_state == TrialState.waiting_for_hold_period:
-            # All animal-initiated events (poke/spout) are ignored during this
-            # period but we may choose to record the time of nose-poke withdraw
-            # if it occurs.
-            if event == Event.poke_end:
-                # Record the time of nose-poke withdrawal if it is the first
-                # time since initiating a trial.
-                log.debug('Animal withdrew during hold period')
-                if 'poke_end' not in self.trial_info:
-                    log.debug('Recording poke_end')
-                    self.trial_info['poke_end'] = timestamp
-            elif event == Event.hold_duration_elapsed:
+        elif self.model.paradigm.experiment_mode == 'Stage 2 training':
+            if event == Event.button_start:
+                self.target_start()
+                if hasattr(self, 'timer'): self.timer.cancel()
                 self.trial_state = TrialState.waiting_for_response
-                self.start_timer('response_duration',
-                                 Event.response_duration_elapsed)
 
-        elif self.trial_state == TrialState.waiting_for_response:
-            # If the animal happened to initiate a nose-poke during the hold
-            # period above and is still maintaining the nose-poke, they have to
-            # manually withdraw and re-poke for us to process the event.
-            if event == Event.poke_end:
-                # Record the time of nose-poke withdrawal if it is the first
-                # time since initiating a trial.
-                log.debug('Animal withdrew during response period')
-                # self.start_timer('response_duration',
-                #                  Event.response_duration_elapsed)
-                if 'poke_end' not in self.trial_info:
-                    self.trial_info['poke_end'] = timestamp
-            elif event == Event.poke_start:
-                self.timer.cancel();
-                self.trial_info['response_ts'] = timestamp
-                self.stop_trial(response='nose poke')
+            elif event == Event.button_end:
+                self.target_stop()
+                if self.trial_state == TrialState.waiting_for_response:
+                    if hasattr(self, 'timer'): self.timer.cancel()
+                    self.start_timer('response_duration', Event.response_duration_elapsed)
+
             elif event == Event.spout_start:
-                self.timer.cancel();
-                self.trial_info['spout_start'] = timestamp
-                self.trial_info['response_ts'] = timestamp
-                self.stop_trial(response='spout contact')
-            # elif event == Event.spout_end:
-            #     pass
+                if self.trial_state == TrialState.waiting_for_response:
+                    self.pump_trigger()
+                    self.trial_state = TrialState.waiting_for_button
+
             elif event == Event.response_duration_elapsed:
-                self.timer.cancel();
-                self.trial_info['response_ts'] = timestamp
-                self.stop_trial(response='no response')
+                self.trial_state = TrialState.waiting_for_button
 
-        elif self.trial_state == TrialState.waiting_for_to:
-            if event == Event.to_duration_elapsed:
-                # Turn the light back on
-                self.engine.set_sw_do('light', 1)
-                self.start_timer('iti_duration',
-                                 Event.iti_duration_elapsed)
-                self.trial_state = TrialState.waiting_for_iti
-            elif event in (Event.spout_start, Event.poke_start):
-                self.timer.cancel()
-                self.start_timer('to_duration', Event.to_duration_elapsed)
+        elif self.model.paradigm.experiment_mode == 'Automatic':
+            if self.trial_state == TrialState.waiting_for_poke_start:
+                if event == Event.poke_start:
+                    # Animal has nose-poked in an attempt to initiate a trial.
+                    self.trial_state = TrialState.waiting_for_poke_duration
+                    self.start_timer('poke_duration', Event.poke_duration_elapsed)
+                    # If the animal does not maintain the nose-poke long enough,
+                    # this value will get overwritten with the next nose-poke.
+                    self.trial_info['poke_start'] = timestamp
 
-        elif self.trial_state == TrialState.waiting_for_iti:
-            if event == Event.iti_duration_elapsed:
-                self.trial_state = TrialState.waiting_for_poke_start
+            elif self.trial_state == TrialState.waiting_for_poke_duration:
+                if event == Event.poke_end:
+                    # Animal has withdrawn from nose-poke too early. Cancel the
+                    # timer so that it does not fire a 'event_poke_duration_elapsed'.
+                    log.debug('Animal withdrew too early')
+                    self.timer.cancel()
+                    self.trial_state = TrialState.waiting_for_poke_start
+                elif event == Event.poke_duration_elapsed:
+                    if self.get_current_value('poke_hold_duration') <= 0 \
+                        or self.get_current_value('ttype') in ('NOGO', 'NOGO_REPEAT'):
+                        self.start_trial()
+                    else:
+                        log.debug('Starting trial: %s', self.get_current_value('ttype'))
+                        self.target_play()
+                        self.trial_state = TrialState.waiting_for_poke_hold_duration
+                        self.start_timer('poke_hold_duration', Event.poke_hold_duration_elapsed)
+
+            elif self.trial_state == TrialState.waiting_for_poke_hold_duration:
+                if event == Event.poke_end:
+                    log.debug('Animal withdrew too early during poke hold period')
+                    log.debug('Trial canceled')
+                    self.timer.cancel()
+                    self.trial_state = TrialState.waiting_for_poke_start
+                elif event == Event.poke_hold_duration_elapsed:
+                    self.trial_state = TrialState.waiting_for_hold_period
+                    self.start_timer('hold_duration', Event.hold_duration_elapsed)
+
+            elif self.trial_state == TrialState.waiting_for_hold_period:
+                # All animal-initiated events (poke/spout) are ignored during this
+                # period but we may choose to record the time of nose-poke withdraw
+                # if it occurs.
+                if event == Event.poke_end:
+                    # Record the time of nose-poke withdrawal if it is the first
+                    # time since initiating a trial.
+                    log.debug('Animal withdrew during hold period')
+                    if 'poke_end' not in self.trial_info:
+                        log.debug('Recording poke_end')
+                        self.trial_info['poke_end'] = timestamp
+                elif event == Event.hold_duration_elapsed:
+                    self.trial_state = TrialState.waiting_for_response
+                    self.start_timer('response_duration',
+                                     Event.response_duration_elapsed)
+
+            elif self.trial_state == TrialState.waiting_for_response:
+                # If the animal happened to initiate a nose-poke during the hold
+                # period above and is still maintaining the nose-poke, they have to
+                # manually withdraw and re-poke for us to process the event.
+                if event == Event.poke_end:
+                    # Record the time of nose-poke withdrawal if it is the first
+                    # time since initiating a trial.
+                    log.debug('Animal withdrew during response period')
+                    # self.start_timer('response_duration',
+                    #                  Event.response_duration_elapsed)
+                    if 'poke_end' not in self.trial_info:
+                        self.trial_info['poke_end'] = timestamp
+                elif event == Event.poke_start:
+                    self.timer.cancel();
+                    self.trial_info['response_ts'] = timestamp
+                    self.stop_trial(response='nose poke')
+                elif event == Event.spout_start:
+                    self.timer.cancel();
+                    self.trial_info['spout_start'] = timestamp
+                    self.trial_info['response_ts'] = timestamp
+                    self.stop_trial(response='spout contact')
+                # elif event == Event.spout_end:
+                #     pass
+                elif event == Event.response_duration_elapsed:
+                    self.timer.cancel();
+                    self.trial_info['response_ts'] = timestamp
+                    self.stop_trial(response='no response')
+
+            elif self.trial_state == TrialState.waiting_for_to:
+                if event == Event.to_duration_elapsed:
+                    # Turn the light back on
+                    self.switch_light(1)
+                    self.start_timer('iti_duration',
+                                     Event.iti_duration_elapsed)
+                    self.trial_state = TrialState.waiting_for_iti
+                elif event in (Event.spout_start, Event.poke_start):
+                    self.timer.cancel()
+                    self.start_timer('to_duration', Event.to_duration_elapsed)
+
+            elif self.trial_state == TrialState.waiting_for_iti:
+                if event == Event.iti_duration_elapsed:
+                    self.trial_state = TrialState.waiting_for_poke_start
 
         log.debug('Event handled')
 
@@ -725,6 +700,15 @@ class Controller(
     def set_target_level(self, level):
         self.check_level(level)
 
+    @on_trait_change('model.paradigm.experiment_mode')
+    def experiment_mode_change(self, object, name, old, new):
+        if new == 'Automatic':
+            self.trial_state = TrialState.waiting_for_poke_start
+        elif new == 'Stage 1 training':
+            self.trial_state = TrialState.waiting_for_response
+        elif new == 'Stage 2 training':
+            self.trial_state = TrialState.waiting_for_button
+
     # Only inform the user that the entered value is not allowed. The context
     # target and masker levels will not be changed, however, when outputting the
     # sounds the level limit is applied
@@ -737,6 +721,107 @@ class Controller(
         except:
             log.error(traceback.format_exc())
 
+    target_playing = False
+    target_offset = 0          # Relative offset
+    target_start_offset = 0    # Absolute offset where the target was started
+
+    def target_init(self, mode):
+        try:
+            if mode=='play' and self.target_playing:
+                log.debug('Target already playing')
+                return
+            if mode=='start' and self.target_playing:
+                log.debug('Target already started')
+                return
+            if mode=='stop' and not self.target_playing:
+                log.debug('Target already stopped')
+                return
+
+            log.debug('Initializing to %s the target', mode)
+            # Get the current position in the analog output buffer, and add a cetain
+            # update_delay (to give us time to generate and upload the new signal).
+            ts = self.get_ts()
+            ud = self.update_delay*1e-3 # Convert msec to sec
+            offset = int(round((ts+ud)*self.fs_ao))
+
+            # Insert the target at a specific phase of the modulated masker
+            masker_frequency = self.get_current_value('masker_frequency')
+            if mode=='play' and masker_frequency <> 0:
+                period = self.fs_ao/masker_frequency
+                phase_delay = self.get_current_value('phase_delay')/360.0*period
+                phase = (offset % self.masker.shape[-1]) % period
+                delay = phase_delay-phase
+                if delay<0: delay+=period
+                offset += int(delay)
+
+            # Generate target
+            if   mode=='play':
+                self.target_offset = 0
+                target_duration = self.get_current_value('target_duration')
+            elif mode=='start':
+                self.target_offset = 0
+                target_duration = 5   # sec, can be almost any value
+                self.target_start_offset = offset
+                self.target_playing = True
+            elif mode=='stop':
+                self.target_offset = offset - self.target_start_offset
+                target_duration = self.get_current_value('target_ramp_duration') * 1e-3
+                self.target_playing = False
+            else:
+                raise(ValueError('Wrong value given for the mode parameter. ' +
+                    'Should be "play", "start" or "stop"'))
+
+            target_duration = int(target_duration * self.fs_ao)
+            target = self.get_target(self.target_offset, target_duration)
+
+            # Ramp beginning and end of the target
+            target_ramp_length = self.get_current_value('target_ramp_duration') * 1e-3 * self.fs_ao
+            target_ramp_length = int(target_ramp_length)
+            if target_ramp_length <> 0:
+                target_ramp = np.sin(2*np.pi*1/target_ramp_length/4*np.arange(target_ramp_length))**2
+                if mode=='play' or mode=='start':
+                    target[0:target_ramp_length]      *= target_ramp
+                if mode=='play' or mode=='stop':
+                    target[:-target_ramp_length-1:-1] *= target_ramp
+
+            # Zero-pad if target is less than 1s
+            duration = target.shape[-1]
+            if duration < self.fs_ao:
+                target = np.concatenate([target, np.zeros(self.fs_ao-duration)])
+                duration = target.shape[-1]
+
+            # Combine target with masker and
+            log.debug('Inserting target at %f', offset / self.fs_ao)
+            log.debug('Overwriting %f samples in buffer', duration / self.fs_ao)
+            masker = self.get_masker(offset, duration)
+            signal = masker + target
+            self.engine.write_hw_ao(signal, offset)
+            self.masker_offset = offset + duration
+            if mode=='start': self.target_offset += target_duration
+
+            if mode=='play' or mode=='stop':
+                log.debug('Logging target epoch to HDF5')
+                if mode=='play':
+                    target_start = offset / self.fs_ao
+                    target_end = target_start + self.get_current_value('target_duration')
+                elif mode=='stop':
+                    target_start = self.target_start_offset / self.fs_ao
+                    target_end = (offset + target_ramp_length) / self.fs_ao
+                self.trial_info['target_start'] = target_start
+                self.trial_info['target_end'  ] = target_end
+                self.model.data.target_epoch.send([(target_start, target_end)])
+        except:
+            log.error(traceback.format_exc())
+
+    def target_play(self):
+        self.target_init('play')
+
+    def target_start(self):
+        self.target_init('start')
+
+    def target_stop(self):
+        self.target_init('stop')
+
     def get_masker(self, offset, duration):
         masker_level = self.get_current_value('masker_level')
         if masker_level < 0: masker_level = 0
@@ -747,6 +832,7 @@ class Controller(
         target_level = self.get_current_value('target_level')
         if target_level < 0: target_level = 0
         target_sf = 10.0**(-target_level/20.0)
+
         return self.get_cyclic(self.target, offset, duration) * target_sf
 
     def get_cyclic(self, signal, offset, duration):
@@ -770,8 +856,18 @@ class Controller(
                 break
         return np.concatenate(result, axis=-1)
 
-    def get_ts(self):
-        return self.engine.ao_sample_clock()/self.fs_ao
+    def switch_light(self, state):
+        self.engine.set_sw_do('light', 1 if state else 0)
+        ts = self.get_ts()
+        if not state:
+            if self.timeout_start_ts is not np.nan:
+                log.debug('Logging timeout epoch to HDF5')
+                self.model.data.timeout_epoch.send([(self.timeout_start_ts, np.nan)])
+            self.timeout_start_ts = ts
+        else:
+            log.debug('Logging timeout epoch to HDF5')
+            self.model.data.timeout_epoch.send([(self.timeout_start_ts, ts)])
+            self.timeout_start_ts = np.nan
 
 class Paradigm(
         PositiveCMRParadigmMixin,
@@ -784,11 +880,17 @@ class Paradigm(
     events, frequency of the stimulus, which speaker is active, etc.).
     '''
 
+    experiment_mode = Enum('Automatic', 'Stage 1 training', 'Stage 2 training')
+
+    toggle_target_button = Button('Toggle Target')
+    toggle_pump_button   = Button('Toggle Pump')
+    toggle_light_button  = Button('Toggle Light')
+
     # Parameters specific to the actual appetitive paradigm that are not needed
     # by the training program (and therefore not in the "mixin")
     traits_view = View(
             VGroup(
-                #'go_probability',
+                Item('experiment_mode'),
                 Include('constant_limits_paradigm_mixin_group'),
                 Include('abstract_positive_paradigm_group'),
                 Include('pump_paradigm_mixin_syringe_group'),
@@ -807,6 +909,12 @@ class Paradigm(
                 'target_ramp_duration',
                 'hw_att',
                 label='Sound',
+                ),
+            VGroup(
+                Item('toggle_target_button', show_label=False),
+                Item('toggle_pump_button'  , show_label=False),
+                Item('toggle_light_button' , show_label=False),
+                label='Manual',
                 ),
             )
 

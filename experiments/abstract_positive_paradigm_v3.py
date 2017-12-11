@@ -28,8 +28,6 @@ class AbstractPositiveParadigm(AbstractExperimentParadigm):
             'poke_duration',
             'poke_hold_duration',
             'phase_delay',
-            'pump_rate',
-            'reward_volume',
             'target_duration',
             label='Paradigm',
             show_border=True,
