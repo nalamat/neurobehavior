@@ -48,8 +48,8 @@ class ExperimentToolBar(ToolBar):
                         tooltip='Revert settings', **kw)
     start   = SVGButton('Run', filename=icons['start'],
                         tooltip='Begin experiment', **kw)
-    pause   = SVGButton('Pause', filename=icons['pause'],
-                        tooltip='Pause', **kw)
+    # pause   = SVGButton('Pause', filename=icons['pause'],
+    #                     tooltip='Pause', **kw)
     resume  = SVGButton('Resume', filename=icons['resume'],
                         tooltip='Resume', **kw)
     stop    = SVGButton('Stop', filename=icons['stop'],
@@ -79,12 +79,12 @@ class ExperimentToolBar(ToolBar):
                    Item('remind_nogo',
                         enabled_when="object.handler.state=='running' and not object.handler.remind_nogo_requested",
                         **item_kw),
-                #    Item('cancel_remind',
-                #         enabled_when="object.handler.state=='running' and object.handler.remind_requested",
-                #         **item_kw),
-                   Item('pause',
-                        enabled_when="object.handler.state=='running'",
-                        **item_kw),
+                   # Item('cancel_remind',
+                   #      enabled_when="object.handler.state=='running' and object.handler.remind_requested",
+                   #      **item_kw),
+                   # Item('pause',
+                   #      enabled_when="object.handler.state=='running'",
+                   #      **item_kw),
                    Item('resume',
                         enabled_when="object.handler.state=='paused'",
                         **item_kw),
