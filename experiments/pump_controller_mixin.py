@@ -26,7 +26,7 @@ class PumpToolBar(ToolBar):
     traits_view = View(
             HGroup(Item('pump_override', **item_kw),
                    Item('pump_trigger', **item_kw),
-                   enabled_when="object.handler.state<>'halted'",
+                   enabled_when="object.handler.state!='halted'",
                    show_labels=False,
                    ),
             )

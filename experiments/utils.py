@@ -11,7 +11,7 @@ log = logging.getLogger(__name__)
 def get_save_file(path, wildcard):
     wildcard_base = wildcard.split('|')[1][1:]
     fd = FileDialog(action='save as', default_directory=path, wildcard=wildcard)
-    if fd.open() == OK and fd.path <> '':
+    if fd.open() == OK and fd.path != '':
         if not fd.path.endswith(wildcard_base):
             fd.path += wildcard_base
         return fd.path
@@ -19,7 +19,7 @@ def get_save_file(path, wildcard):
 
 def load_instance(path, wildcard):
     fd = FileDialog(action='open', default_directory=path, wildcard=wildcard)
-    if fd.open() == OK and fd.path <> '':
+    if fd.open() == OK and fd.path != '':
         with open(fd.path, 'rb') as infile:
             return pickle.load(infile)
     else:

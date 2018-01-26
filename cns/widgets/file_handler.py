@@ -10,7 +10,7 @@ def get_save_file(path, wildcard):
     exts = wildcard.split('|')[1].split(';')
     exts = tuple([x[1:] for x in exts])
     fd = FileDialog(action='save as', default_directory=path, wildcard=wildcard)
-    if fd.open() == OK and fd.path <> '':
+    if fd.open() == OK and fd.path != '':
         if not fd.path.endswith(exts):
             fd.path += exts[0]
         return fd.path
@@ -69,7 +69,7 @@ class FileHandler(Controller):
         fd = FileDialog(action='open',
                         default_directory=self.path,
                         wildcard=self.wildcard)
-        if fd.open() == OK and fd.path <> '':
+        if fd.open() == OK and fd.path != '':
             log.debug('Loading %s', fd.path)
             try:
                 self.load_object(info, fd.path)

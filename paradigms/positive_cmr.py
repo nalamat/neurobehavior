@@ -194,7 +194,7 @@ class Controller(
             sf = 1/np.sqrt(np.mean(self.target**2)) # normalize by rms
             self.target *= sf
 
-            if masker_fs <> target_fs:
+            if masker_fs != target_fs:
                 raise Exception('Masker and target sampling frequencies do not match')
             self.fs_ao = masker_fs
 
@@ -276,11 +276,11 @@ class Controller(
             self.thread.start()
             self.trigger_next()
 
-            if self.engine.ai_sample_clock_rate() <> self.fs_ai:
+            if self.engine.ai_sample_clock_rate() != self.fs_ai:
                 raise Exception('The requested analog input sampling rate ' + \
                     'couldn\'t be accurately generated, please use a rate ' + \
                     'divisable by 100 MHz.')
-            if self.engine.ao_sample_clock_rate() <> self.fs_ao:
+            if self.engine.ao_sample_clock_rate() != self.fs_ao:
                 raise Exception('The requested analog output sampling rate ' + \
                     'couldn''t be accurately generated, please use a rate ' + \
                     'divisable by 100 MHz.')
@@ -349,18 +349,18 @@ class Controller(
 
     @on_trait_change('model.paradigm.toggle_target_button')
     def toggle_target_button(self):
-        if self.state <> 'running': return
+        if self.state != 'running': return
         if self.target_playing: self.target_stop()
         else: self.target_start()
 
     @on_trait_change('model.paradigm.toggle_pump_button')
     def toggle_pump_button(self):
-        if self.state <> 'running': return
+        if self.state != 'running': return
         self.pump_override()
 
     @on_trait_change('model.paradigm.toggle_light_button')
     def toggle_light_button(self):
-        if self.state <> 'running': return
+        if self.state != 'running': return
         state = self.engine.get_sw_do('light')
         self.switch_light(1 - state)
 
@@ -746,7 +746,7 @@ class Controller(
 
             # Insert the target at a specific phase of the modulated masker
             masker_frequency = self.get_current_value('masker_frequency')
-            if mode=='play' and masker_frequency <> 0:
+            if mode=='play' and masker_frequency != 0:
                 period = self.fs_ao/masker_frequency
                 phase_delay = self.get_current_value('phase_delay')/360.0*period
                 phase = (offset % self.masker.shape[-1]) % period
@@ -777,7 +777,7 @@ class Controller(
             # Ramp beginning and end of the target
             target_ramp_length = self.get_current_value('target_ramp_duration') * 1e-3 * self.fs_ao
             target_ramp_length = int(target_ramp_length)
-            if target_ramp_length <> 0:
+            if target_ramp_length != 0:
                 target_ramp = np.sin(2*np.pi*1/target_ramp_length/4*np.arange(target_ramp_length))**2
                 if mode=='play' or mode=='start':
                     target[0:target_ramp_length]      *= target_ramp
