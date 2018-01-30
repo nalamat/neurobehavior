@@ -430,15 +430,15 @@ class Controller(
 
     def samples_needed(self, names, offset, samples):
         if samples > 5*self.fs_ao: samples = 5*self.fs_ao
-        signal = self.get_masker(self.masker_offset, samples)
-        self.masker_offset += samples
+        signal = self.get_masker(offset, samples)
+        self.masker_offset = offset + samples
         if self.target_playing:
             signal += self.get_target(self.target_offset, samples)
             self.target_offset += samples
         log.debug('Samples needed at offset %f for duration %f',
                 offset / self.fs_ao, samples / self.fs_ao)
         try:
-            self.engine.write_hw_ao(signal)
+            self.engine.write_hw_ao(signal, offset)
         except:
             log.error(traceback.format_exc())
 
