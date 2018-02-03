@@ -429,14 +429,14 @@ class Controller(
         self.model.data.spout.send(spout)
 
     def samples_needed(self, names, offset, samples):
-        if samples > 5*self.fs_ao: samples = 5*self.fs_ao
+        # if samples > 5*self.fs_ao: samples = 5*self.fs_ao
         signal = self.get_masker(offset, samples)
         self.masker_offset = offset + samples
         if self.target_playing:
             signal += self.get_target(self.target_offset, samples)
             self.target_offset += samples
-        log.debug('Samples needed at offset %f for duration %f',
-                offset / self.fs_ao, samples / self.fs_ao)
+        log.debug('Samples needed at offset %f for duration %f, target %s',
+                offset / self.fs_ao, samples / self.fs_ao, 'on' if self.target_playing else 'off')
         try:
             self.engine.write_hw_ao(signal, offset)
         except:
@@ -740,9 +740,9 @@ class Controller(
             log.debug('Initializing to %s the target', mode)
             # Get the current position in the analog output buffer, and add a cetain
             # update_delay (to give us time to generate and upload the new signal).
-            ts = self.get_ts()
-            ud = self.update_delay*1e-3 # Convert msec to sec
-            offset = int(round((ts+ud)*self.fs_ao))
+            ts = self.get_ts()                         # Sec
+            ud = self.update_delay*1e-3                # Convert msec to sec
+            offset = int(round((ts+ud)*self.fs_ao))    # Convert sec to samples
 
             # Insert the target at a specific phase of the modulated masker
             masker_frequency = self.get_current_value('masker_frequency')
@@ -760,23 +760,22 @@ class Controller(
                 target_duration = self.get_current_value('target_duration')
             elif mode=='start':
                 self.target_offset = 0
-                target_duration = 5   # sec, can be almost any value
+                target_duration = self.engine.hw_ao_monitor_period   # Sec
                 self.target_start_offset = offset
                 self.target_playing = True
             elif mode=='stop':
                 self.target_offset = offset - self.target_start_offset
-                target_duration = self.get_current_value('target_ramp_duration') * 1e-3
+                target_duration = self.get_current_value('target_ramp_duration') * 1e-3    # Sec
                 self.target_playing = False
             else:
                 raise(ValueError('Wrong value given for the mode parameter. ' +
                     'Should be "play", "start" or "stop"'))
 
-            target_duration = int(target_duration * self.fs_ao)
+            target_duration = int(target_duration * self.fs_ao)    # Convert sec to samples
             target = self.get_target(self.target_offset, target_duration)
 
             # Ramp beginning and end of the target
-            target_ramp_length = self.get_current_value('target_ramp_duration') * 1e-3 * self.fs_ao
-            target_ramp_length = int(target_ramp_length)
+            target_ramp_length = int(self.get_current_value('target_ramp_duration') * 1e-3 * self.fs_ao)    # Samples
             if target_ramp_length != 0:
                 target_ramp = np.sin(2*np.pi*1/target_ramp_length/4*np.arange(target_ramp_length))**2
                 if mode=='play' or mode=='start':
@@ -784,10 +783,11 @@ class Controller(
                 if mode=='play' or mode=='stop':
                     target[:-target_ramp_length-1:-1] *= target_ramp
 
-            # Zero-pad if target is less than 1s
-            duration = target.shape[-1]
-            if duration < self.fs_ao:
-                target = np.concatenate([target, np.zeros(self.fs_ao-duration)])
+            # Zero-pad if target is less than minimum update duration
+            duration = target.shape[-1]    # Samples
+            duration_min = self.engine.hw_ao_monitor_period*self.fs_ao    # Samples
+            if duration < duration_min:
+                target = np.concatenate([target, np.zeros(duration_min-duration)])
                 duration = target.shape[-1]
 
             # Combine target with masker and
